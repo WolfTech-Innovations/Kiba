@@ -1,0 +1,929 @@
+name: "KibaOS Build"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 2 * * 0'
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker system prune -af --volumes
+
+      - name: Create build script
+        run: |
+          cat > build.sh << 'BUILD_SCRIPT_EOF'
+          #!/bin/bash
+          set -ex
+          export DEBIAN_FRONTEND=noninteractive
+
+          # Install live-build
+          apt-get update && apt-get install -y \
+            live-build debootstrap xorriso git
+
+          cd /w
+          ISO="kibaos-v${RUN_NUM}"
+
+          echo "=== Configuring live-build ==="
+
+          lb config \
+            --distribution trixie \
+            --architectures amd64 \
+            --archive-areas "main contrib non-free non-free-firmware" \
+            --debian-installer live \
+            --debian-installer-gui false \
+            --binary-images iso-hybrid \
+            --mode debian \
+            --system live \
+            --linux-flavours amd64 \
+            --linux-packages "linux-image linux-headers" \
+            --bootappend-live "boot=live components quiet splash" \
+            --bootappend-install "auto=true priority=critical" \
+            --iso-application "KibaOS" \
+            --iso-volume "KIBAOS" \
+            --apt-options "--yes --no-install-recommends"
+
+          echo "=== Adding packages ==="
+
+          mkdir -p config/package-lists
+          cat > config/package-lists/kde.list.chroot << 'PACKAGES'
+          # Base system
+          linux-image-amd64
+          firmware-linux-free
+          firmware-linux-nonfree
+          systemd-sysv
+          sudo
+          ca-certificates
+          openssl
+
+          # Network
+          network-manager
+          wpasupplicant
+          wget
+          curl
+
+          # KDE Plasma 6 (Debian 13 trixie)
+          kde-plasma-desktop
+          plasma-desktop
+          plasma-workspace
+          sddm
+          sddm-theme-debian-breeze
+          kde-standard
+          plasma-nm
+          plasma-pa
+          plasma-firewall
+          dolphin
+          konsole
+          kate
+          ark
+          okular
+          gwenview
+          spectacle
+          kcalc
+          kdeconnect
+          qt6-svg-plugins
+          desktop-file-utils
+
+          # Shell - zsh
+          zsh
+          zsh-autosuggestions
+          zsh-syntax-highlighting
+
+          # Boot splash
+          plymouth
+          plymouth-themes
+          kde-config-plymouth
+
+          # Essential apps
+          firefox-esr
+          vlc
+          calamares
+          calamares-settings-debian
+
+          # Essential tools
+          nano
+          gparted
+          htop
+
+          # Filesystems
+          ntfs-3g
+          exfatprogs
+
+          # Boot loader
+          grub-efi-amd64
+          grub-pc-bin
+          PACKAGES
+
+          echo "=== Creating live customization hook ==="
+
+          mkdir -p config/hooks/live
+          cat > config/hooks/live/0100-customize.hook.chroot << 'HOOK'
+          #!/bin/bash
+          set -e
+
+          # ── Plymouth theme setup ──────────────────────────────────────────
+
+          mkdir -p /usr/share/kibaos
+          mkdir -p /usr/share/plymouth/themes/kibaos-spinner
+
+          # Embed boot logo as base64 and decode it directly — no network needed
+          cat > /tmp/logo_b64.txt << 'LOGO_B64'
+          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
+          LOGO_B64
+
+          base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
+          rm /tmp/logo_b64.txt
+
+          # Plymouth theme config
+          cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth << 'PLYMOUTH_THEME'
+          [Plymouth Theme]
+          Name=KibaOS Spinner
+          Description=KibaOS boot splash
+          ModuleName=script
+
+          [script]
+          ImageDir=/usr/share/plymouth/themes/kibaos-spinner
+          ScriptFile=/usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
+          PLYMOUTH_THEME
+
+          cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script << 'PLYMOUTH_SCRIPT'
+          Window.SetBackgroundTopColor(0.04, 0.04, 0.08);
+          Window.SetBackgroundBottomColor(0.02, 0.02, 0.06);
+
+          logo.image = Image("watermark.png");
+          logo.sprite = Sprite(logo.image);
+          logo.x = Window.GetX() + Window.GetWidth()  / 2 - logo.image.GetWidth()  / 2;
+          logo.y = Window.GetY() + Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 80;
+          logo.sprite.SetPosition(logo.x, logo.y, 0);
+
+          for (i = 0; i < 32; i++) {
+              spinner_image[i] = Image("spinner-" + i + ".png");
+          }
+          spinner.sprite = Sprite();
+          spinner.frame = 0;
+          spinner.x = Window.GetX() + Window.GetWidth()  / 2 - spinner_image[0].GetWidth()  / 2;
+          spinner.y = logo.y + logo.image.GetHeight() + 40;
+          spinner.sprite.SetPosition(spinner.x, spinner.y, 1);
+
+          fun progress_callback(duration, progress) {
+              spinner.frame = Math.Int(progress * 32) % 32;
+              spinner.sprite.SetImage(spinner_image[spinner.frame]);
+          }
+          Plymouth.SetRefreshFunction(progress_callback);
+
+          message_sprite = Sprite();
+          message_sprite.SetPosition(10, 10, 10000);
+          fun message_callback(text) {
+              message_image = Image.Text(text, 1, 1, 1);
+              message_sprite.SetImage(message_image);
+          }
+          Plymouth.SetMessageFunction(message_callback);
+          PLYMOUTH_SCRIPT
+
+          cp /usr/share/kibaos/logo.png \
+             /usr/share/plymouth/themes/kibaos-spinner/watermark.png
+
+          # Borrow spinner frames from the default spinner theme if available
+          if [ -d /usr/share/plymouth/themes/spinner ]; then
+              cp /usr/share/plymouth/themes/spinner/spinner-*.png \
+                 /usr/share/plymouth/themes/kibaos-spinner/ 2>/dev/null || true
+          fi
+
+          update-alternatives --install \
+            /usr/share/plymouth/themes/default.plymouth default.plymouth \
+            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100
+          update-alternatives --set default.plymouth \
+            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth
+
+          # ── GRUB branding ─────────────────────────────────────────────────
+
+          cat >> /etc/default/grub << 'GRUB_CONFIG'
+
+          # KibaOS GRUB Branding
+          GRUB_DISTRIBUTOR="KibaOS"
+          GRUB_TIMEOUT=5
+          GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+          GRUB_CMDLINE_LINUX=""
+          GRUB_GFXMODE=1920x1080,1280x720,auto
+          GRUB_COLOR_NORMAL="white/black"
+          GRUB_COLOR_HIGHLIGHT="black/white"
+          GRUB_CONFIG
+
+          cat > /etc/grub.d/40_custom << 'GRUB_CUSTOM'
+          #!/bin/sh
+          exec tail -n +3 $0
+          # KibaOS GRUB entries
+
+          menuentry 'KibaOS' --class kibaos --class gnu-linux --class gnu --class os {
+              load_video
+              insmod gzio
+              insmod part_gpt
+              insmod part_msdos
+              insmod ext2
+              search --no-floppy --fs-uuid --set=root $root_uuid
+              echo 'Loading KibaOS kernel...'
+              linux /vmlinuz root=UUID=$root_uuid ro quiet splash
+              echo 'Loading initial ramdisk...'
+              initrd /initrd.img
+          }
+
+          menuentry 'KibaOS — Advanced Options' --class kibaos --class gnu-linux --class gnu --class os {
+              load_video
+              insmod gzio
+              insmod part_gpt
+              insmod part_msdos
+              insmod ext2
+              search --no-floppy --fs-uuid --set=root $root_uuid
+              echo 'Loading KibaOS kernel (recovery)...'
+              linux /vmlinuz root=UUID=$root_uuid ro recovery nomodeset
+              echo 'Loading initial ramdisk...'
+              initrd /initrd.img
+          }
+          GRUB_CUSTOM
+          chmod +x /etc/grub.d/40_custom
+
+          # ── SDDM autologin for live session ───────────────────────────────
+
+          mkdir -p /etc/sddm.conf.d
+          cat > /etc/sddm.conf.d/autologin.conf << 'SDDM_CONF'
+          [Autologin]
+          User=user
+          Session=plasma
+          SDDM_CONF
+
+          # ── Default shell: zsh ────────────────────────────────────────────
+
+          # Set zsh as default for live user and root
+          chsh -s /bin/zsh user  2>/dev/null || true
+          chsh -s /bin/zsh root  2>/dev/null || true
+
+          # Minimal zsh config with autosuggestions + syntax highlighting
+          cat > /etc/zsh/zshrc << 'ZSHRC'
+          # KibaOS system-wide zshrc
+          export LANG=en_US.UTF-8
+          export EDITOR=nano
+
+          # History
+          HISTSIZE=10000
+          SAVEHIST=10000
+          HISTFILE=~/.zsh_history
+          setopt SHARE_HISTORY
+          setopt HIST_IGNORE_DUPS
+
+          # Completion
+          autoload -Uz compinit && compinit
+          zstyle ':completion:*' menu select
+
+          # Prompt
+          autoload -Uz vcs_info
+          precmd() { vcs_info }
+          PROMPT='%F{#1e90ff}%n@%m%f %F{#ffffff}%~%f %F{#1e90ff}❯%f '
+
+          # Plugins (packaged by Debian)
+          source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh 2>/dev/null || true
+          source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh 2>/dev/null || true
+
+          # Aliases
+          alias ls='ls --color=auto'
+          alias ll='ls -lah'
+          alias update='sudo apt update && sudo apt upgrade -y'
+          alias install='sudo apt install'
+          ZSHRC
+
+          # ── Live user setup ───────────────────────────────────────────────
+
+          if ! id -u user >/dev/null 2>&1; then
+            useradd -m -s /bin/zsh -G sudo,audio,video,netdev,plugdev user
+            echo "user:live" | chpasswd
+          else
+            usermod -s /bin/zsh user
+          fi
+
+          echo "user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/live-user
+          chmod 440 /etc/sudoers.d/live-user
+
+          # ── Dracula color scheme + KDE rounded corners ────────────────────
+          # Official Dracula palette (draculatheme.com/spec):
+          #   Background  #282a36  ( 40, 42, 54)
+          #   CurrentLine #44475a  ( 68, 71, 90)
+          #   Foreground  #f8f8f2  (248,248,242)
+          #   Comment     #6272a4  ( 98,114,164)
+          #   Cyan        #8be9fd  (139,233,253)
+          #   Green       #50fa7b  ( 80,250,123)
+          #   Orange      #ffb86c  (255,184,108)
+          #   Pink        #ff79c6  (255,121,198)
+          #   Purple      #bd93f9  (189,147,249)
+          #   Red         #ff5555  (255, 85, 85)
+          #   Yellow      #f1fa8c  (241,250,140)
+          # Written into /etc/skel so every user inherits on first login.
+
+          SKEL_KDE=/etc/skel/.config
+          mkdir -p "$SKEL_KDE"
+
+          # ── 1. Dracula KDE color scheme file ──────────────────────────────
+          mkdir -p /usr/share/color-schemes
+          cat > /usr/share/color-schemes/Dracula.colors << 'DRACULA_COLORS'
+          [ColorEffects:Disabled]
+          ChangeSelectionColor=true
+          Color=56,56,56
+          ColorAmount=0
+          ColorEffect=0
+          ContrastAmount=0.65
+          ContrastEffect=1
+          IntensityAmount=0.1
+          IntensityEffect=2
+
+          [ColorEffects:Inactive]
+          ChangeSelectionColor=true
+          Color=112,111,110
+          ColorAmount=0.025
+          ColorEffect=2
+          ContrastAmount=0.1
+          ContrastEffect=2
+          Enable=false
+          IntensityAmount=0
+          IntensityEffect=0
+
+          [Colors:Button]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=68,71,90
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Complementary]
+          BackgroundAlternate=40,42,54
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Header]
+          BackgroundAlternate=40,42,54
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Selection]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=189,147,249
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=40,42,54
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Tooltip]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:View]
+          BackgroundAlternate=40,42,54
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Window]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [General]
+          ColorScheme=Dracula
+          Name=Dracula
+          shadeSortColumn=true
+
+          [KDE]
+          contrast=4
+          DRACULA_COLORS
+
+          # ── 2. Dracula Konsole color scheme ───────────────────────────────
+          mkdir -p /usr/share/konsole
+          cat > /usr/share/konsole/Dracula.colorscheme << 'KONSOLE_COLORS'
+          [Background]
+          Color=40,42,54
+
+          [BackgroundFaint]
+          Color=40,42,54
+
+          [BackgroundIntense]
+          Color=40,42,54
+
+          [Color0]
+          Color=40,42,54
+
+          [Color0Faint]
+          Color=40,42,54
+
+          [Color0Intense]
+          Color=68,71,90
+
+          [Color1]
+          Color=255,85,85
+
+          [Color1Faint]
+          Color=255,85,85
+
+          [Color1Intense]
+          Color=255,85,85
+
+          [Color2]
+          Color=80,250,123
+
+          [Color2Faint]
+          Color=80,250,123
+
+          [Color2Intense]
+          Color=80,250,123
+
+          [Color3]
+          Color=241,250,140
+
+          [Color3Faint]
+          Color=241,250,140
+
+          [Color3Intense]
+          Color=241,250,140
+
+          [Color4]
+          Color=189,147,249
+
+          [Color4Faint]
+          Color=189,147,249
+
+          [Color4Intense]
+          Color=189,147,249
+
+          [Color5]
+          Color=255,121,198
+
+          [Color5Faint]
+          Color=255,121,198
+
+          [Color5Intense]
+          Color=255,121,198
+
+          [Color6]
+          Color=139,233,253
+
+          [Color6Faint]
+          Color=139,233,253
+
+          [Color6Intense]
+          Color=139,233,253
+
+          [Color7]
+          Color=248,248,242
+
+          [Color7Faint]
+          Color=248,248,242
+
+          [Color7Intense]
+          Color=248,248,242
+
+          [Foreground]
+          Color=248,248,242
+
+          [ForegroundFaint]
+          Color=98,114,164
+
+          [ForegroundIntense]
+          Color=248,248,242
+
+          [General]
+          Anchor=0.5,0.5
+          Blur=false
+          ColorRandomization=false
+          Description=Dracula
+          FillStyle=Tile
+          Opacity=0.95
+          Wallpaper=
+          KONSOLE_COLORS
+
+          # ── 3. Konsole default profile pointing at Dracula ─────────────────
+          mkdir -p /etc/skel/.local/share/konsole
+          cat > /etc/skel/.local/share/konsole/KibaOS.profile << 'KONSOLE_PROFILE'
+          [Appearance]
+          ColorScheme=Dracula
+          Font=Monospace,11,-1,5,50,0,0,0,0,0
+
+          [General]
+          Command=/bin/zsh
+          Name=KibaOS
+          Parent=FALLBACK/
+          TerminalColumns=100
+          TerminalRows=30
+
+          [Scrolling]
+          ScrollBarPosition=2
+          KONSOLE_PROFILE
+
+          cat > /etc/skel/.local/share/konsole/konsolerc << 'KONSOLERC'
+          [Desktop Entry]
+          DefaultProfile=KibaOS.profile
+          KONSOLERC
+
+          # ── 4. KDE global settings — Dracula everywhere ───────────────────
+          cat > "$SKEL_KDE/kdeglobals" << 'KDEGLOBALS'
+          [ColorEffects:Disabled]
+          ChangeSelectionColor=true
+          Color=56,56,56
+          ColorAmount=0
+          ColorEffect=0
+          ContrastAmount=0.65
+          ContrastEffect=1
+          IntensityAmount=0.1
+          IntensityEffect=2
+
+          [ColorEffects:Inactive]
+          Enable=false
+
+          [Colors:Button]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=68,71,90
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Selection]
+          BackgroundNormal=189,147,249
+          BackgroundAlternate=68,71,90
+          ForegroundNormal=40,42,54
+          ForegroundInactive=98,114,164
+          ForegroundActive=248,248,242
+
+          [Colors:View]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=40,42,54
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+
+          [Colors:Window]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=68,71,90
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+
+          [Colors:Tooltip]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=68,71,90
+          ForegroundNormal=248,248,242
+
+          [Colors:Complementary]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=40,42,54
+          ForegroundNormal=248,248,242
+
+          [Colors:Header]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=40,42,54
+          ForegroundNormal=248,248,242
+
+          [General]
+          ColorScheme=Dracula
+          Name=Dracula
+          widgetStyle=Breeze
+          shadeSortColumn=true
+
+          [Icons]
+          Theme=breeze-dark
+
+          [KDE]
+          LookAndFeelPackage=org.kde.breezedark.desktop
+          SingleClick=false
+          contrast=4
+
+          [WM]
+          activeBackground=40,42,54
+          activeBlend=189,147,249
+          activeForeground=248,248,242
+          activeFrame=40,42,54
+          inactiveBackground=40,42,54
+          inactiveBlend=68,71,90
+          inactiveForeground=98,114,164
+          inactiveFrame=40,42,54
+          KDEGLOBALS
+
+          # ── 5. KWin: compositing + rounded corners (12px) ─────────────────
+          cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
+          [Compositing]
+          Enabled=true
+          Backend=OpenGL
+          GLCore=true
+          HiddenPreviews=5
+          OpenGLIsUnsafe=false
+
+          [Effect-overview]
+          BorderActivate=7
+
+          [Plugins]
+          blurEnabled=true
+          contrastEnabled=true
+          kwin4_effect_dimscreenEnabled=false
+          slideEnabled=true
+          wobblywindowsEnabled=false
+
+          [Windows]
+          RoundedCorners=true
+
+          [org.kde.kdecoration2]
+          ButtonsOnLeft=
+          ButtonsOnRight=IAX
+          library=org.kde.breeze
+          theme=__aurorae__svg__Dracula
+          BorderSize=None
+          BorderSizeAuto=false
+
+          [Script-roundedwindows]
+          CornerRadius=12
+          KWINRC
+
+          # ── 6. Breeze decoration: Dracula shadow colour ───────────────────
+          cat > "$SKEL_KDE/breezerc" << 'BREEZERC'
+          [Windeco Exception 0]
+          BorderSize=None
+          Enabled=true
+          ExceptionPattern=.*
+          ExceptionType=0
+          HideTitleBar=false
+          Mask=2
+
+          [Common]
+          ShadowColor=189,147,249
+          ShadowSize=ShadowVeryLarge
+          ShadowStrength=80
+          BREEZERC
+
+          # ── 7. Plasma panel: Breeze Dark theme + floating ─────────────────
+          cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
+          [Theme]
+          name=breeze-dark
+
+          [PlasmaTabletMode]
+          TabletMode=off
+          PLASMARC
+
+          cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
+          [PlasmaViews][Panel 2][Defaults]
+          thickness=44
+
+          [PlasmaViews][Panel 2][Horizontal1920]
+          thickness=44
+          PLASMASHELLRC
+
+          mkdir -p "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc.d"
+          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
+          [Containments][2]
+          activityId=
+          formfactor=2
+          immutability=1
+          lastScreen=0
+          location=4
+          plugin=org.kde.panel
+          wallpaperplugin=org.kde.image
+
+          [Containments][2][General]
+          floating=1
+          PANELRC
+
+          # ── 8. Update Plymouth background to Dracula #282a36 ──────────────
+          # Patch the existing script's background colours
+          sed -i \
+            's/Window.SetBackgroundTopColor(0.04, 0.04, 0.08)/Window.SetBackgroundTopColor(0.157, 0.165, 0.212)/' \
+            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
+          sed -i \
+            's/Window.SetBackgroundBottomColor(0.02, 0.02, 0.06)/Window.SetBackgroundBottomColor(0.157, 0.165, 0.212)/' \
+            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
+
+          # ── 9. Copy skel → live user ──────────────────────────────────────
+          cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
+          chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
+
+          # ── Services ──────────────────────────────────────────────────────
+
+          systemctl enable sddm          || true
+          systemctl enable NetworkManager || true
+          systemctl enable plymouth      || true
+
+          # ── System identity ───────────────────────────────────────────────
+
+          echo "kibaos-live" > /etc/hostname
+
+          cat > /etc/os-release << 'EOF'
+          NAME="KibaOS"
+          ID=kibaos
+          ID_LIKE=debian
+          VERSION_ID="1.0"
+          PRETTY_NAME="KibaOS 1.0"
+          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          EOF
+
+          cat > /etc/issue << 'EOF'
+          KibaOS \r (\l)
+
+          EOF
+
+          cat > /etc/motd << 'EOF'
+
+           _  ___ _             ___  ____
+          | |/ (_) |__   __ _ / _ \/ ___|
+          | ' /| | '_ \ / _` | | | \___ \
+          | . \| | |_) | (_| | |_| |___) |
+          |_|\_\_|_.__/ \__,_|\___/|____/
+
+          Welcome to KibaOS — built on Debian 13 Trixie
+
+          EOF
+          HOOK
+
+          chmod +x config/hooks/live/0100-customize.hook.chroot
+
+          echo "=== Creating Calamares config ==="
+
+          # Basic Calamares branding
+          mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
+          cat > config/includes.chroot/etc/calamares/branding/kibaos/branding.desc << 'BRANDING'
+          componentName: kibaos
+          welcomeStyleCalamares: true
+          welcomeExpandingLogo: true
+          strings:
+            productName: KibaOS
+            shortProductName: KibaOS
+            version: "1.0"
+            shortVersion: "1.0"
+            versionedName: "KibaOS 1.0"
+            shortVersionedName: "KibaOS 1.0"
+            bootloaderEntryName: KibaOS
+            productUrl: https://github.com/WolfTech-Innovations/kibaos
+            supportUrl: https://github.com/WolfTech-Innovations/kibaos/issues
+            knownIssuesUrl: https://github.com/WolfTech-Innovations/kibaos/issues
+            releaseNotesUrl: https://github.com/WolfTech-Innovations/kibaos
+          images:
+            productLogo: logo.png
+            productIcon: logo.png
+            productWelcome: welcome.png
+          slideshow: show.qml
+          BRANDING
+
+          # Copy logo into Calamares branding
+          mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
+          cat > config/hooks/live/0110-calamares-branding.hook.chroot << 'BRANDING_HOOK'
+          #!/bin/bash
+          set -e
+          mkdir -p /etc/calamares/branding/kibaos
+          cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
+          cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
+
+          # Point Calamares at our branding
+          if [ -f /etc/calamares/settings.conf ]; then
+            sed -i 's/branding: .*/branding: kibaos/' /etc/calamares/settings.conf
+          fi
+          BRANDING_HOOK
+          chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
+
+          echo "=== Building ISO ==="
+
+          lb build 2>&1 | tee build.log
+
+          if [ -f live-image-amd64.hybrid.iso ]; then
+            mv live-image-amd64.hybrid.iso "${ISO}.iso"
+            sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
+            echo ""
+            echo "═══ KibaOS Build Complete ═══"
+            ls -lh "${ISO}.iso"
+          else
+            echo "ERROR: ISO file not found!"
+            exit 1
+          fi
+          BUILD_SCRIPT_EOF
+
+          chmod +x build.sh
+
+      - name: Run build in Docker
+        run: |
+          docker run --rm --privileged \
+            -v "$PWD:/w" \
+            -e RUN_NUM="${{ github.run_number }}" \
+            debian:trixie \
+            /w/build.sh
+
+      - name: Upload to SourceForge
+        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        env:
+          SF_USER: ${{ secrets.SF_USER }}
+          SF_PASS: ${{ secrets.SF_PASS }}
+        run: |
+          if [ -z "$SF_USER" ] || [ -z "$SF_PASS" ]; then
+            echo "SourceForge credentials not configured. Skipping upload."
+            exit 0
+          fi
+
+          sudo apt-get update
+          sudo apt-get install -y sshpass rsync
+
+          for iso_file in *.iso; do
+            [ -f "$iso_file" ] || continue
+            echo "Uploading $iso_file to SourceForge..."
+            for attempt in 1 2 3; do
+              if sshpass -p "$SF_PASS" rsync -avP \
+                -e "ssh -o StrictHostKeyChecking=no" \
+                "$iso_file" \
+                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"; then
+                echo "Successfully uploaded $iso_file"
+                break
+              else
+                echo "Upload attempt $attempt failed, retrying in 30s..."
+                sleep 30
+              fi
+            done
+          done
