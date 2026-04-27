@@ -2,10 +2,6 @@ name: "KibaOS Build"
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main, develop]
-  schedule:
-    - cron: '0 2 * * 0'
 
 jobs:
   build-and-upload:
@@ -72,6 +68,7 @@ jobs:
           wpasupplicant
           wget
           curl
+          git
 
           # KDE Plasma 6 (Debian 13 trixie)
           kde-plasma-desktop
@@ -89,11 +86,12 @@ jobs:
           ark
           okular
           gwenview
-          spectacle
+          kde-spectacle
           kcalc
-          kdeconnect
           qt6-svg-plugins
           desktop-file-utils
+          plasma-widgets-addons
+          kdeplasma-addons
 
           # Shell - zsh
           zsh
@@ -123,6 +121,28 @@ jobs:
           # Boot loader
           grub-efi-amd64
           grub-pc-bin
+
+          # CachyOS kernel build deps
+          build-essential
+          libncurses-dev
+          gawk
+          flex
+          bison
+          openssl
+          libssl-dev
+          dkms
+          libelf-dev
+          libudev-dev
+          libpci-dev
+          libiberty-dev
+          autoconf
+          bc
+          rsync
+          kmod
+          cpio
+          python3
+          debhelper
+          fakeroot
           PACKAGES
 
           echo "=== Creating live customization hook ==="
@@ -139,13 +159,13 @@ jobs:
 
           # Embed boot logo as base64 and decode it directly — no network needed
           cat > /tmp/logo_b64.txt << 'LOGO_B64'
-          iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGAOq9/d1w4Q8QEAAHNZ9Q6/ZoCIDwAAmNNqd/m1AkR8AADA3Fa5068RIOIDAAD2YfG7/dIBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAADH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABce6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyAgQAAAg81mAeP0KAABYwh9tYQICAABkBAgAAJARIAAAQEaAAAAAGQECAABkBAgAAJC5DRCvXwEAAEv6rTFMQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADICBAAACAjQAAAgIwAAQAAMgIEAADI/HU6nT62PgQAAHAIHyYgAABARoAAAAAZAQIAAGQECAAAkBEgAABARoAAAACZS4D4Kl4AAGBNH6eTCQgAABASIAAAQEaAAAAAmesAsQcCAACs4WdrmIAAAAAZAQIAAGQECAAAkLkNEHsgAADAkn5rDBMQAAAgI0AAAIDMZwHiNSwAAGAJf7SFCQgAAJARIAAAQOarAPEaFgAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41X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
           LOGO_B64
 
           base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
           rm /tmp/logo_b64.txt
 
-          # Plymouth theme config
+          # Plymouth theme config — Dracula indigo background (#282a36)
           cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth << 'PLYMOUTH_THEME'
           [Plymouth Theme]
           Name=KibaOS Spinner
@@ -157,9 +177,10 @@ jobs:
           ScriptFile=/usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
           PLYMOUTH_THEME
 
+          # Midnight indigo = Dracula #282a36 = (0.157, 0.165, 0.212)
           cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script << 'PLYMOUTH_SCRIPT'
-          Window.SetBackgroundTopColor(0.04, 0.04, 0.08);
-          Window.SetBackgroundBottomColor(0.02, 0.02, 0.06);
+          Window.SetBackgroundTopColor(0.157, 0.165, 0.212);
+          Window.SetBackgroundBottomColor(0.157, 0.165, 0.212);
 
           logo.image = Image("watermark.png");
           logo.sprite = Sprite(logo.image);
@@ -206,6 +227,9 @@ jobs:
           update-alternatives --set default.plymouth \
             /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth
 
+          # Rebuild initramfs so plymouth theme actually loads on boot
+          update-initramfs -u -k all || update-initramfs -u
+
           # ── GRUB branding ─────────────────────────────────────────────────
 
           cat >> /etc/default/grub << 'GRUB_CONFIG'
@@ -220,39 +244,6 @@ jobs:
           GRUB_COLOR_HIGHLIGHT="black/white"
           GRUB_CONFIG
 
-          cat > /etc/grub.d/40_custom << 'GRUB_CUSTOM'
-          #!/bin/sh
-          exec tail -n +3 $0
-          # KibaOS GRUB entries
-
-          menuentry 'KibaOS' --class kibaos --class gnu-linux --class gnu --class os {
-              load_video
-              insmod gzio
-              insmod part_gpt
-              insmod part_msdos
-              insmod ext2
-              search --no-floppy --fs-uuid --set=root $root_uuid
-              echo 'Loading KibaOS kernel...'
-              linux /vmlinuz root=UUID=$root_uuid ro quiet splash
-              echo 'Loading initial ramdisk...'
-              initrd /initrd.img
-          }
-
-          menuentry 'KibaOS — Advanced Options' --class kibaos --class gnu-linux --class gnu --class os {
-              load_video
-              insmod gzio
-              insmod part_gpt
-              insmod part_msdos
-              insmod ext2
-              search --no-floppy --fs-uuid --set=root $root_uuid
-              echo 'Loading KibaOS kernel (recovery)...'
-              linux /vmlinuz root=UUID=$root_uuid ro recovery nomodeset
-              echo 'Loading initial ramdisk...'
-              initrd /initrd.img
-          }
-          GRUB_CUSTOM
-          chmod +x /etc/grub.d/40_custom
-
           # ── SDDM autologin for live session ───────────────────────────────
 
           mkdir -p /etc/sddm.conf.d
@@ -264,37 +255,30 @@ jobs:
 
           # ── Default shell: zsh ────────────────────────────────────────────
 
-          # Set zsh as default for live user and root
           chsh -s /bin/zsh user  2>/dev/null || true
           chsh -s /bin/zsh root  2>/dev/null || true
 
-          # Minimal zsh config with autosuggestions + syntax highlighting
           cat > /etc/zsh/zshrc << 'ZSHRC'
           # KibaOS system-wide zshrc
           export LANG=en_US.UTF-8
           export EDITOR=nano
 
-          # History
           HISTSIZE=10000
           SAVEHIST=10000
           HISTFILE=~/.zsh_history
           setopt SHARE_HISTORY
           setopt HIST_IGNORE_DUPS
 
-          # Completion
           autoload -Uz compinit && compinit
           zstyle ':completion:*' menu select
 
-          # Prompt
           autoload -Uz vcs_info
           precmd() { vcs_info }
-          PROMPT='%F{#1e90ff}%n@%m%f %F{#ffffff}%~%f %F{#1e90ff}❯%f '
+          PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f %F{#bd93f9}❯%f '
 
-          # Plugins (packaged by Debian)
           source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh 2>/dev/null || true
           source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh 2>/dev/null || true
 
-          # Aliases
           alias ls='ls --color=auto'
           alias ll='ls -lah'
           alias update='sudo apt update && sudo apt upgrade -y'
@@ -313,25 +297,40 @@ jobs:
           echo "user ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/live-user
           chmod 440 /etc/sudoers.d/live-user
 
-          # ── Dracula color scheme + KDE rounded corners ────────────────────
-          # Official Dracula palette (draculatheme.com/spec):
-          #   Background  #282a36  ( 40, 42, 54)
-          #   CurrentLine #44475a  ( 68, 71, 90)
-          #   Foreground  #f8f8f2  (248,248,242)
-          #   Comment     #6272a4  ( 98,114,164)
-          #   Cyan        #8be9fd  (139,233,253)
-          #   Green       #50fa7b  ( 80,250,123)
-          #   Orange      #ffb86c  (255,184,108)
-          #   Pink        #ff79c6  (255,121,198)
-          #   Purple      #bd93f9  (189,147,249)
-          #   Red         #ff5555  (255, 85, 85)
-          #   Yellow      #f1fa8c  (241,250,140)
-          # Written into /etc/skel so every user inherits on first login.
+          # ── Disable sleep / suspend ───────────────────────────────────────
+          mkdir -p /etc/systemd/sleep.conf.d
+          cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
+          [Sleep]
+          AllowSuspend=no
+          AllowHibernation=no
+          AllowHybridSleep=no
+          AllowSuspendThenHibernate=no
+          NOSLEEP
+
+          # Also prevent screen lock / DPMS via KDE power settings in skel
+          mkdir -p /etc/skel/.config
+          cat > /etc/skel/.config/powermanagementprofilesrc << 'POWERRC'
+          [AC][DPMSControl]
+          idleTime=0
+          lockBeforeSleep=false
+          turnOffDisplayWhenIdle=false
+
+          [AC][HandleButtonEvents]
+          lidAction=0
+          powerButtonAction=0
+          powerDownAction=0
+
+          [AC][SuspendAndShutdown]
+          autoSuspend=false
+          autoSuspendAction=0
+          autoSuspendIdleTime=0
+          POWERRC
+
+          # ── Dracula color scheme ──────────────────────────────────────────
 
           SKEL_KDE=/etc/skel/.config
           mkdir -p "$SKEL_KDE"
 
-          # ── 1. Dracula KDE color scheme file ──────────────────────────────
           mkdir -p /usr/share/color-schemes
           cat > /usr/share/color-schemes/Dracula.colors << 'DRACULA_COLORS'
           [ColorEffects:Disabled]
@@ -462,7 +461,7 @@ jobs:
           contrast=4
           DRACULA_COLORS
 
-          # ── 2. Dracula Konsole color scheme ───────────────────────────────
+          # ── 2. Konsole Dracula color scheme ───────────────────────────────
           mkdir -p /usr/share/konsole
           cat > /usr/share/konsole/Dracula.colorscheme << 'KONSOLE_COLORS'
           [Background]
@@ -728,6 +727,11 @@ jobs:
 
           # ── 6. Breeze decoration: Dracula shadow colour ───────────────────
           cat > "$SKEL_KDE/breezerc" << 'BREEZERC'
+          [Common]
+          ShadowColor=189,147,249
+          ShadowSize=ShadowVeryLarge
+          ShadowStrength=80
+
           [Windeco Exception 0]
           BorderSize=None
           Enabled=true
@@ -735,14 +739,9 @@ jobs:
           ExceptionType=0
           HideTitleBar=false
           Mask=2
-
-          [Common]
-          ShadowColor=189,147,249
-          ShadowSize=ShadowVeryLarge
-          ShadowStrength=80
           BREEZERC
 
-          # ── 7. Plasma panel: Breeze Dark theme + floating ─────────────────
+          # ── 7. Plasma panel: TOP, rounded but not floating, Dracula theme ──
           cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
           [Theme]
           name=breeze-dark
@@ -759,29 +758,133 @@ jobs:
           thickness=44
           PLASMASHELLRC
 
-          mkdir -p "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc.d"
+          # Panel on top, rounded but NOT floating, with:
+          # - App launcher (kickoff)
+          # - Task manager
+          # - System tray
+          # - Clock
+          # Desktop icons: Calamares, Firefox, Trash + sticky note top-right
           cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
+          [Containments][1]
+          activityId=
+          formfactor=0
+          immutability=1
+          lastScreen=0
+          location=0
+          plugin=org.kde.plasma.folder
+          wallpaperplugin=org.kde.image
+
+          [Containments][1][Wallpaper][org.kde.image][General]
+          Image=
+          SlideshowInterval=0
+          color=#282a36
+
+          [Containments][1][Applets][10]
+          immutability=1
+          plugin=org.kde.plasma.icon
+
+          [Containments][1][Applets][10][Configuration][General]
+          applicationName=org.mozilla.firefox
+          iconPath=/usr/share/applications/firefox-esr.desktop
+          label=Firefox
+
+          [Containments][1][Applets][10][Geometry]
+          x=80
+          y=40
+          width=64
+          height=64
+
+          [Containments][1][Applets][11]
+          immutability=1
+          plugin=org.kde.plasma.icon
+
+          [Containments][1][Applets][11][Configuration][General]
+          applicationName=calamares
+          iconPath=/usr/share/applications/calamares.desktop
+          label=Install KibaOS
+
+          [Containments][1][Applets][11][Geometry]
+          x=10
+          y=40
+          width=64
+          height=64
+
+          [Containments][1][Applets][12]
+          immutability=1
+          plugin=org.kde.plasma.trash
+
+          [Containments][1][Applets][12][Geometry]
+          x=150
+          y=40
+          width=64
+          height=64
+
+          [Containments][1][Applets][13]
+          immutability=1
+          plugin=org.kde.plasma.notes
+
+          [Containments][1][Applets][13][Geometry]
+          x=-80
+          y=60
+          width=200
+          height=200
+
           [Containments][2]
           activityId=
           formfactor=2
           immutability=1
           lastScreen=0
-          location=4
+          location=3
           plugin=org.kde.panel
           wallpaperplugin=org.kde.image
 
           [Containments][2][General]
-          floating=1
+          floating=0
+
+          [Containments][2][Applets][3]
+          immutability=1
+          plugin=org.kde.plasma.kickoff
+
+          [Containments][2][Applets][3][Configuration][General]
+          icon=start-here-kde-symbolic
+
+          [Containments][2][Applets][4]
+          immutability=1
+          plugin=org.kde.plasma.icontasks
+
+          [Containments][2][Applets][5]
+          immutability=1
+          plugin=org.kde.plasma.systemtray
+
+          [Containments][2][Applets][6]
+          immutability=1
+          plugin=org.kde.plasma.digitalclock
+
+          [Containments][2][Layout]
+          AppletOrder=3;4;5;6
           PANELRC
 
-          # ── 8. Update Plymouth background to Dracula #282a36 ──────────────
-          # Patch the existing script's background colours
-          sed -i \
-            's/Window.SetBackgroundTopColor(0.04, 0.04, 0.08)/Window.SetBackgroundTopColor(0.157, 0.165, 0.212)/' \
-            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
-          sed -i \
-            's/Window.SetBackgroundBottomColor(0.02, 0.02, 0.06)/Window.SetBackgroundBottomColor(0.157, 0.165, 0.212)/' \
-            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
+          # ── 8. Midnight indigo wallpaper (solid color via script) ─────────
+          # KDE solid color wallpaper — set to #282a36 (Dracula background)
+          mkdir -p "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc.d"
+
+          # Override wallpaper plugin to use solid color
+          cat >> "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'WALLPAPER'
+
+          [Containments][1][Wallpaper][org.kde.color][General]
+          Color=#282a36
+          WALLPAPER
+
+          # Also set via kscreenlockerrc so lock screen matches
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
+          [Daemon]
+          Autolock=false
+          LockOnResume=false
+          Timeout=0
+
+          [Greeter][Wallpaper][org.kde.color][General]
+          Color=#282a36
+          LOCKRC
 
           # ── 9. Copy skel → live user ──────────────────────────────────────
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
@@ -836,6 +939,7 @@ jobs:
           componentName: kibaos
           welcomeStyleCalamares: true
           welcomeExpandingLogo: true
+          slideshowAPI: 2
           strings:
             productName: KibaOS
             shortProductName: KibaOS
@@ -855,8 +959,7 @@ jobs:
           slideshow: show.qml
           BRANDING
 
-          # Copy logo into Calamares branding
-          mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
+          mkdir -p config/hooks/live
           cat > config/hooks/live/0110-calamares-branding.hook.chroot << 'BRANDING_HOOK'
           #!/bin/bash
           set -e
@@ -868,8 +971,131 @@ jobs:
           if [ -f /etc/calamares/settings.conf ]; then
             sed -i 's/branding: .*/branding: kibaos/' /etc/calamares/settings.conf
           fi
+
+          # ── Calamares show.qml slideshow ──────────────────────────────────
+          cat > /etc/calamares/branding/kibaos/show.qml << 'SHOWQML'
+          import calamares.slideshow 1.0;
+
+          Presentation {
+              id: presentation
+
+              Timer {
+                  interval: 5000
+                  running: presentation.activatedInCalamares
+                  repeat: true
+                  onTriggered: presentation.goToNextSlide()
+              }
+
+              Slide {
+                  centeredText: "Welcome to KibaOS\n\nFast, beautiful, and built on Debian 13 Trixie."
+              }
+
+              Slide {
+                  centeredText: "KDE Plasma 6\n\nA powerful desktop crafted for you."
+              }
+
+              Slide {
+                  centeredText: "Installation in progress...\n\nThis won't take long."
+              }
+
+              function onActivate() { presentation.currentSlide = 0; }
+              function onLeave() {}
+          }
+          SHOWQML
+
+          # ── Calamares .desktop launcher on desktop ────────────────────────
+          # Ensure calamares .desktop exists with correct Exec
+          mkdir -p /usr/share/applications
+          cat > /usr/share/applications/calamares.desktop << 'CALADESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Version=1.0
+          Name=Install KibaOS
+          Comment=Install KibaOS to your system
+          Exec=sudo calamares
+          Icon=calamares
+          Terminal=false
+          Categories=System;
+          CALADESKTOP
+
+          # ── Apply post-install hook: copy settings to installed system ─────
+          mkdir -p /etc/calamares/modules
+          cat > /etc/calamares/modules/postinstall.conf << 'POSTINSTALL'
+          ---
+          script:
+            - /usr/share/kibaos/post-install.sh
+          POSTINSTALL
+
+          mkdir -p /usr/share/kibaos
+          cat > /usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
+          #!/bin/bash
+          # Runs inside installed system — copy all KibaOS settings to new user
+          TARGET_HOME="$1"
+          [ -z "$TARGET_HOME" ] && TARGET_HOME="/home/$(getent passwd 1000 | cut -d: -f1)"
+          [ -z "$TARGET_HOME" ] && exit 0
+
+          cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
+          chown -R "$(stat -c '%U:%G' "$TARGET_HOME")" "$TARGET_HOME/.config" "$TARGET_HOME/.local" 2>/dev/null || true
+          POSTINSTALLSH
+          chmod +x /usr/share/kibaos/post-install.sh
+
           BRANDING_HOOK
           chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
+
+          echo "=== Creating CachyOS kernel hook ==="
+
+          # CachyOS kernel via linux-cachyos-deb builder
+          # Uses the official CachyOS deb builder — builds a generic BORE kernel
+          cat > config/hooks/live/0120-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
+          #!/bin/bash
+          set -e
+
+          echo "=== Building CachyOS kernel for Debian ==="
+
+          # Clone the official CachyOS deb builder
+          git clone --depth=1 https://github.com/CachyOS/linux-cachyos-deb /tmp/cachyos-deb || {
+            echo "CachyOS deb repo unavailable, falling back to stock kernel"
+            exit 0
+          }
+
+          cd /tmp/cachyos-deb
+
+          # Non-interactive build: BORE scheduler, generic x86-64, no LTO (faster CI build)
+          export CACHY_SCHEDULER=bore
+          export CACHY_MARCH=generic
+          export CACHY_LTO=none
+          export CACHY_TICK=1000
+          export CACHY_PREEMPT=full
+          export NONINTERACTIVE=1
+
+          # Run the kernel builder — produces .deb packages in /tmp/cachyos-deb
+          bash cachyos-deb.sh --non-interactive 2>&1 | tail -50 || {
+            echo "CachyOS kernel build failed — keeping stock kernel"
+            cd /
+            rm -rf /tmp/cachyos-deb
+            exit 0
+          }
+
+          # Install built .deb packages
+          dpkg -i /tmp/cachyos-deb/*.deb 2>/dev/null || true
+
+          # Set CachyOS kernel as default in GRUB
+          CACHY_VERSION=$(ls /boot/vmlinuz-* | grep -i cachy | sort -V | tail -1 | sed 's|/boot/vmlinuz-||')
+          if [ -n "$CACHY_VERSION" ]; then
+            echo "CachyOS kernel installed: $CACHY_VERSION"
+            # Update grub to prefer cachyos kernel
+            sed -i "s/GRUB_DEFAULT=0/GRUB_DEFAULT=\"Advanced options for KibaOS>KibaOS, with Linux $CACHY_VERSION\"/" \
+              /etc/default/grub 2>/dev/null || true
+          fi
+
+          # Rebuild initramfs for new kernel
+          update-initramfs -c -k "$CACHY_VERSION" 2>/dev/null || update-initramfs -u
+
+          cd /
+          rm -rf /tmp/cachyos-deb
+          echo "=== CachyOS kernel build complete ==="
+          CACHY_HOOK
+          chmod +x config/hooks/live/0120-cachyos-kernel.hook.chroot
 
           echo "=== Building ISO ==="
 
