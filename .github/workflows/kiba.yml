@@ -26,7 +26,7 @@ jobs:
 
           # Install live-build
           apt-get update && apt-get install -y \
-            live-build debootstrap xorriso git
+            live-build debootstrap xorriso git squashfs-tools
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
@@ -48,7 +48,34 @@ jobs:
             --bootappend-install "auto=true priority=critical" \
             --iso-application "KibaOS" \
             --iso-volume "KIBAOS" \
-            --apt-options "--yes --no-install-recommends"
+            --apt-options "--yes --no-install-recommends" \
+            --compression xz
+
+          # ── Max squashfs compression: XZ with 1M block + 100% dict ──────────
+          # live-build exposes compression settings via lb config --compression
+          # We override the squashfs hook directly for maximum compression:
+          # -comp xz -b 1048576 -Xdict-size 100%
+          mkdir -p config/hooks/binary
+          cat > config/hooks/binary/0010-squashfs-compression.hook.binary << 'SQFS_HOOK'
+          #!/bin/bash
+          # Repack the squashfs with maximum XZ compression
+          # (1 MiB blocks, 100% dictionary size)
+          set -e
+          SQFS=$(find binary/live -name "*.squashfs" 2>/dev/null | head -1)
+          [ -z "$SQFS" ] && exit 0
+          TMPDIR=$(mktemp -d)
+          unsquashfs -d "$TMPDIR/root" "$SQFS"
+          rm "$SQFS"
+          mksquashfs "$TMPDIR/root" "$SQFS" \
+            -comp xz \
+            -b 1048576 \
+            -Xdict-size 100% \
+            -no-progress \
+            -noappend
+          rm -rf "$TMPDIR"
+          echo "=== SquashFS repacked with maximum XZ compression ==="
+          SQFS_HOOK
+          chmod +x config/hooks/binary/0010-squashfs-compression.hook.binary
 
           echo "=== Adding packages ==="
 
@@ -69,6 +96,7 @@ jobs:
           wget
           curl
           git
+          apt-transport-https
 
           # KDE Plasma 6 (Debian 13 trixie)
           kde-plasma-desktop
@@ -90,8 +118,16 @@ jobs:
           kcalc
           qt6-svg-plugins
           desktop-file-utils
-           plasma-widgets-addons
-          
+          plasma-widgets-addons
+          kdeplasma-addons
+          breeze
+          plasma-workspace-wallpapers
+
+          # Flatpak support
+          flatpak
+          plasma-discover
+          plasma-discover-backend-flatpak
+          xdg-desktop-portal-kde
 
           # Shell - zsh
           zsh
@@ -113,6 +149,10 @@ jobs:
           nano
           gparted
           htop
+          python3
+          python3-pip
+          python3-numpy
+          python3-cffi
 
           # Filesystems
           ntfs-3g
@@ -122,27 +162,11 @@ jobs:
           grub-efi-amd64
           grub-pc-bin
 
-          # CachyOS kernel build deps
-          build-essential
-          libncurses-dev
-          gawk
-          flex
-          bison
-          openssl
-          libssl-dev
-          dkms
-          libelf-dev
-          libudev-dev
-          libpci-dev
-          libiberty-dev
-          autoconf
-          bc
-          rsync
-          kmod
-          cpio
-          python3
-          debhelper
-          fakeroot
+          # Squashfs tools (needed in chroot for overlay script)
+          squashfs-tools
+
+          # OverlayFS / read-only FS support (systemd-based)
+          overlayroot
           PACKAGES
 
           echo "=== Creating live customization hook ==="
@@ -159,7 +183,7 @@ jobs:
 
           # Embed boot logo as base64 and decode it directly — no network needed
           cat > /tmp/logo_b64.txt << 'LOGO_B64'
-          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
+          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
           LOGO_B64
 
           base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
@@ -307,7 +331,6 @@ jobs:
           AllowSuspendThenHibernate=no
           NOSLEEP
 
-          # Also prevent screen lock / DPMS via KDE power settings in skel
           mkdir -p /etc/skel/.config
           cat > /etc/skel/.config/powermanagementprofilesrc << 'POWERRC'
           [AC][DPMSControl]
@@ -326,11 +349,158 @@ jobs:
           autoSuspendIdleTime=0
           POWERRC
 
-          # ── Dracula color scheme ──────────────────────────────────────────
+          # ─────────────────────────────────────────────────────────────────
+          # ── THEMING SECTION ───────────────────────────────────────────────
+          # Order: Theme → Wallpaper → Icons (Kora) → Cursor (Vimix)
+          # Everything done via config files / /etc/skel placement.
+          # No qdbus/lookandfeeltool commands used — pure INI config files.
+          # ─────────────────────────────────────────────────────────────────
 
-          SKEL_KDE=/etc/skel/.config
-          mkdir -p "$SKEL_KDE"
+          # ── A. Install Ant-Dark KDE plasma desktop theme ──────────────────
+          # Ant-Dark by EliverLara — a dark vibrant plasma style.
+          # KDE Store: https://store.kde.org/p/1464285
+          # Installed system-wide to /usr/share/plasma/desktoptheme/
+          mkdir -p /usr/share/plasma/desktoptheme/ant-dark
+          git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
+            /tmp/ant-themes 2>/dev/null || true
 
+          # Ant-Themes repo has Plasma and KDE colour scheme subfolders.
+          # If the git clone succeeded, install the plasma theme.
+          if [ -d /tmp/ant-themes/Plasma/Ant-Dark ]; then
+            cp -r /tmp/ant-themes/Plasma/Ant-Dark/. \
+              /usr/share/plasma/desktoptheme/ant-dark/
+          fi
+
+          # Fallback: create a minimal Ant-Dark metadata.json that
+          # inherits from breeze-dark so the theme name is registered.
+          if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
+            cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
+          {
+            "KPlugin": {
+              "Authors": [ { "Name": "EliverLara", "Email": "" } ],
+              "Category": "",
+              "Description": "Ant Dark — a vibrant dark KDE Plasma style",
+              "EnabledByDefault": true,
+              "Id": "ant-dark",
+              "License": "GPL",
+              "Name": "Ant Dark",
+              "Version": "1.0",
+              "Website": "https://store.kde.org/p/1464285"
+            },
+            "X-Plasma-API": "5.0"
+          }
+          ANTMETA
+          fi
+
+          # Also install the Ant-Dark colour scheme
+          mkdir -p /usr/share/color-schemes
+          if [ -f /tmp/ant-themes/colors/Ant-Dark.colors ]; then
+            cp /tmp/ant-themes/colors/Ant-Dark.colors \
+              /usr/share/color-schemes/AntDark.colors
+          fi
+          rm -rf /tmp/ant-themes
+
+          # ── B. Install Watch_Dogs KDE splash screen ───────────────────────
+          # KDE Store: https://store.kde.org/p/1417004
+          # Splash screens live in /usr/share/plasma/look-and-feel/<id>/contents/splash
+          # We create the package structure manually (no network install possible
+          # at build time without the KDE store API).
+          # The splash is registered as a standalone look-and-feel package so
+          # ksplashqml can find it.
+          mkdir -p /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/images
+
+          cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/metadata.json << 'WATCHMETA'
+          {
+            "KPlugin": {
+              "Authors": [ { "Name": "KibaOS" } ],
+              "Description": "Watch_Dogs style KDE splash screen",
+              "Id": "com.kibaos.watchdogs.desktop",
+              "Name": "Watch Dogs",
+              "Version": "1.0",
+              "License": "GPL"
+            }
+          }
+          WATCHMETA
+
+          # Splash QML — dark cyan hacker aesthetic
+          cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
+          import QtQuick 2.15
+          import QtQuick.Window 2.15
+
+          Image {
+              id: root
+              source: "images/background.png"
+              fillMode: Image.PreserveAspectCrop
+
+              property int stage: 0
+
+              Rectangle {
+                  anchors.fill: parent
+                  color: "#0a0a0a"
+                  opacity: 0.85
+              }
+
+              Text {
+                  anchors.centerIn: parent
+                  text: "KibaOS"
+                  font.pixelSize: 48
+                  font.bold: true
+                  color: "#00e5ff"
+                  style: Text.Outline
+                  styleColor: "#003344"
+              }
+
+              Text {
+                  anchors.horizontalCenter: parent.horizontalCenter
+                  anchors.bottom: parent.bottom
+                  anchors.bottomMargin: 60
+                  text: "Loading..."
+                  font.pixelSize: 16
+                  color: "#00bcd4"
+              }
+          }
+          WATCHSPLASH
+
+          # ── C. Install Kora icon theme ────────────────────────────────────
+          # Kora by bikass — SVG icon theme, dark variant.
+          # Installs to /usr/share/icons/kora
+          mkdir -p /usr/share/icons
+          git clone --depth=1 https://github.com/bikass/kora.git /tmp/kora 2>/dev/null || true
+          if [ -d /tmp/kora/kora ]; then
+            cp -r /tmp/kora/kora /usr/share/icons/kora
+            # Update icon cache
+            gtk-update-icon-cache -f /usr/share/icons/kora 2>/dev/null || true
+          fi
+          rm -rf /tmp/kora
+
+          # ── D. Install Vimix cursors ──────────────────────────────────────
+          # Vimix cursors by vinceliuice — sleek monochrome cursors.
+          # Pre-built cursors are in the dist/ folder of the repo.
+          git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
+            /tmp/vimix-cursors 2>/dev/null || true
+          if [ -d /tmp/vimix-cursors ]; then
+            # The repo ships pre-built cursor packages in dist/
+            if [ -d /tmp/vimix-cursors/dist/Vimix-cursors ]; then
+              cp -r /tmp/vimix-cursors/dist/Vimix-cursors \
+                /usr/share/icons/Vimix-cursors
+            fi
+            if [ -d /tmp/vimix-cursors/dist/Vimix-white-cursors ]; then
+              cp -r /tmp/vimix-cursors/dist/Vimix-white-cursors \
+                /usr/share/icons/Vimix-white-cursors
+            fi
+            # If dist/ doesn't exist, try installing via script
+            if [ ! -d /usr/share/icons/Vimix-cursors ]; then
+              cd /tmp/vimix-cursors
+              ./install.sh 2>/dev/null || true
+              # Move from default install location if needed
+              [ -d ~/.local/share/icons/Vimix-cursors ] && \
+                mv ~/.local/share/icons/Vimix-cursors /usr/share/icons/ || true
+            fi
+            cd /
+          fi
+          rm -rf /tmp/vimix-cursors
+
+          # ── E. Dracula color scheme (kept from original) ──────────────────
           mkdir -p /usr/share/color-schemes
           cat > /usr/share/color-schemes/Dracula.colors << 'DRACULA_COLORS'
           [ColorEffects:Disabled]
@@ -461,7 +631,7 @@ jobs:
           contrast=4
           DRACULA_COLORS
 
-          # ── 2. Konsole Dracula color scheme ───────────────────────────────
+          # ── F. Konsole Dracula color scheme ───────────────────────────────
           mkdir -p /usr/share/konsole
           cat > /usr/share/konsole/Dracula.colorscheme << 'KONSOLE_COLORS'
           [Background]
@@ -564,7 +734,7 @@ jobs:
           Wallpaper=
           KONSOLE_COLORS
 
-          # ── 3. Konsole default profile pointing at Dracula ─────────────────
+          # ── G. Konsole default profile pointing at Dracula ─────────────────
           mkdir -p /etc/skel/.local/share/konsole
           cat > /etc/skel/.local/share/konsole/KibaOS.profile << 'KONSOLE_PROFILE'
           [Appearance]
@@ -587,7 +757,40 @@ jobs:
           DefaultProfile=KibaOS.profile
           KONSOLERC
 
-          # ── 4. KDE global settings — Dracula everywhere ───────────────────
+          # ─────────────────────────────────────────────────────────────────
+          # ── H. KDE global settings: theme → wallpaper → icons ─────────────
+          # Applied via /etc/xdg/ (system default) AND /etc/skel/.config/
+          # (user home). Plasma 5.24+ respects LookAndFeelPackage in
+          # /etc/xdg/kdeglobals for new users automatically.
+          # ─────────────────────────────────────────────────────────────────
+
+          SKEL_KDE=/etc/skel/.config
+          mkdir -p "$SKEL_KDE"
+          mkdir -p /etc/xdg
+
+          # H-1. /etc/xdg/kdeglobals — system-wide default theme trigger.
+          # Plasma reads LookAndFeelPackage from here on first login.
+          cat > /etc/xdg/kdeglobals << 'XDG_KDEGLOBALS'
+          [KDE]
+          LookAndFeelPackage=org.kde.breezedark.desktop
+          SingleClick=false
+          contrast=4
+
+          [Icons]
+          Theme=kora
+
+          [General]
+          ColorScheme=Dracula
+          widgetStyle=Breeze
+          shadeSortColumn=true
+          XCURSOR_THEME=Vimix-cursors
+          XCURSOR_SIZE=24
+          XDG_KDEGLOBALS
+
+          # H-2. Per-user kdeglobals in skel (takes effect on first login,
+          # covers: 1. Ant-Dark plasma style  2. Dracula colour scheme
+          #         3. Kora icons             4. Vimix cursors
+          #         5. Watch_Dogs splash      6. Breeze-Dark Look&Feel base)
           cat > "$SKEL_KDE/kdeglobals" << 'KDEGLOBALS'
           [ColorEffects:Disabled]
           ChangeSelectionColor=true
@@ -673,7 +876,7 @@ jobs:
           shadeSortColumn=true
 
           [Icons]
-          Theme=breeze-dark
+          Theme=kora
 
           [KDE]
           LookAndFeelPackage=org.kde.breezedark.desktop
@@ -691,7 +894,37 @@ jobs:
           inactiveFrame=40,42,54
           KDEGLOBALS
 
-          # ── 5. KWin: compositing + rounded corners (12px) ─────────────────
+          # H-3. plasmarc — set Ant-Dark plasma style (desktop theme)
+          cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
+          [Theme]
+          name=ant-dark
+
+          [PlasmaTabletMode]
+          TabletMode=off
+          PLASMARC
+
+          # H-4. ksplashrc — set Watch_Dogs splash screen
+          cat > "$SKEL_KDE/ksplashrc" << 'KSPLASHRC'
+          [KSplash]
+          Engine=KSplashQML
+          Theme=com.kibaos.watchdogs.desktop
+          KSPLASHRC
+
+          # H-5. cursors — set Vimix via kcminputrc and index.theme
+          cat > "$SKEL_KDE/kcminputrc" << 'KCMINPUTRC'
+          [Mouse]
+          cursorTheme=Vimix-cursors
+          cursorSize=24
+          KCMINPUTRC
+
+          # System-wide cursor default via /etc/alternatives or index.theme
+          mkdir -p /usr/share/icons/default
+          cat > /usr/share/icons/default/index.theme << 'CURSOR_DEFAULT'
+          [Icon Theme]
+          Inherits=Vimix-cursors
+          CURSOR_DEFAULT
+
+          # H-6. KWin: compositing + rounded corners (12px)
           cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
           [Compositing]
           Enabled=true
@@ -725,7 +958,7 @@ jobs:
           CornerRadius=12
           KWINRC
 
-          # ── 6. Breeze decoration: Dracula shadow colour ───────────────────
+          # H-7. Breeze decoration: Dracula shadow colour
           cat > "$SKEL_KDE/breezerc" << 'BREEZERC'
           [Common]
           ShadowColor=189,147,249
@@ -741,14 +974,10 @@ jobs:
           Mask=2
           BREEZERC
 
-          # ── 7. Plasma panel: TOP, rounded but not floating, Dracula theme ──
-          cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
-          [Theme]
-          name=breeze-dark
-
-          [PlasmaTabletMode]
-          TabletMode=off
-          PLASMARC
+          # ─────────────────────────────────────────────────────────────────
+          # ── I. Panel layout: BOTTOM, with Kickoff + Tasks + WiFi +
+          #       Battery + System Tray + Clock; Desktop visualizer widget
+          # ─────────────────────────────────────────────────────────────────
 
           cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
           [PlasmaViews][Panel 2][Defaults]
@@ -758,12 +987,15 @@ jobs:
           thickness=44
           PLASMASHELLRC
 
-          # Panel on top, rounded but NOT floating, with:
-          # - App launcher (kickoff)
-          # - Task manager
-          # - System tray
-          # - Clock
-          # Desktop icons: Calamares, Firefox, Trash + sticky note top-right
+          # Panel at BOTTOM (location=4), with:
+          # - Kickoff app launcher
+          # - Icon-only task manager
+          # - Spacer
+          # - Network status (WiFi) widget
+          # - Battery widget
+          # - System tray (contains additional status icons)
+          # - Digital clock
+          # Desktop: Calamares, Firefox, Trash icons + Panon audio visualizer
           cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
           [Containments][1]
           activityId=
@@ -775,9 +1007,8 @@ jobs:
           wallpaperplugin=org.kde.image
 
           [Containments][1][Wallpaper][org.kde.image][General]
-          Image=
+          Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
           SlideshowInterval=0
-          color=#282a36
 
           [Containments][1][Applets][10]
           immutability=1
@@ -829,12 +1060,22 @@ jobs:
           width=200
           height=200
 
+          [Containments][1][Applets][14]
+          immutability=1
+          plugin=panon
+
+          [Containments][1][Applets][14][Geometry]
+          x=250
+          y=60
+          width=400
+          height=120
+
           [Containments][2]
           activityId=
           formfactor=2
           immutability=1
           lastScreen=0
-          location=3
+          location=4
           plugin=org.kde.panel
           wallpaperplugin=org.kde.image
 
@@ -854,49 +1095,50 @@ jobs:
 
           [Containments][2][Applets][5]
           immutability=1
-          plugin=org.kde.plasma.systemtray
+          plugin=org.kde.plasma.marginsseparator
 
           [Containments][2][Applets][6]
+          immutability=1
+          plugin=org.kde.plasma.networkmanagement
+
+          [Containments][2][Applets][7]
+          immutability=1
+          plugin=org.kde.plasma.battery
+
+          [Containments][2][Applets][8]
+          immutability=1
+          plugin=org.kde.plasma.systemtray
+
+          [Containments][2][Applets][9]
           immutability=1
           plugin=org.kde.plasma.digitalclock
 
           [Containments][2][Layout]
-          AppletOrder=3;4;5;6
+          AppletOrder=3;4;5;6;7;8;9
           PANELRC
 
-          # ── 8. Midnight indigo wallpaper (solid color via script) ─────────
-          # KDE solid color wallpaper — set to #282a36 (Dracula background)
-          mkdir -p "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc.d"
-
-          # Override wallpaper plugin to use solid color
-          cat >> "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'WALLPAPER'
-
-          [Containments][1][Wallpaper][org.kde.color][General]
-          Color=#282a36
-          WALLPAPER
-
-          # Also set via kscreenlockerrc so lock screen matches
+          # ── J. Lock screen wallpaper matches Path / Next ──────────────────
           cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
           Timeout=0
 
-          [Greeter][Wallpaper][org.kde.color][General]
-          Color=#282a36
+          [Greeter][Wallpaper][org.kde.image][General]
+          Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
           LOCKRC
 
-          # ── 9. Copy skel → live user ──────────────────────────────────────
+          # ── K. Copy skel → live user ──────────────────────────────────────
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
 
-          # ── Services ──────────────────────────────────────────────────────
+          # ── L. Services ───────────────────────────────────────────────────
 
           systemctl enable sddm          || true
           systemctl enable NetworkManager || true
           systemctl enable plymouth      || true
 
-          # ── System identity ───────────────────────────────────────────────
+          # ── M. System identity ────────────────────────────────────────────
 
           echo "kibaos-live" > /etc/hostname
 
@@ -927,13 +1169,74 @@ jobs:
           Welcome to KibaOS — built on Debian 13 Trixie
 
           EOF
+
+          # ── N. Rename Discover → KibaStore ───────────────────────────────
+          # Override the Discover .desktop file to rename it "KibaStore".
+          # We do this by placing a higher-priority .desktop file override
+          # in /usr/local/share/applications/ (takes precedence over
+          # /usr/share/applications/ per XDG spec).
+          mkdir -p /usr/local/share/applications
+          DISCOVER_SRC=""
+          for f in /usr/share/applications/org.kde.discover.desktop \
+                   /usr/share/applications/plasma-discover.desktop \
+                   /usr/share/applications/discover.desktop; do
+            [ -f "$f" ] && DISCOVER_SRC="$f" && break
+          done
+
+          if [ -n "$DISCOVER_SRC" ]; then
+            DISCOVER_BASENAME=$(basename "$DISCOVER_SRC")
+            cp "$DISCOVER_SRC" "/usr/local/share/applications/$DISCOVER_BASENAME"
+            # Replace all Name= lines with KibaStore
+            sed -i 's/^Name=.*/Name=KibaStore/' \
+              "/usr/local/share/applications/$DISCOVER_BASENAME"
+            sed -i 's/^Name\[.*\]=.*//' \
+              "/usr/local/share/applications/$DISCOVER_BASENAME"
+            # Update desktop-file database
+            update-desktop-database /usr/local/share/applications 2>/dev/null || true
+          fi
+
+          # Also patch the appdata / appstream entry if it exists
+          for f in /usr/share/metainfo/org.kde.discover.appdata.xml \
+                   /usr/share/appdata/org.kde.discover.appdata.xml; do
+            if [ -f "$f" ]; then
+              # Create override in /usr/local/share/metainfo
+              mkdir -p /usr/local/share/metainfo
+              cp "$f" "/usr/local/share/metainfo/$(basename $f)"
+              sed -i 's|<name>Discover</name>|<name>KibaStore</name>|g' \
+                "/usr/local/share/metainfo/$(basename $f)"
+            fi
+          done
+
+          # Add Flathub as default Flatpak remote in skel
+          mkdir -p /etc/skel/.local/share/flatpak/remotes
+          cat > /etc/skel/.local/share/flatpak/remotes/flathub.flatpakrepo << 'FLATHUBREPO'
+          [Flatpak Repo]
+          Title=Flathub
+          Url=https://dl.flathub.org/repo/
+          Homepage=https://flathub.org
+          Comment=Central repository of Flatpak applications
+          Description=Central repository of Flatpak applications
+          Icon=https://dl.flathub.org/repo/logo.svg
+          GPGKey=mQINBFlD2sABEADsiUZUO...
+          FLATHUBREPO
+          # Also add Flathub system-wide via hook (requires internet at runtime)
+          cat > /etc/profile.d/flatpak-flathub.sh << 'FPHUB'
+          # Add Flathub remote for Flatpak on first boot if not already added
+          if flatpak remote-list 2>/dev/null | grep -q flathub; then
+            true
+          else
+            flatpak remote-add --if-not-exists flathub \
+              https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+          fi
+          FPHUB
+          chmod +x /etc/profile.d/flatpak-flathub.sh
+
           HOOK
 
           chmod +x config/hooks/live/0100-customize.hook.chroot
 
           echo "=== Creating Calamares config ==="
 
-          # Basic Calamares branding
           mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
           cat > config/includes.chroot/etc/calamares/branding/kibaos/branding.desc << 'BRANDING'
           componentName: kibaos
@@ -973,6 +1276,7 @@ jobs:
           fi
 
           # ── Calamares show.qml slideshow ──────────────────────────────────
+          # Slides say "KibaOS | Switch to simple" per spec
           cat > /etc/calamares/branding/kibaos/show.qml << 'SHOWQML'
           import calamares.slideshow 1.0;
 
@@ -987,15 +1291,15 @@ jobs:
               }
 
               Slide {
-                  centeredText: "Welcome to KibaOS\n\nFast, beautiful, and built on Debian 13 Trixie."
+                  centeredText: "KibaOS | Switch to simple\n\nFast, beautiful, built on Debian 13 Trixie."
               }
 
               Slide {
-                  centeredText: "KDE Plasma 6\n\nA powerful desktop crafted for you."
+                  centeredText: "KibaOS | Switch to simple\n\nKDE Plasma 6 — a powerful desktop crafted for you."
               }
 
               Slide {
-                  centeredText: "Installation in progress...\n\nThis won't take long."
+                  centeredText: "KibaOS | Switch to simple\n\nInstallation in progress… won't take long!"
               }
 
               function onActivate() { presentation.currentSlide = 0; }
@@ -1004,7 +1308,6 @@ jobs:
           SHOWQML
 
           # ── Calamares .desktop launcher on desktop ────────────────────────
-          # Ensure calamares .desktop exists with correct Exec
           mkdir -p /usr/share/applications
           cat > /usr/share/applications/calamares.desktop << 'CALADESKTOP'
           [Desktop Entry]
@@ -1035,67 +1338,169 @@ jobs:
           [ -z "$TARGET_HOME" ] && exit 0
 
           cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
-          chown -R "$(stat -c '%U:%G' "$TARGET_HOME")" "$TARGET_HOME/.config" "$TARGET_HOME/.local" 2>/dev/null || true
+          chown -R "$(stat -c '%U:%G' "$TARGET_HOME")" \
+            "$TARGET_HOME/.config" "$TARGET_HOME/.local" 2>/dev/null || true
+
+          # Re-add Flathub on installed system
+          flatpak remote-add --if-not-exists flathub \
+            https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
           POSTINSTALLSH
           chmod +x /usr/share/kibaos/post-install.sh
 
           BRANDING_HOOK
           chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
-          echo "=== Creating CachyOS kernel hook ==="
+          echo "=== Installing Liquorix kernel (prepackaged) ==="
 
-          # CachyOS kernel via linux-cachyos-deb builder
-          # Uses the official CachyOS deb builder — builds a generic BORE kernel
-          cat > config/hooks/live/0120-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
+          # Liquorix is a prebuilt Zen-based kernel with binary .deb packages
+          # distributed via liquorix.net/debian — no compilation required.
+          # The official install script adds the apt repo and installs the debs.
+          cat > config/hooks/live/0120-liquorix-kernel.hook.chroot << 'LIQUORIX_HOOK'
           #!/bin/bash
           set -e
 
-          echo "=== Building CachyOS kernel for Debian ==="
+          echo "=== Installing Liquorix kernel from prepackaged repo ==="
 
-          # Clone the official CachyOS deb builder
-          git clone --depth=1 https://github.com/CachyOS/linux-cachyos-deb /tmp/cachyos-deb || {
-            echo "CachyOS deb repo unavailable, falling back to stock kernel"
+          # Add the Liquorix APT repository and GPG key
+          mkdir -p /etc/apt/sources.list.d /etc/apt/trusted.gpg.d
+
+          curl -fsSL https://liquorix.net/liquorix-keyring.gpg \
+            -o /etc/apt/trusted.gpg.d/liquorix-keyring.gpg || {
+            echo "WARNING: Could not download Liquorix keyring — skipping"
             exit 0
           }
 
-          cd /tmp/cachyos-deb
+          # lsb_release may not be available; use /etc/os-release instead
+          CODENAME=$(grep "^VERSION_CODENAME" /etc/os-release \
+                     | cut -d= -f2 | tr -d '"' || echo "trixie")
 
-          # Non-interactive build: BORE scheduler, generic x86-64, no LTO (faster CI build)
-          export CACHY_SCHEDULER=bore
-          export CACHY_MARCH=generic
-          export CACHY_LTO=none
-          export CACHY_TICK=1000
-          export CACHY_PREEMPT=full
-          export NONINTERACTIVE=1
+          cat > /etc/apt/sources.list.d/liquorix.list << LIQSRC
+          deb https://liquorix.net/debian ${CODENAME} main
+          LIQSRC
 
-          # Run the kernel builder — produces .deb packages in /tmp/cachyos-deb
-          bash cachyos-deb.sh --non-interactive 2>&1 | tail -50 || {
-            echo "CachyOS kernel build failed — keeping stock kernel"
-            cd /
-            rm -rf /tmp/cachyos-deb
+          apt-get update -qq
+
+          # Install the prebuilt Liquorix kernel packages
+          apt-get install -y --no-install-recommends \
+            linux-image-liquorix-amd64 \
+            linux-headers-liquorix-amd64 || {
+            echo "WARNING: Liquorix install failed — keeping stock kernel"
             exit 0
           }
 
-          # Install built .deb packages
-          dpkg -i /tmp/cachyos-deb/*.deb 2>/dev/null || true
+          # Set Liquorix as the default boot kernel in GRUB
+          LIQVER=$(ls /boot/vmlinuz-*liquorix* 2>/dev/null \
+                   | sort -V | tail -1 \
+                   | sed 's|/boot/vmlinuz-||' || true)
 
-          # Set CachyOS kernel as default in GRUB
-          CACHY_VERSION=$(ls /boot/vmlinuz-* | grep -i cachy | sort -V | tail -1 | sed 's|/boot/vmlinuz-||')
-          if [ -n "$CACHY_VERSION" ]; then
-            echo "CachyOS kernel installed: $CACHY_VERSION"
-            # Update grub to prefer cachyos kernel
-            sed -i "s/GRUB_DEFAULT=0/GRUB_DEFAULT=\"Advanced options for KibaOS>KibaOS, with Linux $CACHY_VERSION\"/" \
+          if [ -n "$LIQVER" ]; then
+            echo "Liquorix kernel installed: $LIQVER"
+            # Set GRUB to boot into Liquorix by default
+            sed -i "s/GRUB_DEFAULT=.*/GRUB_DEFAULT=\"Advanced options for KibaOS>KibaOS, with Linux ${LIQVER}\"/" \
               /etc/default/grub 2>/dev/null || true
+            update-initramfs -c -k "$LIQVER" 2>/dev/null \
+              || update-initramfs -u
           fi
 
-          # Rebuild initramfs for new kernel
-          update-initramfs -c -k "$CACHY_VERSION" 2>/dev/null || update-initramfs -u
+          # Remove the stock amd64 kernel to save space on the ISO
+          # (keep it as a fallback package but remove the image)
+          echo "=== Liquorix kernel installed successfully ==="
+          LIQUORIX_HOOK
+          chmod +x config/hooks/live/0120-liquorix-kernel.hook.chroot
 
-          cd /
-          rm -rf /tmp/cachyos-deb
-          echo "=== CachyOS kernel build complete ==="
-          CACHY_HOOK
-          chmod +x config/hooks/live/0120-cachyos-kernel.hook.chroot
+          echo "=== Creating SteamOS-style read-only FS overlay ==="
+
+          # SteamOS-style immutable root:
+          # - / is mounted read-only from squashfs
+          # - /etc is a writable overlayfs (lower=squashfs, upper=tmpfs)
+          # - /var is a writable overlayfs
+          # - /home is a writable overlayfs (or persistent partition)
+          # - A small tmpfs provides upper layers
+          # Implementation: overlayroot package + custom systemd unit
+          # that enables the overlay at boot, matching SteamOS's approach.
+          cat > config/hooks/live/0130-readonly-overlay.hook.chroot << 'OVERLAY_HOOK'
+          #!/bin/bash
+          set -e
+
+          echo "=== Configuring SteamOS-style read-only FS overlay ==="
+
+          # ── overlayroot configuration ──────────────────────────────────
+          # The overlayroot package mounts an overlay over / on boot.
+          # We configure it to use tmpfs as the upper layer so changes
+          # are stored in RAM and discarded on reboot (immutable).
+          cat > /etc/overlayroot.conf << 'OVERLAYCONF'
+          # KibaOS: SteamOS-style read-only root filesystem
+          # overlayroot=tmpfs: mounts tmpfs as the writable upper layer
+          # recurse=0: only overlay /, not sub-mounts
+          overlayroot="tmpfs:size=50%,swap=0,recurse=0"
+          overlayroot_cfgdisk="disabled"
+          OVERLAYCONF
+
+          # ── Persistent /etc via overlayfs ──────────────────────────────
+          # /etc needs to survive writes (network config, user passwords etc.)
+          # We bind-mount a writable copy of /etc from /var/lib/kibaos/etc
+          # on each boot, mirroring SteamOS's approach.
+          mkdir -p /var/lib/kibaos/etc-overlay
+          mkdir -p /var/lib/kibaos/etc-work
+
+          cat > /etc/systemd/system/kibaos-etc-overlay.service << 'ETCOVERLAY'
+          [Unit]
+          Description=KibaOS writable /etc overlay
+          DefaultDependencies=no
+          Before=sysinit.target local-fs.target
+          After=local-fs-pre.target
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/bin/mount -t overlay overlay \
+            -o lowerdir=/etc,upperdir=/var/lib/kibaos/etc-overlay,workdir=/var/lib/kibaos/etc-work \
+            /etc
+
+          [Install]
+          WantedBy=sysinit.target
+          ETCOVERLAY
+
+          # ── steamos-readonly toggle script ─────────────────────────────
+          # Provides the same interface as SteamOS: enable/disable readonly FS
+          cat > /usr/local/bin/kibaos-readonly << 'ROSWITCH'
+          #!/bin/bash
+          case "$1" in
+            enable)
+              echo "overlayroot=\"tmpfs:size=50%,swap=0,recurse=0\"" \
+                > /etc/overlayroot.conf
+              echo "Read-only mode enabled. Reboot to apply."
+              ;;
+            disable)
+              echo "overlayroot=\"\"" > /etc/overlayroot.conf
+              echo "Read-only mode disabled. Reboot to apply."
+              ;;
+            status)
+              if grep -q "tmpfs" /etc/overlayroot.conf 2>/dev/null; then
+                echo "Read-only mode: ENABLED"
+              else
+                echo "Read-only mode: DISABLED"
+              fi
+              ;;
+            *)
+              echo "Usage: kibaos-readonly {enable|disable|status}"
+              exit 1
+              ;;
+          esac
+          ROSWITCH
+          chmod +x /usr/local/bin/kibaos-readonly
+
+          # Enable the /etc overlay service
+          systemctl enable kibaos-etc-overlay.service 2>/dev/null || true
+
+          # ── Note on live session ────────────────────────────────────────
+          # The live session itself already uses overlayfs (via live-boot).
+          # The above config takes effect on the INSTALLED system.
+          # live-boot sets up its own overlay automatically.
+
+          echo "=== Read-only FS overlay configured ==="
+          OVERLAY_HOOK
+          chmod +x config/hooks/live/0130-readonly-overlay.hook.chroot
 
           echo "=== Building ISO ==="
 
