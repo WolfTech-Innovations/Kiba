@@ -90,8 +90,8 @@ jobs:
           kcalc
           qt6-svg-plugins
           desktop-file-utils
-          plasma-widgets-addons
-          kdeplasma-addons
+           plasma-widgets-addons
+          
 
           # Shell - zsh
           zsh
