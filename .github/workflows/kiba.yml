@@ -1147,8 +1147,8 @@ jobs:
           ID_LIKE=debian
           VERSION_ID="1.0"
           PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
           EOF
 
@@ -1250,10 +1250,10 @@ jobs:
             versionedName: "KibaOS 1.0"
             shortVersionedName: "KibaOS 1.0"
             bootloaderEntryName: KibaOS
-            productUrl: https://github.com/WolfTech-Innovations/kibaos
-            supportUrl: https://github.com/WolfTech-Innovations/kibaos/issues
-            knownIssuesUrl: https://github.com/WolfTech-Innovations/kibaos/issues
-            releaseNotesUrl: https://github.com/WolfTech-Innovations/kibaos
+            productUrl: https://github.com/WolfTech-Innovations/kiba
+            supportUrl: https://github.com/WolfTech-Innovations/kiba/issues
+            knownIssuesUrl: https://github.com/WolfTech-Innovations/kiba/issues
+            releaseNotesUrl: https://github.com/WolfTech-Innovations/kiba
           images:
             productLogo: logo.png
             productIcon: logo.png
@@ -1462,9 +1462,9 @@ jobs:
           ID_LIKE=debian
           VERSION_ID="1.0"
           PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           OSREL
 
           cat > /etc/issue << 'ISSUE'
@@ -1602,7 +1602,7 @@ jobs:
                      | cut -d= -f2 | tr -d '"' || echo "trixie")
 
           cat > /etc/apt/sources.list.d/liquorix.list << LIQSRC
-          deb https://liquorix.net/debian ${CODENAME} main
+          deb http://liquorix.net/debian trixie main
           LIQSRC
 
           apt-get update -qq
