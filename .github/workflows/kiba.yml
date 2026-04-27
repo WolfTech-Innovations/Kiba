@@ -119,7 +119,6 @@ jobs:
           qt6-svg-plugins
           desktop-file-utils
           plasma-widgets-addons
-          kdeplasma-addons
           breeze
           plasma-workspace-wallpapers
 
@@ -1273,6 +1272,63 @@ jobs:
           # Point Calamares at our branding
           if [ -f /etc/calamares/settings.conf ]; then
             sed -i 's/branding: .*/branding: kibaos/' /etc/calamares/settings.conf
+            # Ensure shellprocess@post is in the exec sequence.
+            # calamares-settings-debian may not include it — inject it if missing.
+            if ! grep -q "shellprocess@post" /etc/calamares/settings.conf; then
+              # Insert shellprocess@post before the "finished" module line,
+              # or append it to the exec: list if "finished" isn't found.
+              if grep -q "- finished" /etc/calamares/settings.conf; then
+                sed -i '/- finished/i\        - shellprocess@post' \
+                  /etc/calamares/settings.conf
+              else
+                sed -i '/exec:/a\        - shellprocess@post' \
+                  /etc/calamares/settings.conf
+              fi
+            fi
+          else
+            # calamares-settings-debian wasn't installed or put settings.conf
+            # somewhere else — write a minimal but complete settings.conf.
+            cat > /etc/calamares/settings.conf << 'CALASETTINGS'
+          ---
+          modules-search: [ local, /usr/lib/calamares/modules ]
+
+          sequence:
+            - show:
+              - welcome
+              - locale
+              - keyboard
+              - partition
+              - users
+              - summary
+            - exec:
+              - partition
+              - mount
+              - unpackfs
+              - machineid
+              - fstab
+              - locale
+              - keyboard
+              - localecfg
+              - users
+              - displaymanager
+              - networkcfg
+              - hwclock
+              - services-systemd
+              - bootloader-config
+              - grubcfg
+              - bootloader
+              - shellprocess@post
+              - umount
+            - show:
+              - finished
+
+          branding: kibaos
+          prompt-install: false
+          dont-chroot: false
+          oem-setup: false
+          disable-cancel: false
+          disable-cancel-during-exec: false
+          CALASETTINGS
           fi
 
           # ── Calamares show.qml slideshow ──────────────────────────────────
@@ -1323,27 +1379,198 @@ jobs:
 
           # ── Apply post-install hook: copy settings to installed system ─────
           mkdir -p /etc/calamares/modules
-          cat > /etc/calamares/modules/postinstall.conf << 'POSTINSTALL'
+          # shellprocess is the correct Calamares module for running scripts
+          # after installation. The key is "script" with a list of commands.
+          cat > /etc/calamares/modules/shellprocess@post.conf << 'POSTINSTALL'
           ---
+          # KibaOS post-install: runs inside the TARGET (installed) system
+          dontChroot: false
+          timeout: 120
           script:
-            - /usr/share/kibaos/post-install.sh
+            - command: "/usr/share/kibaos/post-install.sh"
+              timeout: 120
           POSTINSTALL
 
           mkdir -p /usr/share/kibaos
           cat > /usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
           #!/bin/bash
-          # Runs inside installed system — copy all KibaOS settings to new user
-          TARGET_HOME="$1"
-          [ -z "$TARGET_HOME" ] && TARGET_HOME="/home/$(getent passwd 1000 | cut -d: -f1)"
-          [ -z "$TARGET_HOME" ] && exit 0
+          # KibaOS post-install hook — runs inside the TARGET (installed) system
+          # via Calamares shellprocess@post module (dontChroot: false).
+          # Copies every system-level config written during live-build chroot
+          # into the installed system so nothing is lost after reboot.
+          set -e
 
+          # ── Resolve target user (UID 1000 = first real user created by Calamares) ──
+          TARGET_USER=$(getent passwd 1000 | cut -d: -f1 || true)
+          [ -z "$TARGET_USER" ] && TARGET_USER=$(ls /home | head -1)
+          [ -z "$TARGET_USER" ] && { echo "ERROR: no target user found"; exit 1; }
+          TARGET_HOME="/home/$TARGET_USER"
+
+          echo "=== KibaOS post-install: target user=$TARGET_USER home=$TARGET_HOME ==="
+
+          # ── 1. Skel → user home (KDE, Konsole, Flatpak, power profiles) ─────
           cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
-          chown -R "$(stat -c '%U:%G' "$TARGET_HOME")" \
-            "$TARGET_HOME/.config" "$TARGET_HOME/.local" 2>/dev/null || true
+          chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME" 2>/dev/null || true
 
-          # Re-add Flathub on installed system
-          flatpak remote-add --if-not-exists flathub \
-            https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+          # ── 2. Shell: set zsh as default for target user ──────────────────────
+          if command -v chsh >/dev/null 2>&1 && [ -x /bin/zsh ]; then
+            chsh -s /bin/zsh "$TARGET_USER" 2>/dev/null || true
+          fi
+          # /etc/zsh/zshrc is already a system file — no copy needed, it lives in /etc
+
+          # ── 3. SDDM: remove live autologin, keep KDE session default ──────────
+          mkdir -p /etc/sddm.conf.d
+          # Remove the live autologin — installed system should require login
+          rm -f /etc/sddm.conf.d/autologin.conf
+          # Write a clean sddm conf pointing at plasma session
+          cat > /etc/sddm.conf.d/kde.conf << 'SDDMCONF'
+          [General]
+          DisplayServer=x11
+          GreeterEnvironment=QT_SCREEN_SCALE_FACTORS=1,QT_FONT_DPI=96
+
+          [Theme]
+          Current=breeze
+
+          [Users]
+          DefaultPath=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+          HideShells=
+          RememberLastSession=true
+          RememberLastUser=true
+          SDDMCONF
+
+          # ── 4. Systemd sleep config ────────────────────────────────────────────
+          mkdir -p /etc/systemd/sleep.conf.d
+          cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
+          [Sleep]
+          AllowSuspend=no
+          AllowHibernation=no
+          AllowHybridSleep=no
+          AllowSuspendThenHibernate=no
+          NOSLEEP
+
+          # ── 5. Sudoers: remove live NOPASSWD, add installed-system sudo group ──
+          rm -f /etc/sudoers.d/live-user
+          # Standard Debian sudo group membership (Calamares adds user to sudo)
+          # No extra sudoers file needed — group membership handles it
+
+          # ── 6. System identity files ──────────────────────────────────────────
+          echo "kibaos" > /etc/hostname
+
+          cat > /etc/os-release << 'OSREL'
+          NAME="KibaOS"
+          ID=kibaos
+          ID_LIKE=debian
+          VERSION_ID="1.0"
+          PRETTY_NAME="KibaOS 1.0"
+          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          OSREL
+
+          cat > /etc/issue << 'ISSUE'
+          KibaOS \r (\l)
+
+          ISSUE
+
+          cat > /etc/motd << 'MOTD'
+
+           _  ___ _             ___  ____
+          | |/ (_) |__   __ _ / _ \/ ___|
+          | ' /| | '_ \ / _` | | | \___ \
+          | . \| | |_) | (_| | |_| |___) |
+          |_|\_\_|_.__/ \__,_|\___/|____/
+
+          Welcome to KibaOS — built on Debian 13 Trixie
+
+          MOTD
+
+          # ── 7. Plymouth theme ─────────────────────────────────────────────────
+          # Theme files live in /usr/share/plymouth — already in squashfs, copied
+          # by live-build's filesystem copy. Re-register the alternative in case
+          # it wasn't preserved.
+          if [ -f /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth ]; then
+            update-alternatives --install \
+              /usr/share/plymouth/themes/default.plymouth default.plymouth \
+              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100 \
+              2>/dev/null || true
+            update-alternatives --set default.plymouth \
+              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth \
+              2>/dev/null || true
+            update-initramfs -u -k all 2>/dev/null || update-initramfs -u 2>/dev/null || true
+          fi
+
+          # ── 8. GRUB branding ──────────────────────────────────────────────────
+          # /etc/default/grub already contains KibaOS branding from the chroot
+          # hook (appended via cat >>). Ensure update-grub runs so it takes.
+          if command -v update-grub >/dev/null 2>&1; then
+            update-grub 2>/dev/null || true
+          fi
+
+          # ── 9. KDE system-wide defaults (/etc/xdg) ───────────────────────────
+          # /etc/xdg/kdeglobals is written in the chroot and lives in squashfs.
+          # Ensure /etc/xdg/ has the right files for the installed system.
+          mkdir -p /etc/xdg
+          # Already present from squashfs — no-op if correct; re-write to be safe.
+          cat > /etc/xdg/kdeglobals << 'XDGKDEGLOBALS'
+          [KDE]
+          LookAndFeelPackage=org.kde.breezedark.desktop
+          SingleClick=false
+          contrast=4
+
+          [Icons]
+          Theme=kora
+
+          [General]
+          ColorScheme=Dracula
+          widgetStyle=Breeze
+          shadeSortColumn=true
+          XCURSOR_THEME=Vimix-cursors
+          XCURSOR_SIZE=24
+          XDGKDEGLOBALS
+
+          # ── 10. Cursor default ────────────────────────────────────────────────
+          mkdir -p /usr/share/icons/default
+          cat > /usr/share/icons/default/index.theme << 'CURSORDEFAULT'
+          [Icon Theme]
+          Inherits=Vimix-cursors
+          CURSORDEFAULT
+
+          # ── 11. Calamares branding (already in /etc/calamares via squashfs) ───
+          # Ensure logo exists — re-copy from /usr/share/kibaos in case path broke
+          if [ -f /usr/share/kibaos/logo.png ]; then
+            mkdir -p /etc/calamares/branding/kibaos
+            cp -f /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
+            cp -f /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
+          fi
+
+          # ── 12. KibaStore (Discover rename) ──────────────────────────────────
+          # /usr/local/share/applications override is already in squashfs.
+          update-desktop-database /usr/local/share/applications 2>/dev/null || true
+
+          # ── 13. Flatpak remotes ───────────────────────────────────────────────
+          if command -v flatpak >/dev/null 2>&1; then
+            flatpak remote-add --if-not-exists flathub \
+              https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+          fi
+
+          # ── 14. Enable required services ─────────────────────────────────────
+          systemctl enable sddm           2>/dev/null || true
+          systemctl enable NetworkManager 2>/dev/null || true
+
+          # ── 15. overlayroot: installed system should NOT have live tmpfs overlay
+          # Clear overlayroot so the installed system boots normally (r/w)
+          if [ -f /etc/overlayroot.conf ]; then
+            echo 'overlayroot=""' > /etc/overlayroot.conf
+            echo 'overlayroot_cfgdisk="disabled"' >> /etc/overlayroot.conf
+          fi
+          # The kibaos-etc-overlay service is only for live; disable on installed
+          systemctl disable kibaos-etc-overlay.service 2>/dev/null || true
+
+          # ── 16. kibaos-readonly tool ─────────────────────────────────────────
+          # /usr/local/bin/kibaos-readonly already copied via squashfs — ensure +x
+          chmod +x /usr/local/bin/kibaos-readonly 2>/dev/null || true
+
+          echo "=== KibaOS post-install complete ==="
           POSTINSTALLSH
           chmod +x /usr/share/kibaos/post-install.sh
 
