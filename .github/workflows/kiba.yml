@@ -651,27 +651,27 @@ jobs:
 
               Rectangle {
                   anchors.fill: parent
-                  color: "#0a0a0a"
+                  color: "#00000"
                   opacity: 0.85
               }
 
               Text {
                   anchors.centerIn: parent
-                  text: "KibaOS"
+                  text: "KibaOS | Switch to simple"
                   font.pixelSize: 48
                   font.bold: true
                   color: "#00e5ff"
                   style: Text.Outline
-                  styleColor: "#003344"
+                  styleColor: "#ffffff"
               }
 
               Text {
                   anchors.horizontalCenter: parent.horizontalCenter
                   anchors.bottom: parent.bottom
                   anchors.bottomMargin: 60
-                  text: "Loading..."
+                  text: ""
                   font.pixelSize: 16
-                  color: "#00bcd4"
+                  color: "#fffff"
               }
           }
           WATCHSPLASH
@@ -1766,9 +1766,9 @@ jobs:
           ID_LIKE=debian
           VERSION_ID="1.0"
           PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           EOF
 
           cat > /etc/issue << 'EOF'
@@ -1869,10 +1869,10 @@ jobs:
             versionedName: "KibaOS 1.0"
             shortVersionedName: "KibaOS 1.0"
             bootloaderEntryName: KibaOS
-            productUrl: https://github.com/WolfTech-Innovations/kibaos
-            supportUrl: https://github.com/WolfTech-Innovations/kibaos/issues
-            knownIssuesUrl: https://github.com/WolfTech-Innovations/kibaos/issues
-            releaseNotesUrl: https://github.com/WolfTech-Innovations/kibaos
+            productUrl: https://github.com/WolfTech-Innovations/kiba
+            supportUrl: https://github.com/WolfTech-Innovations/kiba/issues
+            knownIssuesUrl: https://github.com/WolfTech-Innovations/kiba/issues
+            releaseNotesUrl: https://github.com/WolfTech-Innovations/kiba
           images:
             productLogo: logo.png
             productIcon: logo.png
@@ -2951,7 +2951,7 @@ jobs:
                      | cut -d= -f2 | tr -d '"' || echo "trixie")
 
           cat > /etc/apt/sources.list.d/liquorix.list << LIQSRC
-          deb https://liquorix.net/debian ${CODENAME} main
+          deb https://liquorix.net/debian trixie main
           LIQSRC
 
           apt-get update -qq
