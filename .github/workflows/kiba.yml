@@ -171,8 +171,7 @@ jobs:
           qml6-module-qtquick-layouts
           qml6-module-qtquick-window
           qml6-module-qtqml
-          # Keyboard layout detection (used by keyboard module):
-          ckbcomp
+          # Keyboard layout detection (used by keyboard module)
           # Python modules for calamares Python jobs:
           python3-pyqt6
           python3-dbus
