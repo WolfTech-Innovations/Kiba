@@ -98,13 +98,15 @@ jobs:
           git
           apt-transport-https
 
-          # KDE Plasma 6 (Debian 13 trixie)
+          # KDE Plasma 6 (Debian 13 trixie) — minimal working set
+          # kde-standard is intentionally excluded: it pulls in ~800MB of extras
+          # including kdepim, kdeedu, kdeutils we don't need. We list exactly what
+          # we need so the ISO stays lean.
           kde-plasma-desktop
           plasma-desktop
           plasma-workspace
           sddm
           sddm-theme-debian-breeze
-          kde-standard
           plasma-nm
           plasma-pa
           plasma-firewall
@@ -118,9 +120,14 @@ jobs:
           kcalc
           qt6-svg-plugins
           desktop-file-utils
-          plasma-widgets-addons
-          breeze
+          # Plasma addons — explicit packages instead of the kde-standard metapkg:
+          #   plasma-widgets-addons → replaced by plasma-workspace-wallpapers below
+          #   kdeplasma-addons      → replaced by individual components
           plasma-workspace-wallpapers
+          plasma-wallpapers-addons
+          kwin-addons
+          breeze
+          breeze-gtk-theme
 
           # Flatpak support
           flatpak
@@ -138,11 +145,41 @@ jobs:
           plymouth-themes
           kde-config-plymouth
 
-          # Essential apps
-          firefox-esr
-          vlc
+          # ── Calamares installer + all confirmed runtime dependencies (trixie) ──
+          # Confirmed from packages.debian.org/trixie/calamares:
           calamares
           calamares-settings-debian
+          # Calamares hard deps pulled automatically by apt, but list explicitly
+          # so live-build doesn't strip them during chroot:
+          libkpmcore12
+          libparted2t64
+          libpwquality1
+          libpython3.13
+          libqt6core6t64
+          libqt6dbus6
+          libqt6gui6
+          libqt6network6
+          libqt6qml6
+          libqt6quick6
+          libqt6quickwidgets6
+          libqt6svg6
+          libqt6widgets6
+          libqt6xml6
+          # QML modules calamares slideshow requires at runtime:
+          qml6-module-qtquick
+          qml6-module-qtquick-controls
+          qml6-module-qtquick-layouts
+          qml6-module-qtquick-window
+          qml6-module-qtqml
+          # Keyboard layout detection (used by keyboard module):
+          ckbcomp
+          # Python modules for calamares Python jobs:
+          python3-pyqt6
+          python3-dbus
+
+          # ── Browsers / media ──────────────────────────────────────────────────
+          firefox-esr
+          vlc
 
           # Essential tools
           nano
@@ -180,18 +217,45 @@ jobs:
           mkdir -p /usr/share/kibaos
           mkdir -p /usr/share/plymouth/themes/kibaos-spinner
 
-          # Embed boot logo as base64 and decode it directly — no network needed
-          cat > /tmp/logo_b64.txt << 'LOGO_B64'
+          # Encode the actual KibaOS logo (uploaded PNG) as base64 for embedding.
+          # The logo is the dark navy geometric arrow/chevron mark on white background.
+          # We convert it: invert to white-on-dark for the dark Plymouth background,
+          # then embed it. The raw PNG is also copied for use in Calamares branding.
+          if [ -f /tmp/kibaos-logo-original.png ]; then
+            # Use the logo as-is (already dark navy on white — fine for Calamares)
+            cp /tmp/kibaos-logo-original.png /usr/share/kibaos/logo.png
+
+            # For Plymouth (dark #282a36 background) we need a white version:
+            # Invert the logo colours so the mark shows white on transparent/dark.
+            if command -v convert >/dev/null 2>&1; then
+              convert /tmp/kibaos-logo-original.png \
+                -channel RGB -negate \
+                -background "#282a36" -alpha remove \
+                /usr/share/kibaos/logo-plymouth.png 2>/dev/null || \
+                cp /usr/share/kibaos/logo.png /usr/share/kibaos/logo-plymouth.png
+            else
+              cp /usr/share/kibaos/logo.png /usr/share/kibaos/logo-plymouth.png
+            fi
+          fi
+
+          # Fallback: decode the embedded base64 logo if file wasn't pre-staged
+          if [ ! -f /usr/share/kibaos/logo.png ]; then
+              cat > /tmp/logo_b64.txt << 'LOGO_B64'
           iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAADH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
           LOGO_B64
+            base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
+            rm /tmp/logo_b64.txt
+            cp /usr/share/kibaos/logo.png /usr/share/kibaos/logo-plymouth.png
+          fi
 
-          base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
-          rm /tmp/logo_b64.txt
+          # ── Plymouth theme — logo-based boot splash ───────────────────────
+          # Uses the 'script' Plymouth module which gives us full control.
+          # Layout: dark Dracula bg, KibaOS logo centred, thin progress bar,
+          # "KibaOS" text label, spinner dots beneath logo.
 
-          # Plymouth theme config — Dracula indigo background (#282a36)
           cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth << 'PLYMOUTH_THEME'
           [Plymouth Theme]
-          Name=KibaOS Spinner
+          Name=KibaOS
           Description=KibaOS boot splash
           ModuleName=script
 
@@ -200,45 +264,96 @@ jobs:
           ScriptFile=/usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
           PLYMOUTH_THEME
 
-          # Midnight indigo = Dracula #282a36 = (0.157, 0.165, 0.212)
+          # Plymouth script — logo centred, animated dot-pulse progress bar
+          # Dracula bg: R=0.157 G=0.165 B=0.212  (#282a36)
+          # Dracula purple: R=0.741 G=0.576 B=0.976  (#bd93f9)
           cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script << 'PLYMOUTH_SCRIPT'
+          # ── Background ─────────────────────────────────────────────────────
           Window.SetBackgroundTopColor(0.157, 0.165, 0.212);
           Window.SetBackgroundBottomColor(0.157, 0.165, 0.212);
 
-          logo.image = Image("watermark.png");
-          logo.sprite = Sprite(logo.image);
-          logo.x = Window.GetX() + Window.GetWidth()  / 2 - logo.image.GetWidth()  / 2;
-          logo.y = Window.GetY() + Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 80;
-          logo.sprite.SetPosition(logo.x, logo.y, 0);
+          screen_width  = Window.GetWidth();
+          screen_height = Window.GetHeight();
+          cx = screen_width  / 2;
+          cy = screen_height / 2;
 
-          for (i = 0; i < 32; i++) {
-              spinner_image[i] = Image("spinner-" + i + ".png");
-          }
-          spinner.sprite = Sprite();
-          spinner.frame = 0;
-          spinner.x = Window.GetX() + Window.GetWidth()  / 2 - spinner_image[0].GetWidth()  / 2;
-          spinner.y = logo.y + logo.image.GetHeight() + 40;
-          spinner.sprite.SetPosition(spinner.x, spinner.y, 1);
+          # ── Logo ────────────────────────────────────────────────────────────
+          logo.image  = Image("logo.png");
+          # Scale logo to ~160px wide, maintain aspect
+          logo_target_w = 160;
+          logo_scale    = logo_target_w / logo.image.GetWidth();
+          logo.scaled   = logo.image.Scale(
+                            Math.Int(logo.image.GetWidth()  * logo_scale),
+                            Math.Int(logo.image.GetHeight() * logo_scale));
+          logo.sprite   = Sprite(logo.scaled);
+          logo.x = cx - logo.scaled.GetWidth()  / 2;
+          logo.y = cy - logo.scaled.GetHeight() / 2 - 60;
+          logo.sprite.SetPosition(logo.x, logo.y, 1);
+
+          # ── "KibaOS" label beneath logo ─────────────────────────────────────
+          label.image  = Image.Text("KibaOS", 0.741, 0.576, 0.976,
+                                    1, "Sans Bold 20");
+          label.sprite = Sprite(label.image);
+          label.sprite.SetPosition(
+            cx - label.image.GetWidth() / 2,
+            logo.y + logo.scaled.GetHeight() + 16,
+            1);
+
+          # ── "Switch to Simple" tagline ───────────────────────────────────────
+          tag.image  = Image.Text("Switch to Simple", 0.384, 0.447, 0.643,
+                                  1, "Sans 13");
+          tag.sprite = Sprite(tag.image);
+          tag.sprite.SetPosition(
+            cx - tag.image.GetWidth() / 2,
+            logo.y + logo.scaled.GetHeight() + 48,
+            1);
+
+          # ── Progress bar (thin, 400px wide) ─────────────────────────────────
+          bar_w = 400;
+          bar_h = 4;
+          bar_x = cx - bar_w / 2;
+          bar_y = cy + logo.scaled.GetHeight() / 2 + 70;
+
+          # Background track (dark grey)
+          bar_bg.image  = Image(bar_w, bar_h);
+          bar_bg.image.FillWithColor(0.267, 0.278, 0.349, 1.0);
+          bar_bg.sprite = Sprite(bar_bg.image);
+          bar_bg.sprite.SetPosition(bar_x, bar_y, 1);
+
+          # Filled progress
+          bar_fg.image  = Image(1, bar_h);
+          bar_fg.image.FillWithColor(0.741, 0.576, 0.976, 1.0);
+          bar_fg.sprite = Sprite(bar_fg.image);
+          bar_fg.sprite.SetPosition(bar_x, bar_y, 2);
+          bar_fg.width  = 1;
 
           fun progress_callback(duration, progress) {
-              spinner.frame = Math.Int(progress * 32) % 32;
-              spinner.sprite.SetImage(spinner_image[spinner.frame]);
+              new_w = Math.Int(bar_w * progress);
+              if (new_w < 1) { new_w = 1; }
+              if (new_w != bar_fg.width) {
+                  bar_fg.image  = Image(new_w, bar_h);
+                  bar_fg.image.FillWithColor(0.741, 0.576, 0.976, 1.0);
+                  bar_fg.sprite.SetImage(bar_fg.image);
+                  bar_fg.width = new_w;
+              }
           }
-          Plymouth.SetRefreshFunction(progress_callback);
+          Plymouth.SetBootProgressFunction(progress_callback);
 
-          message_sprite = Sprite();
-          message_sprite.SetPosition(10, 10, 10000);
+          # ── Status message (bottom-left, small) ──────────────────────────────
+          msg.sprite = Sprite();
+          msg.sprite.SetPosition(16, screen_height - 36, 10);
           fun message_callback(text) {
-              message_image = Image.Text(text, 1, 1, 1);
-              message_sprite.SetImage(message_image);
+              msg.image = Image.Text(text, 0.596, 0.631, 0.784, 1, "Sans 11");
+              msg.sprite.SetImage(msg.image);
           }
           Plymouth.SetMessageFunction(message_callback);
           PLYMOUTH_SCRIPT
 
-          cp /usr/share/kibaos/logo.png \
-             /usr/share/plymouth/themes/kibaos-spinner/watermark.png
+          # Use the logo-plymouth (white/inverted) for the boot screen
+          cp /usr/share/kibaos/logo-plymouth.png \
+             /usr/share/plymouth/themes/kibaos-spinner/logo.png
 
-          # Borrow spinner frames from the default spinner theme if available
+          # Keep spinner PNGs for compatibility (some plymouth builds need them)
           if [ -d /usr/share/plymouth/themes/spinner ]; then
               cp /usr/share/plymouth/themes/spinner/spinner-*.png \
                  /usr/share/plymouth/themes/kibaos-spinner/ 2>/dev/null || true
@@ -253,19 +368,121 @@ jobs:
           # Rebuild initramfs so plymouth theme actually loads on boot
           update-initramfs -u -k all || update-initramfs -u
 
-          # ── GRUB branding ─────────────────────────────────────────────────
+          # ── GRUB branding — full overwrite ────────────────────────────────
+          # live-build generates a default /etc/default/grub that shows the
+          # generic Debian iso-builder GRUB menu. We overwrite it completely
+          # so KibaOS branding is in control from the start.
+          # We also install a GRUB theme (custom colours + KibaOS title) by
+          # writing a theme.txt into /boot/grub/themes/kibaos/.
 
-          cat >> /etc/default/grub << 'GRUB_CONFIG'
-
-          # KibaOS GRUB Branding
-          GRUB_DISTRIBUTOR="KibaOS"
+          cat > /etc/default/grub << 'GRUB_CONFIG'
+          GRUB_DEFAULT=0
           GRUB_TIMEOUT=5
-          GRUB_CMDLINE_LINUX_DEFAULT="quiet splash"
+          GRUB_TIMEOUT_STYLE=menu
+          GRUB_DISTRIBUTOR="KibaOS"
+          GRUB_CMDLINE_LINUX_DEFAULT="quiet splash loglevel=3 rd.udev.log_priority=3"
           GRUB_CMDLINE_LINUX=""
           GRUB_GFXMODE=1920x1080,1280x720,auto
-          GRUB_COLOR_NORMAL="white/black"
-          GRUB_COLOR_HIGHLIGHT="black/white"
+          GRUB_GFXPAYLOAD_LINUX=keep
+          GRUB_COLOR_NORMAL="light-cyan/black"
+          GRUB_COLOR_HIGHLIGHT="black/light-cyan"
+          GRUB_THEME="/boot/grub/themes/kibaos/theme.txt"
+          GRUB_TERMINAL_OUTPUT="gfxterm"
+          GRUB_DISABLE_OS_PROBER=false
           GRUB_CONFIG
+
+          # ── KibaOS GRUB theme ─────────────────────────────────────────────
+          # Dracula-palette GRUB theme — no external assets needed, pure text.
+          mkdir -p /boot/grub/themes/kibaos
+
+          cat > /boot/grub/themes/kibaos/theme.txt << 'GRUBTHEME'
+          # KibaOS GRUB Theme — Dracula-palette, minimal
+
+          title-text: "KibaOS"
+          title-font: "Sans Bold 22"
+          title-color: "#bd93f9"
+
+          desktop-color: "#282a36"
+          desktop-image: ""
+
+          + label {
+              left = 50%-200
+              top = 15%
+              width = 400
+              height = 40
+              text = "KibaOS — Switch to Simple"
+              font = "Sans Bold 18"
+              color = "#f8f8f2"
+              align = "center"
+          }
+
+          + label {
+              left = 50%-200
+              top = 23%
+              width = 400
+              height = 28
+              text = "Built on Debian 13 Trixie"
+              font = "Sans 14"
+              color = "#6272a4"
+              align = "center"
+          }
+
+          + boot_menu {
+              left = 50%-250
+              top = 35%
+              width = 500
+              height = 280
+              item_font = "Sans 14"
+              item_color = "#f8f8f2"
+              selected_item_font = "Sans Bold 14"
+              selected_item_color = "#282a36"
+              selected_item_pixmap_style = ""
+              selected_item_bg_color = "#bd93f9"
+              icon_width = 0
+              icon_height = 0
+              item_height = 36
+              item_padding = 10
+              item_icon_space = 0
+              scrollbar = false
+          }
+
+          + progress_bar {
+              id = "__timeout__"
+              left = 50%-250
+              top = 82%
+              width = 500
+              height = 8
+              bg_color = "#44475a"
+              fg_color = "#bd93f9"
+              border_color = "#44475a"
+              bar_style = "progress_bar"
+              highlight_style = "progress_bar"
+          }
+
+          + label {
+              left = 50%-250
+              top = 87%
+              width = 500
+              height = 24
+              text = "Use ↑↓ to navigate  |  Enter to boot  |  e to edit"
+              font = "Sans 12"
+              color = "#6272a4"
+              align = "center"
+          }
+          GRUBTHEME
+
+          # live-build also generates isolinux/grub.cfg for the ISO boot menu.
+          # Override the live boot menu title while we're here.
+          if [ -f /boot/grub/grub.cfg ]; then
+            sed -i 's/Debian GNU\/Linux/KibaOS/g'  /boot/grub/grub.cfg || true
+            sed -i 's/debian/kibaos/gi'             /boot/grub/grub.cfg || true
+          fi
+
+          # Also patch the live-build EFI grub stub title
+          for f in /usr/share/live/build/bootloaders/grub-efi/grub.cfg \
+                   /usr/share/live/build/bootloaders/grub-pc/grub.cfg; do
+            [ -f "$f" ] && sed -i 's/Debian GNU\/Linux/KibaOS/g' "$f" || true
+          done
 
           # ── SDDM autologin for live session ───────────────────────────────
 
@@ -1006,7 +1223,7 @@ jobs:
           wallpaperplugin=org.kde.image
 
           [Containments][1][Wallpaper][org.kde.image][General]
-          Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
+          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
           SlideshowInterval=0
 
           [Containments][1][Applets][10]
@@ -1124,10 +1341,413 @@ jobs:
           Timeout=0
 
           [Greeter][Wallpaper][org.kde.image][General]
-          Image=file:///usr/share/wallpapers/Next/contents/images/5120x2880.png
+          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
           LOCKRC
 
-          # ── K. Copy skel → live user ──────────────────────────────────────
+          # ─────────────────────────────────────────────────────────────────
+          # ── O. Liquid Glass + ChromeOS-inspired aesthetic ─────────────────
+          # No external icon packs or themes required.
+          # Achieved entirely through KDE config: blur, transparency, contrast,
+          # rounded corners, translucent panel, and a ChromeOS-style bottom bar.
+          # "Liquid glass" = heavy blur + frosted transparency on all surfaces.
+          # ChromeOS = minimal, clean, bottom shelf with app icons only.
+          # ─────────────────────────────────────────────────────────────────
+
+          # O-1. KWin: Maximum blur + high contrast effect ("frosted glass")
+          cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
+          [Compositing]
+          Enabled=true
+          Backend=OpenGL
+          GLCore=true
+          HiddenPreviews=5
+          OpenGLIsUnsafe=false
+          AnimationSpeed=3
+
+          [Effect-overview]
+          BorderActivate=7
+
+          [Plugins]
+          # Blur is the core of the liquid glass look
+          blurEnabled=true
+          # Contrast sharpens the frosted appearance
+          contrastEnabled=true
+          kwin4_effect_dimscreenEnabled=false
+          slideEnabled=true
+          wobblywindowsEnabled=false
+          # Window thumbnails (ChromeOS overview-like)
+          presentwindowsEnabled=true
+
+          [Effect-blur]
+          BlurStrength=12
+          NoiseStrength=2
+
+          [Windows]
+          RoundedCorners=true
+
+          [org.kde.kdecoration2]
+          ButtonsOnLeft=
+          ButtonsOnRight=IAX
+          library=org.kde.breeze
+          BorderSize=None
+          BorderSizeAuto=false
+
+          [Script-roundedwindows]
+          # 16px radius = macOS-style soft corners
+          CornerRadius=16
+          KWINRC
+
+          # O-2. Plasma panel: translucent floating ChromeOS-style bottom shelf
+          # Floating panel with transparency looks like ChromeOS shelf or macOS dock.
+          cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
+          [PlasmaViews][Panel 2][Defaults]
+          thickness=52
+
+          [PlasmaViews][Panel 2][Horizontal1920]
+          thickness=52
+
+          [PlasmaViews][Panel 2][floating]
+          floating=1
+
+          [PlasmaViews][Panel 2][opacity]
+          type=2
+          PLASMASHELLRC
+
+          # O-3. Breeze decoration: stronger glass-like shadow
+          cat > "$SKEL_KDE/breezerc" << 'BREEZERC'
+          [Common]
+          ShadowColor=40,42,54
+          ShadowSize=ShadowVeryLarge
+          ShadowStrength=128
+          BackgroundOpacity=85
+
+          [Windeco Exception 0]
+          BorderSize=None
+          Enabled=true
+          ExceptionPattern=.*
+          ExceptionType=0
+          HideTitleBar=false
+          Mask=2
+          BREEZERC
+
+          # O-4. KDE global: enable translucency on plasma theme
+          #      We override the colour scheme to add alpha transparency where
+          #      KDE supports it — primarily through the plasma style config.
+          cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
+          [Theme]
+          name=breeze-dark
+
+          [PlasmaTabletMode]
+          TabletMode=off
+
+          [KScreen]
+          ScaleFactor=1
+          PLASMARC
+
+          # O-5. KDE theme: write a colours override that uses lower alpha backgrounds
+          #      KDE 6 respects *Background*Alpha keys in the color scheme.
+          #      This gives everything a translucent tinted glass look.
+          mkdir -p /usr/share/color-schemes
+          cat > /usr/share/color-schemes/KibaOSGlass.colors << 'GLASS_COLORS'
+          [ColorEffects:Disabled]
+          ChangeSelectionColor=true
+          Color=56,56,56
+          ColorAmount=0
+          ColorEffect=0
+          ContrastAmount=0.65
+          ContrastEffect=1
+          IntensityAmount=0.1
+          IntensityEffect=2
+
+          [ColorEffects:Inactive]
+          Enable=false
+
+          [Colors:Button]
+          BackgroundAlternate=68,71,90,180
+          BackgroundNormal=68,71,90,180
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Selection]
+          BackgroundNormal=189,147,249,200
+          BackgroundAlternate=68,71,90,200
+          ForegroundNormal=40,42,54
+          ForegroundInactive=98,114,164
+          ForegroundActive=248,248,242
+
+          [Colors:View]
+          BackgroundNormal=40,42,54,160
+          BackgroundAlternate=40,42,54,160
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+
+          [Colors:Window]
+          BackgroundNormal=40,42,54,200
+          BackgroundAlternate=68,71,90,200
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+
+          [Colors:Tooltip]
+          BackgroundNormal=40,42,54,200
+          BackgroundAlternate=68,71,90,200
+          ForegroundNormal=248,248,242
+
+          [Colors:Complementary]
+          BackgroundNormal=40,42,54,200
+          BackgroundAlternate=40,42,54,200
+          ForegroundNormal=248,248,242
+
+          [Colors:Header]
+          BackgroundNormal=40,42,54,200
+          BackgroundAlternate=40,42,54,200
+          ForegroundNormal=248,248,242
+
+          [General]
+          ColorScheme=KibaOSGlass
+          Name=KibaOS Glass
+          shadeSortColumn=true
+
+          [KDE]
+          contrast=7
+          GLASS_COLORS
+
+          # Point kdeglobals at the glass colour scheme
+          sed -i 's/^ColorScheme=.*/ColorScheme=KibaOSGlass/' "$SKEL_KDE/kdeglobals"
+
+          # O-6. ChromeOS-style: taskbar uses Icon-only tasks (no labels),
+          #      floating panel, large icons. Already configured in appletsrc above —
+          #      the icontasks applet handles this. Add a chromeos-feel app grid:
+          mkdir -p "$SKEL_KDE"
+          cat >> "$SKEL_KDE/krunnerrc" << 'KRUNNERRC'
+          [General]
+          # Fast launcher on Meta key (ChromeOS launcher-style)
+          activateWhenTypingOnDesktop=true
+          KRUNNERRC
+
+          # O-7. KDE 6 desktop: single-click to open (ChromeOS behaviour)
+          sed -i 's/SingleClick=.*/SingleClick=true/' "$SKEL_KDE/kdeglobals" 2>/dev/null || true
+
+          # O-8. Font smoothing: subpixel antialiasing (liquid glass needs smooth fonts)
+          cat > "$SKEL_KDE/kdeglobals_fonts" << 'FONTCONF'
+          [General]
+          font=Noto Sans,10,-1,5,50,0,0,0,0,0
+          menuFont=Noto Sans,10,-1,5,50,0,0,0,0,0
+          smallestReadableFont=Noto Sans,8,-1,5,50,0,0,0,0,0
+          toolBarFont=Noto Sans,10,-1,5,50,0,0,0,0,0
+          fixed=Noto Mono,11,-1,5,50,0,0,0,0,0
+          FONTCONF
+
+          # Add Noto fonts to package list is handled in package list above;
+          # here we just configure the font settings in skel.
+          mkdir -p /etc/fonts/conf.d
+          cat > /etc/fonts/local.conf << 'FONTSCONF'
+          <?xml version="1.0"?>
+          <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+          <fontconfig>
+            <match target="font">
+              <edit name="antialias" mode="assign"><bool>true</bool></edit>
+              <edit name="hinting" mode="assign"><bool>true</bool></edit>
+              <edit name="hintstyle" mode="assign"><const>hintslight</const></edit>
+              <edit name="rgba" mode="assign"><const>rgb</const></edit>
+              <edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit>
+            </match>
+          </fontconfig>
+          FONTSCONF
+
+          # ─────────────────────────────────────────────────────────────────
+          # ── P. Calamares age verification module (California AADC) ────────
+          # California Age-Appropriate Design Code (AB 2273) requires apps
+          # to verify user age before data collection. We implement this as
+          # a custom Calamares Python view module that runs during installation.
+          # The module shows a simple age gate page and writes the result to
+          # /etc/kibaos/user-age-verified which post-install can check.
+          # ─────────────────────────────────────────────────────────────────
+
+          mkdir -p /usr/lib/calamares/modules/ageverify
+          cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'
+          ---
+          type: "view"
+          name: "ageverify"
+          interface: "python"
+          script: "main.py"
+          AGEDESC
+
+          cat > /usr/lib/calamares/modules/ageverify/main.py << 'AGEPYEOF'
+          #!/usr/bin/env python3
+          # -*- coding: utf-8 -*-
+          # KibaOS Age Verification — California AADC (AB 2273) compliance
+          # Shown as a Calamares installer page before users complete setup.
+          # Written as a Calamares Python view module using PythonQt / PyQt6.
+
+          import calamares
+          from PyQt6.QtWidgets import (
+              QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+              QPushButton, QButtonGroup, QRadioButton,
+              QFrame, QSizePolicy, QSpacerItem
+          )
+          from PyQt6.QtCore import Qt
+          from PyQt6.QtGui import QFont, QColor, QPalette
+          import os
+
+          class AgeVerifyPage(QWidget):
+              def __init__(self):
+                  super().__init__()
+                  self._age_group = None
+                  self._selection  = None
+                  self._build_ui()
+
+              def _build_ui(self):
+                  layout = QVBoxLayout(self)
+                  layout.setContentsMargins(48, 32, 48, 32)
+                  layout.setSpacing(16)
+
+                  # ── Header ─────────────────────────────────────────────
+                  title = QLabel("Age Verification")
+                  f = title.font()
+                  f.setPointSize(20)
+                  f.setBold(True)
+                  title.setFont(f)
+                  layout.addWidget(title)
+
+                  sub = QLabel(
+                      "California law (AB 2273 — Age-Appropriate Design Code) requires "
+                      "us to verify your age group before completing installation. "
+                      "This information is stored locally on your device only and is "
+                      "never transmitted."
+                  )
+                  sub.setWordWrap(True)
+                  sub.setStyleSheet("color: #6272a4; font-size: 13px;")
+                  layout.addWidget(sub)
+
+                  sep = QFrame()
+                  sep.setFrameShape(QFrame.Shape.HLine)
+                  sep.setStyleSheet("color: #44475a;")
+                  layout.addWidget(sep)
+
+                  prompt = QLabel("Please select your age group:")
+                  pf = prompt.font()
+                  pf.setPointSize(13)
+                  prompt.setFont(pf)
+                  layout.addWidget(prompt)
+
+                  # ── Age radio buttons ───────────────────────────────────
+                  self._age_group = QButtonGroup(self)
+                  age_choices = [
+                      ("under13",   "Under 13  (Children — enhanced privacy protections apply)"),
+                      ("13to15",    "13 – 15   (Teen — some content restrictions apply)"),
+                      ("16to17",    "16 – 17   (Minor — standard minor protections)"),
+                      ("18plus",    "18 or older  (Adult — full access)"),
+                      ("decline",   "Prefer not to say"),
+                  ]
+                  for value, label in age_choices:
+                      rb = QRadioButton(label)
+                      rb.setProperty("ageValue", value)
+                      rb.setStyleSheet("font-size: 13px; padding: 6px 0;")
+                      self._age_group.addButton(rb)
+                      layout.addWidget(rb)
+
+                  self._age_group.buttonClicked.connect(self._on_age_selected)
+
+                  layout.addItem(QSpacerItem(20, 20,
+                      QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
+                  # ── Privacy note ────────────────────────────────────────
+                  note = QLabel(
+                      "🔒  Your selection is saved to /etc/kibaos/age-verify on this device "
+                      "only. KibaOS does not collect or transmit personal data."
+                  )
+                  note.setWordWrap(True)
+                  note.setStyleSheet(
+                      "background: rgba(68,71,90,120); border-radius: 8px; "
+                      "padding: 10px; color: #f8f8f2; font-size: 12px;"
+                  )
+                  layout.addWidget(note)
+
+              def _on_age_selected(self, btn):
+                  self._selection = btn.property("ageValue")
+
+              def isComplete(self):
+                  # Page is complete when user has made a selection
+                  return self._selection is not None
+
+              def getSelection(self):
+                  return self._selection
+
+
+          _page = None
+
+          def viewStep():
+              return _page
+
+          def create():
+              global _page
+              _page = AgeVerifyPage()
+              return _page
+
+          def onLeave():
+              """Called when the user clicks Next. Write their choice to disk."""
+              global _page
+              if _page is None:
+                  return
+              selection = _page.getSelection() or "not-answered"
+              try:
+                  target = calamares.globalstorage.value("rootMountPoint") or ""
+                  dest = os.path.join(target, "etc", "kibaos")
+                  os.makedirs(dest, exist_ok=True)
+                  with open(os.path.join(dest, "age-verify"), "w") as f:
+                      f.write(f"age_group={selection}\n")
+                      f.write("# KibaOS age verification — California AB 2273\n")
+                      f.write("# Stored locally only, never transmitted.\n")
+              except Exception as e:
+                  calamares.utils.debug(f"ageverify: could not write result: {e}")
+
+          def prettyName():
+              return "Age Verification"
+
+          def isNextEnabled():
+              return True   # Allow skip (user may not wish to answer)
+
+          def onActivate():
+              pass
+
+          def retranslate():
+              pass
+          AGEPYEOF
+
+          chmod +x /usr/lib/calamares/modules/ageverify/main.py
+
+          # Add ageverify to the Calamares settings.conf show sequence
+          # (it's a view module — it goes in the "show" list, not "exec")
+          if [ -f /etc/calamares/settings.conf ]; then
+            # Insert after "users" in the show sequence
+            if ! grep -q "ageverify" /etc/calamares/settings.conf; then
+              sed -i '/^\s*- users$/a\              - ageverify' \
+                /etc/calamares/settings.conf
+            fi
+          fi
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
 
@@ -1147,8 +1767,8 @@ jobs:
           ID_LIKE=debian
           VERSION_ID="1.0"
           PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
+          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
           BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
           EOF
 
@@ -1250,10 +1870,10 @@ jobs:
             versionedName: "KibaOS 1.0"
             shortVersionedName: "KibaOS 1.0"
             bootloaderEntryName: KibaOS
-            productUrl: https://github.com/WolfTech-Innovations/kiba
-            supportUrl: https://github.com/WolfTech-Innovations/kiba/issues
-            knownIssuesUrl: https://github.com/WolfTech-Innovations/kiba/issues
-            releaseNotesUrl: https://github.com/WolfTech-Innovations/kiba
+            productUrl: https://github.com/WolfTech-Innovations/kibaos
+            supportUrl: https://github.com/WolfTech-Innovations/kibaos/issues
+            knownIssuesUrl: https://github.com/WolfTech-Innovations/kibaos/issues
+            releaseNotesUrl: https://github.com/WolfTech-Innovations/kibaos
           images:
             productLogo: logo.png
             productIcon: logo.png
@@ -1272,25 +1892,47 @@ jobs:
           # Point Calamares at our branding
           if [ -f /etc/calamares/settings.conf ]; then
             sed -i 's/branding: .*/branding: kibaos/' /etc/calamares/settings.conf
-            # Ensure shellprocess@post is in the exec sequence.
-            # calamares-settings-debian may not include it — inject it if missing.
+
+            # Ensure shellprocess@post is in the exec sequence BEFORE umount.
+            # calamares-settings-debian uses 2-space indentation.
+            # We must also ensure an instances: block exists for shellprocess@post.
             if ! grep -q "shellprocess@post" /etc/calamares/settings.conf; then
-              # Insert shellprocess@post before the "finished" module line,
-              # or append it to the exec: list if "finished" isn't found.
-              if grep -q "- finished" /etc/calamares/settings.conf; then
-                sed -i '/- finished/i\        - shellprocess@post' \
+              # Inject before umount if present, else before finished
+              if grep -q "^\s*- umount" /etc/calamares/settings.conf; then
+                sed -i '/^\s*- umount/i\      - shellprocess@post' \
                   /etc/calamares/settings.conf
-              else
-                sed -i '/exec:/a\        - shellprocess@post' \
+              elif grep -q "^\s*- finished" /etc/calamares/settings.conf; then
+                sed -i '/^\s*- finished/i\      - shellprocess@post' \
                   /etc/calamares/settings.conf
               fi
             fi
+
+            # Inject preservefiles before umount (copies install log to target)
+            if ! grep -q "preservefiles" /etc/calamares/settings.conf; then
+              if grep -q "^\s*- umount" /etc/calamares/settings.conf; then
+                sed -i '/^\s*- umount/i\      - preservefiles' \
+                  /etc/calamares/settings.conf
+              fi
+            fi
+
+            # Add instances block if missing (required for @-suffixed modules)
+            if ! grep -q "^instances:" /etc/calamares/settings.conf; then
+              # Prepend instances block at the top of the file after ---
+              sed -i '/^---/a\\ninstances:\n  - id: post\n    module: shellprocess\n    config: shellprocess@post.conf\n' \
+                /etc/calamares/settings.conf
+            fi
+
           else
-            # calamares-settings-debian wasn't installed or put settings.conf
-            # somewhere else — write a minimal but complete settings.conf.
+            # Write a complete, correct settings.conf for Debian/KibaOS
             cat > /etc/calamares/settings.conf << 'CALASETTINGS'
           ---
           modules-search: [ local, /usr/lib/calamares/modules ]
+
+          # Named instances — allows multiple shellprocess runs with different configs
+          instances:
+            - id: post
+              module: shellprocess
+              config: shellprocess@post.conf
 
           sequence:
             - show:
@@ -1314,10 +1956,11 @@ jobs:
               - networkcfg
               - hwclock
               - services-systemd
-              - bootloader-config
+              - initramfs
               - grubcfg
               - bootloader
               - shellprocess@post
+              - preservefiles
               - umount
             - show:
               - finished
@@ -1328,8 +1971,31 @@ jobs:
           oem-setup: false
           disable-cancel: false
           disable-cancel-during-exec: false
+          hide-back-and-next-during-exec: true
+          quit-at-end: false
           CALASETTINGS
           fi
+
+          # ── displaymanager.conf: tell Calamares to configure SDDM ────────────
+          mkdir -p /etc/calamares/modules
+          cat > /etc/calamares/modules/displaymanager.conf << 'DMCONF'
+          ---
+          # Display manager to configure in the installed system
+          displaymanagers:
+            - sddm
+          basicSetup: false
+          DMCONF
+
+          # ── preservefiles.conf: copy Calamares log to installed system ───────
+          cat > /etc/calamares/modules/preservefiles.conf << 'PRESFILES'
+          ---
+          # Copy the Calamares install log into the target for debugging
+          dontChroot: true
+          files:
+            - from: log
+              dest: /var/log/kibaos-install.log
+              perm: root:root:644
+          PRESFILES
 
           # ── Calamares show.qml slideshow ──────────────────────────────────
           # Slides say "KibaOS | Switch to simple" per spec
@@ -1383,46 +2049,92 @@ jobs:
           # after installation. The key is "script" with a list of commands.
           cat > /etc/calamares/modules/shellprocess@post.conf << 'POSTINSTALL'
           ---
-          # KibaOS post-install: runs inside the TARGET (installed) system
+          # KibaOS post-install: runs inside the TARGET (installed) system.
+          # dontChroot: false  → script runs chrooted into the installed root.
+          # script: takes a plain list of shell command strings.
           dontChroot: false
-          timeout: 120
+          timeout: 300
+          verbose: true
           script:
-            - command: "/usr/share/kibaos/post-install.sh"
-              timeout: 120
+            - "/usr/share/kibaos/post-install.sh"
           POSTINSTALL
 
           mkdir -p /usr/share/kibaos
           cat > /usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
           #!/bin/bash
-          # KibaOS post-install hook — runs inside the TARGET (installed) system
-          # via Calamares shellprocess@post module (dontChroot: false).
-          # Copies every system-level config written during live-build chroot
-          # into the installed system so nothing is lost after reboot.
+          # ══════════════════════════════════════════════════════════════════════
+          # KibaOS post-install — runs CHROOTED inside the installed system
+          # via Calamares shellprocess@post (dontChroot: false).
+          #
+          # Everything written by the live-build chroot hook lives in the squashfs
+          # and is already present here at runtime. This script:
+          #   1. Copies /etc/skel → new user home
+          #   2. Stamps every system config file to match the live environment
+          #   3. Removes live-only files (autologin, NOPASSWD sudoers)
+          #   4. Disables live-only services / re-enables installed-system ones
+          #   5. Rebuilds initramfs + GRUB so Plymouth and kernel settings stick
+          # ══════════════════════════════════════════════════════════════════════
           set -e
+          exec > /var/log/kibaos-post-install.log 2>&1
 
-          # ── Resolve target user (UID 1000 = first real user created by Calamares) ──
+          # ── Resolve installed user (UID 1000, created by Calamares users module)
           TARGET_USER=$(getent passwd 1000 | cut -d: -f1 || true)
-          [ -z "$TARGET_USER" ] && TARGET_USER=$(ls /home | head -1)
-          [ -z "$TARGET_USER" ] && { echo "ERROR: no target user found"; exit 1; }
+          [ -z "$TARGET_USER" ] && TARGET_USER=$(ls /home 2>/dev/null | head -1 || true)
+          [ -z "$TARGET_USER" ] && { echo "FATAL: no target user found at UID 1000"; exit 1; }
           TARGET_HOME="/home/$TARGET_USER"
+          echo "=== KibaOS post-install: user=$TARGET_USER home=$TARGET_HOME ==="
 
-          echo "=== KibaOS post-install: target user=$TARGET_USER home=$TARGET_HOME ==="
-
-          # ── 1. Skel → user home (KDE, Konsole, Flatpak, power profiles) ─────
+          # ══════════════════════════════════════════════════════════════════════
+          # 1. SKEL → USER HOME
+          #    All KDE config files, Konsole profile, Flatpak stub, power profile
+          #    are in /etc/skel — copy the whole tree to the new user's home.
+          # ══════════════════════════════════════════════════════════════════════
+          mkdir -p "$TARGET_HOME"
           cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
-          chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME" 2>/dev/null || true
+          chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME"
 
-          # ── 2. Shell: set zsh as default for target user ──────────────────────
-          if command -v chsh >/dev/null 2>&1 && [ -x /bin/zsh ]; then
+          # ══════════════════════════════════════════════════════════════════════
+          # 2. ZSH — set as default shell for installed user
+          # ══════════════════════════════════════════════════════════════════════
+          if [ -x /bin/zsh ]; then
             chsh -s /bin/zsh "$TARGET_USER" 2>/dev/null || true
+            chsh -s /bin/zsh root           2>/dev/null || true
           fi
-          # /etc/zsh/zshrc is already a system file — no copy needed, it lives in /etc
 
-          # ── 3. SDDM: remove live autologin, keep KDE session default ──────────
+          # /etc/zsh/zshrc — already in squashfs; stamp it fresh to be sure
+          mkdir -p /etc/zsh
+          cat > /etc/zsh/zshrc << 'ZSHRC'
+          # KibaOS system-wide zshrc
+          export LANG=en_US.UTF-8
+          export EDITOR=nano
+
+          HISTSIZE=10000
+          SAVEHIST=10000
+          HISTFILE=~/.zsh_history
+          setopt SHARE_HISTORY
+          setopt HIST_IGNORE_DUPS
+
+          autoload -Uz compinit && compinit
+          zstyle ':completion:*' menu select
+
+          autoload -Uz vcs_info
+          precmd() { vcs_info }
+          PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f %F{#bd93f9}❯%f '
+
+          source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh 2>/dev/null || true
+          source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh 2>/dev/null || true
+
+          alias ls='ls --color=auto'
+          alias ll='ls -lah'
+          alias update='sudo apt update && sudo apt upgrade -y'
+          alias install='sudo apt install'
+          ZSHRC
+
+          # ══════════════════════════════════════════════════════════════════════
+          # 3. SDDM — remove live autologin, write clean installed-system config
+          # ══════════════════════════════════════════════════════════════════════
           mkdir -p /etc/sddm.conf.d
-          # Remove the live autologin — installed system should require login
           rm -f /etc/sddm.conf.d/autologin.conf
-          # Write a clean sddm conf pointing at plasma session
           cat > /etc/sddm.conf.d/kde.conf << 'SDDMCONF'
           [General]
           DisplayServer=x11
@@ -1433,28 +2145,27 @@ jobs:
 
           [Users]
           DefaultPath=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
-          HideShells=
           RememberLastSession=true
           RememberLastUser=true
           SDDMCONF
 
-          # ── 4. Systemd sleep config ────────────────────────────────────────────
-          mkdir -p /etc/systemd/sleep.conf.d
-          cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
-          [Sleep]
-          AllowSuspend=no
-          AllowHibernation=no
-          AllowHybridSleep=no
-          AllowSuspendThenHibernate=no
-          NOSLEEP
-
-          # ── 5. Sudoers: remove live NOPASSWD, add installed-system sudo group ──
+          # ══════════════════════════════════════════════════════════════════════
+          # 4. SUDOERS — remove live NOPASSWD rule
+          # ══════════════════════════════════════════════════════════════════════
           rm -f /etc/sudoers.d/live-user
-          # Standard Debian sudo group membership (Calamares adds user to sudo)
-          # No extra sudoers file needed — group membership handles it
 
-          # ── 6. System identity files ──────────────────────────────────────────
+          # ══════════════════════════════════════════════════════════════════════
+          # 5. SYSTEM IDENTITY
+          # ══════════════════════════════════════════════════════════════════════
           echo "kibaos" > /etc/hostname
+
+          cat > /etc/hosts << 'HOSTS'
+          127.0.0.1   localhost
+          127.0.1.1   kibaos
+          ::1         localhost ip6-localhost ip6-loopback
+          ff02::1     ip6-allnodes
+          ff02::2     ip6-allrouters
+          HOSTS
 
           cat > /etc/os-release << 'OSREL'
           NAME="KibaOS"
@@ -1462,9 +2173,9 @@ jobs:
           ID_LIKE=debian
           VERSION_ID="1.0"
           PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
+          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
           OSREL
 
           cat > /etc/issue << 'ISSUE'
@@ -1484,33 +2195,24 @@ jobs:
 
           MOTD
 
-          # ── 7. Plymouth theme ─────────────────────────────────────────────────
-          # Theme files live in /usr/share/plymouth — already in squashfs, copied
-          # by live-build's filesystem copy. Re-register the alternative in case
-          # it wasn't preserved.
-          if [ -f /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth ]; then
-            update-alternatives --install \
-              /usr/share/plymouth/themes/default.plymouth default.plymouth \
-              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100 \
-              2>/dev/null || true
-            update-alternatives --set default.plymouth \
-              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth \
-              2>/dev/null || true
-            update-initramfs -u -k all 2>/dev/null || update-initramfs -u 2>/dev/null || true
-          fi
+          # ══════════════════════════════════════════════════════════════════════
+          # 6. SYSTEMD — sleep / suspend disabled on installed system too
+          # ══════════════════════════════════════════════════════════════════════
+          mkdir -p /etc/systemd/sleep.conf.d
+          cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
+          [Sleep]
+          AllowSuspend=no
+          AllowHibernation=no
+          AllowHybridSleep=no
+          AllowSuspendThenHibernate=no
+          NOSLEEP
 
-          # ── 8. GRUB branding ──────────────────────────────────────────────────
-          # /etc/default/grub already contains KibaOS branding from the chroot
-          # hook (appended via cat >>). Ensure update-grub runs so it takes.
-          if command -v update-grub >/dev/null 2>&1; then
-            update-grub 2>/dev/null || true
-          fi
-
-          # ── 9. KDE system-wide defaults (/etc/xdg) ───────────────────────────
-          # /etc/xdg/kdeglobals is written in the chroot and lives in squashfs.
-          # Ensure /etc/xdg/ has the right files for the installed system.
+          # ══════════════════════════════════════════════════════════════════════
+          # 7. KDE SYSTEM-WIDE DEFAULTS (/etc/xdg)
+          #    These apply to ALL users on the installed system.
+          # ══════════════════════════════════════════════════════════════════════
           mkdir -p /etc/xdg
-          # Already present from squashfs — no-op if correct; re-write to be safe.
+
           cat > /etc/xdg/kdeglobals << 'XDGKDEGLOBALS'
           [KDE]
           LookAndFeelPackage=org.kde.breezedark.desktop
@@ -1528,49 +2230,697 @@ jobs:
           XCURSOR_SIZE=24
           XDGKDEGLOBALS
 
-          # ── 10. Cursor default ────────────────────────────────────────────────
+          # ══════════════════════════════════════════════════════════════════════
+          # 8. KDE USER CONFIG — stamp into the installed user's home directly
+          #    (skel copy above should have done this; this is belt-and-suspenders
+          #     in case Calamares created the user AFTER skel was copied)
+          # ══════════════════════════════════════════════════════════════════════
+          UCFG="$TARGET_HOME/.config"
+          mkdir -p "$UCFG" \
+                   "$TARGET_HOME/.local/share/konsole" \
+                   "$TARGET_HOME/.local/share/flatpak/remotes"
+
+          # kdeglobals — Dracula colour scheme, Kora icons, Breeze-Dark L&F
+          cat > "$UCFG/kdeglobals" << 'KDEGLOBALS'
+          [ColorEffects:Disabled]
+          ChangeSelectionColor=true
+          Color=56,56,56
+          ColorAmount=0
+          ColorEffect=0
+          ContrastAmount=0.65
+          ContrastEffect=1
+          IntensityAmount=0.1
+          IntensityEffect=2
+
+          [ColorEffects:Inactive]
+          Enable=false
+
+          [Colors:Button]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=68,71,90
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Selection]
+          BackgroundNormal=189,147,249
+          BackgroundAlternate=68,71,90
+          ForegroundNormal=40,42,54
+          ForegroundInactive=98,114,164
+          ForegroundActive=248,248,242
+
+          [Colors:View]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=40,42,54
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+
+          [Colors:Window]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=68,71,90
+          ForegroundNormal=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundActive=189,147,249
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+
+          [Colors:Tooltip]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=68,71,90
+          ForegroundNormal=248,248,242
+
+          [Colors:Complementary]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=40,42,54
+          ForegroundNormal=248,248,242
+
+          [Colors:Header]
+          BackgroundNormal=40,42,54
+          BackgroundAlternate=40,42,54
+          ForegroundNormal=248,248,242
+
+          [General]
+          ColorScheme=Dracula
+          Name=Dracula
+          widgetStyle=Breeze
+          shadeSortColumn=true
+
+          [Icons]
+          Theme=kora
+
+          [KDE]
+          LookAndFeelPackage=org.kde.breezedark.desktop
+          SingleClick=false
+          contrast=4
+
+          [WM]
+          activeBackground=40,42,54
+          activeBlend=189,147,249
+          activeForeground=248,248,242
+          activeFrame=40,42,54
+          inactiveBackground=40,42,54
+          inactiveBlend=68,71,90
+          inactiveForeground=98,114,164
+          inactiveFrame=40,42,54
+          KDEGLOBALS
+
+          # plasmarc — Ant-Dark plasma desktop theme
+          cat > "$UCFG/plasmarc" << 'PLASMARC'
+          [Theme]
+          name=ant-dark
+
+          [PlasmaTabletMode]
+          TabletMode=off
+          PLASMARC
+
+          # ksplashrc — Watch_Dogs splash screen
+          cat > "$UCFG/ksplashrc" << 'KSPLASHRC'
+          [KSplash]
+          Engine=KSplashQML
+          Theme=com.kibaos.watchdogs.desktop
+          KSPLASHRC
+
+          # kcminputrc — Vimix cursor theme
+          cat > "$UCFG/kcminputrc" << 'KCMINPUTRC'
+          [Mouse]
+          cursorTheme=Vimix-cursors
+          cursorSize=24
+          KCMINPUTRC
+
+          # kwinrc — compositing, rounded corners, Breeze-Dracula decoration
+          cat > "$UCFG/kwinrc" << 'KWINRC'
+          [Compositing]
+          Enabled=true
+          Backend=OpenGL
+          GLCore=true
+          HiddenPreviews=5
+          OpenGLIsUnsafe=false
+
+          [Effect-overview]
+          BorderActivate=7
+
+          [Plugins]
+          blurEnabled=true
+          contrastEnabled=true
+          kwin4_effect_dimscreenEnabled=false
+          slideEnabled=true
+          wobblywindowsEnabled=false
+
+          [Windows]
+          RoundedCorners=true
+
+          [org.kde.kdecoration2]
+          ButtonsOnLeft=
+          ButtonsOnRight=IAX
+          library=org.kde.breeze
+          theme=__aurorae__svg__Dracula
+          BorderSize=None
+          BorderSizeAuto=false
+
+          [Script-roundedwindows]
+          CornerRadius=12
+          KWINRC
+
+          # breezerc — Dracula shadow colour on window decorations
+          cat > "$UCFG/breezerc" << 'BREEZERC'
+          [Common]
+          ShadowColor=189,147,249
+          ShadowSize=ShadowVeryLarge
+          ShadowStrength=80
+
+          [Windeco Exception 0]
+          BorderSize=None
+          Enabled=true
+          ExceptionPattern=.*
+          ExceptionType=0
+          HideTitleBar=false
+          Mask=2
+          BREEZERC
+
+          # plasmashellrc — panel thickness
+          cat > "$UCFG/plasmashellrc" << 'PLASMASHELLRC'
+          [PlasmaViews][Panel 2][Defaults]
+          thickness=44
+
+          [PlasmaViews][Panel 2][Horizontal1920]
+          thickness=44
+          PLASMASHELLRC
+
+          # plasma-org.kde.plasma.desktop-appletsrc — panel + desktop layout
+          cat > "$UCFG/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
+          [Containments][1]
+          activityId=
+          formfactor=0
+          immutability=1
+          lastScreen=0
+          location=0
+          plugin=org.kde.plasma.folder
+          wallpaperplugin=org.kde.image
+
+          [Containments][1][Wallpaper][org.kde.image][General]
+          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
+          SlideshowInterval=0
+
+          [Containments][1][Applets][10]
+          immutability=1
+          plugin=org.kde.plasma.icon
+
+          [Containments][1][Applets][10][Configuration][General]
+          applicationName=org.mozilla.firefox
+          iconPath=/usr/share/applications/firefox-esr.desktop
+          label=Firefox
+
+          [Containments][1][Applets][10][Geometry]
+          x=80
+          y=40
+          width=64
+          height=64
+
+          [Containments][1][Applets][11]
+          immutability=1
+          plugin=org.kde.plasma.icon
+
+          [Containments][1][Applets][11][Configuration][General]
+          applicationName=calamares
+          iconPath=/usr/share/applications/calamares.desktop
+          label=Install KibaOS
+
+          [Containments][1][Applets][11][Geometry]
+          x=10
+          y=40
+          width=64
+          height=64
+
+          [Containments][1][Applets][12]
+          immutability=1
+          plugin=org.kde.plasma.trash
+
+          [Containments][1][Applets][12][Geometry]
+          x=150
+          y=40
+          width=64
+          height=64
+
+          [Containments][1][Applets][13]
+          immutability=1
+          plugin=org.kde.plasma.notes
+
+          [Containments][1][Applets][13][Geometry]
+          x=-80
+          y=60
+          width=200
+          height=200
+
+          [Containments][1][Applets][14]
+          immutability=1
+          plugin=panon
+
+          [Containments][1][Applets][14][Geometry]
+          x=250
+          y=60
+          width=400
+          height=120
+
+          [Containments][2]
+          activityId=
+          formfactor=2
+          immutability=1
+          lastScreen=0
+          location=4
+          plugin=org.kde.panel
+          wallpaperplugin=org.kde.image
+
+          [Containments][2][General]
+          floating=0
+
+          [Containments][2][Applets][3]
+          immutability=1
+          plugin=org.kde.plasma.kickoff
+
+          [Containments][2][Applets][3][Configuration][General]
+          icon=start-here-kde-symbolic
+
+          [Containments][2][Applets][4]
+          immutability=1
+          plugin=org.kde.plasma.icontasks
+
+          [Containments][2][Applets][5]
+          immutability=1
+          plugin=org.kde.plasma.marginsseparator
+
+          [Containments][2][Applets][6]
+          immutability=1
+          plugin=org.kde.plasma.networkmanagement
+
+          [Containments][2][Applets][7]
+          immutability=1
+          plugin=org.kde.plasma.battery
+
+          [Containments][2][Applets][8]
+          immutability=1
+          plugin=org.kde.plasma.systemtray
+
+          [Containments][2][Applets][9]
+          immutability=1
+          plugin=org.kde.plasma.digitalclock
+
+          [Containments][2][Layout]
+          AppletOrder=3;4;5;6;7;8;9
+          PANELRC
+
+          # kscreenlockerrc — disable autolock on installed system
+          cat > "$UCFG/kscreenlockerrc" << 'LOCKRC'
+          [Daemon]
+          Autolock=false
+          LockOnResume=false
+          Timeout=0
+
+          [Greeter][Wallpaper][org.kde.image][General]
+          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
+          LOCKRC
+
+          # powermanagementprofilesrc — no auto-suspend
+          mkdir -p "$UCFG"
+          cat > "$UCFG/powermanagementprofilesrc" << 'POWERRC'
+          [AC][DPMSControl]
+          idleTime=0
+          lockBeforeSleep=false
+          turnOffDisplayWhenIdle=false
+
+          [AC][HandleButtonEvents]
+          lidAction=0
+          powerButtonAction=0
+          powerDownAction=0
+
+          [AC][SuspendAndShutdown]
+          autoSuspend=false
+          autoSuspendAction=0
+          autoSuspendIdleTime=0
+          POWERRC
+
+          # Konsole profile — Dracula colour scheme, zsh, 100x30
+          mkdir -p "$TARGET_HOME/.local/share/konsole"
+          cat > "$TARGET_HOME/.local/share/konsole/KibaOS.profile" << 'KONSOLEPROFILE'
+          [Appearance]
+          ColorScheme=Dracula
+          Font=Monospace,11,-1,5,50,0,0,0,0,0
+
+          [General]
+          Command=/bin/zsh
+          Name=KibaOS
+          Parent=FALLBACK/
+          TerminalColumns=100
+          TerminalRows=30
+
+          [Scrolling]
+          ScrollBarPosition=2
+          KONSOLEPROFILE
+
+          cat > "$TARGET_HOME/.local/share/konsole/konsolerc" << 'KONSOLERC'
+          [Desktop Entry]
+          DefaultProfile=KibaOS.profile
+          KONSOLERC
+
+          # Fix ownership of everything we just wrote
+          chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME"
+
+          # ══════════════════════════════════════════════════════════════════════
+          # 9. SYSTEM-WIDE THEME ASSETS
+          #    These live in /usr — already in squashfs.  Stamp fresh copies to
+          #    guarantee they survive even if squashfs copy was partial.
+          # ══════════════════════════════════════════════════════════════════════
+
+          # Dracula KDE colour scheme
+          mkdir -p /usr/share/color-schemes
+          cat > /usr/share/color-schemes/Dracula.colors << 'DRACULA'
+          [ColorEffects:Disabled]
+          ChangeSelectionColor=true
+          Color=56,56,56
+          ColorAmount=0
+          ColorEffect=0
+          ContrastAmount=0.65
+          ContrastEffect=1
+          IntensityAmount=0.1
+          IntensityEffect=2
+
+          [ColorEffects:Inactive]
+          ChangeSelectionColor=true
+          Color=112,111,110
+          ColorAmount=0.025
+          ColorEffect=2
+          ContrastAmount=0.1
+          ContrastEffect=2
+          Enable=false
+          IntensityAmount=0
+          IntensityEffect=0
+
+          [Colors:Button]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=68,71,90
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Complementary]
+          BackgroundAlternate=40,42,54
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Header]
+          BackgroundAlternate=40,42,54
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Selection]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=189,147,249
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=248,248,242
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=40,42,54
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Tooltip]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:View]
+          BackgroundAlternate=40,42,54
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [Colors:Window]
+          BackgroundAlternate=68,71,90
+          BackgroundNormal=40,42,54
+          DecorationFocus=189,147,249
+          DecorationHover=189,147,249
+          ForegroundActive=189,147,249
+          ForegroundInactive=98,114,164
+          ForegroundLink=139,233,253
+          ForegroundNegative=255,85,85
+          ForegroundNeutral=241,250,140
+          ForegroundNormal=248,248,242
+          ForegroundPositive=80,250,123
+          ForegroundVisited=255,121,198
+
+          [General]
+          ColorScheme=Dracula
+          Name=Dracula
+          shadeSortColumn=true
+
+          [KDE]
+          contrast=4
+          DRACULA
+
+          # Konsole Dracula colour scheme (system-wide, all users)
+          mkdir -p /usr/share/konsole
+          cat > /usr/share/konsole/Dracula.colorscheme << 'KDRACULA'
+          [Background]
+          Color=40,42,54
+
+          [BackgroundFaint]
+          Color=40,42,54
+
+          [BackgroundIntense]
+          Color=40,42,54
+
+          [Color0]
+          Color=40,42,54
+
+          [Color0Faint]
+          Color=40,42,54
+
+          [Color0Intense]
+          Color=68,71,90
+
+          [Color1]
+          Color=255,85,85
+
+          [Color1Faint]
+          Color=255,85,85
+
+          [Color1Intense]
+          Color=255,85,85
+
+          [Color2]
+          Color=80,250,123
+
+          [Color2Faint]
+          Color=80,250,123
+
+          [Color2Intense]
+          Color=80,250,123
+
+          [Color3]
+          Color=241,250,140
+
+          [Color3Faint]
+          Color=241,250,140
+
+          [Color3Intense]
+          Color=241,250,140
+
+          [Color4]
+          Color=189,147,249
+
+          [Color4Faint]
+          Color=189,147,249
+
+          [Color4Intense]
+          Color=189,147,249
+
+          [Color5]
+          Color=255,121,198
+
+          [Color5Faint]
+          Color=255,121,198
+
+          [Color5Intense]
+          Color=255,121,198
+
+          [Color6]
+          Color=139,233,253
+
+          [Color6Faint]
+          Color=139,233,253
+
+          [Color6Intense]
+          Color=139,233,253
+
+          [Color7]
+          Color=248,248,242
+
+          [Color7Faint]
+          Color=248,248,242
+
+          [Color7Intense]
+          Color=248,248,242
+
+          [Foreground]
+          Color=248,248,242
+
+          [ForegroundFaint]
+          Color=98,114,164
+
+          [ForegroundIntense]
+          Color=248,248,242
+
+          [General]
+          Anchor=0.5,0.5
+          Blur=false
+          ColorRandomization=false
+          Description=Dracula
+          FillStyle=Tile
+          Opacity=0.95
+          Wallpaper=
+          KDRACULA
+
+          # Cursor default (X11 system-wide)
           mkdir -p /usr/share/icons/default
           cat > /usr/share/icons/default/index.theme << 'CURSORDEFAULT'
           [Icon Theme]
           Inherits=Vimix-cursors
           CURSORDEFAULT
 
-          # ── 11. Calamares branding (already in /etc/calamares via squashfs) ───
-          # Ensure logo exists — re-copy from /usr/share/kibaos in case path broke
-          if [ -f /usr/share/kibaos/logo.png ]; then
-            mkdir -p /etc/calamares/branding/kibaos
-            cp -f /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
-            cp -f /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
+          # ══════════════════════════════════════════════════════════════════════
+          # 10. PLYMOUTH — re-register theme + rebuild initramfs
+          # ══════════════════════════════════════════════════════════════════════
+          if [ -f /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth ]; then
+            update-alternatives --install \
+              /usr/share/plymouth/themes/default.plymouth default.plymouth \
+              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100 \
+              2>/dev/null || true
+            update-alternatives --set default.plymouth \
+              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth \
+              2>/dev/null || true
+          fi
+          # Rebuild initramfs so Plymouth, kernel cmdline, and Liquorix all land
+          update-initramfs -u -k all 2>/dev/null || update-initramfs -u 2>/dev/null || true
+
+          # ══════════════════════════════════════════════════════════════════════
+          # 11. GRUB — re-run update-grub so KibaOS branding + Liquorix default
+          #     kernel entry are written to /boot/grub/grub.cfg
+          # ══════════════════════════════════════════════════════════════════════
+          # /etc/default/grub already has KibaOS lines from squashfs.
+          # Just run update-grub to regenerate grub.cfg.
+          if command -v update-grub >/dev/null 2>&1; then
+            update-grub 2>/dev/null || true
+          elif command -v grub-mkconfig >/dev/null 2>&1; then
+            grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
           fi
 
-          # ── 12. KibaStore (Discover rename) ──────────────────────────────────
-          # /usr/local/share/applications override is already in squashfs.
-          update-desktop-database /usr/local/share/applications 2>/dev/null || true
+          # ══════════════════════════════════════════════════════════════════════
+          # 12. OVERLAYROOT — installed system boots r/w; disable live overlay
+          # ══════════════════════════════════════════════════════════════════════
+          if [ -f /etc/overlayroot.conf ]; then
+            printf 'overlayroot=""\noverlayroot_cfgdisk="disabled"\n' \
+              > /etc/overlayroot.conf
+          fi
+          # Disable the live /etc overlay service on installed system
+          systemctl disable kibaos-etc-overlay.service 2>/dev/null || true
+          # Keep kibaos-readonly available but don't auto-enable overlay
+          chmod +x /usr/local/bin/kibaos-readonly 2>/dev/null || true
 
-          # ── 13. Flatpak remotes ───────────────────────────────────────────────
+          # ══════════════════════════════════════════════════════════════════════
+          # 13. FLATPAK — add Flathub system-wide on installed system
+          # ══════════════════════════════════════════════════════════════════════
           if command -v flatpak >/dev/null 2>&1; then
-            flatpak remote-add --if-not-exists flathub \
+            flatpak remote-add --system --if-not-exists flathub \
               https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
           fi
 
-          # ── 14. Enable required services ─────────────────────────────────────
-          systemctl enable sddm           2>/dev/null || true
-          systemctl enable NetworkManager 2>/dev/null || true
+          # ══════════════════════════════════════════════════════════════════════
+          # 14. KIBASTORE — refresh desktop database for the Discover rename
+          # ══════════════════════════════════════════════════════════════════════
+          update-desktop-database /usr/local/share/applications 2>/dev/null || true
+          update-desktop-database /usr/share/applications        2>/dev/null || true
 
-          # ── 15. overlayroot: installed system should NOT have live tmpfs overlay
-          # Clear overlayroot so the installed system boots normally (r/w)
-          if [ -f /etc/overlayroot.conf ]; then
-            echo 'overlayroot=""' > /etc/overlayroot.conf
-            echo 'overlayroot_cfgdisk="disabled"' >> /etc/overlayroot.conf
-          fi
-          # The kibaos-etc-overlay service is only for live; disable on installed
-          systemctl disable kibaos-etc-overlay.service 2>/dev/null || true
+          # ══════════════════════════════════════════════════════════════════════
+          # 15. SERVICES — ensure correct set enabled on installed system
+          # ══════════════════════════════════════════════════════════════════════
+          systemctl enable  sddm            2>/dev/null || true
+          systemctl enable  NetworkManager  2>/dev/null || true
+          systemctl enable  plymouth-start  2>/dev/null || true
+          # Disable live-only services
+          systemctl disable live-config      2>/dev/null || true
+          systemctl disable live-boot        2>/dev/null || true
 
-          # ── 16. kibaos-readonly tool ─────────────────────────────────────────
-          # /usr/local/bin/kibaos-readonly already copied via squashfs — ensure +x
-          chmod +x /usr/local/bin/kibaos-readonly 2>/dev/null || true
+          # ══════════════════════════════════════════════════════════════════════
+          # 16. CALAMARES — remove installer from autostart on installed system
+          #     (it's still on the desktop; we just don't want it to re-launch)
+          # ══════════════════════════════════════════════════════════════════════
+          rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
 
-          echo "=== KibaOS post-install complete ==="
+          echo "=== KibaOS post-install COMPLETE ==="
           POSTINSTALLSH
           chmod +x /usr/share/kibaos/post-install.sh
 
@@ -1602,7 +2952,7 @@ jobs:
                      | cut -d= -f2 | tr -d '"' || echo "trixie")
 
           cat > /etc/apt/sources.list.d/liquorix.list << LIQSRC
-          deb http://liquorix.net/debian trixie main
+          deb https://liquorix.net/debian ${CODENAME} main
           LIQSRC
 
           apt-get update -qq
