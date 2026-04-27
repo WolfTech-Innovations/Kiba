@@ -2,6 +2,10 @@
 ![Banner](https://github.com/WolfTech-Innovations/Kiba/blob/18c12ea77043ab04b0cd34722c75073a0f861c20/branding/kibaos_banner.png)
 KibaOS is a lightweight Linux distribution built on Debian 13 (Trixie) with KDE Plasma 6 as the desktop environment. It is developed and maintained by WolfTech Innovations.
 
+[![Download KibaOS](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/kibaos/files/latest/download)
+
+_____ 
+
 The goal of KibaOS is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
 
 ---
