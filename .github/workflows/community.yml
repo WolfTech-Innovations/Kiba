@@ -1,0 +1,81 @@
+name: Community Management
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  pull_request_target:
+    types: [opened, edited, synchronize]
+  issues:
+    types: [opened, edited]
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/stale@v9
+        with:
+          stale-issue-message: 'This issue is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days.'
+          stale-pr-message: 'This PR is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days.'
+          close-issue-message: 'This issue was closed because it has been stalled for 5 days with no activity.'
+          close-pr-message: 'This PR was closed because it has been stalled for 5 days with no activity.'
+          days-before-issue-stale: 30
+          days-before-pr-stale: 30
+          days-before-issue-close: 5
+          days-before-pr-close: 5
+          stale-issue-label: 'stale'
+          stale-pr-label: 'stale'
+
+  welcome:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    if: (github.event_name == 'issues' || github.event_name == 'pull_request_target') && github.event.action == 'opened'
+    steps:
+      - uses: actions/first-interaction@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-message: 'Welcome to the KibaOS project! Thank you for opening your first issue. Our team will look into it as soon as possible.'
+          pr-message: 'Welcome to the KibaOS project! Thank you for your first pull request. We appreciate your contribution!'
+
+  labeler:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    if: github.event_name == 'pull_request_target'
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+
+  auto-label-title:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+    if: github.event_name == 'issues' || github.event_name == 'pull_request_target'
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const title = (context.payload.issue || context.payload.pull_request).title.toLowerCase();
+            const labels = [];
+            if (title.includes('bug') || title.includes('fix') || title.includes('error')) labels.push('bug');
+            if (title.includes('feat') || title.includes('add') || title.includes('new')) labels.push('feature');
+            if (title.includes('doc')) labels.push('documentation');
+
+            if (labels.length > 0) {
+              const issue_number = (context.payload.issue || context.payload.pull_request).number;
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue_number,
+                labels: labels
+              });
+            }

@@ -1,0 +1,13 @@
+# Configuration for actions/labeler
+
+branding:
+  - changed-files:
+    - any-glob-to-any-file: 'branding/**/*'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: '**/*.md'
+
+workflow:
+  - changed-files:
+    - any-glob-to-any-file: '.github/workflows/*'
