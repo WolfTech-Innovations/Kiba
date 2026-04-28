@@ -33,7 +33,7 @@ jobs:
               return;
             }
 
-            const { data: files } = await github.rest.pull_requests.listFiles({
+            const { data: files } = await github.rest.pulls.listFiles({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: pr.number,
@@ -48,7 +48,7 @@ jobs:
               console.log('PR concerns the build workflow and is from a trusted contributor. Automatically approving and merging...');
 
               // Approve the PR
-              await github.rest.pull_requests.createReview({
+              await github.rest.pulls.createReview({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: pr.number,
@@ -58,7 +58,7 @@ jobs:
 
               // Merge the PR
               try {
-                await github.rest.pull_requests.merge({
+                await github.rest.pulls.merge({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   pull_number: pr.number,
