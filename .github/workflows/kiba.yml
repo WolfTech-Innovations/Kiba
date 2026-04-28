@@ -49,8 +49,7 @@ jobs:
             --iso-application "KibaOS" \
             --iso-volume "KIBAOS" \
             --apt-options "--yes --no-install-recommends" \
-            --compression xz \
-            --compression-level 9
+            --compression xz
 
           # ── Max squashfs compression: XZ with 1M block + 100% dict ──────────
           # live-build exposes compression settings via lb config --compression
