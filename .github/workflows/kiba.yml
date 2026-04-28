@@ -91,23 +91,15 @@ jobs:
           #!/bin/bash
           set -e
           echo "=== Installing Starship Prompt ==="
+          # Ensure curl is available for this hook
+          which curl >/dev/null 2>&1 || {
+            apt-get update
+            apt-get install -y --no-install-recommends curl ca-certificates
+          }
           curl -sS https://starship.rs/install.sh | sh -s -- -y
           echo "=== Starship Prompt installed ==="
           STARSHIP_HOOK
           chmod +x config/hooks/live/0030-starship.hook.chroot
-
-          # ── Tailscale hook ──────────────────────────────────────────────────
-          mkdir -p config/hooks/live
-          cat > config/hooks/live/0040-tailscale.hook.chroot << 'TS_HOOK'
-          #!/bin/bash
-          set -e
-          echo "=== Installing Tailscale ==="
-          # Use non-interactive install
-          curl -fsSL https://tailscale.com/install.sh | sh
-          systemctl enable tailscaled
-          echo "=== Tailscale installed ==="
-          TS_HOOK
-          chmod +x config/hooks/live/0040-tailscale.hook.chroot
 
           # ── CachyOS Kernel hook ──────────────────────────────────────────────
           mkdir -p config/hooks/live
@@ -212,13 +204,8 @@ jobs:
           # 2. Remove all locales except en and en_US
           find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en' ! -name 'en_US' -exec rm -rf {} +
 
-          # 3. Strip ELF binaries and libraries
-          find /usr/bin /usr/sbin /usr/lib /usr/lib64 -type f 2>/dev/null | \
-          while read -r f; do
-            if file "$f" 2>/dev/null | grep -q "ELF.*not stripped"; then
-              strip --strip-unneeded "$f" 2>/dev/null || true
-            fi
-          done
+          # 3. Strip ELF binaries and libraries (Optimized)
+          find /usr/bin /usr/sbin /usr/lib /usr/lib64 -type f -executable 2>/dev/null | xargs strip --strip-unneeded 2>/dev/null || true
 
           # 4. Clean apt
           apt-get clean
@@ -466,7 +453,6 @@ jobs:
           # kaccounts-integration: KDE Online Accounts (Google Drive, Nextcloud etc.)
           kaccounts-integration
           kaccounts-providers
-          kio-gdrive
           # nextcloud-desktop: Nextcloud sync client + Dolphin integration
           nextcloud-desktop
           dolphin-nextcloud
@@ -538,7 +524,6 @@ jobs:
           duf
           ncdu
           htop
-          rclone
           zenity
 
           # ── Boot loaders ──────────────────────────────────────────────────────
@@ -559,12 +544,9 @@ jobs:
           debianutils
           kmod
           binutils
-          syncthing
-          rclone
-          podman
-          distrobox
           fzf
           yt-dlp
+          file
           PACKAGES
 
           echo "=== Creating live customization hook ==="
@@ -1370,7 +1352,7 @@ jobs:
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Simple welcome message for beginners
-          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nThis system is designed to be simple and modern.\n\nKey features:\n- CachyOS Kernel & Extreme Minimization\n- Starship Prompt & Modern CLI tools\n- Tailscale & Global Cloud Sync\n- Google Drive integration (Dolphin)\n- Distrobox for containerized apps\n- Inter & JetBrains Mono typography\n\nEnjoy your stay!" --width=400 2>/dev/null
+          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nThis system is designed to be simple and modern for everyday use.\n\nKey features:\n- High-performance CachyOS Kernel\n- Extreme system minimization for speed\n- Modern terminal with Starship prompt\n- Beautiful Inter & JetBrains Mono typography\n- Simple, ready-to-use desktop\n\nEnjoy your stay!" --width=400 2>/dev/null
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
@@ -1918,7 +1900,7 @@ jobs:
           fi
 
           # Check for critical modern tools (mapping binary names to package names where needed)
-          for tool in micro fastfetch eza bat btop ripgrep fd-find rclone tealdeer starship tailscale syncthing podman distrobox fzf yt-dlp; do
+          for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
             if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
                echo "VERIFIED: $tool installed"
             else
