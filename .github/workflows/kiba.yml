@@ -402,10 +402,6 @@ jobs:
           nano
           python3
 
-          # ── Filesystems ───────────────────────────────────────────────────────
-          ntfs-3g
-          exfatprogs
-
           # ── Boot loaders ──────────────────────────────────────────────────────
           syslinux
           syslinux-common
@@ -413,6 +409,12 @@ jobs:
 
           # ── Squashfs ──────────────────────────────────────────────────────────
           squashfs-tools
+          zstd
+
+          # ── Filesystems ───────────────────────────────────────────────────────
+          ntfs-3g
+          exfatprogs
+          cryptsetup
 
           # ── Overlay FS ────────────────────────────────────────────────────────
           # overlayroot installed via hook 0130 to avoid kernel config loop
@@ -1679,15 +1681,18 @@ jobs:
           #!/bin/bash
           set -e
           export DEBIAN_FRONTEND=noninteractive
-          echo "=== Installing overlayroot ==="
-          apt-get update
-          apt-get install -y --no-install-recommends overlayroot
-          echo "=== Configuring SteamOS-style read-only FS overlay ==="
 
+          echo "=== Configuring SteamOS-style read-only FS overlay ==="
           cat > /etc/overlayroot.conf << 'OVERLAYCONF'
           overlayroot="tmpfs:size=50%,swap=0,recurse=0"
           overlayroot_cfgdisk="disabled"
           OVERLAYCONF
+
+          echo "=== Installing overlayroot and dependencies ==="
+          apt-get update
+          dpkg --configure -a
+          apt-get install -y --no-install-recommends \
+            zstd cryptsetup-bin initramfs-tools overlayroot
 
           mkdir -p /var/lib/kibaos/etc-overlay /var/lib/kibaos/etc-work
 
