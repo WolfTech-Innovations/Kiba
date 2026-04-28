@@ -97,7 +97,8 @@ jobs:
           # Use Nitrux's CachyOS kernel deb repository or direct download
           # For trixie, we'll try to find the latest version from their GitHub
           REPO="Nitrux/linux-cachyos-deb"
-          LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
+          LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
           if [ -z "$LATEST_TAG" ]; then
             echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
@@ -109,11 +110,29 @@ jobs:
           cd /tmp/cachyos
 
           # Download image and headers
-          curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-cachyos_${LATEST_TAG}_amd64.deb"
-          curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-cachyos_${LATEST_TAG}_amd64.deb"
+          IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-cachyos" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-cachyos" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+
+          if [ -n "$IMAGE_URL" ]; then
+            curl -LO "$IMAGE_URL"
+          else
+            echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-cachyos_${LATEST_TAG}_amd64.deb"
+          fi
+
+          if [ -n "$HEADERS_URL" ]; then
+            curl -LO "$HEADERS_URL"
+          else
+             echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-cachyos_${LATEST_TAG}_amd64.deb"
+          fi
 
           # Install
-          apt-get install -y ./*.deb
+          apt-get install -y ./*.deb || {
+            echo "WARNING: CachyOS Kernel install failed, falling back to stock"
+            cd / && rm -rf /tmp/cachyos
+            exit 0
+          }
 
           # Cleanup
           cd / && rm -rf /tmp/cachyos
@@ -449,7 +468,7 @@ jobs:
           btop
           ripgrep
           fd-find
-          tldr
+          tealdeer
           duf
           ncdu
           htop
@@ -697,6 +716,18 @@ jobs:
             alias grep='rg'
           elif command -v ripgrep >/dev/null 2>&1; then
             alias grep='ripgrep'
+          fi
+
+          if command -v fdfind >/dev/null 2>&1; then
+            alias fd='fdfind'
+          fi
+
+          if command -v tldr >/dev/null 2>&1; then
+            # Use tealdeer if available
+            alias help='tldr'
+          elif command -v tealdeer >/dev/null 2>&1; then
+            alias help='tealdeer'
+            alias tldr='tealdeer'
           fi
 
           command -v duf >/dev/null 2>&1 && alias df='duf'
@@ -1764,12 +1795,22 @@ jobs:
           lb build 2>&1 | tee build.log
 
           echo "=== Pipeline Verification ==="
-          # Check for CachyOS kernel in the chroot environment (binary hook is better but we'll check build.log or binary/live)
+          # Check for CachyOS kernel in the chroot environment
           if grep -qi "cachyos" build.log; then
             echo "VERIFIED: CachyOS kernel mentioned in build log"
           else
             echo "WARNING: CachyOS kernel not found in build log"
           fi
+
+          # Check for critical modern tools (mapping binary names to package names where needed)
+          for tool in micro fastfetch eza bat btop ripgrep fd-find rclone tealdeer; do
+            if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log; then
+               echo "VERIFIED: $tool installed"
+            else
+               # Some might be installed as dependencies or already present
+               echo "NOTICE: $tool installation status unclear from log"
+            fi
+          done
 
           if [ -f live-image-amd64.hybrid.iso ]; then
             mv live-image-amd64.hybrid.iso "${ISO}.iso"
