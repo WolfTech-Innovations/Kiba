@@ -416,6 +416,10 @@ jobs:
           exfatprogs
           cryptsetup
 
+          # ── Utilities ─────────────────────────────────────────────────────────
+          debianutils
+          kmod
+
           # ── Overlay FS ────────────────────────────────────────────────────────
           # overlayroot installed via hook 0130 to avoid kernel config loop
           PACKAGES
@@ -1682,23 +1686,18 @@ jobs:
           set -e
           export DEBIAN_FRONTEND=noninteractive
 
+          echo "=== Installing overlayroot ==="
+          apt-get update
+          dpkg --configure -a
+          apt-get install -y --no-install-recommends overlayroot
+
           echo "=== Configuring SteamOS-style read-only FS overlay ==="
           cat > /etc/overlayroot.conf << 'OVERLAYCONF'
           overlayroot="tmpfs:size=50%,swap=0,recurse=0"
           overlayroot_cfgdisk="disabled"
           OVERLAYCONF
 
-          echo "=== Installing overlayroot and dependencies ==="
-          apt-get update
-          dpkg --configure -a
-          # Install dependencies first to ensure they are configured
-          apt-get install -y --no-install-recommends \
-            zstd cryptsetup-bin initramfs-tools
-          # Install overlayroot with force-confold to avoid interactive prompt
-          apt-get install -y --no-install-recommends \
-            -o Dpkg::Options::="--force-confdef" \
-            -o Dpkg::Options::="--force-confold" \
-            overlayroot
+          update-initramfs -u -k all || update-initramfs -u
 
           mkdir -p /var/lib/kibaos/etc-overlay /var/lib/kibaos/etc-work
 
