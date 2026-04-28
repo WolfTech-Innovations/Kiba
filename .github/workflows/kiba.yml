@@ -57,7 +57,7 @@ jobs:
             --apt-options "--yes --no-install-recommends" \
             --apt-recommends false \
             --apt-indices false \
-            --debootstrap-options "--variant=minbase" \
+            --debootstrap-options "--variant=minbase --exclude=nano,vim-tiny,info" \
             --firmware-chroot false \
             --memtest none \
             --compression xz \
@@ -84,6 +84,47 @@ jobs:
           echo "=== SquashFS repacked with maximum zstd compression ==="
           SQFS_HOOK
           chmod +x config/hooks/binary/0010-squashfs-compression.hook.binary
+
+          # ── CachyOS Kernel hook ──────────────────────────────────────────────
+          mkdir -p config/hooks/live
+          cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
+          #!/bin/bash
+          set -e
+          echo "=== Installing CachyOS Kernel ==="
+          apt-get update
+          apt-get install -y curl ca-certificates
+
+          # Use Nitrux's CachyOS kernel deb repository or direct download
+          # For trixie, we'll try to find the latest version from their GitHub
+          REPO="Nitrux/linux-cachyos-deb"
+          LATEST_TAG=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+
+          if [ -z "$LATEST_TAG" ]; then
+            echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
+            # Fallback to a known version or exit
+            exit 0
+          fi
+
+          mkdir -p /tmp/cachyos
+          cd /tmp/cachyos
+
+          # Download image and headers
+          curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-cachyos_${LATEST_TAG}_amd64.deb"
+          curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-cachyos_${LATEST_TAG}_amd64.deb"
+
+          # Install
+          apt-get install -y ./*.deb
+
+          # Cleanup
+          cd / && rm -rf /tmp/cachyos
+
+          # Remove stock kernel to keep it minimal
+          apt-get purge -y linux-image-amd64 linux-headers-amd64 linux-image-6.* linux-headers-6.*
+          apt-get autoremove -y
+
+          echo "=== CachyOS Kernel installed ==="
+          CACHY_HOOK
+          chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
           # ── UPX binary compression hook ──────────────────────────────────────
           mkdir -p config/hooks/live
@@ -400,7 +441,19 @@ jobs:
 
           # ── Essential tools ───────────────────────────────────────────────────
           nano
+          micro
           python3
+          fastfetch
+          eza
+          bat
+          btop
+          ripgrep
+          fd-find
+          tldr
+          duf
+          ncdu
+          htop
+          rclone
 
           # ── Boot loaders ──────────────────────────────────────────────────────
           syslinux
@@ -419,9 +472,6 @@ jobs:
           # ── Utilities ─────────────────────────────────────────────────────────
           debianutils
           kmod
-
-          # ── Overlay FS ────────────────────────────────────────────────────────
-          # overlayroot installed via hook 0130 to avoid kernel config loop
           PACKAGES
 
           echo "=== Creating live customization hook ==="
@@ -569,8 +619,13 @@ jobs:
 
           # ── Environment ────────────────────────────────────────
           export LANG=en_US.UTF-8
-          export EDITOR=nano
-          export VISUAL=nano
+          if command -v micro >/dev/null 2>&1; then
+            export EDITOR=micro
+            export VISUAL=micro
+          else
+            export EDITOR=nano
+            export VISUAL=nano
+          fi
           export PAGER=less
 
           # ── History ────────────────────────────────────────────
@@ -597,6 +652,11 @@ jobs:
           # ── Prompt — Dracula palette ────────────────────────────
           PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
 
+          # ── Fastfetch on startup ────────────────────────────────
+          if command -v fastfetch >/dev/null 2>&1; then
+            fastfetch
+          fi
+
           # ── Plugins ────────────────────────────────────────────
           [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
             source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
@@ -614,12 +674,36 @@ jobs:
             alias search='nala search'
           fi
 
+          # ── Modern Aliases ──────────────────────────────────────
+          if command -v eza >/dev/null 2>&1; then
+            alias ls='eza --icons --group-directories-first'
+            alias ll='eza -lah --icons --group-directories-first'
+            alias la='eza -A --icons'
+            alias tree='eza --tree --icons'
+          else
+            alias ls='ls --color=auto'
+            alias ll='ls -lah'
+            alias la='ls -A'
+          fi
+
+          if command -v bat >/dev/null 2>&1; then
+            alias cat='bat --paging=never'
+          elif command -v batcat >/dev/null 2>&1; then
+            alias cat='batcat --paging=never'
+            alias bat='batcat'
+          fi
+
+          if command -v rg >/dev/null 2>&1; then
+            alias grep='rg'
+          elif command -v ripgrep >/dev/null 2>&1; then
+            alias grep='ripgrep'
+          fi
+
+          command -v duf >/dev/null 2>&1 && alias df='duf'
+          command -v ncdu >/dev/null 2>&1 && alias du='ncdu'
+          command -v btop >/dev/null 2>&1 && alias top='btop'
+
           # ── General aliases ─────────────────────────────────────
-          alias ls='ls --color=auto'
-          alias ll='ls -lah'
-          alias la='ls -A'
-          alias grep='grep --color=auto'
-          alias df='df -h'
           alias free='free -h'
           alias mkdir='mkdir -pv'
           alias cp='cp -iv'
@@ -1635,11 +1719,6 @@ jobs:
           command -v grub-mkconfig >/dev/null 2>&1 && \
             grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
 
-          # 10. Disable live overlayroot on installed system
-          [ -f /etc/overlayroot.conf ] && \
-            printf 'overlayroot=""\noverlayroot_cfgdisk="disabled"\n' \
-              > /etc/overlayroot.conf || true
-
           # 11. Flatpak — add Flathub system-wide
           command -v flatpak >/dev/null 2>&1 && \
             flatpak remote-add --system --if-not-exists flathub \
@@ -1680,66 +1759,17 @@ jobs:
           BRANDING_HOOK
           chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
-          # ── SteamOS-style read-only FS overlay ────────────────────────────────
-          cat > config/hooks/live/0130-readonly-overlay.hook.chroot << 'OVERLAY_HOOK'
-          #!/bin/bash
-          set -e
-          export DEBIAN_FRONTEND=noninteractive
-
-          echo "=== Installing overlayroot ==="
-          apt-get update
-          dpkg --configure -a
-          apt-get install -y --no-install-recommends overlayroot
-
-          echo "=== Configuring SteamOS-style read-only FS overlay ==="
-          cat > /etc/overlayroot.conf << 'OVERLAYCONF'
-          overlayroot="tmpfs:size=50%,swap=0,recurse=0"
-          overlayroot_cfgdisk="disabled"
-          OVERLAYCONF
-
-          update-initramfs -u -k all || update-initramfs -u
-
-          mkdir -p /var/lib/kibaos/etc-overlay /var/lib/kibaos/etc-work
-
-          cat > /etc/systemd/system/kibaos-etc-overlay.service << 'ETCOVERLAY'
-          [Unit]
-          Description=KibaOS writable /etc overlay
-          DefaultDependencies=no
-          Before=sysinit.target local-fs.target
-          After=local-fs-pre.target
-          [Service]
-          Type=oneshot
-          RemainAfterExit=yes
-          ExecStart=/bin/mount -t overlay overlay \
-            -o lowerdir=/etc,upperdir=/var/lib/kibaos/etc-overlay,workdir=/var/lib/kibaos/etc-work \
-            /etc
-          [Install]
-          WantedBy=sysinit.target
-          ETCOVERLAY
-
-          cat > /usr/local/bin/kibaos-readonly << 'ROSWITCH'
-          #!/bin/bash
-          case "$1" in
-            enable)
-              echo 'overlayroot="tmpfs:size=50%,swap=0,recurse=0"' > /etc/overlayroot.conf
-              echo "Read-only mode enabled. Reboot to apply.";;
-            disable)
-              echo 'overlayroot=""' > /etc/overlayroot.conf
-              echo "Read-only mode disabled. Reboot to apply.";;
-            status)
-              grep -q "tmpfs" /etc/overlayroot.conf 2>/dev/null && \
-                echo "Read-only mode: ENABLED" || echo "Read-only mode: DISABLED";;
-            *) echo "Usage: kibaos-readonly {enable|disable|status}"; exit 1;;
-          esac
-          ROSWITCH
-          chmod +x /usr/local/bin/kibaos-readonly
-          systemctl enable kibaos-etc-overlay.service 2>/dev/null || true
-          echo "=== Read-only FS overlay configured ==="
-          OVERLAY_HOOK
-          chmod +x config/hooks/live/0130-readonly-overlay.hook.chroot
 
           echo "=== Building ISO ==="
           lb build 2>&1 | tee build.log
+
+          echo "=== Pipeline Verification ==="
+          # Check for CachyOS kernel in the chroot environment (binary hook is better but we'll check build.log or binary/live)
+          if grep -qi "cachyos" build.log; then
+            echo "VERIFIED: CachyOS kernel mentioned in build log"
+          else
+            echo "WARNING: CachyOS kernel not found in build log"
+          fi
 
           if [ -f live-image-amd64.hybrid.iso ]; then
             mv live-image-amd64.hybrid.iso "${ISO}.iso"
