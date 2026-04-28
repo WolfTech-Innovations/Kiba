@@ -49,7 +49,8 @@ jobs:
             --iso-application "KibaOS" \
             --iso-volume "KIBAOS" \
             --apt-options "--yes --no-install-recommends" \
-            --compression xz
+            --compression xz \
+            --compression-level 9
 
           # ── Max squashfs compression: XZ with 1M block + 100% dict ──────────
           # live-build exposes compression settings via lb config --compression
@@ -76,6 +77,139 @@ jobs:
           echo "=== SquashFS repacked with maximum XZ compression ==="
           SQFS_HOOK
           chmod +x config/hooks/binary/0010-squashfs-compression.hook.binary
+
+          # ── UPX binary compression hook ──────────────────────────────────────
+          # Compresses all ELF executables in the squashfs with UPX --best.
+          # Skips: shared libs (.so), kernel modules (.ko), scripts, Qt/KDE bins
+          # that use internal checksums (kwin, plasmashell — UPX breaks them),
+          # and anything already compressed or too small (<64KB).
+          # NOTE: runs BEFORE the squashfs repack hook so compression stacks.
+          mkdir -p config/hooks/live
+          cat > config/hooks/live/0050-upx-compress.hook.chroot << 'UPX_HOOK'
+          #!/bin/bash
+          set -e
+          echo "=== UPX: compressing ELF binaries ==="
+
+          # Install upx in chroot if not already present
+          which upx >/dev/null 2>&1 || apt-get install -y upx --no-install-recommends 2>/dev/null || true
+
+          if ! which upx >/dev/null 2>&1; then
+            echo "UPX not found, skipping binary compression"
+            exit 0
+          fi
+
+          # Binaries to skip — Qt/KDE internals that break under UPX
+          SKIP_PATTERNS="kwin|plasmashell|plasma_session|kded|ksmserver|startplasma|sddm|Xorg|X11|xwayland|python|perl|ruby|node|java|dbus|systemd|udev|plymouth|grub|shim|vmlinuz|initrd"
+
+          find /usr/bin /usr/sbin /usr/lib/kde4 /usr/lib/x86_64-linux-gnu/libexec                /usr/lib/x86_64-linux-gnu/qt6/libexec             -maxdepth 2 -type f -size +65536c 2>/dev/null |           while read -r f; do
+            # Skip if matches known-bad patterns
+            echo "$f" | grep -qiE "$SKIP_PATTERNS" && continue
+            # Only process ELF binaries
+            file "$f" 2>/dev/null | grep -q "ELF.*executable" || continue
+            # Skip if already UPX-packed
+            upx -t "$f" >/dev/null 2>&1 && continue
+            # Compress — continue on failure (some ELFs resist UPX)
+            upx --best --no-lzma -q "$f" 2>/dev/null || true
+          done
+
+          echo "=== UPX compression complete ==="
+          UPX_HOOK
+          chmod +x config/hooks/live/0050-upx-compress.hook.chroot
+
+          # ── Bazaar app store via Flatpak (first-boot install) ──────────────────
+          # Bazaar is GTK4/libadwaita, fully unbranded modern app store.
+          # No GNOME session deps needed at runtime — just gtk4 + libadwaita runtimes
+          # which Flatpak provides in its own sandbox. Install at first boot via
+          # a systemd one-shot that runs after network-online.target.
+          cat > config/hooks/live/0055-bazaar-firstboot.hook.chroot << 'BAZAAR_HOOK'
+          #!/bin/bash
+          set -e
+
+          # ── First-boot service: installs Bazaar from Flathub ──────────────────
+          mkdir -p /etc/systemd/system
+          cat > /etc/systemd/system/kibaos-install-bazaar.service << 'BAZSVC'
+          [Unit]
+          Description=KibaOS: Install Bazaar app store from Flathub
+          After=network-online.target flatpak.service
+          Wants=network-online.target
+          ConditionPathExists=!/var/lib/kibaos/.bazaar-installed
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/bin/bash -c ' \
+            flatpak remote-add --if-not-exists --system flathub https://dl.flathub.org/repo/flathub.flatpakrepo && \
+            flatpak install --system --noninteractive flathub io.github.kolunmi.Bazaar && \
+            mkdir -p /var/lib/kibaos && touch /var/lib/kibaos/.bazaar-installed'
+
+          [Install]
+          WantedBy=multi-user.target
+          BAZSVC
+
+          systemctl enable kibaos-install-bazaar.service 2>/dev/null || true
+
+          # Pre-stage Flathub repo so it's ready immediately on first boot
+          flatpak remote-add --if-not-exists --system flathub             https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
+
+          # ── KibaStore .desktop → points to Bazaar (after it installs) ─────────
+          mkdir -p /usr/share/applications
+          cat > /usr/share/applications/kibastore.desktop << 'KDESKTOP'
+          [Desktop Entry]
+          Type=Application
+          Name=KibaStore
+          Comment=Discover and install applications
+          Exec=bash -c 'flatpak run io.github.kolunmi.Bazaar 2>/dev/null || notify-send "KibaStore" "Installing app store, please wait..." &'
+          Icon=io.github.kolunmi.Bazaar
+          Terminal=false
+          Categories=System;PackageManager;
+          Keywords=store;apps;flatpak;software;
+          KDESKTOP
+
+          update-desktop-database /usr/share/applications 2>/dev/null || true
+          echo "=== Bazaar first-boot service configured ==="
+          BAZAAR_HOOK
+          chmod +x config/hooks/live/0055-bazaar-firstboot.hook.chroot
+
+          # ── GRUB: override live-build's default boot menu ─────────────────────
+          # live-build generates grub.cfg at binary stage via lb binary_grub_cfg.
+          # It reads /etc/default/grub from the CHROOT, not the binary dir.
+          # The real fix: place a custom grub.cfg in config/bootloaders/grub-pc/
+          # AND patch /etc/default/grub GRUB_DISTRIBUTOR so update-grub uses KibaOS.
+          # The binary hook below runs AFTER lb binary_grub_cfg and rewrites the
+          # generated grub.cfg to replace all "Debian GNU/Linux" → "KibaOS".
+          mkdir -p config/hooks/binary
+          cat > config/hooks/binary/0020-grub-branding.hook.binary << 'GRUB_HOOK'
+          #!/bin/bash
+          set -e
+          echo "=== Patching GRUB menu branding ==="
+
+          # live-build writes grub.cfg into binary/boot/grub/grub.cfg
+          # Find and patch all instances of Debian branding
+          for cfg in             binary/boot/grub/grub.cfg             binary/boot/grub/x86_64-efi/grub.cfg             binary/EFI/boot/grub.cfg; do
+            [ -f "$cfg" ] || continue
+            sed -i \
+              -e 's/Debian GNU\/Linux/KibaOS/g' \
+              -e 's/debian live/KibaOS Live/g' \
+              -e 's/Debian Live/KibaOS Live/g' \
+              -e 's/Live system (amd64)/KibaOS Live/g' \
+              -e 's/menuentry "Debian/menuentry "KibaOS/g' \
+              "$cfg"
+            echo "  Patched: $cfg"
+          done
+
+          # Also patch any isolinux/syslinux boot screens
+          for txt in             binary/isolinux/isolinux.cfg             binary/isolinux/live.cfg             binary/isolinux/install.cfg; do
+            [ -f "$txt" ] || continue
+            sed -i \
+              -e 's/Debian GNU\/Linux/KibaOS/g' \
+              -e 's/Debian Live/KibaOS Live/g' \
+              "$txt"
+            echo "  Patched: $txt"
+          done
+
+          echo "=== GRUB branding patch complete ==="
+          GRUB_HOOK
+          chmod +x config/hooks/binary/0020-grub-branding.hook.binary
 
           echo "=== Adding packages ==="
 
@@ -109,15 +243,9 @@ jobs:
           sddm-theme-debian-breeze
           plasma-nm
           plasma-pa
-          plasma-firewall
           dolphin
           konsole
-          kate
           ark
-          okular
-          gwenview
-          kde-spectacle
-          kcalc
           qt6-svg-plugins
           desktop-file-utils
           # Plasma addons — explicit packages instead of the kde-standard metapkg:
@@ -131,9 +259,10 @@ jobs:
 
           # Flatpak support
           flatpak
-          plasma-discover
-          plasma-discover-backend-flatpak
           xdg-desktop-portal-kde
+          # Bazaar app store installed via flatpak at first boot (see hook below)
+          # upx for binary compression
+          upx
 
           # Shell - zsh
           zsh
@@ -178,16 +307,11 @@ jobs:
 
           # ── Browsers / media ──────────────────────────────────────────────────
           firefox-esr
-          vlc
 
           # Essential tools
           nano
-          gparted
           htop
           python3
-          python3-pip
-          python3-numpy
-          python3-cffi
 
           # Filesystems
           ntfs-3g
@@ -1196,10 +1320,16 @@ jobs:
 
           cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
           [PlasmaViews][Panel 2][Defaults]
-          thickness=44
+          thickness=52
 
           [PlasmaViews][Panel 2][Horizontal1920]
-          thickness=44
+          thickness=52
+
+          [PlasmaViews][Panel 2][floating]
+          floating=1
+
+          [PlasmaViews][Panel 2][opacity]
+          type=2
           PLASMASHELLRC
 
           # Panel at BOTTOM (location=4), with:
@@ -1222,7 +1352,7 @@ jobs:
           wallpaperplugin=org.kde.image
 
           [Containments][1][Wallpaper][org.kde.image][General]
-          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
+          Image=file:///usr/share/wallpapers/Ceratopsian/contents/images/5120x2880.png
           SlideshowInterval=0
 
           [Containments][1][Applets][10]
@@ -1230,12 +1360,12 @@ jobs:
           plugin=org.kde.plasma.icon
 
           [Containments][1][Applets][10][Configuration][General]
-          applicationName=org.mozilla.firefox
-          iconPath=/usr/share/applications/firefox-esr.desktop
-          label=Firefox
+          applicationName=calamares
+          iconPath=/usr/share/applications/calamares.desktop
+          label=Install KibaOS
 
           [Containments][1][Applets][10][Geometry]
-          x=80
+          x=20
           y=40
           width=64
           height=64
@@ -1245,45 +1375,30 @@ jobs:
           plugin=org.kde.plasma.icon
 
           [Containments][1][Applets][11][Configuration][General]
-          applicationName=calamares
-          iconPath=/usr/share/applications/calamares.desktop
-          label=Install KibaOS
+          applicationName=kibastore
+          iconPath=/usr/share/applications/kibastore.desktop
+          label=KibaStore
 
           [Containments][1][Applets][11][Geometry]
-          x=10
+          x=100
           y=40
           width=64
           height=64
 
           [Containments][1][Applets][12]
           immutability=1
-          plugin=org.kde.plasma.trash
+          plugin=org.kde.plasma.icon
+
+          [Containments][1][Applets][12][Configuration][General]
+          applicationName=org.mozilla.firefox
+          iconPath=/usr/share/applications/firefox-esr.desktop
+          label=Firefox
 
           [Containments][1][Applets][12][Geometry]
-          x=150
+          x=180
           y=40
           width=64
           height=64
-
-          [Containments][1][Applets][13]
-          immutability=1
-          plugin=org.kde.plasma.notes
-
-          [Containments][1][Applets][13][Geometry]
-          x=-80
-          y=60
-          width=200
-          height=200
-
-          [Containments][1][Applets][14]
-          immutability=1
-          plugin=panon
-
-          [Containments][1][Applets][14][Geometry]
-          x=250
-          y=60
-          width=400
-          height=120
 
           [Containments][2]
           activityId=
@@ -1295,7 +1410,7 @@ jobs:
           wallpaperplugin=org.kde.image
 
           [Containments][2][General]
-          floating=0
+          floating=1
 
           [Containments][2][Applets][3]
           immutability=1
@@ -1312,14 +1427,6 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.marginsseparator
 
-          [Containments][2][Applets][6]
-          immutability=1
-          plugin=org.kde.plasma.networkmanagement
-
-          [Containments][2][Applets][7]
-          immutability=1
-          plugin=org.kde.plasma.battery
-
           [Containments][2][Applets][8]
           immutability=1
           plugin=org.kde.plasma.systemtray
@@ -1329,7 +1436,7 @@ jobs:
           plugin=org.kde.plasma.digitalclock
 
           [Containments][2][Layout]
-          AppletOrder=3;4;5;6;7;8;9
+          AppletOrder=3;4;5;8;9
           PANELRC
 
           # ── J. Lock screen wallpaper matches Path / Next ──────────────────
@@ -1340,7 +1447,7 @@ jobs:
           Timeout=0
 
           [Greeter][Wallpaper][org.kde.image][General]
-          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
+          Image=file:///usr/share/wallpapers/Ceratopsian/contents/images/5120x2880.png
           LOCKRC
 
           # ─────────────────────────────────────────────────────────────────
@@ -1858,26 +1965,40 @@ jobs:
           mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
           cat > config/includes.chroot/etc/calamares/branding/kibaos/branding.desc << 'BRANDING'
           componentName: kibaos
+
+          # Welcome page style — valid values: "calamares" or "distro"
           welcomeStyleCalamares: true
           welcomeExpandingLogo: true
+
+          # Slideshow API version (2 = async load, requires onActivate/onLeave in QML)
           slideshowAPI: 2
+
           strings:
-            productName: KibaOS
-            shortProductName: KibaOS
+            productName: "KibaOS"
+            shortProductName: "KibaOS"
             version: "1.0"
             shortVersion: "1.0"
             versionedName: "KibaOS 1.0"
             shortVersionedName: "KibaOS 1.0"
-            bootloaderEntryName: KibaOS
-            productUrl: https://github.com/WolfTech-Innovations/kiba
-            supportUrl: https://github.com/WolfTech-Innovations/kiba/issues
-            knownIssuesUrl: https://github.com/WolfTech-Innovations/kiba/issues
-            releaseNotesUrl: https://github.com/WolfTech-Innovations/kiba
+            bootloaderEntryName: "KibaOS"
+            productUrl: "https://github.com/WolfTech-Innovations/kiba"
+            supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
+            knownIssuesUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
+            releaseNotesUrl: "https://github.com/WolfTech-Innovations/kiba"
+
           images:
-            productLogo: logo.png
-            productIcon: logo.png
-            productWelcome: welcome.png
-          slideshow: show.qml
+            productLogo: "logo.png"
+            productIcon: "logo.png"
+            productWelcome: "welcome.png"
+
+          # Sidebar colors — exactly 4 required sub-keys, no others
+          style:
+            SidebarBackground:        "#282a36"
+            SidebarText:              "#f8f8f2"
+            SidebarTextCurrent:       "#282a36"
+            SidebarBackgroundCurrent: "#bd93f9"
+
+          slideshow: "show.qml"
           BRANDING
 
           mkdir -p config/hooks/live
@@ -2416,13 +2537,19 @@ jobs:
           Mask=2
           BREEZERC
 
-          # plasmashellrc — panel thickness
+          # plasmashellrc — floating panel
           cat > "$UCFG/plasmashellrc" << 'PLASMASHELLRC'
           [PlasmaViews][Panel 2][Defaults]
-          thickness=44
+          thickness=52
 
           [PlasmaViews][Panel 2][Horizontal1920]
-          thickness=44
+          thickness=52
+
+          [PlasmaViews][Panel 2][floating]
+          floating=1
+
+          [PlasmaViews][Panel 2][opacity]
+          type=2
           PLASMASHELLRC
 
           # plasma-org.kde.plasma.desktop-appletsrc — panel + desktop layout
@@ -2437,7 +2564,7 @@ jobs:
           wallpaperplugin=org.kde.image
 
           [Containments][1][Wallpaper][org.kde.image][General]
-          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
+          Image=file:///usr/share/wallpapers/Ceratopsian/contents/images/5120x2880.png
           SlideshowInterval=0
 
           [Containments][1][Applets][10]
@@ -2445,12 +2572,12 @@ jobs:
           plugin=org.kde.plasma.icon
 
           [Containments][1][Applets][10][Configuration][General]
-          applicationName=org.mozilla.firefox
-          iconPath=/usr/share/applications/firefox-esr.desktop
-          label=Firefox
+          applicationName=calamares
+          iconPath=/usr/share/applications/calamares.desktop
+          label=Install KibaOS
 
           [Containments][1][Applets][10][Geometry]
-          x=80
+          x=20
           y=40
           width=64
           height=64
@@ -2460,45 +2587,30 @@ jobs:
           plugin=org.kde.plasma.icon
 
           [Containments][1][Applets][11][Configuration][General]
-          applicationName=calamares
-          iconPath=/usr/share/applications/calamares.desktop
-          label=Install KibaOS
+          applicationName=kibastore
+          iconPath=/usr/share/applications/kibastore.desktop
+          label=KibaStore
 
           [Containments][1][Applets][11][Geometry]
-          x=10
+          x=100
           y=40
           width=64
           height=64
 
           [Containments][1][Applets][12]
           immutability=1
-          plugin=org.kde.plasma.trash
+          plugin=org.kde.plasma.icon
+
+          [Containments][1][Applets][12][Configuration][General]
+          applicationName=org.mozilla.firefox
+          iconPath=/usr/share/applications/firefox-esr.desktop
+          label=Firefox
 
           [Containments][1][Applets][12][Geometry]
-          x=150
+          x=180
           y=40
           width=64
           height=64
-
-          [Containments][1][Applets][13]
-          immutability=1
-          plugin=org.kde.plasma.notes
-
-          [Containments][1][Applets][13][Geometry]
-          x=-80
-          y=60
-          width=200
-          height=200
-
-          [Containments][1][Applets][14]
-          immutability=1
-          plugin=panon
-
-          [Containments][1][Applets][14][Geometry]
-          x=250
-          y=60
-          width=400
-          height=120
 
           [Containments][2]
           activityId=
@@ -2510,7 +2622,7 @@ jobs:
           wallpaperplugin=org.kde.image
 
           [Containments][2][General]
-          floating=0
+          floating=1
 
           [Containments][2][Applets][3]
           immutability=1
@@ -2527,14 +2639,6 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.marginsseparator
 
-          [Containments][2][Applets][6]
-          immutability=1
-          plugin=org.kde.plasma.networkmanagement
-
-          [Containments][2][Applets][7]
-          immutability=1
-          plugin=org.kde.plasma.battery
-
           [Containments][2][Applets][8]
           immutability=1
           plugin=org.kde.plasma.systemtray
@@ -2544,7 +2648,7 @@ jobs:
           plugin=org.kde.plasma.digitalclock
 
           [Containments][2][Layout]
-          AppletOrder=3;4;5;6;7;8;9
+          AppletOrder=3;4;5;8;9
           PANELRC
 
           # kscreenlockerrc — disable autolock on installed system
@@ -2555,7 +2659,7 @@ jobs:
           Timeout=0
 
           [Greeter][Wallpaper][org.kde.image][General]
-          Image=file:///usr/share/wallpapers/Mountain/contents/images/5120x2880.png
+          Image=file:///usr/share/wallpapers/Ceratopsian/contents/images/5120x2880.png
           LOCKRC
 
           # powermanagementprofilesrc — no auto-suspend
