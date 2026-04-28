@@ -1,0 +1,83 @@
+name: Auto Merge Build PRs
+
+on:
+  pull_request_target:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronized
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check and Merge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const author = pr.user.login;
+            const association = pr.author_association;
+
+            // Security check: Only allow trusted contributors to auto-merge workflow changes
+            const trustedAssociations = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+            if (!trustedAssociations.includes(association)) {
+              console.log(`User ${author} (${association}) is not a trusted contributor. Skipping auto-merge.`);
+              return;
+            }
+
+            const { data: files } = await github.rest.pull_requests.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+            });
+
+            const buildRelatedDirs = ['.github/workflows/', 'branding/'];
+            const isBuildRelated = files.every(file =>
+              buildRelatedDirs.some(dir => file.filename.startsWith(dir))
+            );
+
+            if (isBuildRelated) {
+              console.log('PR concerns the build workflow and is from a trusted contributor. Automatically approving and merging...');
+
+              // Approve the PR
+              await github.rest.pull_requests.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+                event: 'APPROVE',
+                body: 'Automatically approved as it only affects build workflow files and is from a trusted contributor.'
+              });
+
+              // Merge the PR
+              try {
+                await github.rest.pull_requests.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pr.number,
+                  merge_method: 'merge'
+                });
+                console.log('PR merged successfully.');
+
+                // Explicitly trigger the build workflow
+                console.log('Triggering the KibaOS Build workflow...');
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'kiba.yml',
+                  ref: 'main'
+                });
+                console.log('Workflow dispatch sent.');
+              } catch (error) {
+                console.error('Failed to merge or trigger workflow:', error);
+              }
+            } else {
+              console.log('PR contains non-build files. Skipping auto-merge.');
+            }
