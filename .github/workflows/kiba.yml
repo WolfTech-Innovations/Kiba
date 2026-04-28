@@ -85,6 +85,30 @@ jobs:
           SQFS_HOOK
           chmod +x config/hooks/binary/0010-squashfs-compression.hook.binary
 
+          # ── Starship prompt hook ────────────────────────────────────────────
+          mkdir -p config/hooks/live
+          cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
+          #!/bin/bash
+          set -e
+          echo "=== Installing Starship Prompt ==="
+          curl -sS https://starship.rs/install.sh | sh -s -- -y
+          echo "=== Starship Prompt installed ==="
+          STARSHIP_HOOK
+          chmod +x config/hooks/live/0030-starship.hook.chroot
+
+          # ── Tailscale hook ──────────────────────────────────────────────────
+          mkdir -p config/hooks/live
+          cat > config/hooks/live/0040-tailscale.hook.chroot << 'TS_HOOK'
+          #!/bin/bash
+          set -e
+          echo "=== Installing Tailscale ==="
+          # Use non-interactive install
+          curl -fsSL https://tailscale.com/install.sh | sh
+          systemctl enable tailscaled
+          echo "=== Tailscale installed ==="
+          TS_HOOK
+          chmod +x config/hooks/live/0040-tailscale.hook.chroot
+
           # ── CachyOS Kernel hook ──────────────────────────────────────────────
           mkdir -p config/hooks/live
           cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
@@ -137,8 +161,9 @@ jobs:
           # Cleanup
           cd / && rm -rf /tmp/cachyos
 
-          # Remove stock kernel to keep it minimal
-          apt-get purge -y linux-image-amd64 linux-headers-amd64 linux-image-6.* linux-headers-6.*
+          # Remove stock kernel meta-packages to keep it minimal
+          # We don't use wildcards to avoid purging the CachyOS kernel we just installed
+          apt-get purge -y linux-image-amd64 linux-headers-amd64
           apt-get autoremove -y
 
           echo "=== CachyOS Kernel installed ==="
@@ -168,6 +193,43 @@ jobs:
           echo "=== UPX compression complete ==="
           UPX_HOOK
           chmod +x config/hooks/live/0050-upx-compress.hook.chroot
+
+          # ── Extreme Minimization hook ─────────────────────────────────────────
+          cat > config/hooks/live/0090-extreme-minimization.hook.chroot << 'MIN_HOOK'
+          #!/bin/bash
+          set -e
+          echo "=== Aggressive Minimization: cleaning system ==="
+
+          # 1. Remove all documentation, man pages, and info files
+          # Preserve fzf scripts before nuking doc
+          mkdir -p /usr/share/fzf
+          cp /usr/share/doc/fzf/examples/*.zsh /usr/share/fzf/ 2>/dev/null || true
+          rm -rf /usr/share/doc/*
+          rm -rf /usr/share/man/*
+          rm -rf /usr/share/info/*
+          rm -rf /usr/share/help/*
+
+          # 2. Remove all locales except en and en_US
+          find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en' ! -name 'en_US' -exec rm -rf {} +
+
+          # 3. Strip ELF binaries and libraries
+          find /usr/bin /usr/sbin /usr/lib /usr/lib64 -type f 2>/dev/null | \
+          while read -r f; do
+            if file "$f" 2>/dev/null | grep -q "ELF.*not stripped"; then
+              strip --strip-unneeded "$f" 2>/dev/null || true
+            fi
+          done
+
+          # 4. Clean apt
+          apt-get clean
+          rm -rf /var/lib/apt/lists/*
+
+          # 5. Remove temporary files
+          rm -rf /tmp/* /var/tmp/*
+
+          echo "=== Aggressive Minimization complete ==="
+          MIN_HOOK
+          chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
           # ── Build Bazaar from source (native Debian package, no Flatpak needed) ─
           # Bazaar has a Debian package in trixie repos. We build it from the
@@ -396,11 +458,15 @@ jobs:
           kwin-addons
           breeze
           breeze-gtk-theme
+          fonts-jetbrains-mono
+          fonts-noto-color-emoji
+          fonts-inter
 
           # ── Cloud & online accounts integration ───────────────────────────────
           # kaccounts-integration: KDE Online Accounts (Google Drive, Nextcloud etc.)
           kaccounts-integration
           kaccounts-providers
+          kio-gdrive
           # nextcloud-desktop: Nextcloud sync client + Dolphin integration
           nextcloud-desktop
           dolphin-nextcloud
@@ -473,6 +539,7 @@ jobs:
           ncdu
           htop
           rclone
+          zenity
 
           # ── Boot loaders ──────────────────────────────────────────────────────
           syslinux
@@ -491,6 +558,13 @@ jobs:
           # ── Utilities ─────────────────────────────────────────────────────────
           debianutils
           kmod
+          binutils
+          syncthing
+          rclone
+          podman
+          distrobox
+          fzf
+          yt-dlp
           PACKAGES
 
           echo "=== Creating live customization hook ==="
@@ -668,8 +742,19 @@ jobs:
           zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
           setopt PROMPT_SUBST
 
-          # ── Prompt — Dracula palette ────────────────────────────
-          PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
+          # ── Prompt — Starship (Modern) ──────────────────────────
+          if command -v starship >/dev/null 2>&1; then
+            eval "$(starship init zsh)"
+          else
+            # Fallback to Dracula palette
+            PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
+          fi
+
+          # ── Fzf Integration ─────────────────────────────────────
+          if command -v fzf >/dev/null 2>&1; then
+            source /usr/share/fzf/key-bindings.zsh 2>/dev/null || true
+            source /usr/share/fzf/completion.zsh 2>/dev/null || true
+          fi
 
           # ── Fastfetch on startup ────────────────────────────────
           if command -v fastfetch >/dev/null 2>&1; then
@@ -955,6 +1040,11 @@ jobs:
           widgetStyle=Breeze
           XCURSOR_THEME=Vimix-cursors
           XCURSOR_SIZE=24
+          font=Inter,11,-1,5,50,0,0,0,0,0
+          fixed=JetBrains Mono,11,-1,5,50,0,0,0,0,0
+          toolBarFont=Inter,11,-1,5,50,0,0,0,0,0
+          menuFont=Inter,11,-1,5,50,0,0,0,0,0
+          smallestReadableFont=Inter,9,-1,5,50,0,0,0,0,0
           XDG_KDEGLOBALS
 
           cat > "$SKEL_KDE/kdeglobals" << 'KDEGLOBALS'
@@ -991,6 +1081,11 @@ jobs:
           ColorScheme=Dracula
           widgetStyle=Breeze
           shadeSortColumn=true
+          font=Inter,11,-1,5,50,0,0,0,0,0
+          fixed=JetBrains Mono,11,-1,5,50,0,0,0,0,0
+          toolBarFont=Inter,11,-1,5,50,0,0,0,0,0
+          menuFont=Inter,11,-1,5,50,0,0,0,0,0
+          smallestReadableFont=Inter,9,-1,5,50,0,0,0,0,0
 
           [Icons]
           Theme=kora
@@ -1269,6 +1364,26 @@ jobs:
           Welcome to KibaOS — Switch to Simple
 
           EOF
+
+          # ── Desktop Welcome ───────────────────────────────────────────────────
+          mkdir -p /usr/local/bin
+          cat > /usr/local/bin/kiba-welcome << 'WELCOME'
+          #!/bin/bash
+          # Simple welcome message for beginners
+          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nThis system is designed to be simple and modern.\n\nKey features:\n- CachyOS Kernel & Extreme Minimization\n- Starship Prompt & Modern CLI tools\n- Tailscale & Global Cloud Sync\n- Google Drive integration (Dolphin)\n- Distrobox for containerized apps\n- Inter & JetBrains Mono typography\n\nEnjoy your stay!" --width=400 2>/dev/null
+          WELCOME
+          chmod +x /usr/local/bin/kiba-welcome
+
+          mkdir -p /etc/skel/.config/autostart
+          cat > /etc/skel/.config/autostart/kiba-welcome.desktop << 'WELCOMEDESK'
+          [Desktop Entry]
+          Type=Application
+          Name=Kiba Welcome
+          Exec=/usr/local/bin/kiba-welcome
+          Icon=start-here-kde-symbolic
+          Terminal=false
+          X-KDE-autostart-condition=kiba-welcome
+          WELCOMEDESK
 
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
@@ -1803,8 +1918,8 @@ jobs:
           fi
 
           # Check for critical modern tools (mapping binary names to package names where needed)
-          for tool in micro fastfetch eza bat btop ripgrep fd-find rclone tealdeer; do
-            if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log; then
+          for tool in micro fastfetch eza bat btop ripgrep fd-find rclone tealdeer starship tailscale syncthing podman distrobox fzf yt-dlp; do
+            if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
                echo "VERIFIED: $tool installed"
             else
                # Some might be installed as dependencies or already present
