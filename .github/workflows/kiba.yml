@@ -60,7 +60,7 @@ jobs:
             --debootstrap-options "--variant=minbase" \
             --firmware-chroot false \
             --memtest none \
-            --compression zstd \
+            --compression xz \
             --chroot-squashfs-compression-type zstd
 
           # ── Max squashfs compression: zstd best (smaller + faster than xz) ───
