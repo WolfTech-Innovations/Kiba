@@ -1691,8 +1691,14 @@ jobs:
           echo "=== Installing overlayroot and dependencies ==="
           apt-get update
           dpkg --configure -a
+          # Install dependencies first to ensure they are configured
           apt-get install -y --no-install-recommends \
-            zstd cryptsetup-bin initramfs-tools overlayroot
+            zstd cryptsetup-bin initramfs-tools
+          # Install overlayroot with force-confold to avoid interactive prompt
+          apt-get install -y --no-install-recommends \
+            -o Dpkg::Options::="--force-confdef" \
+            -o Dpkg::Options::="--force-confold" \
+            overlayroot
 
           mkdir -p /var/lib/kibaos/etc-overlay /var/lib/kibaos/etc-work
 
