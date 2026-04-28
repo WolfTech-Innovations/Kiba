@@ -30,7 +30,7 @@ jobs:
             syslinux syslinux-common isolinux \
             meson ninja-build pkg-config \
             libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
-            libsoup-2.4-dev libjson-glib-dev libostree-dev \
+             libjson-glib-dev libostree-dev \
             gcc g++ gettext
 
           cd /w
@@ -127,7 +127,7 @@ jobs:
             apt-get install -y --no-install-recommends \
               meson ninja-build pkg-config gcc git \
               libgtk-4-dev libadwaita-1-dev libflatpak-dev \
-              libappstream-dev libsoup-2.4-dev libjson-glib-dev \
+              libappstream-dev  libjson-glib-dev \
               libostree-dev gettext 2>/dev/null || true
 
             git clone --depth=1 https://github.com/kolunmi/bazaar.git /tmp/bazaar 2>/dev/null || {
