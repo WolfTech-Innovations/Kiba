@@ -297,6 +297,7 @@ jobs:
           cat > config/package-lists/kibaos.list.chroot << 'PACKAGES'
           # ── Base system ───────────────────────────────────────────────────────
           linux-image-amd64
+          linux-headers-amd64
           firmware-linux-free
           firmware-linux-nonfree
           systemd-sysv
@@ -414,7 +415,7 @@ jobs:
           squashfs-tools
 
           # ── Overlay FS ────────────────────────────────────────────────────────
-          overlayroot
+          # overlayroot installed via hook 0130 to avoid kernel config loop
           PACKAGES
 
           echo "=== Creating live customization hook ==="
@@ -1677,6 +1678,10 @@ jobs:
           cat > config/hooks/live/0130-readonly-overlay.hook.chroot << 'OVERLAY_HOOK'
           #!/bin/bash
           set -e
+          export DEBIAN_FRONTEND=noninteractive
+          echo "=== Installing overlayroot ==="
+          apt-get update
+          apt-get install -y --no-install-recommends overlayroot
           echo "=== Configuring SteamOS-style read-only FS overlay ==="
 
           cat > /etc/overlayroot.conf << 'OVERLAYCONF'
