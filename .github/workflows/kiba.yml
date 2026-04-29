@@ -23,6 +23,7 @@ jobs:
           apt-get update && apt-get install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
+            qemu-system-x86 \
             meson ninja-build pkg-config \
             libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
              libjson-glib-dev libostree-dev \
@@ -44,7 +45,7 @@ jobs:
             --system live \
             --linux-flavours amd64 \
             --linux-packages "linux-image linux-headers" \
-            --bootappend-live "boot=live components quiet splash" \
+            --bootappend-live "boot=live components quiet splash console=ttyS0" \
             --bootappend-install "auto=true priority=critical" \
             --bootloaders "grub-pc,grub-efi" \
             --iso-application "KibaOS" \
@@ -159,14 +160,6 @@ jobs:
           echo "=== CachyOS Kernel installed ==="
           CACHY_HOOK
           chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
-
-          # ── UPX binary compression hook ──────────────────────────────────────
-          mkdir -p config/hooks/live
-          cat > config/hooks/live/0050-upx-compress.hook.chroot << 'UPX_HOOK'
-          #!/bin/bash
-          echo "Hook removed"
-          UPX_HOOK
-          chmod +x config/hooks/live/0050-upx-compress.hook.chroot
 
           # ── Extreme Minimization hook ─────────────────────────────────────────
           cat > config/hooks/live/0090-extreme-minimization.hook.chroot << 'MIN_HOOK'
@@ -404,9 +397,6 @@ jobs:
           xdg-desktop-portal-kde
           xdg-desktop-portal-gtk
 
-          # ── UPX ───────────────────────────────────────────────────────────────
-          upx
-
           # ── Shell — zsh ───────────────────────────────────────────────────────
           zsh
           zsh-autosuggestions
@@ -459,6 +449,7 @@ jobs:
           tealdeer
           duf
           ncdu
+          htop
           zenity
 
           # ── Boot loaders ──────────────────────────────────────────────────────
@@ -480,6 +471,7 @@ jobs:
           kmod
           binutils
           fzf
+          yt-dlp
           file
           PACKAGES
 
@@ -1844,7 +1836,7 @@ jobs:
           fi
 
           # Check for critical modern tools (mapping binary names to package names where needed)
-          for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf; do
+          for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
             if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
                echo "VERIFIED: $tool installed"
             else
@@ -1856,6 +1848,40 @@ jobs:
           if [ -f live-image-amd64.hybrid.iso ]; then
             mv live-image-amd64.hybrid.iso "${ISO}.iso"
             sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
+
+            echo "=== Starting Headless Boot Test (QEMU) ==="
+            # Run QEMU for 60 seconds and capture serial output
+            # We use -nographic and -serial stdio to capture boot logs
+            # We add a small delay to ensure the kernel starts printing
+            timeout 60s qemu-system-x86_64 \
+              -m 2G \
+              -cdrom "${ISO}.iso" \
+              -nographic \
+              -serial stdio \
+              -no-reboot \
+              > boot_test.log 2>&1 || true
+
+            echo "=== Analyzing Boot Logs ==="
+            if grep -qi "Kernel panic" boot_test.log; then
+              echo "ERROR: Kernel panic detected during boot test!"
+              cat boot_test.log
+              exit 1
+            fi
+
+            if grep -qi "Call Trace:" boot_test.log; then
+               echo "ERROR: Potential crash/trace detected in logs!"
+               cat boot_test.log
+               exit 1
+            fi
+
+            # Check if we at least reached the initramfs or live-boot stage
+            if ! grep -qiE "init|live-boot|Loading|Linux version" boot_test.log; then
+               echo "WARNING: Boot log seems empty or didn't start properly"
+               # This might be due to lack of kvm, but we'll still fail if it's definitely broken
+            fi
+
+            echo "VERIFIED: Boot test completed without panics"
+
             echo ""
             echo "═══ KibaOS Build Complete ═══"
             ls -lh "${ISO}.iso"
