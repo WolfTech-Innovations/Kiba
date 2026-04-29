@@ -359,7 +359,8 @@ jobs:
 
           # ── Network ───────────────────────────────────────────────────────────
           network-manager
-          wpasupplicant
+          wpa_supplicant
+          iwd
           wget
           curl
           git
@@ -813,12 +814,12 @@ jobs:
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
-              color: "#282a36"
+              color: "#00000"
               anchors.fill: parent
               Text {
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
-                  font.pixelSize: 48; font.bold: true; color: "#00e5ff"
+                  font.pixelSize: 48; font.bold: true; color: "#ffffff"
               }
           }
           WATCHSPLASH
