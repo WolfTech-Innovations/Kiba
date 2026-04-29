@@ -82,72 +82,7 @@ test.yaml:22:17: receiver of object dereference "permissions" must be type of ob
    |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 
----
-
-## Technical Details
-
-### Shell
-
-<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
-<img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square" alt="Kernel: CachyOS">
-
-KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
-
-- Shared history across sessions.
-- Tab completion with menu select.
-- Autosuggestions & syntax highlighting.
-- Minimalist Dracula-themed prompt.
-
-**Useful Aliases:**
-
-- `ll` -> `ls -lah` (via `eza`)
-- `update` -> `sudo nala update && sudo nala upgrade -y`
-- `install` -> `sudo nala install`
-- `edit` -> Quick access to `micro`
-- `please` -> Alias for `sudo`
-- `cls` -> Clear the terminal
-
-### Theme
-
-<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
-
-KibaOS ships the **Dracula** color scheme system-wide using the official palette from [draculatheme.com](https://draculatheme.com).
-
-| Color      | Hex       | Role         |
-| ---------- | --------- | ------------ |
-| Background | `#282a36` | Primary BG   |
-| Purple     | `#bd93f9` | Accent Color |
-| Pink       | `#ff79c6` | Selection    |
-| Green      | `#50fa7b` | Success      |
-
-The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
-
-### System Requirements
-
-| Component | Minimum                | Recommended         |
-| --------- | ---------------------- | ------------------- |
-| **CPU**   | 64-bit x86 (amd64)     | Dual-core or better |
-| **RAM**   | 2 GB                   | 4 GB                |
-| **Disk**  | 20 GB                  | **SSD** recommended |
-| **GPU**   | **OpenGL 2.0** support | Dedicated GPU       |
-
----
-
-## Build System
-
-<p align="left">
-  <img src="https://img.shields.io/badge/Build-live--build-blue?style=flat-square" alt="Build: live-build">
-  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
-  <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
-</p>
-
-KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
-
-- **Orchestration:** `.github/workflows/kiba.yml`
-- **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
-- **Delivery:** Completed ISOs are automatically uploaded to **SourceForge** from the `main` branch.
-
-### Building Locally
+## Quick start
 
 Install `actionlint` command by downloading [the released binary][releases] or by Homebrew or by `go install`. See
 [the installation document][install] for more details like how to manage the command with several package managers

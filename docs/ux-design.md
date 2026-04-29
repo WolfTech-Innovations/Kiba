@@ -77,10 +77,6 @@ Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
 - `cat` -> `bat`
 - `grep` -> `ripgrep`
 - `update` -> `sudo nala update && sudo nala upgrade -y`
-- `edit` -> `micro` (System default editor)
-- `please` -> `sudo`
-- `cls` -> `clear`
-- `path` -> Multi-line `$PATH` overview
 
 ## Boot Branding
 
