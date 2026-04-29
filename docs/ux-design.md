@@ -84,6 +84,7 @@ The branding experience starts from the moment the system boots:
 
 - **Plymouth:** A custom "kibaos-spinner" theme with a Dracula-themed progress bar.
 - **ISOLINUX:** The bootloader menu features Dracula colors and plain-English options for ease of use.
+
 ### Interface Components
 
 - **Global Theme:** A customized **Ant-Dark** theme, providing a consistent base for all applications.
