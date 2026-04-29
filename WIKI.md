@@ -12,12 +12,9 @@
   <img src="https://img.shields.io/badge/Status-Stable-success?style=for-the-badge" alt="Status">
 </p>
 
-
 Welcome to the official **KibaOS Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaOS.
 
-
 ---
-
 
 ## 📖 Extended Documentation
 
@@ -29,52 +26,50 @@ For more specific details on the various components of KibaOS, please refer to t
 - [**Security & Compliance**](./docs/security-compliance.md)
 - [**Build Infrastructure & Automation**](./docs/build-system.md)
 - [**Contributing Guidelines**](./docs/contributing.md)
-
+- [**Frequently Asked Questions**](./docs/faq.md)
 
 ---
 
-
 ## 🏗️ Architecture & Core Components
 
-
 ### Base System
+
 KibaOS is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
 
 - **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
 - **Init System:** **Systemd**.
 - **Display Server:** **Wayland** (default) with **X11** fallback.
-- **Bootloader:** **ISOLINUX** (exclusively, for a simplified and branded boot experience).
-
+- **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems).
 
 ### Extreme Minimization
+
 The system undergoes aggressive footprint reduction during the build process:
+
 - **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
 - **Locale Optimization:** Only `en` and `en_US` locales are preserved.
 - **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-desktop` + `plasma-workspace` combination.
 - **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
 
-
 ---
-
 
 ## 🎨 User Experience (UX) & Design
 
-
 ### Visual Identity
+
 KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component | Choice |
-|-----------|--------|
+| Component               | Choice             |
+| ----------------------- | ------------------ |
 | **Desktop Environment** | **KDE Plasma 6.3** |
-| **Global Theme** | **Ant-Dark** |
-| **Color Scheme** | **Dracula** |
-| **Icon Theme** | **Kora** |
-| **Cursor Theme** | **Vimix** |
-| **System Font** | **Inter** |
-| **Monospace Font** | **JetBrains Mono** |
-
+| **Global Theme**        | **Ant-Dark**       |
+| **Color Scheme**        | **Dracula**        |
+| **Icon Theme**          | **Kora**           |
+| **Cursor Theme**        | **Vimix**          |
+| **System Font**         | **Inter**          |
+| **Monospace Font**      | **JetBrains Mono** |
 
 ### Shell Experience
+
 **Zsh** is the default shell for all users, including `root`.
 
 - **Prompt:** **Starship** (Pre-configured with a minimalist Dracula theme).
@@ -89,61 +84,55 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
   - `fd-find` (Fast file finder)
   - `tealdeer` (`tldr` implementation)
 
-
 ### Boot & Branding
-- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
-- **Boot Menu:** Branded ISOLINUX menu with plain-English options for beginners.
 
+- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
+- **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
 
 ---
 
-
 ## 📦 Software Management
 
-
 ### KibaStore
+
 KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves as a user-friendly frontend for managing **Flatpaks** without the overhead of heavy software centers.
 
 ### Repositories & Packages
+
 - **Ungoogled Chromium:** Provided via OBS (Open Build Service) repository.
 - **Flatpak:** Integrated by default with the **Flathub** remote.
 - **Nala:** Configured as the primary package manager frontend with system-wide aliases (`apt` -> `nala`).
 
-
 ---
-
 
 ## 🛡️ Security & Compliance
 
-
 ### California AADC (AB 2273)
+
 KibaOS includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
 
 - **Implementation:** A Python-based view module in the installer.
 - **Privacy:** Data is stored **locally only** at `/etc/kibaos/age-verify` and is never transmitted to external servers.
 
-
 ---
-
 
 ## 🚀 Build Infrastructure
 
 KibaOS uses a highly automated CI/CD pipeline.
 
 ### Build Pipeline
+
 1. **Tooling:** Built using **live-build** (lb).
 2. **Environment:** **Docker** container running **Debian Trixie**.
 3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
 4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
 
-
 ### Image Optimization
+
 - **Compression:** The SquashFS filesystem is repacked with **Zstd** (compression level 19) for maximum space efficiency and decompression speed.
 - **Initramfs:** Configured with `zstd -19` for faster boot times.
 
-
 ---
-
 
 ## 🛠️ Build Locally
 
@@ -162,16 +151,13 @@ docker run --rm --privileged \
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.
 
-
 ---
-
 
 ## 🤝 Community & Support
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
 - **Organization:** [WolfTech Innovations](https://github.com/WolfTech-Innovations)
-
 
 > [!NOTE]
 > KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
