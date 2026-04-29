@@ -43,6 +43,7 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaOS.
+- [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
 ---
@@ -216,7 +217,7 @@ Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://
 
 ## License
 
-KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the [**MIT License**](./LICENSE).
+KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
