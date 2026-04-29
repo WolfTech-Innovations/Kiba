@@ -1,5 +1,4 @@
-Usage
-=====
+# Usage
 
 This document describes how to use [actionlint](..).
 
@@ -43,6 +42,7 @@ actionlint -shellcheck= -pyflakes=
 ```
 
 <a id="format"></a>
+
 ### Format error messages
 
 `-format` option can flexibly format error messages with [Go template syntax][go-template].
@@ -133,7 +133,7 @@ The sequence can be traversed with `range` action, which is like `for ... = rang
 The error object has the following fields.
 
 | Field                | Description                                           | Example                                                          |
-|----------------------|-------------------------------------------------------|------------------------------------------------------------------|
+| -------------------- | ----------------------------------------------------- | ---------------------------------------------------------------- |
 | `{{$err.Message}}`   | Body of error message                                 | `property "platform" is not defined in object type {os: string}` |
 | `{{$err.Snippet}}`   | Code snippet to indicate error position               | `          node_version: 16.x\n          ^~~~~~~~~~~~~`          |
 | `{{$err.Kind}}`      | Name of rule the error belongs to                     | `expression`                                                     |
@@ -147,7 +147,7 @@ there are a few custom actions defined by actionlint. Most useful action would b
 example. List of all custom actions are as follows:
 
 | Action           | Description                                                                      | Example usage                             |
-|------------------|----------------------------------------------------------------------------------|-------------------------------------------|
+| ---------------- | -------------------------------------------------------------------------------- | ----------------------------------------- |
 | `json x`         | Serialize `x` as JSON string followed by newline character                       | `{{json $err}}`                           |
 | `replace x y z`  | Replace string `y` with `z` in `x`                                               | `{{replace $err.Filepath "\\" "/"}}`      |
 | `toPascalCase x` | Convert `x` into PascalCase (e.g. 'foo-bar' to 'FooBar')                         | `{{toPascalCase $err.Kind}}`              |
@@ -157,7 +157,7 @@ example. List of all custom actions are as follows:
 The kind object returned from `allKinds` action has the following fields.
 
 | Field                   | Description                   | Example                                     |
-|-------------------------|-------------------------------|---------------------------------------------|
+| ----------------------- | ----------------------------- | ------------------------------------------- |
 | `{{$kind.Name}}`        | Name of the kind              | `syntax-check`                              |
 | `{{$kind.Description}}` | Short description of the kind | `Checks for GitHub Actions workflow syntax` |
 
@@ -183,13 +183,14 @@ Note that special characters escaped with backslash like `\n` in the format stri
 `actionlint` command exits with one of the following exit statuses.
 
 | Status | Description                                             |
-|--------|---------------------------------------------------------|
+| ------ | ------------------------------------------------------- |
 | `0`    | The command ran successfully and no problem was found   |
 | `1`    | The command ran successfully and some problem was found |
 | `2`    | The command failed due to invalid command line option   |
 | `3`    | The command failed due to some fatal error              |
 
 <a id="on-github-actions"></a>
+
 ## Use actionlint on GitHub Actions
 
 Preparing `actionlint` executable with the download script is recommended. See [the instruction](install.md#download-script) for
@@ -264,6 +265,7 @@ the workflow content in the code editor, the results will be updated on the fly.
 table moves a cursor to position of the error in the code editor.
 
 <a id="docker"></a>
+
 ## [Docker][docker] image
 
 [Official Docker image][docker-image] is available. The image contains `actionlint` executable and all dependencies (shellcheck
@@ -303,8 +305,8 @@ docker run --rm -v /path/to/workflows:/workflows rhysd/actionlint:latest -color 
 
 Go APIs are available. See [the Go API document](api.md) for more details.
 
-
 <a id="tools-integ"></a>
+
 ## Tools integration
 
 ### reviewdog
@@ -326,6 +328,7 @@ jobs:
 ```
 
 <a id="problem-matchers"></a>
+
 ### Problem Matchers
 
 [Problem Matchers][problem-matchers] is a feature to extract GitHub Actions annotations from terminal outputs of linters.
@@ -373,11 +376,11 @@ repos:
 
 As alternatives to `actionlint` hook, `actionlint-docker` or `actionlint-system` hooks are available.
 
-| Hook ID | Explanation |
-|-|-|
-| `actionlint` | Automatically installs `actionlint` command in isolated `$GOPATH` directory using [Go toolchain][go-install]. |
-| `actionlint-docker` | Automatically pulls [the actionlint Docker image](#docker). |
-| `actionlint-system` | Uses system-installed `actionlint` command. The command is necessary to be [installed manually](install.md). |
+| Hook ID             | Explanation                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `actionlint`        | Automatically installs `actionlint` command in isolated `$GOPATH` directory using [Go toolchain][go-install]. |
+| `actionlint-docker` | Automatically pulls [the actionlint Docker image](#docker).                                                   |
+| `actionlint-system` | Uses system-installed `actionlint` command. The command is necessary to be [installed manually](install.md).  |
 
 ### VS Code
 

@@ -1,5 +1,4 @@
-Configuration
-=============
+# Configuration
 
 This document describes how to configure [actionlint](..) behavior.
 
@@ -36,7 +35,7 @@ paths:
     # List of regular expressions to filter errors by the error messages.
     ignore:
       # Ignore the specific error from shellcheck
-      - 'shellcheck reported issue in this script: SC2086:.+'
+      - "shellcheck reported issue in this script: SC2086:.+"
   # This pattern only matches '.github/workflows/release.yaml' file.
   .github/workflows/release.yaml:
     ignore:
