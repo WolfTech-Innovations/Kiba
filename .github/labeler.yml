@@ -1,25 +1,19 @@
-# Labeler configuration for actions/labeler@v5
+# Labeler configuration
 
 branding:
-  - changed-files:
-      - any-glob-to-any-file: "branding/**/*"
+  - branding/**/*
 
 documentation:
-  - changed-files:
-      - any-glob-to-any-file: "README.md"
-      - any-glob-to-any-file: "LICENSE"
-      - any-glob-to-any-file: "**/*.md"
+  - README.md
+  - LICENSE
 
 workflows:
-  - changed-files:
-      - any-glob-to-any-file: ".github/workflows/**/*"
+  - .github/workflows/**/*
 
 automation:
-  - changed-files:
-      - any-glob-to-any-file: ".github/scripts/**/*"
-      - any-glob-to-any-file: "build.sh"
+  - .github/scripts/**/*
+  - build.sh
 
 templates:
-  - changed-files:
-      - any-glob-to-any-file: ".github/ISSUE_TEMPLATE/**/*"
-      - any-glob-to-any-file: ".github/PULL_REQUEST_TEMPLATE.md"
+  - .github/ISSUE_TEMPLATE/**/*
+  - .github/PULL_REQUEST_TEMPLATE.md
