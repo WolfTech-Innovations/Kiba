@@ -705,7 +705,7 @@ jobs:
           alias edit='${EDITOR:-micro}'
           alias please='sudo'
           alias cls='clear'
-          alias path='echo -e ${PATH//:/\\n}'
+          alias path='echo -e "${PATH//:/\\n}"'
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
@@ -759,7 +759,7 @@ jobs:
           alias edit='${EDITOR:-micro}'
           alias please='sudo'
           alias cls='clear'
-          alias path='echo -e ${PATH//:/\\n}'
+          alias path='echo -e "${PATH//:/\\n}"'
           ZSHRC
 
           # ── Update tldr cache ──────────────────────────────────────────────────
@@ -835,7 +835,7 @@ jobs:
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
-              color: "#00000"
+              color: "#000000"
               anchors.fill: parent
               Text {
                   anchors.centerIn: parent
@@ -1131,7 +1131,6 @@ jobs:
 
           # ── Wallpaper: Autumn ─────────────────────────────────────────────────
           # Autumn ships with plasma-workspace-wallpapers
-          AUTUMN_PATH="/usr/share/wallpapers/Autumn/contents/images"
           # Fallback to first available large image if specific path differs
           WALLPAPER_PATH=$(find /usr/share/wallpapers/Autumn -name "*.png" -o -name "*.jpg" 2>/dev/null | sort -V | tail -1 || echo "")
           if [ -z "$WALLPAPER_PATH" ]; then
@@ -1583,10 +1582,9 @@ jobs:
           CALADESKTOP
 
           # ── ageverify module ────────────────────────────────────────────────────
-          # FIXED: correct Calamares Python viewmodule structure
-          # - module.desc must use type: job,
-          # - Python class must subclass ViewStep (not QWidget directly)
-          # - Required methods: create(), widget(), isNextEnabled(), back/next hooks
+          # KibaOS: implemented as a Python job module.
+          # It utilizes Zenity for age verification interaction during the
+          # execution phase of the installer.
 
           mkdir -p /usr/lib/calamares/modules/ageverify
 
