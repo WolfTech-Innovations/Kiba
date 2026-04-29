@@ -483,6 +483,7 @@ jobs:
 
           # ── Plymouth theme ────────────────────────────────────────────────────
           mkdir -p /usr/share/kibaos
+          touch ~/.zshrc
           mkdir -p /usr/share/plymouth/themes/kibaos-spinner
 
           # Decode embedded fallback logo
