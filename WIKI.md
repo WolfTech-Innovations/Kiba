@@ -48,7 +48,6 @@ The system undergoes aggressive footprint reduction during the build process:
 - **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
 - **Locale Optimization:** Only `en` and `en_US` locales are preserved.
 - **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-desktop` + `plasma-workspace` combination.
-- **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
 
 ---
 
