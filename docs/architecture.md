@@ -70,8 +70,6 @@ During the chroot phase, we remove all non-essential documentation to save hundr
 
 We only keep **`en`** and **`en_US`** locales. All other translations are removed from `/usr/share/locale`, significantly reducing the package footprint.
 
-
-
 - **Exclusions:** To prevent system breakage, we exclude critical binaries like `systemd`, `sddm`, `vmlinuz`, and Python/Node/Java runtimes.
 
 ### Dependency Stripping
@@ -108,7 +106,6 @@ To save space, KibaOS limits system locales to only `en` and `en_US`. All other 
 ### Dependency Pruning
 
 We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-desktop` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
-
 
 Configured for maximum compression using **`zstd -19`** in **`/etc/initramfs-tools/initramfs.conf`**. This reduces the size of the initial RAM disk, leading to faster boot times.
 
