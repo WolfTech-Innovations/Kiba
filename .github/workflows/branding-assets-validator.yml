@@ -1,0 +1,21 @@
+name: Branding Assets Validator
+
+on:
+  push:
+    paths:
+      - 'branding/**/*'
+  pull_request:
+    paths:
+      - 'branding/**/*'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Image Existence
+        run: |
+          ls branding/kibaos_banner.png || exit 1
+      - name: Verify Image Formats
+        run: |
+          find branding -type f -name "*.png" -exec file {} + | grep "PNG image data"

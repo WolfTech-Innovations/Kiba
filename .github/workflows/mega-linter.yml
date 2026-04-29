@@ -1,0 +1,30 @@
+name: MegaLinter
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  megalinter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: MegaLinter
+        uses: oxsecurity/megalinter@v8
+        env:
+          VALIDATE_ALL_CODEBASE: true
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Exclude what we have individual workflows for
+          DISABLE_LINTERS: BASH_SHELLCHECK,YAML_YAMLLINT,MARKDOWN_MARKDOWNLINT,JSON_JSONLINT
+          # Enable others
+          ENABLE_LINTERS: REPOSITORY_DEVICETREE,DOCKERFILE_HADOLINT,SECRET_GITLEAKS
