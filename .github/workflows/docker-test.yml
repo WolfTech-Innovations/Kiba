@@ -3,10 +3,10 @@ name: Docker Test
 on:
   push:
     paths:
-      - 'build.sh'
+      - "build.sh"
   pull_request:
     paths:
-      - 'build.sh'
+      - "build.sh"
 
 jobs:
   test-docker:

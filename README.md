@@ -20,7 +20,6 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-
 KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **KDE Plasma 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
@@ -29,15 +28,11 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
   </a>
 </p>
 
-
-_____ 
-
+---
 
 The goal of KibaOS is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
 
-
 ---
-
 
 ## Documentation
 
@@ -48,11 +43,10 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaOS.
+- [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
-
 ---
-
 
 ## Features
 
@@ -65,12 +59,9 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
 - **Performance:** No bloat — only what you need is installed.
 
-
 ---
 
-
 ## Quick Start
-
 
 ### Download
 
@@ -81,17 +72,16 @@ ISO images are available on **SourceForge**:
 
 SHA256 checksums are provided alongside each release. Always verify your download.
 
-
 ### Writing to a USB Drive
 
 On Linux:
+
 ```bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
 > [!IMPORTANT]
 > Replace `/dev/sdX` with your actual drive and `N` with the build number. You can also use tools like **Balena Etcher** or **Ventoy**.
-
 
 ### Live Session
 
@@ -100,18 +90,17 @@ Boot from the USB drive to enter the live environment. The session logs in autom
 > [!NOTE]
 > No changes made in the live session are saved after reboot. To install KibaOS permanently, launch the **Calamares** installer from the desktop.
 
-
 #### Default Credentials (Live Session Only)
 
 | Account | Password |
-|---------|----------|
+| ------- | -------- |
 | `user`  | `live`   |
 | `root`  | `root`   |
-
 
 ### Installation
 
 The **Calamares** installer guides you through:
+
 1. Language and locale selection
 2. Keyboard layout
 3. Disk partitioning (automatic or manual)
@@ -119,16 +108,14 @@ The **Calamares** installer guides you through:
 5. Installation and bootloader setup
 
 Post-install, update your system:
+
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```
 
-
 ---
 
-
 ## Technical Details
-
 
 ### Shell
 
@@ -136,16 +123,17 @@ sudo apt update && sudo apt upgrade -y
 <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square" alt="Kernel: CachyOS">
 
 KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
+
 - Shared history across sessions.
 - Tab completion with menu select.
 - Autosuggestions & syntax highlighting.
 - Minimalist Dracula-themed prompt.
 
 **Useful Aliases:**
+
 - `ll` -> `ls -lah`
 - `update` -> `sudo apt update && sudo apt upgrade -y`
 - `install` -> `sudo apt install`
-
 
 ### Theme
 
@@ -153,28 +141,25 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 KibaOS ships the **Dracula** color scheme system-wide using the official palette from [draculatheme.com](https://draculatheme.com).
 
-| Color | Hex | Role |
-|-------|-----|------|
-| Background | `#282a36` | Primary BG |
-| Purple | `#bd93f9` | Accent Color |
-| Pink | `#ff79c6` | Selection |
-| Green | `#50fa7b` | Success |
+| Color      | Hex       | Role         |
+| ---------- | --------- | ------------ |
+| Background | `#282a36` | Primary BG   |
+| Purple     | `#bd93f9` | Accent Color |
+| Pink       | `#ff79c6` | Selection    |
+| Green      | `#50fa7b` | Success      |
 
 The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
 
-
 ### System Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| **CPU** | 64-bit x86 (amd64) | Dual-core or better |
-| **RAM** | 2 GB | 4 GB |
-| **Disk** | 20 GB | **SSD** recommended |
-| **GPU** | **OpenGL 2.0** support | Dedicated GPU |
-
+| Component | Minimum                | Recommended         |
+| --------- | ---------------------- | ------------------- |
+| **CPU**   | 64-bit x86 (amd64)     | Dual-core or better |
+| **RAM**   | 2 GB                   | 4 GB                |
+| **Disk**  | 20 GB                  | **SSD** recommended |
+| **GPU**   | **OpenGL 2.0** support | Dedicated GPU       |
 
 ---
-
 
 ## Build System
 
@@ -189,7 +174,6 @@ KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** conta
 - **Orchestration:** `.github/workflows/kiba.yml`
 - **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
 - **Delivery:** Completed ISOs are automatically uploaded to **SourceForge** from the `main` branch.
-
 
 ### Building Locally
 
@@ -208,9 +192,7 @@ docker run --rm --privileged \
 > [!NOTE]
 > The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
 
-
 ---
-
 
 ## Project Structure
 
@@ -225,27 +207,21 @@ Kiba/
 └── README.md                  # Project documentation
 ```
 
-
 ---
-
 
 ## Contributing
 
 Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work.
 
-
 ---
-
 
 ## License
 
 KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
 
-
 ---
-
 
 ## About
 
 KibaOS is a **WolfTech Innovations** project.
-[Visit our GitHub](https://github.com/WolfTech-Innovations)
+[Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)

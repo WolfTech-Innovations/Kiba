@@ -2,7 +2,7 @@ name: Lock Threads
 
 on:
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: "0 0 * * 1"
   workflow_dispatch:
 
 jobs:
@@ -14,5 +14,5 @@ jobs:
     steps:
       - uses: dessant/lock-threads@v5
         with:
-          issue-inactive-days: '90'
-          pr-inactive-days: '90'
+          issue-inactive-days: "90"
+          pr-inactive-days: "90"

@@ -1,36 +1,86 @@
-# KibaOS Build System
+# Build System & Automation
 
-KibaOS utilizes a fully automated CI/CD pipeline to ensure consistent and reproducible builds.
+<p align="center">
+  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+</p>
 
-## Infrastructure
+<p align="center">
+  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions" alt="CI">
+  <img src="https://img.shields.io/badge/Tool-live--build-blue?style=for-the-badge" alt="live-build">
+  <img src="https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker" alt="Docker">
+</p>
 
-- **GitHub Actions:** The primary orchestration engine for KibaOS builds. The workflow is defined in `.github/workflows/kiba.yml`.
-- **Docker:** The build process runs inside a **Debian Trixie** Docker container to provide a clean and isolated environment.
-- **live-build (lb):** The industry-standard tool suite used to generate the Debian-based live ISO.
+---
+
+KibaOS utilizes a highly automated CI/CD pipeline to generate reproducible ISO images. This document details the infrastructure, build stages, and customization hooks used in the process.
+
+---
 
 ## Build Pipeline
 
-The build workflow follows these key stages:
+```mermaid
+graph LR
+    A[Push to Main] --> B[GitHub Action]
+    B --> C[Setup Docker]
+    C --> D[lb config]
+    D --> E[Custom Hooks]
+    E --> F[lb build]
+    F --> G[ISO Generation]
+    G --> H[Verification]
+    H --> I[Upload to SourceForge]
+```
 
-1. **Environment Setup:** The GitHub runner is prepared by freeing disk space and installing necessary host dependencies like `docker`.
-2. **Configuration (`lb config`):** The system is configured for the `amd64` architecture, targeting the `trixie` distribution with `main`, `contrib`, `non-free`, and `non-free-firmware` archives enabled.
-3. **Customization Hooks:** A series of shell scripts are executed during the build process to apply KibaOS-specific customizations:
-   - **`0030-starship.hook.chroot`:** Installs the Starship prompt.
-   - **`0045-cachyos-kernel.hook.chroot`:** Replaces the stock kernel with the CachyOS kernel and purges stock kernel meta-packages.
-   - **`0050-upx-compress.hook.chroot`:** Compresses ELF binaries to reduce size.
-   - **`0055-bazaar-native.hook.chroot`:** Builds and installs KibaStore (Bazaar) from source.
-   - **`0090-extreme-minimization.hook.chroot`:** Performs aggressive system cleaning (removing docs, locales, etc.).
-   - **`0100-customize.hook.chroot`:** Applies the Dracula theme, Plasma settings, and shell configurations.
-4. **Binary Building (`lb build`):** The final ISO is assembled, including the kernel, initrd, and the compressed SquashFS root filesystem.
-5. **Image Optimization:**
-   - **SquashFS:** Repacked using **Zstd** at compression level 19 for maximum space efficiency.
-   - **Initramfs:** Compressed with **Zstd** at level 19 for faster boot times.
-6. **Verification:** The build log is automatically grepped to ensure critical components (CachyOS, Starship, etc.) were successfully integrated.
-7. **Delivery:** Successfully built ISOs and their SHA256 checksums are automatically uploaded to **SourceForge**.
+---
+
+## Infrastructure
+
+- **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`) manages the build lifecycle.
+- **Environment:** Builds run inside a **Debian Trixie** Docker container to ensure environment consistency.
+- **Backend:** **live-build (lb)** is used to assemble the Debian-based live system.
+
+---
+
+## Customization Hooks
+
+KibaOS relies on a series of chroot and binary hooks to apply its unique features. These hooks are dynamically created by the GitHub Action workflow before the build starts.
+
+### Chroot Hooks
+
+_Executed inside the temporary system environment._
+
+| Hook                                        | Purpose                                                                            |
+| :------------------------------------------ | :--------------------------------------------------------------------------------- |
+| **`0030-starship.hook.chroot`**             | Installs the Starship cross-shell prompt.                                          |
+| **`0045-cachyos-kernel.hook.chroot`**       | Replaces the stock kernel with CachyOS and purges stock meta-packages.             |
+| **`0050-upx-compress.hook.chroot`**         | Aggressively compresses ELF binaries using UPX.                                    |
+| **`0055-bazaar-native.hook.chroot`**        | Builds **KibaStore** (Bazaar) from source and configures the desktop entry.        |
+| **`0056-ungoogled-chromium.hook.chroot`**   | Integrates Ungoogled Chromium via an OBS repository.                               |
+| **`0090-extreme-minimization.hook.chroot`** | Purges documentation, help files, and non-English locales.                         |
+| **`0100-customize.hook.chroot`**            | Applies Dracula theme, Plasma settings, shell aliases, and system identity.        |
+| **`0110-calamares-branding.hook.chroot`**   | Configures the Calamares installer with KibaOS branding and the age-verify module. |
+
+### Binary Hooks
+
+_Executed on the final ISO filesystem._
+
+| Hook                                        | Purpose                                                                        |
+| :------------------------------------------ | :----------------------------------------------------------------------------- |
+| **`0010-squashfs-compression.hook.binary`** | Repacks the SquashFS with maximum Zstd level 19 compression.                   |
+| **`0020-bootloader-branding.hook.binary`**  | Patches `grub.cfg` to provide branded and beginner-friendly boot menu options. |
+
+---
 
 ## Local Development
 
-You can reproduce the build environment locally using Docker:
+You can reproduce the KibaOS build environment locally on any Linux machine with Docker.
+
+### Requirements
+
+- **Docker** installed and running.
+- At least **15 GB** of free disk space.
+- An active internet connection.
+
+### Build Steps
 
 ```bash
 git clone https://github.com/WolfTech-Innovations/Kiba
@@ -42,4 +92,25 @@ docker run --rm --privileged \
   /w/build.sh
 ```
 
-*Note: The `build.sh` script is generated by the GitHub Actions workflow. Ensure you have at least 15GB of free space.*
+_Note: The `build.sh` script is generated by the GitHub Actions workflow. Ensure you have at least 15GB of free space._
+
+> [!NOTE]
+> The `build.sh` script is the entry point that orchestrates `lb config` and `lb build`. It is generated by the CI workflow, but you can find its logic in `.github/workflows/kiba.yml`.
+
+---
+
+## Verification & Delivery
+
+After the build completes, the pipeline performs several verification steps:
+
+1. **Grep Logs:** Ensures `cachyos`, `starship`, and other critical components were successfully processed.
+2. **Checksum:** Generates a SHA256 hash of the final ISO.
+3. **Upload:** Automatically pushes the ISO to **SourceForge** if the build was triggered from the `main` branch.
+
+---
+
+## Related Reading
+
+- [**Architecture**](./architecture.md)
+- [**Software Management**](./software-management.md)
+- [**Contributing**](./contributing.md)

@@ -2,7 +2,7 @@ name: Community Management
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: "0 0 * * *"
   pull_request_target:
     types: [opened, edited, synchronize]
   issues:
@@ -19,16 +19,16 @@ jobs:
     steps:
       - uses: actions/stale@v9
         with:
-          stale-issue-message: 'This issue is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days.'
-          stale-pr-message: 'This PR is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days.'
-          close-issue-message: 'This issue was closed because it has been stalled for 5 days with no activity.'
-          close-pr-message: 'This PR was closed because it has been stalled for 5 days with no activity.'
+          stale-issue-message: "This issue is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days."
+          stale-pr-message: "This PR is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days."
+          close-issue-message: "This issue was closed because it has been stalled for 5 days with no activity."
+          close-pr-message: "This PR was closed because it has been stalled for 5 days with no activity."
           days-before-issue-stale: 30
           days-before-pr-stale: 30
           days-before-issue-close: 5
           days-before-pr-close: 5
-          stale-issue-label: 'stale'
-          stale-pr-label: 'stale'
+          stale-issue-label: "stale"
+          stale-pr-label: "stale"
 
   welcome:
     runs-on: ubuntu-latest
@@ -40,8 +40,8 @@ jobs:
       - uses: actions/first-interaction@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: 'Welcome to the KibaOS project! Thank you for opening your first issue. Our team will look into it as soon as possible.'
-          pr-message: 'Welcome to the KibaOS project! Thank you for your first pull request. We appreciate your contribution!'
+          issue-message: "Welcome to the KibaOS project! Thank you for opening your first issue. Our team will look into it as soon as possible."
+          pr-message: "Welcome to the KibaOS project! Thank you for your first pull request. We appreciate your contribution!"
 
   labeler:
     runs-on: ubuntu-latest

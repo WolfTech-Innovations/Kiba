@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 0 * * 1'
+    - cron: "0 0 * * 1"
 
 jobs:
   analyze:
@@ -23,7 +23,7 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: 'javascript-typescript' # For scripts/actions
+          languages: "javascript-typescript" # For scripts/actions
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@v3

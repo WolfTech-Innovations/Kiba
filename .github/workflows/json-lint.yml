@@ -3,10 +3,10 @@ name: JSON Lint
 on:
   push:
     paths:
-      - '**/*.json'
+      - "**/*.json"
   pull_request:
     paths:
-      - '**/*.json'
+      - "**/*.json"
 
 jobs:
   jsonlint:
