@@ -96,6 +96,35 @@ jobs:
             apt-get install -y --no-install-recommends curl ca-certificates
           }
           curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+          # Branded starship config
+          mkdir -p /etc/skel/.config
+          cat > /etc/skel/.config/starship.toml << 'STARSHIP_CONF'
+          format = "$all"
+          add_newline = false
+
+          [character]
+          success_symbol = "[❯](bold #bd93f9)"
+          error_symbol = "[❯](bold #ff5555)"
+
+          [directory]
+          style = "bold #bd93f9"
+
+          [git_branch]
+          symbol = "󰊢 "
+          style = "bold #50fa7b"
+
+          [hostname]
+          ssh_only = false
+          format = "[$hostname]($style) "
+          style = "bold #bd93f9"
+
+          [username]
+          show_always = true
+          format = "[$user]($style)@"
+          style = "bold #bd93f9"
+          STARSHIP_CONF
+
           echo "=== Starship Prompt installed ==="
           STARSHIP_HOOK
           chmod +x config/hooks/live/0030-starship.hook.chroot
@@ -109,9 +138,9 @@ jobs:
           apt-get update
           apt-get install -y curl ca-certificates
 
-          # Use Nitrux's CachyOS kernel deb repository or direct download
+          # Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
           # For trixie, we'll try to find the latest version from their GitHub
-          REPO="Nitrux/linux-cachyos-deb"
+          REPO="psygreg/linux-psycachy"
           RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
           LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
@@ -125,21 +154,21 @@ jobs:
           cd /tmp/cachyos
 
           # Download image and headers
-          IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-cachyos" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-cachyos" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
           if [ -n "$IMAGE_URL" ]; then
             curl -LO "$IMAGE_URL"
           else
             echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-cachyos_${LATEST_TAG}_amd64.deb"
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
           if [ -n "$HEADERS_URL" ]; then
             curl -LO "$HEADERS_URL"
           else
              echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-cachyos_${LATEST_TAG}_amd64.deb"
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
           # Install
@@ -258,11 +287,10 @@ jobs:
           }
 
           # Create a standard .desktop entry if the package didn't create one
-          if [ ! -f /usr/share/applications/ungoogled-chromium.desktop ] && \
-             [ ! -f /usr/share/applications/chromium.desktop ]; then
-            CHROMIUM_BIN=$(command -v ungoogled-chromium chromium-browser chromium 2>/dev/null | head -1 || true)
-            if [ -n "$CHROMIUM_BIN" ]; then
-              cat > /usr/share/applications/kibaos-browser.desktop << BDESKTOP
+          # We force create a branded kibaos-browser.desktop to ensure consistency
+          CHROMIUM_BIN=$(command -v ungoogled-chromium chromium-browser chromium 2>/dev/null | head -1 || true)
+          if [ -n "$CHROMIUM_BIN" ]; then
+            cat > /usr/share/applications/kibaos-browser.desktop << BDESKTOP
           [Desktop Entry]
           Type=Application
           Name=Web Browser
@@ -272,7 +300,6 @@ jobs:
           Categories=Network;WebBrowser;
           MimeType=text/html;text/xml;application/xhtml+xml;
           BDESKTOP
-            fi
           fi
 
           echo "=== Chromium Browser installed ==="
@@ -345,6 +372,7 @@ jobs:
           # ── KDE Plasma 6 minimal working set ─────────────────────────────────
           plasma-desktop
           plasma-workspace
+          plasma-workspace-wallpapers
           sddm
           sddm-theme-debian-breeze
           plasma-nm
@@ -668,10 +696,16 @@ jobs:
             alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
-            alias update='sudo nala update'
+            alias update='sudo nala update && sudo nala upgrade -y'
             alias upgrade='sudo nala upgrade'
             alias search='nala search'
           fi
+
+          # ── KibaOS Aliases ──────────────────────────────────────
+          alias edit='${EDITOR:-micro}'
+          alias please='sudo'
+          alias cls='clear'
+          alias path='echo -e ${PATH//:/\\n}'
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
@@ -723,6 +757,13 @@ jobs:
           alias ..='cd ..'
           alias ...='cd ../..'
           ZSHRC
+
+          # ── Update tldr cache ──────────────────────────────────────────────────
+          if command -v tldr >/dev/null 2>&1; then
+            tldr --update || true
+          elif command -v tealdeer >/dev/null 2>&1; then
+            tealdeer --update || true
+          fi
 
           # ── Default shell: zsh ─────────────────────────────────────────────────
           chsh -s /bin/zsh user  2>/dev/null || true
@@ -1137,8 +1178,8 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.icon
           [Containments][1][Applets][12][Configuration][General]
-          applicationName=ungoogled-chromium
-          iconPath=/usr/share/applications/chromium.desktop
+          applicationName=kibaos-browser
+          iconPath=/usr/share/applications/kibaos-browser.desktop
           label=Web Browser
           [Containments][1][Applets][12][Geometry]
           x=180; y=40; width=64; height=64
@@ -1212,7 +1253,7 @@ jobs:
           systemctl enable NetworkManager  || true
           systemctl enable plymouth        || true
 
-          # ── KibaStore .desktop (rename Discover if present) ────────────────────
+          # ── KibaStore .desktop (hide Discover, prioritize Bazaar) ──────────────
           mkdir -p /usr/local/share/applications
           for f in \
             /usr/share/applications/org.kde.discover.desktop \
@@ -1221,8 +1262,7 @@ jobs:
             [ -f "$f" ] || continue
             FNAME=$(basename "$f")
             cp "$f" "/usr/local/share/applications/$FNAME"
-            sed -i 's/^Name=.*/Name=KibaStore/' "/usr/local/share/applications/$FNAME"
-            sed -i 's/^Name\[.*\]=.*//' "/usr/local/share/applications/$FNAME"
+            echo "NoDisplay=true" >> "/usr/local/share/applications/$FNAME"
             update-desktop-database /usr/local/share/applications 2>/dev/null || true
           done
 
@@ -1264,8 +1304,26 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Simple welcome message for beginners
-          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nYour new system is ready. We've made it fast, simple, and beautiful for you.\n\nEverything you need is already here. Just open an app and go!\n\nEnjoy your new computer." --width=400 2>/dev/null
+          # Functional welcome menu for KibaOS
+          CHOICE=$(zenity --list --title="Welcome to KibaOS" \
+            --text="Welcome to KibaOS! What would you like to do?" \
+            --column="Action" --column="Description" \
+            "Install KibaOS" "Install the system permanently to your disk" \
+            "Web Browser" "Browse the internet" \
+            "KibaStore" "Discover and install new applications" \
+            --width=450 --height=300 2>/dev/null)
+
+          case "$CHOICE" in
+            "Install KibaOS")
+              sudo calamares &
+              ;;
+            "Web Browser")
+              gtk-launch kibaos-browser &
+              ;;
+            "KibaStore")
+              gtk-launch kibastore &
+              ;;
+          esac
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
@@ -1282,6 +1340,14 @@ jobs:
 
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
+
+          # Final cleanup: Purge Bazaar build-only dependencies to keep ISO small
+          apt-get purge -y \
+            meson ninja-build pkg-config gcc \
+            libgtk-4-dev libadwaita-1-dev libflatpak-dev \
+            libappstream-dev libjson-glib-dev \
+            libostree-dev gettext
+          apt-get autoremove -y
           HOOK
           chmod +x config/hooks/live/0100-customize.hook.chroot
 
@@ -1687,8 +1753,8 @@ jobs:
 
           echo "=== Pipeline Verification ==="
           # Check for CachyOS kernel in the chroot environment
-          if grep -qi "cachyos" build.log; then
-            echo "VERIFIED: CachyOS kernel mentioned in build log"
+          if grep -qiE "cachyos|psycachy" build.log; then
+            echo "VERIFIED: CachyOS kernel (psycachy) mentioned in build log"
           else
             echo "WARNING: CachyOS kernel not found in build log"
           fi
