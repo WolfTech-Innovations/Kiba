@@ -57,7 +57,7 @@ If you're ready to contribute code or documentation:
 2. **Follow the coding style** used in the project.
 3. **Verify your changes** by running relevant build scripts or tests.
 4. **Submit a pull request** with a clear description of your changes and reference any related issues.
-If you find a bug, please open an issue. Provide:
+   If you find a bug, please open an issue. Provide:
 
 - Steps to reproduce.
 - Expected vs. Actual behavior.
