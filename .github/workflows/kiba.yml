@@ -204,14 +204,11 @@ jobs:
           # 2. Remove all locales except en and en_US
           find /usr/share/locale -mindepth 1 -maxdepth 1 ! -name 'en' ! -name 'en_US' -exec rm -rf {} +
 
-          # 3. Strip ELF binaries and libraries (Optimized)
-          find /usr/bin /usr/sbin /usr/lib /usr/lib64 -type f -executable 2>/dev/null | xargs strip --strip-unneeded 2>/dev/null || true
-
-          # 4. Clean apt
-          apt-get clean
+          # 3. Clean apt cache and lists
+          rm -rf /var/cache/apt/archives/*
           rm -rf /var/lib/apt/lists/*
 
-          # 5. Remove temporary files
+          # 4. Remove temporary files
           rm -rf /tmp/* /var/tmp/*
 
           echo "=== Aggressive Minimization complete ==="
