@@ -1,4 +1,4 @@
-# 🦊 KibaOS
+# KibaOS
 
 <p align="center">
   <img src="branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
@@ -13,7 +13,15 @@
   <img src="https://img.shields.io/badge/KDE-Plasma%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
 </p>
 
-KibaOS is a lightweight Linux distribution built on Debian 13 (Trixie) with KDE Plasma 6 as the desktop environment. It is developed and maintained by WolfTech Innovations.
+<p align="center">
+  <img src="https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style=flat-square" alt="Repo Size">
+  <img src="https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style=flat-square" alt="Stars">
+  <img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square" alt="Forks">
+  <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
+</p>
+
+
+KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **KDE Plasma 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -21,60 +29,74 @@ KibaOS is a lightweight Linux distribution built on Debian 13 (Trixie) with KDE 
   </a>
 </p>
 
+
 _____ 
+
 
 The goal of KibaOS is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
 
+
 ---
 
-## 🚀 Features
 
-- **Debian Base:** Built on Debian 13 Trixie (supported until 2030).
-- **Modern Desktop:** KDE Plasma 6.3 with Wayland as the default session.
-- **Dracula Aesthetic:** Dracula color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
-- **Polished UI:** Floating rounded taskbar and 12px rounded window corners via KWin compositor.
-- **Optimized Shell:** Zsh as the default shell with autosuggestions and syntax highlighting.
-- **Custom Branding:** Plymouth boot splash and Calamares graphical installer with KibaOS branding.
-- **Essential Apps:** Firefox ESR, Dolphin, Konsole, Kate, VLC, GParted included.
+## Features
+
+- **Debian Base:** Built on **Debian 13 Trixie** (supported until 2030).
+- **Modern Desktop:** **KDE Plasma 6.3** with **Wayland** as the default session.
+- **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
+- **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
+- **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
+- **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
+- **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
 - **Performance:** No bloat — only what you need is installed.
 
+
 ---
 
-## 📦 Quick Start
 
-### 📥 Download
+## Quick Start
 
-ISO images are available on SourceForge:
-👉 [Download KibaOS on SourceForge](https://sourceforge.net/projects/kibaos/files/)
+
+### Download
+
+<img src="https://img.shields.io/sourceforge/dt/kibaos?style=flat-square" alt="SourceForge Downloads">
+
+ISO images are available on **SourceForge**:
+[Download KibaOS on SourceForge](https://sourceforge.net/projects/kibaos/files/)
 
 SHA256 checksums are provided alongside each release. Always verify your download.
 
-### 💿 Writing to a USB Drive
+
+### Writing to a USB Drive
 
 On Linux:
 ```bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
+
 > [!IMPORTANT]
 > Replace `/dev/sdX` with your actual drive and `N` with the build number. You can also use tools like **Balena Etcher** or **Ventoy**.
 
-### 🖥️ Live Session
+
+### Live Session
 
 Boot from the USB drive to enter the live environment. The session logs in automatically.
 
 > [!NOTE]
 > No changes made in the live session are saved after reboot. To install KibaOS permanently, launch the **Calamares** installer from the desktop.
 
-#### 🔑 Default Credentials (Live Session Only)
+
+#### Default Credentials (Live Session Only)
 
 | Account | Password |
 |---------|----------|
 | `user`  | `live`   |
 | `root`  | `root`   |
 
-### ⚙️ Installation
 
-The Calamares installer guides you through:
+### Installation
+
+The **Calamares** installer guides you through:
 1. Language and locale selection
 2. Keyboard layout
 3. Disk partitioning (automatic or manual)
@@ -86,13 +108,19 @@ Post-install, update your system:
 sudo apt update && sudo apt upgrade -y
 ```
 
+
 ---
 
-## 🛠️ Technical Details
 
-### 💻 Shell
+## Technical Details
 
-KibaOS uses **Zsh** by default with a pre-configured system-wide config at `/etc/zsh/zshrc`:
+
+### Shell
+
+<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
+<img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square" alt="Kernel: CachyOS">
+
+KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
 - Shared history across sessions.
 - Tab completion with menu select.
 - Autosuggestions & syntax highlighting.
@@ -103,9 +131,12 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at `/etc
 - `update` -> `sudo apt update && sudo apt upgrade -y`
 - `install` -> `sudo apt install`
 
-### 🎨 Theme
 
-KibaOS ships the Dracula color scheme system-wide using the official palette from [draculatheme.com](https://draculatheme.com).
+### Theme
+
+<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
+
+KibaOS ships the **Dracula** color scheme system-wide using the official palette from [draculatheme.com](https://draculatheme.com).
 
 | Color | Hex | Role |
 |-------|-----|------|
@@ -114,30 +145,40 @@ KibaOS ships the Dracula color scheme system-wide using the official palette fro
 | Pink | `#ff79c6` | Selection |
 | Green | `#50fa7b` | Success |
 
-The scheme is applied to KDE Plasma, Konsole, KWin decorations, Breeze Dark panel, and Plymouth.
+The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
 
-### 🖥️ System Requirements
+
+### System Requirements
 
 | Component | Minimum | Recommended |
 |-----------|---------|-------------|
 | **CPU** | 64-bit x86 (amd64) | Dual-core or better |
 | **RAM** | 2 GB | 4 GB |
-| **Disk** | 20 GB | SSD recommended |
-| **GPU** | OpenGL 2.0 support | Dedicated GPU |
+| **Disk** | 20 GB | **SSD** recommended |
+| **GPU** | **OpenGL 2.0** support | Dedicated GPU |
+
 
 ---
 
-## 🏗️ Build System
 
-KibaOS is built using `live-build` inside a Debian Trixie Docker container via GitHub Actions.
+## Build System
+
+<p align="left">
+  <img src="https://img.shields.io/badge/Build-live--build-blue?style=flat-square" alt="Build: live-build">
+  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
+  <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
+</p>
+
+KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
 
 - **Orchestration:** `.github/workflows/kiba.yml`
 - **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
-- **Delivery:** Completed ISOs are automatically uploaded to SourceForge from the `main` branch.
+- **Delivery:** Completed ISOs are automatically uploaded to **SourceForge** from the `main` branch.
 
-### 🔨 Building Locally
 
-Requirements: Docker, a Linux host with at least 15 GB free space.
+### Building Locally
+
+Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
 ```bash
 git clone https://github.com/WolfTech-Innovations/Kiba
@@ -150,11 +191,13 @@ docker run --rm --privileged \
 ```
 
 > [!NOTE]
-> The `build.sh` script is generated at build-time by the GitHub Actions workflow and contains the full configuration and customization hooks.
+> The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
+
 
 ---
 
-## 📁 Project Structure
+
+## Project Structure
 
 ```text
 Kiba/
@@ -166,21 +209,27 @@ Kiba/
 └── README.md                  # Project documentation
 ```
 
+
 ---
 
-## 🤝 Contributing
+
+## Contributing
 
 Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work.
 
+
 ---
 
-## 📜 License
+
+## License
 
 KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
 
+
 ---
 
-## 🏢 About
+
+## About
 
 KibaOS is a **WolfTech Innovations** project.
 [Visit our GitHub](https://github.com/WolfTech-Innovations)
