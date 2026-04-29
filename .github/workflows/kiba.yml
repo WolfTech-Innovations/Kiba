@@ -176,7 +176,7 @@ jobs:
             echo "UPX not found, skipping"
             exit 0
           fi
-          SKIP_PATTERNS="kwin|plasmashell|plasma_session|kded|ksmserver|startplasma|sddm|Xorg|X11|xwayland|python|perl|ruby|node|java|dbus|systemd|udev|plymouth|vmlinuz|initrd"
+          SKIP_PATTERNS="kwin|plasmashell|plasma_session|kded|ksmserver|startplasma|sddm|Xorg|X11|xwayland|python|perl|ruby|node|java|dbus|systemd|udev|plymouth|vmlinuz|initrd|bash|dash|sh|zsh|grep|sed|awk|mount|umount|tar|gzip|bzip2|xz|zstd|file|binutils|apt|nala|dpkg|ldconfig|resolv"
           find /usr/bin /usr/sbin \
             -maxdepth 2 -type f -size +65536c 2>/dev/null | \
           while read -r f; do
@@ -379,6 +379,8 @@ jobs:
           openssl
           locales
           tzdata
+          libc6
+          libc-bin
 
           # ── Nala (apt frontend) ───────────────────────────────────────────────
           nala
@@ -614,6 +616,14 @@ jobs:
           # ── Aggressive Initrd Compression ────────────────────────────────────
           sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
           echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
+
+          # Ensure critical libraries are correctly linked and indexed
+          ldconfig
+          if [ ! -e /lib/x86_64-linux-gnu/libresolv.so.2 ] && [ ! -e /lib64/libresolv.so.2 ]; then
+            echo "WARNING: libresolv.so.2 not found, attempting to fix..."
+            ldconfig
+          fi
+
           update-initramfs -u -k all || update-initramfs -u
 
           # ── GRUB boot config ─────────────────────────────────────────────────

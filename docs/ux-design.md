@@ -83,7 +83,7 @@ Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
 The branding experience starts from the moment the system boots:
 
 - **Plymouth:** A custom "kibaos-spinner" theme with a Dracula-themed progress bar.
-- **ISOLINUX:** The bootloader menu features Dracula colors and plain-English options for ease of use.
+- **Grub**
 
 ### Interface Components
 
