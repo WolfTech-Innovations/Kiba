@@ -224,4 +224,4 @@ KibaOS is a distribution, not a single codebase. Individual components are subje
 ## About
 
 KibaOS is a **WolfTech Innovations** project.
-[Visit our GitHub](https://github.com/WolfTech-Innovations)
+[Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)

@@ -3,10 +3,10 @@ name: Branding Assets Validator
 on:
   push:
     paths:
-      - 'branding/**/*'
+      - "branding/**/*"
   pull_request:
     paths:
-      - 'branding/**/*'
+      - "branding/**/*"
 
 jobs:
   validate:

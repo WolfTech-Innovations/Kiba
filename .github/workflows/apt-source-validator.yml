@@ -3,8 +3,8 @@ name: APT Source Validator
 on:
   push:
     paths:
-      - 'build.sh'
-      - '.github/workflows/kiba.yml'
+      - "build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
 
 jobs:

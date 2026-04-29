@@ -158,6 +158,13 @@ docker run --rm --privileged \
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
 - **Organization:** [WolfTech Innovations](https://github.com/WolfTech-Innovations)
+- **Acknowledgments:** [Community & FOSS](./ACKNOWLEDGMENTS.md)
+
+---
+
+## ⚖️ License
+
+KibaOS is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
 
 > [!NOTE]
 > KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
