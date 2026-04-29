@@ -668,7 +668,7 @@ jobs:
             alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
-            alias update='sudo nala update'
+            alias update='sudo nala update && sudo nala upgrade -y'
             alias upgrade='sudo nala upgrade'
             alias search='nala search'
           fi
@@ -722,6 +722,10 @@ jobs:
           alias rm='rm -I'
           alias ..='cd ..'
           alias ...='cd ../..'
+          alias edit='${EDITOR:-micro}'
+          alias please='sudo'
+          alias cls='clear'
+          alias path='echo -e ${PATH//:/\\n}'
           ZSHRC
 
           # ── Default shell: zsh ─────────────────────────────────────────────────
@@ -1517,7 +1521,7 @@ jobs:
           # - module.desc must use type: job,
           # - Python class must subclass ViewStep (not QWidget directly)
           # - Required methods: create(), widget(), isNextEnabled(), back/next hooks
-          
+
           mkdir -p /usr/lib/calamares/modules/ageverify
 
           cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'

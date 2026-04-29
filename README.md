@@ -131,9 +131,12 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 **Useful Aliases:**
 
-- `ll` -> `ls -lah`
-- `update` -> `sudo apt update && sudo apt upgrade -y`
-- `install` -> `sudo apt install`
+- `ll` -> `ls -lah` (via `eza`)
+- `update` -> `sudo nala update && sudo nala upgrade -y`
+- `install` -> `sudo nala install`
+- `edit` -> Quick access to `micro`
+- `please` -> Alias for `sudo`
+- `cls` -> Clear the terminal
 
 ### Theme
 
