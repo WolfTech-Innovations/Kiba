@@ -19,6 +19,21 @@ Welcome to the official **KibaOS Wiki**. This document provides an exhaustive de
 ---
 
 
+## 📖 Extended Documentation
+
+For more specific details on the various components of KibaOS, please refer to the following documents:
+
+- [**Architecture Deep-Dive**](./docs/architecture.md)
+- [**UX & Visual Design**](./docs/ux-design.md)
+- [**Software & Package Management**](./docs/software-management.md)
+- [**Security & Compliance**](./docs/security-compliance.md)
+- [**Build Infrastructure & Automation**](./docs/build-system.md)
+- [**Contributing Guidelines**](./docs/contributing.md)
+
+
+---
+
+
 ## 🏗️ Architecture & Core Components
 
 
