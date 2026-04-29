@@ -1,0 +1,16 @@
+name: Kernel Endpoint Monitor
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-endpoints:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify CachyOS Kernel URLs
+        run: |
+          REPO_URL="https://api.github.com/repos/Nitrux/linux-cachyos-deb/releases/latest"
+          curl -f -I "$REPO_URL" || exit 1

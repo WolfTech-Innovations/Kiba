@@ -1,0 +1,22 @@
+name: Repo Files Integrity Check
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "0 0 * * 0"
+
+jobs:
+  check-integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Essential Files
+        run: |
+          ESSENTIAL_FILES="README.md LICENSE WIKI.md ACKNOWLEDGMENTS.md package.json"
+          for file in $ESSENTIAL_FILES; do
+            if [ ! -s "$file" ]; then
+              echo "::error::Critical file $file is missing or empty!"
+              exit 1
+            fi
+          done

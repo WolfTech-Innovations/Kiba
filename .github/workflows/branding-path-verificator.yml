@@ -1,0 +1,22 @@
+name: Branding Path Verificator
+
+on:
+  push:
+    paths:
+      - 'branding/**'
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  verify-paths:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Asset References
+        run: |
+          for asset in branding/*; do
+            [ -f "$asset" ] || continue
+            filename=$(basename "$asset")
+            if ! grep -q "$filename" .github/workflows/kiba.yml; then
+              echo "Warning: Asset $filename is not referenced in the build workflow."
+            fi
+          done
