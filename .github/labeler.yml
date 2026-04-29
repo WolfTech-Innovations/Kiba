@@ -2,7 +2,7 @@
 
 branding:
   - changed-files:
-      - any-glob-to-any-file: 'branding/**/*'
+      - any-glob-to-any-file: "branding/**/*"
 
 documentation:
   - changed-files:
@@ -12,16 +12,16 @@ documentation:
 
 workflows:
   - changed-files:
-      - any-glob-to-any-file: '.github/workflows/**/*'
+      - any-glob-to-any-file: ".github/workflows/**/*"
 
 automation:
   - changed-files:
       - any-glob-to-any-file:
-          - '.github/scripts/**/*'
+          - ".github/scripts/**/*"
           - build.sh
 
 templates:
   - changed-files:
       - any-glob-to-any-file:
-          - '.github/ISSUE_TEMPLATE/**/*'
+          - ".github/ISSUE_TEMPLATE/**/*"
           - .github/PULL_REQUEST_TEMPLATE.md
