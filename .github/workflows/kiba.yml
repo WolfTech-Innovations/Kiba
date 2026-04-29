@@ -1320,10 +1320,10 @@ jobs:
           strings:
             productName: "KibaOS"
             shortProductName: "KibaOS"
-            version: "1.0"
-            shortVersion: "1.0"
-            versionedName: "KibaOS 1.0"
-            shortVersionedName: "KibaOS 1.0"
+            version: "1.8"
+            shortVersion: "1.8"
+            versionedName: "KibaOS"
+            shortVersionedName: "KibaOS"
             bootloaderEntryName: "KibaOS"
             productUrl: "https://github.com/WolfTech-Innovations/kiba"
             supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
@@ -1366,9 +1366,9 @@ jobs:
               - keyboard
               - partition
               - users
-              - ageverify
               - summary
             - exec:
+              - ageverify
               - partition
               - mount
               - unpackfs
@@ -1412,7 +1412,7 @@ jobs:
               - ram
               - power
               - internet
-            requiredStorageGiB: 10.0
+            requiredStorageGiB: 20.0
             requiredRam: 1.0
           geoip:
             style: "json"
@@ -1449,8 +1449,8 @@ jobs:
           sidebar: "Your Account"
           userShell: /bin/zsh
           autologinGroup:  autologin
-          sudoersGroup:    sudo
-          setRootPassword: true
+          sudoersGroup:    admin
+          setRootPassword: false
           doAutoLogin:     false
           passwordRequirements:
             minLength: 6
@@ -1537,159 +1537,43 @@ jobs:
 
           # ── ageverify module ────────────────────────────────────────────────────
           # FIXED: correct Calamares Python viewmodule structure
-          # - module.desc must use type: viewmodule, interface: pythonqt
+          # - module.desc must use type: job, 
+interface: python
           # - Python class must subclass ViewStep (not QWidget directly)
           # - Required methods: create(), widget(), isNextEnabled(), back/next hooks
           mkdir -p /usr/lib/calamares/modules/ageverify
 
           cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'
           ---
-          type:      "viewmodule"
+          type:      "job"
           name:      "ageverify"
-          interface: "pythonqt"
+          interface: "python"
           script:    "main.py"
           AGEDESC
 
           cat > /usr/lib/calamares/modules/ageverify/main.py << 'AGEPYEOF'
-          #!/usr/bin/env python3
-          # -*- coding: utf-8 -*-
-          # KibaOS Age Verification — California AADC (AB 2273) compliance
-          # Calamares Python ViewModule using the pythonqt interface.
-          # Required exports: ViewStep subclass named the same as the module,
-          # or a create() function returning a ViewStep.
+          # main.py
+import libcalamares, os, subprocess
 
-          import libcalamares
-          from libcalamares.ui.view_step import ViewStep
-          from PyQt6.QtWidgets import (
-              QWidget, QVBoxLayout, QLabel,
-              QPushButton, QButtonGroup, QRadioButton,
-              QFrame, QSizePolicy, QSpacerItem
-          )
-          from PyQt6.QtCore import Qt
-          import os
-
-          class AgeVerifyWidget(QWidget):
-              def __init__(self, parent=None):
-                  super().__init__(parent)
-                  self._selection = None
-                  self._age_group = None
-                  self._build_ui()
-
-              def _build_ui(self):
-                  layout = QVBoxLayout(self)
-                  layout.setContentsMargins(48, 32, 48, 32)
-                  layout.setSpacing(16)
-
-                  title = QLabel("Age Verification")
-                  f = title.font(); f.setPointSize(20); f.setBold(True)
-                  title.setFont(f)
-                  layout.addWidget(title)
-
-                  sub = QLabel(
-                      "California law (AB 2273 — Age-Appropriate Design Code) requires "
-                      "us to note your age group before completing installation. "
-                      "This information is stored locally only and is never transmitted."
-                  )
-                  sub.setWordWrap(True)
-                  sub.setStyleSheet("color: #6272a4; font-size: 13px;")
-                  layout.addWidget(sub)
-
-                  sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-                  layout.addWidget(sep)
-
-                  prompt = QLabel("Please select your age group:")
-                  pf = prompt.font(); pf.setPointSize(13); prompt.setFont(pf)
-                  layout.addWidget(prompt)
-
-                  self._age_group = QButtonGroup(self)
-                  for value, label in [
-                      ("under13", "Under 13  (Children — enhanced protections apply)"),
-                      ("13to15",  "13 – 15   (Teen — some restrictions apply)"),
-                      ("16to17",  "16 – 17   (Minor — standard protections)"),
-                      ("18plus",  "18 or older  (Adult — full access)"),
-                  ]:
-                      rb = QRadioButton(label)
-                      rb.setProperty("ageValue", value)
-                      rb.setStyleSheet("font-size: 13px; padding: 6px 0;")
-                      self._age_group.addButton(rb)
-                      layout.addWidget(rb)
-
-                  self._age_group.buttonClicked.connect(
-                      lambda btn: setattr(self, '_selection', btn.property("ageValue"))
-                  )
-
-                  layout.addItem(QSpacerItem(
-                      20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-                  note = QLabel(
-                      "🔒  Your selection is saved to /etc/kibaos/age-verify on this "
-                      "device only. KibaOS does not collect or transmit personal data."
-                  )
-                  note.setWordWrap(True)
-                  note.setStyleSheet(
-                      "background: rgba(68,71,90,120); border-radius: 8px; "
-                      "padding: 10px; color: #f8f8f2; font-size: 12px;")
-                  layout.addWidget(note)
-
-              def get_selection(self):
-                  return self._selection
-
-
-          class AgeverifyViewStep(ViewStep):
-              """Calamares ViewStep for age verification."""
-
-              def __init__(self, parent=None):
-                  super().__init__(parent)
-                  self._widget = AgeVerifyWidget()
-
-              def prettyName(self):
-                  return "Age Verification"
-
-              def widget(self):
-                  return self._widget
-
-              def isNextEnabled(self):
-                  # Allow next even without selection (optional compliance step)
-                  return True
-
-              def isBackEnabled(self):
-                  return True
-
-              def isAtBeginning(self):
-                  return True
-
-              def isAtEnd(self):
-                  return True
-
-              def jobs(self):
-                  selection = self._widget.get_selection() or "not-answered"
-                  return [AgeVerifyJob(selection)]
-
-
-          class AgeVerifyJob(libcalamares.job.Job):
-              def __init__(self, selection):
-                  super().__init__()
-                  self._selection = selection
-
-              def prettyName(self):
-                  return "Saving age verification"
-
-              def exec(self):
-                  try:
-                      root = libcalamares.globalstorage.value("rootMountPoint") or ""
-                      dest = os.path.join(root, "etc", "kibaos")
-                      os.makedirs(dest, exist_ok=True)
-                      with open(os.path.join(dest, "age-verify"), "w") as f:
-                          f.write(f"age_group={self._selection}\n")
-                          f.write("# KibaOS age verification — California AB 2273\n")
-                          f.write("# Stored locally only, never transmitted.\n")
-                  except Exception as e:
-                      libcalamares.utils.debug(f"ageverify: {e}")
-                  return None
-
-
-          def create():
-              return AgeverifyViewStep()
+def run():
+    result = subprocess.run(
+        ["zenity", "--list", "--radiolist",
+         "--title=Age Verification",
+         "--text=California AB 2273 requires age group selection:",
+         "--column=", "--column=Age Group",
+         "TRUE", "18 or older",
+         "FALSE", "16-17",
+         "FALSE", "13-15",
+         "FALSE", "Under 13"],
+        capture_output=True, text=True
+    )
+    selection = result.stdout.strip() or "not-answered"
+    root = libcalamares.globalstorage.value("rootMountPoint") or ""
+    dest = os.path.join(root, "etc", "kibaos")
+    os.makedirs(dest, exist_ok=True)
+    with open(os.path.join(dest, "age-verify"), "w") as f:
+        f.write(f"age_group={selection}\n")
+    return None
           AGEPYEOF
           chmod +x /usr/lib/calamares/modules/ageverify/main.py
 
