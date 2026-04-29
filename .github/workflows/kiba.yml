@@ -1583,7 +1583,7 @@ jobs:
           # - module.desc must use type: job,
           # - Python class must subclass ViewStep (not QWidget directly)
           # - Required methods: create(), widget(), isNextEnabled(), back/next hooks
-          
+
           mkdir -p /usr/lib/calamares/modules/ageverify
 
           cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'
