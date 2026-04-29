@@ -1,0 +1,16 @@
+name: PR Review Latency Monitor
+
+on:
+  schedule:
+    - cron: "0 10 * * 1-5"
+  workflow_dispatch:
+
+jobs:
+  monitor-latency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Age
+        uses: davideviolante/pr-reviewer-reminder@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          days-before-reminder: 3

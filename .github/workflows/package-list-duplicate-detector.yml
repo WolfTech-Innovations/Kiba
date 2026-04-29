@@ -1,0 +1,15 @@
+name: Package List Duplicate Detector
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  detect-duplicates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for Redundant Packages
+        run: |
+          sed -n '/PACKAGES/,/PACKAGES/p' .github/workflows/kiba.yml | grep -v "PACKAGES" | grep -v "^#" | grep -v "^$" | sort | uniq -d

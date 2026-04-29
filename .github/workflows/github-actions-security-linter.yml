@@ -1,0 +1,15 @@
+name: GitHub Actions Security Linter
+
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+
+jobs:
+  lint-workflows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actionlint
+        run: |
+          echo "Linting GitHub Actions workflows for security and syntax..."

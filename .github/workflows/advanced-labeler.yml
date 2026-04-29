@@ -1,8 +1,8 @@
 name: Advanced Labeler
 
 on:
-  pull_request:
-    types: [opened, synchronized, reopened]
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 jobs:
   label:

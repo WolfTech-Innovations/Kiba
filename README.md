@@ -139,7 +139,7 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
 
-KibaOS ships the **Dracula** color scheme system-wide using the official palette from [draculatheme.com](https://draculatheme.com).
+KibaOS ships the **Dracula** color scheme system-wide using the official palette
 
 | Color      | Hex       | Role         |
 | ---------- | --------- | ------------ |
@@ -211,7 +211,7 @@ Kiba/
 
 ## Contributing
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work.
+Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
 
 ---
 

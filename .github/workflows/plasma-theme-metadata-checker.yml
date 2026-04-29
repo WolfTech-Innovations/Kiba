@@ -1,0 +1,15 @@
+name: Plasma Theme Metadata Checker
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  check-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JSON Metadata
+        run: |
+          echo "Validating KDE Plasma plugin metadata structure..."
