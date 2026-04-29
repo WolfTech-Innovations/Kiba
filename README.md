@@ -1,5 +1,5 @@
-actionlint
-==========
+# actionlint
+
 [![CI Status][ci-badge]][ci]
 [![API Document][apidoc-badge]][apidoc]
 
