@@ -5,20 +5,26 @@ Thank you for your interest in contributing to KibaOS! We welcome contributions 
 ## How to Contribute
 
 ### Reporting Bugs
+
 If you find a bug, please open an issue on our [GitHub repository](https://github.com/WolfTech-Innovations/Kiba/issues). Provide as much detail as possible, including:
+
 - A clear and descriptive title.
 - Steps to reproduce the bug.
 - Expected and actual behavior.
 - Screenshots or logs if applicable.
 
 ### Suggesting Features
+
 We are always looking for ways to improve KibaOS. If you have an idea for a new feature, please open an issue and describe:
+
 - The problem your feature would solve.
 - How the feature would work.
 - Any alternative solutions you've considered.
 
 ### Submitting Pull Requests
+
 If you're ready to contribute code or documentation:
+
 1. **Fork the repository** and create your branch from `main`.
 2. **Follow the coding style** used in the project.
 3. **Verify your changes** by running relevant build scripts or tests.

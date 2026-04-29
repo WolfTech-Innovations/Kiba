@@ -3,12 +3,12 @@ name: ShellCheck
 on:
   push:
     paths:
-      - '**/*.sh'
-      - '.github/workflows/*.yml'
+      - "**/*.sh"
+      - ".github/workflows/*.yml"
   pull_request:
     paths:
-      - '**/*.sh'
-      - '.github/workflows/*.yml'
+      - "**/*.sh"
+      - ".github/workflows/*.yml"
 
 jobs:
   shellcheck:
@@ -18,5 +18,5 @@ jobs:
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:
-          scandir: '.'
-          ignore_names: 'build.sh' # build.sh is often generated or has complex bashisms
+          scandir: "."
+          ignore_names: "build.sh" # build.sh is often generated or has complex bashisms

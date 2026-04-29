@@ -2,7 +2,7 @@ name: Close Inactive PRs
 
 on:
   schedule:
-    - cron: '0 0 * * 0'
+    - cron: "0 0 * * 0"
 
 jobs:
   close-prs:

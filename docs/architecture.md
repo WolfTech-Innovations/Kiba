@@ -16,21 +16,26 @@ KibaOS is built on a solid, modern foundation designed for stability and perform
 A core philosophy of KibaOS is "Extreme Minimization." We aggressively reduce the system's footprint to ensure it remains lightweight and fast.
 
 ### Documentation Stripping
+
 During the build process, a custom hook removes all non-essential documentation files:
+
 - `/usr/share/doc/*`
 - `/usr/share/man/*`
 - `/usr/share/info/*`
 - `/usr/share/help/*`
 
-*Note: Critical shell integration scripts (like those for `fzf`) are preserved before stripping.*
+_Note: Critical shell integration scripts (like those for `fzf`) are preserved before stripping._
 
 ### Locale Optimization
+
 To save space, KibaOS limits system locales to only `en` and `en_US`. All other locale data is purged from `/usr/share/locale`.
 
 ### Dependency Pruning
+
 We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-desktop` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
 
 ### Binary Compression
+
 ELF binaries in `/usr/bin` and `/usr/sbin` (larger than 64KB) are compressed using **UPX** (Ultimate Packer for eXecutables) with the `--best` setting. Critical system components (like systemd, sddm, and the kernel) are excluded from compression to ensure system stability.
 
 ## Filesystem & Boot
