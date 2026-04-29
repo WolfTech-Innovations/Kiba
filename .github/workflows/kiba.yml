@@ -756,10 +756,6 @@ jobs:
           alias rm='rm -I'
           alias ..='cd ..'
           alias ...='cd ../..'
-          alias edit='${EDITOR:-micro}'
-          alias please='sudo'
-          alias cls='clear'
-          alias path='echo -e "${PATH//:/\\n}"'
           ZSHRC
 
           # ── Update tldr cache ──────────────────────────────────────────────────
