@@ -1,0 +1,19 @@
+name: Markdown Lint
+
+on:
+  push:
+    paths:
+      - '**/*.md'
+  pull_request:
+    paths:
+      - '**/*.md'
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run markdownlint
+        uses: nosotroscode/markdownlint-action@v3
+        with:
+          config: .github/linters/.markdown-lint.yml

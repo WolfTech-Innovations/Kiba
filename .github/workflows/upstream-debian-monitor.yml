@@ -1,0 +1,14 @@
+name: Upstream Debian Monitor
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-debian:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Trixie Status
+        run: |
+          curl -s "https://api.ftp-master.debian.org/madison?package=plasma-desktop&dist=trixie"

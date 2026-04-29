@@ -1,0 +1,17 @@
+name: TODO Checker
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  todo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: TODO to Issue
+        uses: alstr/todo-to-issue-action@v5
+        with:
+          INSERT_ISSUE_URL: true
+          CLOSE_ISSUES: true
+          AUTO_PULL_REQUEST: true
