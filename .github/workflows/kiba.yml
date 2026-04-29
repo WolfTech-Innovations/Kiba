@@ -449,7 +449,6 @@ jobs:
           tealdeer
           duf
           ncdu
-          htop
           zenity
 
           # ── Boot loaders ──────────────────────────────────────────────────────
