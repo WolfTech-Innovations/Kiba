@@ -191,46 +191,39 @@ jobs:
           chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
           # ── Build Bazaar from source (native Debian package, no Flatpak needed) ─
-          # Bazaar has a Debian package in trixie repos. We build it from the
-          # upstream source using meson/ninja so it's installed as a native .deb.
-          # Bazaar still MANAGES Flatpaks (that's its whole purpose), but it
-          # doesn't need to BE a Flatpak itself.
+          # We build KibaStore (Bazaar) from upstream source using meson/ninja.
+          # We skip the Debian 'bazaar' package to avoid conflict with GNU Bazaar VCS.
           cat > config/hooks/live/0055-bazaar-native.hook.chroot << 'BAZAAR_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Installing Bazaar (native build from source) ==="
+          echo "=== Installing KibaStore (Bazaar) from source ==="
 
-          # Try apt first (trixie may have it packaged)
-          if apt-get install -y --no-install-recommends bazaar 2>/dev/null; then
-            echo "=== Bazaar installed from apt ==="
-          else
-            # Build from source
-            apt-get install -y --no-install-recommends \
-              meson ninja-build pkg-config gcc git \
-              libgtk-4-dev libadwaita-1-dev libflatpak-dev \
-              libappstream-dev  libjson-glib-dev \
-              libostree-dev gettext 2>/dev/null || true
+          # Build from source
+          apt-get install -y --no-install-recommends \
+            meson ninja-build pkg-config gcc git \
+            libgtk-4-dev libadwaita-1-dev libflatpak-dev \
+            libappstream-dev libjson-glib-dev \
+            libostree-dev gettext 2>/dev/null || true
 
-            git clone --depth=1 https://github.com/kolunmi/bazaar.git /tmp/bazaar 2>/dev/null || {
-              echo "WARNING: Could not clone Bazaar, skipping"
-              exit 0
-            }
-            cd /tmp/bazaar
-            meson setup build --prefix=/usr --libdir=/usr/lib64 2>/dev/null || \
-            meson setup build --prefix=/usr 2>/dev/null || {
-              echo "WARNING: Bazaar meson setup failed, skipping"
-              cd / && rm -rf /tmp/bazaar
-              exit 0
-            }
-            ninja -C build 2>/dev/null || {
-              echo "WARNING: Bazaar build failed, skipping"
-              cd / && rm -rf /tmp/bazaar
-              exit 0
-            }
-            ninja -C build install 2>/dev/null || true
+          git clone --depth=1 https://github.com/kolunmi/bazaar.git /tmp/bazaar 2>/dev/null || {
+            echo "WARNING: Could not clone Bazaar, skipping"
+            exit 0
+          }
+          cd /tmp/bazaar
+          meson setup build --prefix=/usr --libdir=/usr/lib64 2>/dev/null || \
+          meson setup build --prefix=/usr 2>/dev/null || {
+            echo "WARNING: Bazaar meson setup failed, skipping"
             cd / && rm -rf /tmp/bazaar
-            echo "=== Bazaar built and installed from source ==="
-          fi
+            exit 0
+          }
+          ninja -C build 2>/dev/null || {
+            echo "WARNING: Bazaar build failed, skipping"
+            cd / && rm -rf /tmp/bazaar
+            exit 0
+          }
+          ninja -C build install 2>/dev/null || true
+          cd / && rm -rf /tmp/bazaar
+          echo "=== KibaStore (Bazaar) built and installed from source ==="
 
           # Create KibaStore .desktop pointing at Bazaar
           mkdir -p /usr/share/applications
@@ -251,34 +244,17 @@ jobs:
           BAZAAR_HOOK
           chmod +x config/hooks/live/0055-bazaar-native.hook.chroot
 
-          # ── Ungoogled Chromium via OBS repo ──────────────────────────────────
+          # ── Chromium Browser ──────────────────────────────────────────────────
+          # We prefer ungoogled-chromium, but since the Trixie OBS repo is currently
+          # unavailable, we'll install standard chromium from Debian stable.
           cat > config/hooks/live/0056-ungoogled-chromium.hook.chroot << 'CHROMIUM_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Installing Ungoogled Chromium ==="
-
-          # Add ungoogled-chromium OBS repository for Debian
-          mkdir -p /etc/apt/sources.list.d /etc/apt/trusted.gpg.d
-
-          # OBS repo for ungoogled-chromium on Debian
-          echo 'deb [signed-by=/etc/apt/trusted.gpg.d/home_ungoogled_chromium.gpg] https://download.opensuse.org/repositories/home:/ungoogled_chromium/Debian_Trixie/ /' \
-            > /etc/apt/sources.list.d/home_ungoogled_chromium.list
-
-          curl -fsSL "https://download.opensuse.org/repositories/home:ungoogled_chromium/Debian_Trixie/Release.key" \
-            | gpg --dearmor \
-            > /etc/apt/trusted.gpg.d/home_ungoogled_chromium.gpg 2>/dev/null || {
-            echo "WARNING: Could not add Ungoogled Chromium repo key, falling back to standard chromium"
-            rm -f /etc/apt/sources.list.d/home_ungoogled_chromium.list
-            apt-get update -qq && apt-get install -y --no-install-recommends chromium || true
-            exit 0
-          }
+          echo "=== Installing Chromium Browser ==="
 
           apt-get update -qq
-          apt-get install -y --no-install-recommends ungoogled-chromium || {
-            echo "WARNING: Ungoogled Chromium install failed, falling back to standard chromium"
-            rm -f /etc/apt/sources.list.d/home_ungoogled_chromium.list \
-                   /etc/apt/trusted.gpg.d/home_ungoogled_chromium.gpg
-            apt-get update -qq && apt-get install -y --no-install-recommends chromium || true
+          apt-get install -y --no-install-recommends chromium || {
+            echo "WARNING: Chromium install failed"
           }
 
           # Create a standard .desktop entry if the package didn't create one
@@ -286,11 +262,11 @@ jobs:
              [ ! -f /usr/share/applications/chromium.desktop ]; then
             CHROMIUM_BIN=$(command -v ungoogled-chromium chromium-browser chromium 2>/dev/null | head -1 || true)
             if [ -n "$CHROMIUM_BIN" ]; then
-              cat > /usr/share/applications/kibaos-browser.desktop << 'BDESKTOP'
+              cat > /usr/share/applications/kibaos-browser.desktop << BDESKTOP
           [Desktop Entry]
           Type=Application
           Name=Web Browser
-          Exec=ungoogled-chromium %U
+          Exec=$CHROMIUM_BIN %U
           Icon=chromium
           Terminal=false
           Categories=Network;WebBrowser;
@@ -299,7 +275,7 @@ jobs:
             fi
           fi
 
-          echo "=== Ungoogled Chromium installed ==="
+          echo "=== Chromium Browser installed ==="
           CHROMIUM_HOOK
           chmod +x config/hooks/live/0056-ungoogled-chromium.hook.chroot
 
@@ -1555,24 +1531,23 @@ jobs:
 
           def run():
               result = subprocess.run(
-              ["zenity", "--list", "--radiolist",
-              "--title=Age Verification",
-              "--text=California AB 2273 requires age group selection:",
-              "--column=", "--column=Age Group",
-              "TRUE", "18 or older",
-              "FALSE", "16-17",
-              "FALSE", "13-15",
-              "FALSE", "Under 13"],
-              capture_output=True, text=True
-                                            )
-                selection = result.stdout.strip() or "not-answered"
-                root = libcalamares.globalstorage.value("rootMountPoint") or ""
-                dest = os.path.join(root, "etc", "kibaos")
-                os.makedirs(dest, exist_ok=True)
-                with open(os.path.join(dest, "age-verify"), "w") as f:
-                f.write(f"age_group={selection}\n")
-          return None
-          
+                  ["zenity", "--list", "--radiolist",
+                   "--title=Age Verification",
+                   "--text=California AB 2273 requires age group selection:",
+                   "--column=", "--column=Age Group",
+                   "TRUE", "18 or older",
+                   "FALSE", "16-17",
+                   "FALSE", "13-15",
+                   "FALSE", "Under 13"],
+                  capture_output=True, text=True
+              )
+              selection = result.stdout.strip() or "not-answered"
+              root = libcalamares.globalstorage.value("rootMountPoint") or ""
+              dest = os.path.join(root, "etc", "kibaos")
+              os.makedirs(dest, exist_ok=True)
+              with open(os.path.join(dest, "age-verify"), "w") as f:
+                  f.write(f"age_group={selection}\n")
+              return None
           AGEPYEOF
           chmod +x /usr/lib/calamares/modules/ageverify/main.py
 
