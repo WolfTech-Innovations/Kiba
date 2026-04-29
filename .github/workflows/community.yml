@@ -3,7 +3,7 @@ name: Community Management
 on:
   schedule:
     - cron: "0 0 * * *"
-  pull_request_target:
+  pull_request:
     types: [opened, edited, synchronize]
   issues:
     types: [opened, edited]
@@ -35,7 +35,7 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
-    if: (github.event_name == 'issues' || github.event_name == 'pull_request_target') && github.event.action == 'opened'
+    if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'opened'
     steps:
       - uses: actions/first-interaction@v1
         with:
@@ -48,7 +48,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-    if: github.event_name == 'pull_request_target'
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/labeler@v5
         with:
@@ -59,7 +59,7 @@ jobs:
     permissions:
       issues: write
       pull-requests: write
-    if: github.event_name == 'issues' || github.event_name == 'pull_request_target'
+    if: github.event_name == 'issues' || github.event_name == 'pull_request'
     steps:
       - uses: actions/github-script@v7
         with:
