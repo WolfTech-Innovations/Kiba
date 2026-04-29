@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run markdownlint
-        uses: nosotroscode/markdownlint-action@v3
+        uses: davidAnson/markdownlint-cli2-action@v19
         with:
           config: .github/linters/.markdown-lint.yml
+          globs: "**/*.md"

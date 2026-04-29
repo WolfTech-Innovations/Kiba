@@ -1,19 +1,32 @@
-# Labeler configuration
+# Labeler configuration v5
 
 branding:
-  - branding/**/*
+  - changed-files:
+      - any-glob-to-any-file: branding/**/*
 
 documentation:
-  - README.md
-  - LICENSE
+  - changed-files:
+      - any-glob-to-any-file:
+          - README.md
+          - LICENSE
+          - ACKNOWLEDGMENTS.md
+          - docs/**/*
+          - WIKI.md
 
 workflows:
-  - .github/workflows/**/*
+  - changed-files:
+      - any-glob-to-any-file: .github/workflows/**/*
 
 automation:
-  - .github/scripts/**/*
-  - build.sh
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/scripts/**/*
+          - build.sh
+          - package.json
+          - package-lock.json
 
 templates:
-  - .github/ISSUE_TEMPLATE/**/*
-  - .github/PULL_REQUEST_TEMPLATE.md
+  - changed-files:
+      - any-glob-to-any-file:
+          - .github/ISSUE_TEMPLATE/**/*
+          - .github/PULL_REQUEST_TEMPLATE.md

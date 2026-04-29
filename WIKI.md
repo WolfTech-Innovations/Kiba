@@ -26,7 +26,6 @@ For more specific details on the various components of KibaOS, please refer to t
 - [**Security & Compliance**](./docs/security-compliance.md)
 - [**Build Infrastructure & Automation**](./docs/build-system.md)
 - [**Contributing Guidelines**](./docs/contributing.md)
-- [**Frequently Asked Questions**](./docs/faq.md)
 
 ---
 
@@ -39,7 +38,7 @@ KibaOS is built upon the **Debian 13 (Trixie)** testing branch, providing a mode
 - **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
 - **Init System:** **Systemd**.
 - **Display Server:** **Wayland** (default) with **X11** fallback.
-- **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems).
+- **Bootloader:** **ISOLINUX** (exclusively, for a simplified and branded boot experience).
 
 ### Extreme Minimization
 
@@ -87,7 +86,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 ### Boot & Branding
 
 - **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
-- **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
+- **Boot Menu:** Branded ISOLINUX menu with plain-English options for beginners.
 
 ---
 
