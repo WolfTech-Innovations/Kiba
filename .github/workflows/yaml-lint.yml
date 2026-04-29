@@ -19,3 +19,9 @@ jobs:
         uses: ibiqlik/action-yamllint@v3
         with:
           config_file: .github/linters/.yaml-lint.yml
+          file_or_dir: .
+          # pnpm-lock.yaml is valid YAML but often conflicts with specific lint rules
+          # and is auto-generated, so we exclude it.
+          # We also exclude node_modules.
+          # The action supports a shell-style glob or a space-separated list.
+          # However, the underlying tool often handles exclusions better in the config file.
