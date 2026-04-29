@@ -1,5 +1,9 @@
 extends: default
 
+ignore: |
+  pnpm-lock.yaml
+  node_modules/
+
 rules:
   line-length: disable
   indentation:
@@ -15,4 +19,7 @@ rules:
     min-spaces-from-content: 1
   brackets:
     min-spaces-inside: 0
-    max-spaces-inside: 2
+    max-spaces-inside: 0
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
