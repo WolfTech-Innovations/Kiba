@@ -1537,43 +1537,41 @@ jobs:
 
           # ── ageverify module ────────────────────────────────────────────────────
           # FIXED: correct Calamares Python viewmodule structure
-          # - module.desc must use type: job, 
-interface: python
+          # - module.desc must use type: job,
           # - Python class must subclass ViewStep (not QWidget directly)
           # - Required methods: create(), widget(), isNextEnabled(), back/next hooks
+          
           mkdir -p /usr/lib/calamares/modules/ageverify
 
           cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'
-          ---
           type:      "job"
           name:      "ageverify"
           interface: "python"
           script:    "main.py"
           AGEDESC
-
           cat > /usr/lib/calamares/modules/ageverify/main.py << 'AGEPYEOF'
-          # main.py
-import libcalamares, os, subprocess
+          import libcalamares, os, subprocess
 
-def run():
-    result = subprocess.run(
-        ["zenity", "--list", "--radiolist",
-         "--title=Age Verification",
-         "--text=California AB 2273 requires age group selection:",
-         "--column=", "--column=Age Group",
-         "TRUE", "18 or older",
-         "FALSE", "16-17",
-         "FALSE", "13-15",
-         "FALSE", "Under 13"],
-        capture_output=True, text=True
-    )
-    selection = result.stdout.strip() or "not-answered"
-    root = libcalamares.globalstorage.value("rootMountPoint") or ""
-    dest = os.path.join(root, "etc", "kibaos")
-    os.makedirs(dest, exist_ok=True)
-    with open(os.path.join(dest, "age-verify"), "w") as f:
-        f.write(f"age_group={selection}\n")
-    return None
+          def run():
+              result = subprocess.run(
+              ["zenity", "--list", "--radiolist",
+              "--title=Age Verification",
+              "--text=California AB 2273 requires age group selection:",
+              "--column=", "--column=Age Group",
+              "TRUE", "18 or older",
+              "FALSE", "16-17",
+              "FALSE", "13-15",
+              "FALSE", "Under 13"],
+              capture_output=True, text=True
+                                            )
+                selection = result.stdout.strip() or "not-answered"
+                root = libcalamares.globalstorage.value("rootMountPoint") or ""
+                dest = os.path.join(root, "etc", "kibaos")
+                os.makedirs(dest, exist_ok=True)
+                with open(os.path.join(dest, "age-verify"), "w") as f:
+                f.write(f"age_group={selection}\n")
+          return None
+          
           AGEPYEOF
           chmod +x /usr/lib/calamares/modules/ageverify/main.py
 
