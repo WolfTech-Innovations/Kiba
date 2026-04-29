@@ -359,7 +359,7 @@ jobs:
 
           # ── Network ───────────────────────────────────────────────────────────
           network-manager
-          wpa_supplicant
+          wpasupplicant
           iwd
           wget
           curl
