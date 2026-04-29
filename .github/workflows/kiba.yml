@@ -27,7 +27,7 @@ jobs:
           # ── Install live-build and build deps ─────────────────────────────────
           apt-get update && apt-get install -y \
             live-build debootstrap xorriso git squashfs-tools \
-            syslinux syslinux-common isolinux \
+            grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
             meson ninja-build pkg-config \
             libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
              libjson-glib-dev libostree-dev \
@@ -51,7 +51,7 @@ jobs:
             --linux-packages "linux-image linux-headers" \
             --bootappend-live "boot=live components quiet splash" \
             --bootappend-install "auto=true priority=critical" \
-            --bootloaders "syslinux" \
+            --bootloaders "grub-pc,grub-efi" \
             --iso-application "KibaOS" \
             --iso-volume "KIBAOS" \
             --cache true \
@@ -331,72 +331,36 @@ jobs:
           CHROMIUM_HOOK
           chmod +x config/hooks/live/0056-ungoogled-chromium.hook.chroot
 
-          # ── SYSLINUX branding + user-friendly boot menu ──────────────────────
+          # ── GRUB branding + user-friendly boot menu ──────────────────────────
           mkdir -p config/hooks/binary
           cat > config/hooks/binary/0020-bootloader-branding.hook.binary << 'BOOT_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Patching SYSLINUX boot menu ==="
+          echo "=== Patching GRUB boot menu ==="
 
-          # Write a clean, user-friendly KibaOS SYSLINUX menu
-          # No technical terms — just clear plain-English options
-          ISOLINUX_DIR=""
-          for d in binary/isolinux binary/syslinux; do
-            [ -d "$d" ] && ISOLINUX_DIR="$d" && break
-          done
+          # Find all grub.cfg files in the binary directory
+          GRUB_CONFIGS=$(find binary -name "grub.cfg")
 
-          if [ -n "$ISOLINUX_DIR" ]; then
-            # Patch any existing cfg files first
-            for txt in \
-              "$ISOLINUX_DIR/isolinux.cfg" \
-              "$ISOLINUX_DIR/live.cfg" \
-              "$ISOLINUX_DIR/install.cfg" \
-              "$ISOLINUX_DIR/menu.cfg" \
-              "$ISOLINUX_DIR/syslinux.cfg"; do
-              [ -f "$txt" ] || continue
+          if [ -n "$GRUB_CONFIGS" ]; then
+            for cfg in $GRUB_CONFIGS; do
+              echo "  Patched: $cfg"
               sed -i \
                 -e 's/Debian GNU\/Linux/KibaOS/g' \
                 -e 's/Debian Live/KibaOS/g' \
-                -e 's/MENU TITLE.*/MENU TITLE KibaOS/g' \
-                -e 's/LABEL live/LABEL kibaos_live/g' \
-                -e 's/MENU LABEL Live system (amd64)/MENU LABEL Start KibaOS/g' \
-                -e 's/MENU LABEL Debian GNU\/Linux Live/MENU LABEL Start KibaOS/g' \
-                -e 's/MENU LABEL .*[Ll]ive.*/MENU LABEL Start KibaOS/g' \
-                -e 's/MENU LABEL .*[Ii]nstall.*/MENU LABEL Install KibaOS to this computer/g' \
-                -e 's/MENU LABEL .*[Mm]emtest.*/MENU LABEL Memory check/g' \
-                -e 's/MENU LABEL .*[Ss]peech.*/MENU LABEL Start KibaOS (screen reader)/g' \
-                -e 's/MENU LABEL .*[Ff]ailsafe.*/MENU LABEL Start KibaOS (safe mode)/g' \
-                -e 's/MENU LABEL .*[Ll]ocal.*/MENU LABEL Boot from hard drive/g' \
-                "$txt"
-              echo "  Patched: $txt"
+                -e 's/GNU\/Linux Live/KibaOS/g' \
+                -e 's/Live system (amd64)/Start KibaOS/g' \
+                -e 's/Live system/Start KibaOS/g' \
+                -e 's/Graphical install/Install KibaOS to this computer/g' \
+                -e 's/Install with Speech Synthesis/Start KibaOS (screen reader)/g' \
+                -e 's/Advanced options for/More options for/g' \
+                -e 's/Live system (failsafe mode)/Start KibaOS (safe mode)/g' \
+                "$cfg"
             done
-
-            # Write Dracula-palette colour scheme for the boot menu
-            cat > "$ISOLINUX_DIR/theme.cfg" << 'THEMECFG'
-          MENU TITLE KibaOS
-          MENU RESOLUTION 640 480
-          MENU BACKGROUND #282a36
-          MENU COLOR title    * #FFbd93f9 #00000000 *
-          MENU COLOR border   * #FF44475a #00000000 *
-          MENU COLOR sel      * #FF282a36 #FFbd93f9 *
-          MENU COLOR unsel    * #FFf8f8f2 #00000000 *
-          MENU COLOR hotkey   * #FFbd93f9 #00000000 *
-          MENU COLOR tabmsg   * #FF6272a4 #00000000 *
-          MENU COLOR cmdmark  * #FFbd93f9 #00000000 *
-          MENU COLOR cmdline  * #FFf8f8f2 #00000000 *
-          MENU COLOR disabled * #FF6272a4 #00000000 *
-          MENU COLOR scrollbar * #FF44475a #FF44475a *
-          THEMECFG
-
-            # Inject theme include into main config if not already present
-            MAIN_CFG="$ISOLINUX_DIR/isolinux.cfg"
-            [ -f "$MAIN_CFG" ] || MAIN_CFG="$ISOLINUX_DIR/syslinux.cfg"
-            if [ -f "$MAIN_CFG" ] && ! grep -q "theme.cfg" "$MAIN_CFG"; then
-              sed -i '1i INCLUDE theme.cfg' "$MAIN_CFG"
-            fi
+          else
+            echo "WARNING: No GRUB configuration found to patch"
           fi
 
-          echo "=== SYSLINUX boot menu branding complete ==="
+          echo "=== GRUB boot menu branding complete ==="
           BOOT_HOOK
           chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
 
@@ -518,9 +482,9 @@ jobs:
           zenity
 
           # ── Boot loaders ──────────────────────────────────────────────────────
-          syslinux
-          syslinux-common
-          isolinux
+          grub-pc-bin
+          grub-efi-amd64-bin
+          grub-common
 
           # ── Squashfs ──────────────────────────────────────────────────────────
           squashfs-tools
@@ -652,10 +616,9 @@ jobs:
           echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
           update-initramfs -u -k all || update-initramfs -u
 
-          # ── SYSLINUX boot config (syslinux only, no grub) ────────────────────
-          # We write a custom isolinux.cfg at build time via a binary hook.
+          # ── GRUB boot config ─────────────────────────────────────────────────
+          # We write a custom grub.cfg at build time via a binary hook.
           # The chroot hook just sets the kernel cmdline defaults here.
-          # No /etc/default/grub needed — grub is not installed.
 
           # ── SDDM autologin for live session ───────────────────────────────────
           mkdir -p /etc/sddm.conf.d
@@ -1838,7 +1801,9 @@ jobs:
           echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
           update-initramfs -u -k all 2>/dev/null || update-initramfs -u 2>/dev/null || true
 
-          # 9. GRUB update (Removed per request - using isolinux)
+          # 9. GRUB update
+          echo "=== Updating GRUB configuration ==="
+          DEBIAN_FRONTEND=noninteractive update-grub || true
 
           # 11. Flatpak — add Flathub system-wide
           command -v flatpak >/dev/null 2>&1 && \
