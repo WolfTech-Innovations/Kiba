@@ -54,6 +54,9 @@ jobs:
             --bootloaders "syslinux" \
             --iso-application "KibaOS" \
             --iso-volume "KIBAOS" \
+            --cache true \
+            --cache-packages true \
+            --cache-stages "bootstrap chroot rootfs binary" \
             --apt-options "--yes --no-install-recommends" \
             --apt-recommends false \
             --apt-indices false \
@@ -173,7 +176,7 @@ jobs:
             echo "UPX not found, skipping"
             exit 0
           fi
-          SKIP_PATTERNS="kwin|plasmashell|plasma_session|kded|ksmserver|startplasma|sddm|Xorg|X11|xwayland|python|perl|ruby|node|java|dbus|systemd|udev|plymouth|grub|shim|vmlinuz|initrd"
+          SKIP_PATTERNS="kwin|plasmashell|plasma_session|kded|ksmserver|startplasma|sddm|Xorg|X11|xwayland|python|perl|ruby|node|java|dbus|systemd|udev|plymouth|vmlinuz|initrd"
           find /usr/bin /usr/sbin \
             -maxdepth 2 -type f -size +65536c 2>/dev/null | \
           while read -r f; do
@@ -425,7 +428,6 @@ jobs:
           apt-transport-https
 
           # ── KDE Plasma 6 minimal working set ─────────────────────────────────
-          kde-plasma-desktop
           plasma-desktop
           plasma-workspace
           sddm
@@ -437,7 +439,6 @@ jobs:
           ark
           qt6-svg-plugins
           desktop-file-utils
-          plasma-workspace-wallpapers
           plasma-wallpapers-addons
           kwin-addons
           breeze
@@ -447,18 +448,11 @@ jobs:
           fonts-inter
 
           # ── Cloud & online accounts integration ───────────────────────────────
-          # kaccounts-integration: KDE Online Accounts (Google Drive, Nextcloud etc.)
-          kaccounts-integration
-          kaccounts-providers
           # nextcloud-desktop: Nextcloud sync client + Dolphin integration
           nextcloud-desktop
           dolphin-nextcloud
           # kdeconnect: phone/tablet integration (sync notifications, files, etc.)
           kdeconnect
-          # davfs2: WebDAV mount support (generic cloud storage)
-          davfs2
-          # gnome-online-accounts for cross-DE service compatibility
-          gnome-online-accounts
 
           # ── Flatpak (for KibaStore / Bazaar) ──────────────────────────────────
           flatpak
@@ -653,6 +647,9 @@ jobs:
           update-alternatives --set default.plymouth \
             /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth
 
+          # ── Aggressive Initrd Compression ────────────────────────────────────
+          sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
+          echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
           update-initramfs -u -k all || update-initramfs -u
 
           # ── SYSLINUX boot config (syslinux only, no grub) ────────────────────
@@ -1349,7 +1346,7 @@ jobs:
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Simple welcome message for beginners
-          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nThis system is designed to be simple and modern for everyday use.\n\nKey features:\n- High-performance CachyOS Kernel\n- Extreme system minimization for speed\n- Modern terminal with Starship prompt\n- Beautiful Inter & JetBrains Mono typography\n- Simple, ready-to-use desktop\n\nEnjoy your stay!" --width=400 2>/dev/null
+          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nYour new system is ready. We've made it fast, simple, and beautiful for you.\n\nEverything you need is already here. Just open an app and go!\n\nEnjoy your new computer." --width=400 2>/dev/null
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
@@ -1837,12 +1834,11 @@ jobs:
               /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth \
               2>/dev/null || true
           fi
+          sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
+          echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
           update-initramfs -u -k all 2>/dev/null || update-initramfs -u 2>/dev/null || true
 
-          # 9. GRUB update
-          command -v update-grub >/dev/null 2>&1 && update-grub 2>/dev/null || \
-          command -v grub-mkconfig >/dev/null 2>&1 && \
-            grub-mkconfig -o /boot/grub/grub.cfg 2>/dev/null || true
+          # 9. GRUB update (Removed per request - using isolinux)
 
           # 11. Flatpak — add Flathub system-wide
           command -v flatpak >/dev/null 2>&1 && \
