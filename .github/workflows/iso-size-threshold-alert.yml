@@ -1,0 +1,19 @@
+name: ISO Size Threshold Alert
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  check-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Estimate ISO Size
+        run: |
+          count=$(grep -A 100 "PACKAGES" .github/workflows/kiba.yml | grep -v "PACKAGES" | grep -v "^#" | grep -v "^$" | grep -c .)
+          echo "Current package count: $count"
+          if [ "$count" -gt 300 ]; then
+            echo "Warning: High package count may lead to ISO size issues."
+          fi

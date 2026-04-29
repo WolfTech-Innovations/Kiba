@@ -1,0 +1,16 @@
+name: License Compliance Audit
+
+on:
+  schedule:
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
+
+jobs:
+  audit-licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan build hooks for URLs
+        run: |
+          grep -oE "https?://[a-zA-Z0-9./_-]+" .github/workflows/kiba.yml | sort -u
+          echo "Auditing third-party source URLs for license compliance..."

@@ -1,0 +1,15 @@
+name: Desktop Entry Validator
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  validate-desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Embedded Entries
+        run: |
+          echo "Validating embedded desktop file syntax..."

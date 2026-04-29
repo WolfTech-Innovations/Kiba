@@ -15,8 +15,9 @@ jobs:
             exit 1
           fi
       - name: Check Branch Name
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          BRANCH_NAME="${{ github.head_ref }}"
           if [[ ! $BRANCH_NAME =~ ^(feat|fix|doc|refactor|build|ci)/ ]]; then
             echo "Branch name '$BRANCH_NAME' does not follow conventions (feat/, fix/, etc.)"
             # exit 1 # Optional: don't fail, just warn

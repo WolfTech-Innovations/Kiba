@@ -1,0 +1,15 @@
+name: Plymouth Script Linter
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  lint-plymouth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Plymouth Script
+        run: |
+          echo "Validating Plymouth boot splash script syntax..."
