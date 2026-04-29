@@ -1,0 +1,16 @@
+name: Prettier
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Prettier
+        uses: creyD/prettier_action@v4.3
+        with:
+          prettier_options: --write **/*.{md,yml,yaml,json}
+          commit_message: "style: prettier automated fix"

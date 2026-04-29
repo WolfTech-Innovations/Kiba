@@ -1,0 +1,21 @@
+name: Docker Test
+
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+
+jobs:
+  test-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Image
+        run: |
+          docker build -t kibaos-builder -f- . <<EOF
+          FROM debian:trixie
+          RUN apt-get update && apt-get install -y live-build debootstrap xorriso git squashfs-tools
+          EOF

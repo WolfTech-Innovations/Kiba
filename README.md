@@ -39,6 +39,21 @@ The goal of KibaOS is to provide a clean, modern, and visually consistent out-of
 ---
 
 
+## Documentation
+
+For a more in-depth look at KibaOS, check out our detailed documentation:
+
+- [**Architecture**](./docs/architecture.md): Base system, kernel, and minimization strategies.
+- [**UX & Design**](./docs/ux-design.md): The Dracula aesthetic and terminal experience.
+- [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
+- [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
+- [**Build System**](./docs/build-system.md): How we build and release KibaOS.
+- [**WIKI**](./WIKI.md): Comprehensive technical manual.
+
+
+---
+
+
 ## Features
 
 - **Debian Base:** Built on **Debian 13 Trixie** (supported until 2030).
@@ -206,6 +221,7 @@ Kiba/
 │       └── kiba.yml           # Main build and release workflow
 ├── branding/
 │   └── kibaos_banner.png      # KibaOS brand assets
+├── docs/                      # In-depth documentation
 └── README.md                  # Project documentation
 ```
 

@@ -1,0 +1,14 @@
+name: CachyOS Kernel Monitor
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Latest CachyOS Kernel
+        run: |
+          curl -s https://api.github.com/repos/Nitrux/linux-cachyos-deb/releases/latest | jq -r '.tag_name'

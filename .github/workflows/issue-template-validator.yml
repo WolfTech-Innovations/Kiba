@@ -1,0 +1,16 @@
+name: Issue Template Validator
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  validator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Issue Template
+        uses: stefanbuck/github-issue-parser@v3
+        id: issue-parser
+        with:
+          template-path: .github/ISSUE_TEMPLATE/bug_report.yml # Adjust if needed
