@@ -11,4 +11,10 @@ jobs:
     steps:
       - name: Check Trixie Status
         run: |
-          curl -s "https://api.ftp-master.debian.org/madison?package=plasma-desktop&dist=trixie"
+          STATUS=$(curl -s "https://api.ftp-master.debian.org/madison?package=plasma-desktop&dist=trixie")
+          if [[ -z "$STATUS" ]]; then
+            echo "Warning: Could not fetch Debian Trixie status"
+          else
+            echo "Current Plasma Desktop version in Trixie:"
+            echo "$STATUS"
+          fi

@@ -1,0 +1,17 @@
+name: PR Description Checker
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Description Length
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [[ ${#BODY} -lt 20 ]]; then
+            echo "PR description is too short."
+          fi

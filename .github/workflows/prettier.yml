@@ -12,5 +12,5 @@ jobs:
       - name: Run Prettier
         uses: creyD/prettier_action@v4.3
         with:
-          prettier_options: --write **/*.{md,yml,yaml,json}
-          commit_message: "style: prettier automated fix"
+          dry: true
+          prettier_options: --check **/*.{md,yml,yaml,json}

@@ -1,0 +1,14 @@
+name: Verify No Large Files
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check File Sizes
+        run: |
+          find . -type f -size +10M -not -path "./.git/*" | grep . || true

@@ -16,7 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@master
         with:
           scandir: '.'
           ignore_names: 'build.sh' # build.sh is often generated or has complex bashisms

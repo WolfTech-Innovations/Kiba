@@ -14,5 +14,5 @@ jobs:
         uses: pozil/auto-assign-issue@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          assignees: WolfTech-Innovations # Replace with actual maintainers if known
+          assignees: ${{ github.actor }}
           numOfAssignee: 1

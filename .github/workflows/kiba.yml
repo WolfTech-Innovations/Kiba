@@ -362,7 +362,7 @@ jobs:
                 -e 's/MENU LABEL Live system (amd64)/MENU LABEL Start KibaOS/g' \
                 -e 's/MENU LABEL Debian GNU\/Linux Live/MENU LABEL Start KibaOS/g' \
                 -e 's/MENU LABEL .*[Ll]ive.*/MENU LABEL Start KibaOS/g' \
-                -e 's/MENU LABEL .*[Ii]nstall.*/MENU LABEL Install KibaOS to this computer/g' \
+                -e 's/MENU LABEL .*[Ii]install.*/MENU LABEL Install KibaOS to this computer/g' \
                 -e 's/MENU LABEL .*[Mm]emtest.*/MENU LABEL Memory check/g' \
                 -e 's/MENU LABEL .*[Ss]peech.*/MENU LABEL Start KibaOS (screen reader)/g' \
                 -e 's/MENU LABEL .*[Ff]ailsafe.*/MENU LABEL Start KibaOS (safe mode)/g' \
