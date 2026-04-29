@@ -1,4 +1,1 @@
-{
-  "validate": "jsonlint",
-  "quiet": true
-}
+{ "validate": "jsonlint", "quiet": true }
