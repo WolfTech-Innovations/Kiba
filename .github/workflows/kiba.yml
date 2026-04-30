@@ -1295,6 +1295,7 @@ jobs:
           mkdir -p /etc/calamares/branding/kibaos
           cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
           cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
+          BRANDING_HOOK
 
           # ── Write complete Calamares settings.conf ──────────────────────────────
           cat > /etc/calamares/settings.conf << 'CALASETTINGS'
