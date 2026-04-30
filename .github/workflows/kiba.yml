@@ -746,9 +746,20 @@ jobs:
               color: "#000000"
               anchors.fill: parent
               Text {
+                  id: welcomeText
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
+                  opacity: 0
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
+                  NumberAnimation on opacity {
+                      from: 0
+                      to: 1
+                      duration: 1000
+                      easing.type: Easing.InOutQuad
+                      running: true
+                  }
               }
           }
           WATCHSPLASH
