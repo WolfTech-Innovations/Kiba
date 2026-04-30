@@ -22,6 +22,7 @@ To begin contributing to the KibaOS build system or customization hooks, follow 
 1. **Fork the Repo:** Create your own fork of [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba).
 2. **Setup Environment:** Ensure you have **Docker** installed on a Linux host.
 3. **Local Build:** Run a local build to ensure your environment is working:
+
    ```bash
    git clone https://github.com/YOUR_USERNAME/Kiba
    cd Kiba
@@ -63,11 +64,11 @@ If you're ready to contribute code or documentation:
 - Expected vs. Actual behavior.
 - System logs or screenshots.
 
-### Suggesting Features
+### Suggesting Features (Community)
 
 We love new ideas! Please open an issue to discuss significant features before implementation. This ensures they align with the KibaOS philosophy of "modern simplicity."
 
-### Submitting Pull Requests
+### Submitting Pull Requests (Process)
 
 - **Branching:** Work on a descriptive branch name (e.g., `feature/custom-icons`).
 - **Commits:** Follow conventional commit messages.
