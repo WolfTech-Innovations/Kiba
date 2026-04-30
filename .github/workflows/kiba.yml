@@ -89,13 +89,7 @@ jobs:
           cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Installing Starship Prompt ==="
-          # Ensure curl is available for this hook
-          which curl >/dev/null 2>&1 || {
-            apt-get update
-            apt-get install -y --no-install-recommends curl ca-certificates
-          }
-          curl -sS https://starship.rs/install.sh | sh -s -- -y
+          echo "=== Configuring Starship Prompt ==="
 
           # Branded starship config
           mkdir -p /etc/skel/.config
@@ -125,7 +119,7 @@ jobs:
           style = "bold #bd93f9"
           STARSHIP_CONF
 
-          echo "=== Starship Prompt installed ==="
+          echo "=== Starship Prompt configured ==="
           STARSHIP_HOOK
           chmod +x config/hooks/live/0030-starship.hook.chroot
 
@@ -135,8 +129,6 @@ jobs:
           #!/bin/bash
           set -e
           echo "=== Installing CachyOS Kernel ==="
-          apt-get update
-          apt-get install -y curl ca-certificates
 
           # Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
           # For trixie, we'll try to find the latest version from their GitHub
@@ -224,10 +216,7 @@ jobs:
           cat > config/hooks/live/0056-chromium-policy.hook.chroot << 'CHROMIUM_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Installing and Configuring Chromium ==="
-
-          apt-get update -qq
-          apt-get install -y --no-install-recommends chromium
+          echo "=== Configuring Chromium Managed Policies ==="
 
           # System-wide Managed Policies
           mkdir -p /etc/chromium/policies/managed
@@ -248,7 +237,7 @@ jobs:
           }
           CPOLICY
 
-          echo "=== Chromium configured ==="
+          echo "=== Chromium policies configured ==="
           CHROMIUM_HOOK
           chmod +x config/hooks/live/0056-chromium-policy.hook.chroot
 
@@ -355,6 +344,7 @@ jobs:
           zsh
           zsh-autosuggestions
           zsh-syntax-highlighting
+          starship
 
           # ── Boot splash ───────────────────────────────────────────────────────
           plymouth
@@ -387,6 +377,7 @@ jobs:
           python3-dbus
 
           # ── Browser ───────────────────────────────────────────────────────────
+          chromium
           # Note: ungoogled-chromium installed via OBS hook (0056)
           # firefox-esr removed per spec
 
