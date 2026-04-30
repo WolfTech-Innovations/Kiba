@@ -1,0 +1,20 @@
+name: Calamares Branding Validator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Calamares branding strings
+        run: |
+          # Verify productName is KibaOS
+          grep "productName:" .github/workflows/kiba.yml | grep -v "KibaOS" && { echo "Error: Calamares branding name mismatch."; exit 1; }
+          # Verify sidebar colors (Dracula)
+          grep "SidebarBackground:" .github/workflows/kiba.yml | grep -v "#282a36" && { echo "Warning: Sidebar background color mismatch."; }
+          echo "Calamares branding looks good."

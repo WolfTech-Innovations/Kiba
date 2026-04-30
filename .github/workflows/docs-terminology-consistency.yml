@@ -1,0 +1,23 @@
+name: Docs Terminology Consistency
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  check-terminology:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify KibaOS terminology
+        run: |
+          # Ensure 'KibaStore' is used instead of 'Bazaar' in final docs
+          if grep -r "Bazaar" docs/; then
+            echo "Warning: 'Bazaar' found in docs. Ensure 'KibaStore' is the preferred term."
+          fi
+          # Ensure Dracula is capitalized
+          if grep -r "dracula" docs/ | grep -v "Dracula"; then
+             echo "Warning: 'dracula' found in lowercase. Use 'Dracula'."
+          fi

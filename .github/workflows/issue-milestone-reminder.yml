@@ -1,0 +1,23 @@
+name: Issue Milestone Reminder
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  milestone-reminder:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            if (!context.payload.issue.milestone) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                body: "📌 Friendly reminder to assign this issue to a milestone."
+              });
+            }

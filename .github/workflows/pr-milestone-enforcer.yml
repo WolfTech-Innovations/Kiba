@@ -1,0 +1,15 @@
+name: PR Milestone Enforcer
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, milestoned, demilestoned]
+
+jobs:
+  check-milestone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify milestone assignment
+        if: github.event.pull_request.milestone == null
+        run: |
+          echo "Error: This PR must be assigned to a milestone."
+          exit 1

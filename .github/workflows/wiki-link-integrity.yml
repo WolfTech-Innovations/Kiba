@@ -1,0 +1,22 @@
+name: Wiki Link Integrity
+
+on:
+  push:
+    paths:
+      - 'WIKI.md'
+  workflow_dispatch:
+
+jobs:
+  check-wiki-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for broken internal wiki links
+        run: |
+          grep -oE "\[[^\]]+\]\(\./[^\)]+\)" WIKI.md | while read -r link; do
+            path=$(echo "$link" | sed -E 's/.*\((\.\/.*)\).*/\1/')
+            if [ ! -f "$path" ]; then
+              echo "Error: Broken link $path in WIKI.md"
+              exit 1
+            fi
+          done

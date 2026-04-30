@@ -1,0 +1,25 @@
+name: Release Notes Naming Validator
+
+on:
+  push:
+    paths:
+      - 'Notes/**'
+  workflow_dispatch:
+
+jobs:
+  validate-naming:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check NTE naming convention
+        run: |
+          # Convention: NTE-DDHYM.md
+          cd Notes
+          for file in *.md; do
+            if [[ "$file" == ".gitkeep" ]]; then continue; fi
+            if [[ ! "$file" =~ ^NTE-[0-9]{2}[0-9A-N][0-9][1-9A-C]\.md$ ]]; then
+              echo "Error: $file does not follow the NTE-DDHYM.md naming convention."
+              exit 1
+            fi
+          done
+          echo "All release notes follow the convention."

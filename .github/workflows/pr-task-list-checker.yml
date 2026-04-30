@@ -1,0 +1,22 @@
+name: PR Task List Checker
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-tasks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for incomplete tasks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body;
+            if (!body) {
+              core.setFailed('PR description is empty');
+              return;
+            }
+            if (body.includes('- [ ]')) {
+              core.setFailed('There are incomplete tasks in the PR description');
+            }

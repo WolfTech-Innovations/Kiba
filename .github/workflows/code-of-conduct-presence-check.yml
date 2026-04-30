@@ -1,0 +1,17 @@
+name: Code of Conduct Presence Check
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  check-coc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify CODE_OF_CONDUCT.md
+        run: |
+          if [ ! -f "CODE_OF_CONDUCT.md" ]; then
+            echo "Warning: CODE_OF_CONDUCT.md is missing. It is highly recommended for community health."
+          fi

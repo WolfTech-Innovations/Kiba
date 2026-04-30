@@ -1,0 +1,18 @@
+name: Shell Short-Circuit Validator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  check-short-circuit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for SC2015 violations
+        run: |
+          # Rule: avoid A && B || C
+          grep -E "&&.*\|\|" .github/workflows/kiba.yml && { echo "Warning: Potential SC2015 violation (A && B || C). Use explicit 'if' statements."; }
+          echo "Check complete."

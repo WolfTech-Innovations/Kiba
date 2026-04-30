@@ -1,0 +1,22 @@
+name: Dracula Hex Validator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-hex-codes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Dracula color palette usage
+        run: |
+          # Dracula standard: #282a36, #44475a, #f8f8f2, #6272a4, #8be9fd, #50fa7b, #ffb86c, #ff79c6, #bd93f9, #ff5555, #f1fa8c
+          # We check if hex codes in kiba.yml adhere to 6-char standard (except for QML/CSS which might differ, but we target general consistency)
+          grep -oE "#[0-9a-fA-F]{3,6}" .github/workflows/kiba.yml | while read -r hex; do
+            if [[ ${#hex} -ne 7 && ${#hex} -ne 4 ]]; then
+              echo "Warning: Non-standard hex code $hex found in kiba.yml"
+            fi
+          done

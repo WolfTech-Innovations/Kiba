@@ -1,0 +1,24 @@
+name: Repo Topics Validator
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  check-topics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: repo } = await github.rest.repos.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo
+            });
+            const topics = repo.topics;
+            const required = ['debian', 'kde', 'linux', 'kibaos'];
+            const missing = required.filter(t => !topics.includes(t));
+            if (missing.length > 0) {
+              console.log(`Notice: Missing recommended topics: ${missing.join(', ')}`);
+            }

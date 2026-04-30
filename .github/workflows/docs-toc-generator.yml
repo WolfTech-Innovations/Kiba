@@ -1,0 +1,19 @@
+name: Docs TOC Generator
+
+on:
+  push:
+    paths:
+      - 'docs/*.md'
+  workflow_dispatch:
+
+jobs:
+  check-toc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify TOC existence
+        run: |
+          for doc in docs/*.md; do
+            if [ "$doc" == "docs/README.md" ]; then continue; fi
+            grep -qi "Table of Contents" "$doc" || echo "Notice: $doc might benefit from a Table of Contents."
+          done

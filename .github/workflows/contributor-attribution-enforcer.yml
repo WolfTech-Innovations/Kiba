@@ -1,0 +1,18 @@
+name: Contributor Attribution Enforcer
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  check-attribution:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify attribution in body
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if ! echo "$PR_BODY" | grep -qiE "authored-by|credits|attribution"; then
+            echo "Warning: No contributor attribution found in PR description."
+            # We don't fail, but we could add a comment or label
+          fi

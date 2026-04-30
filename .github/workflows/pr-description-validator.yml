@@ -1,0 +1,18 @@
+name: PR Description Validator
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  validate-description:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check description length
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ ${#PR_BODY} -lt 30 ]; then
+            echo "Error: PR description is too short (minimum 30 characters)."
+            exit 1
+          fi

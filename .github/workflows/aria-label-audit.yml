@@ -1,0 +1,17 @@
+name: ARIA Label Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  audit-aria:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for ARIA labels in custom QML/HTML
+        run: |
+          # Rule: Icon-only buttons should have ARIA labels (simplified check for QML/HTML snippets)
+          grep -i "Button" .github/workflows/kiba.yml | grep -vE "aria-label|text|tooltip" || echo "ARIA audit looks okay."

@@ -1,0 +1,17 @@
+name: Docs Security Policy Check
+
+on:
+  push:
+    paths:
+      - 'SECURITY.md'
+  workflow_dispatch:
+
+jobs:
+  validate-security-policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for reporting instructions
+        run: |
+          grep -qi "report" SECURITY.md || { echo "Error: SECURITY.md must include instructions on how to report vulnerabilities."; exit 1; }
+          grep -qi "vulnerability" SECURITY.md || { echo "Error: SECURITY.md must mention 'vulnerability'."; exit 1; }

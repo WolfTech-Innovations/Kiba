@@ -1,0 +1,19 @@
+name: Docs Metadata Checker
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  check-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for required doc headers
+        run: |
+          for doc in docs/*.md; do
+            if [ "$doc" == "docs/README.md" ]; then continue; fi
+            head -n 5 "$doc" | grep -q "^# " || { echo "Error: $doc must start with a level 1 heading."; exit 1; }
+          done
