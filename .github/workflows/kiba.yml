@@ -289,7 +289,7 @@ jobs:
           plasma-workspace-wallpapers
           plasma-discover
           plasma-discover-backend-flatpak
-          
+
           sddm
           sddm-theme-debian-breeze
           plasma-nm
