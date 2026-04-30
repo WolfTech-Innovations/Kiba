@@ -8,10 +8,8 @@ jobs:
   check-milestone:
     runs-on: ubuntu-latest
     if: |
-      github.actor != 'google-lab-jules' &&
-      github.actor != 'google-lab-jules[bot]' &&
-      github.actor != 'google-labs-jules' &&
-      github.actor != 'google-labs-jules[bot]'
+      !contains(github.event.pull_request.user.login, 'jules') &&
+      github.event.pull_request.user.login != 'christopherfoxjr'
     steps:
       - name: Verify milestone assignment
         if: github.event.pull_request.milestone == null
