@@ -1,0 +1,13 @@
+name: README Contribution Check
+on:
+  push:
+    paths:
+      - 'README.md'
+jobs:
+  check-section:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify contribution section
+        run: |
+          grep -qi "contributing" README.md || { echo "README missing Contributing section"; exit 1; }

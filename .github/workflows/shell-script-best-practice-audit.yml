@@ -1,0 +1,13 @@
+name: Shell Best Practice Audit
+on:
+  push:
+    paths:
+      - '**.sh'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for common pitfalls
+        run: |
+          find . -name "*.sh" | xargs -r grep -l "for .* in \$(ls" && { echo "Pitfall: Avoid using ls in loops"; exit 1; } || echo "No common pitfalls found"

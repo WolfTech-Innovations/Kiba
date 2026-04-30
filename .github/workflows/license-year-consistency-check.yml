@@ -1,0 +1,14 @@
+name: License Year Consistency Check
+on:
+  push:
+    paths:
+      - 'LICENSE'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify year
+        run: |
+          CURRENT_YEAR=$(date +%Y)
+          grep -q "$CURRENT_YEAR" LICENSE || echo "Notice: LICENSE year might need update"

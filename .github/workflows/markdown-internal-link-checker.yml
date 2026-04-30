@@ -1,0 +1,19 @@
+name: Markdown Internal Link Checker
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check internal links
+        run: |
+          grep -roE "\[.*\]\(\./.*\)" . | while read -r line; do
+            link=$(echo "$line" | grep -oE "\(\./.*\)" | tr -d '()')
+            file=$(echo "$line" | cut -d: -f1)
+            dir=$(dirname "$file")
+            target="$dir/$link"
+            ls "$target" || { echo "Broken internal link $link in $file"; exit 1; }
+          done

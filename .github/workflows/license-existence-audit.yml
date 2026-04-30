@@ -1,0 +1,11 @@
+name: License Existence Audit
+on:
+  push:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify LICENSE file
+        run: |
+          ls LICENSE || { echo "Error: LICENSE file is missing"; exit 1; }

@@ -1,0 +1,13 @@
+name: YAML Anchors Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for anchors
+        run: |
+          grep -rn "&" .github/workflows/*.yml && echo "Notice: YAML anchors are used in workflows" || echo "No anchors used"

@@ -1,0 +1,16 @@
+name: Branch Name Enforcer
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  check-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Branch Name
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          if [[ ! "$BRANCH" =~ ^(feat|fix|docs|refactor|chore|ci)/ ]]; then
+            echo "Invalid branch name: $BRANCH. Must start with feat/, fix/, docs/, refactor/, chore/, or ci/."
+            exit 1
+          fi

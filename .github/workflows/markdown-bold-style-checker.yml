@@ -1,0 +1,13 @@
+name: Markdown Bold Style Checker
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce double asterisk bold
+        run: |
+          grep -rnE "__[a-zA-Z0-9]+__" . && { echo "Error: Use ** for bold instead of __"; exit 1; } || echo "Bold style is consistent"

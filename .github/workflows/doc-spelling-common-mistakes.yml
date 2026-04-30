@@ -1,0 +1,13 @@
+name: Doc Spelling Common Mistakes
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for common misspellings
+        run: |
+          grep -rnEi "teh|recieve|occured" . && { echo "Error: Common misspellings found"; exit 1; } || echo "No common mistakes found"

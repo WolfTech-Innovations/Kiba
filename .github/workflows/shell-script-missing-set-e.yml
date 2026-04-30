@@ -1,0 +1,15 @@
+name: Shell Script set -e Enforcer
+on:
+  push:
+    paths:
+      - '**.sh'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for set -e
+        run: |
+          find . -name "*.sh" | while read -r file; do
+            grep -qE "set -e|set -o errexit" "$file" || { echo "Error: $file is missing 'set -e'"; exit 1; }
+          done

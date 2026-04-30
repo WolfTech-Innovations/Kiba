@@ -1,0 +1,13 @@
+name: Branding File Existence Check
+on:
+  push:
+    paths:
+      - 'branding/**'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify essential assets
+        run: |
+          ls branding/kibaos_banner.png || { echo "Warning: kibaos_banner.png is missing"; }

@@ -1,0 +1,16 @@
+name: PR No Conflicts Check
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check mergeable state
+        env:
+          STATE: ${{ github.event.pull_request.mergeable_state }}
+        run: |
+          if [[ "$STATE" == "dirty" ]]; then
+            echo "Error: PR has merge conflicts"
+            exit 1
+          fi

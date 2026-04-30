@@ -1,0 +1,15 @@
+name: Issue Milestone Presence Check
+on:
+  issues:
+    types: [opened]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check milestone
+        env:
+          MILESTONE: ${{ github.event.issue.milestone }}
+        run: |
+          if [[ -z "$MILESTONE" || "$MILESTONE" == "null" ]]; then
+            echo "Notice: New issue opened without milestone"
+          fi

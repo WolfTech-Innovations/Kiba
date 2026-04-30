@@ -1,0 +1,13 @@
+name: Doc Trailing Whitespace Enforcer
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for trailing whitespace
+        run: |
+          grep -rnE "[[:space:]]+$" docs/ *.md && { echo "Error: Trailing whitespace found in markdown files"; exit 1; } || echo "No trailing whitespace"

@@ -1,0 +1,16 @@
+name: License Header Enforcer
+on:
+  push:
+    paths:
+      - '**.sh'
+      - '**.py'
+jobs:
+  check-header:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify license headers
+        run: |
+          find . -maxdepth 2 -name "*.sh" -o -name "*.py" | while read -r file; do
+            head -n 15 "$file" | grep -qi "License" || { echo "Missing license header in $file"; exit 1; }
+          done

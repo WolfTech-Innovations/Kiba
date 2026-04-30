@@ -1,0 +1,16 @@
+name: PR Size Limiter
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  check-size:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check diff size
+        env:
+          ADDITIONS: ${{ github.event.pull_request.additions }}
+        run: |
+          if [[ $ADDITIONS -gt 500 ]]; then
+            echo "Large PR detected: $ADDITIONS additions. Please split it."
+            exit 1
+          fi

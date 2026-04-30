@@ -1,0 +1,16 @@
+name: Issue No Body Checker
+on:
+  issues:
+    types: [opened]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check body
+        env:
+          BODY: ${{ github.event.issue.body }}
+        run: |
+          if [[ -z "$BODY" || "$BODY" == "null" ]]; then
+            echo "Error: Issue must have a body"
+            exit 1
+          fi

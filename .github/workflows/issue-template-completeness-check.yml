@@ -1,0 +1,15 @@
+name: Issue Template Completeness
+on:
+  push:
+    paths:
+      - '.github/ISSUE_TEMPLATE/*.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify template fields
+        run: |
+          find .github/ISSUE_TEMPLATE -name "*.md" | while read -r file; do
+            grep -q "name:" "$file" && grep -q "description:" "$file" || { echo "Error: $file is missing mandatory fields"; exit 1; }
+          done
