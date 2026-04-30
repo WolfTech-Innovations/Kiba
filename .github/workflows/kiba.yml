@@ -219,92 +219,38 @@ jobs:
           MIN_HOOK
           chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
-          # ── Build Bazaar from source (native Debian package, no Flatpak needed) ─
-          # We build KibaStore (Bazaar) from upstream source using meson/ninja.
-          # We skip the Debian 'bazaar' package to avoid conflict with GNU Bazaar VCS.
-          cat > config/hooks/live/0055-bazaar-native.hook.chroot << 'BAZAAR_HOOK'
+
+          # ── Chromium Browser & Policy Configuration ───────────────────────────
+          cat > config/hooks/live/0056-chromium-policy.hook.chroot << 'CHROMIUM_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Installing KibaStore (Bazaar) from source ==="
-
-          # Build from source
-          apt-get install -y --no-install-recommends \
-            meson ninja-build pkg-config gcc git \
-            libgtk-4-dev libadwaita-1-dev libflatpak-dev \
-            libappstream-dev libjson-glib-dev \
-            libostree-dev gettext 2>/dev/null || true
-
-          git clone --depth=1 https://github.com/kolunmi/bazaar.git /tmp/bazaar 2>/dev/null || {
-            echo "WARNING: Could not clone Bazaar, skipping"
-            exit 0
-          }
-          cd /tmp/bazaar
-          meson setup build --prefix=/usr --libdir=/usr/lib64 2>/dev/null || \
-          meson setup build --prefix=/usr 2>/dev/null || {
-            echo "WARNING: Bazaar meson setup failed, skipping"
-            cd / && rm -rf /tmp/bazaar
-            exit 0
-          }
-          ninja -C build 2>/dev/null || {
-            echo "WARNING: Bazaar build failed, skipping"
-            cd / && rm -rf /tmp/bazaar
-            exit 0
-          }
-          ninja -C build install 2>/dev/null || true
-          cd / && rm -rf /tmp/bazaar
-          echo "=== KibaStore (Bazaar) built and installed from source ==="
-
-          # Create KibaStore .desktop pointing at Bazaar
-          mkdir -p /usr/share/applications
-          cat > /usr/share/applications/kibastore.desktop << 'KDESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Name=KibaStore
-          Comment=Discover and install applications
-          Exec=bazaar
-          Icon=io.github.kolunmi.Bazaar
-          Terminal=false
-          Categories=System;PackageManager;
-          Keywords=store;apps;flatpak;software;
-          KDESKTOP
-
-          update-desktop-database /usr/share/applications 2>/dev/null || true
-          echo "=== KibaStore configured ==="
-          BAZAAR_HOOK
-          chmod +x config/hooks/live/0055-bazaar-native.hook.chroot
-
-          # ── Chromium Browser ──────────────────────────────────────────────────
-          # We prefer ungoogled-chromium, but since the Trixie OBS repo is currently
-          # unavailable, we'll install standard chromium from Debian stable.
-          cat > config/hooks/live/0056-ungoogled-chromium.hook.chroot << 'CHROMIUM_HOOK'
-          #!/bin/bash
-          set -e
-          echo "=== Installing Chromium Browser ==="
+          echo "=== Installing and Configuring Chromium ==="
 
           apt-get update -qq
-          apt-get install -y --no-install-recommends chromium || {
-            echo "WARNING: Chromium install failed"
+          apt-get install -y --no-install-recommends chromium
+
+          # System-wide Managed Policies
+          mkdir -p /etc/chromium/policies/managed
+          cat > /etc/chromium/policies/managed/kibaos.json << 'CPOLICY'
+          {
+            "HomepageLocation": "https://alphasearch.pages.dev",
+            "HomepageIsNewTabPage": false,
+            "RestoreOnStartup": 4,
+            "RestoreOnStartupURLs": ["https://alphasearch.pages.dev"],
+            "ManagedBookmarks": [
+              {
+                "name": "KibaOS GitHub",
+                "url": "https://github.com/WolfTech-Innovations/Kiba"
+              }
+            ],
+            "ShowHomeButton": true,
+            "BookmarkBarEnabled": true
           }
+          CPOLICY
 
-          # Create a standard .desktop entry if the package didn't create one
-          # We force create a branded kibaos-browser.desktop to ensure consistency
-          CHROMIUM_BIN=$(command -v ungoogled-chromium chromium-browser chromium 2>/dev/null | head -1 || true)
-          if [ -n "$CHROMIUM_BIN" ]; then
-            cat > /usr/share/applications/kibaos-browser.desktop << BDESKTOP
-          [Desktop Entry]
-          Type=Application
-          Name=Web Browser
-          Exec=$CHROMIUM_BIN %U
-          Icon=chromium
-          Terminal=false
-          Categories=Network;WebBrowser;
-          MimeType=text/html;text/xml;application/xhtml+xml;
-          BDESKTOP
-          fi
-
-          echo "=== Chromium Browser installed ==="
+          echo "=== Chromium configured ==="
           CHROMIUM_HOOK
-          chmod +x config/hooks/live/0056-ungoogled-chromium.hook.chroot
+          chmod +x config/hooks/live/0056-chromium-policy.hook.chroot
 
           # ── GRUB branding + user-friendly boot menu ──────────────────────────
           mkdir -p config/hooks/binary
@@ -373,6 +319,9 @@ jobs:
           plasma-desktop
           plasma-workspace
           plasma-workspace-wallpapers
+          plasma-discover
+          plasma-discover-backend-flatpak
+          packagekit-qt6
           sddm
           sddm-theme-debian-breeze
           plasma-nm
@@ -836,7 +785,7 @@ jobs:
               Text {
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
-                  font.pixelSize: 48; font.bold: true; color: "#ffffff"
+                  font.pixelSize: 48; font.bold: true; color: "#bd93f9"
               }
           }
           WATCHSPLASH
@@ -1139,7 +1088,7 @@ jobs:
           fi
 
           # ── Panel + desktop layout ─────────────────────────────────────────────
-          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << PANELRC
+          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
           [Containments][1]
           activityId=
           formfactor=0
@@ -1167,9 +1116,9 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.icon
           [Containments][1][Applets][11][Configuration][General]
-          applicationName=kibastore
-          iconPath=/usr/share/applications/kibastore.desktop
-          label=KibaStore
+          applicationName=org.kde.discover
+          iconPath=/usr/share/applications/org.kde.discover.desktop
+          label=Software Center
           [Containments][1][Applets][11][Geometry]
           x=100; y=40; width=64; height=64
 
@@ -1177,8 +1126,8 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.icon
           [Containments][1][Applets][12][Configuration][General]
-          applicationName=kibaos-browser
-          iconPath=/usr/share/applications/kibaos-browser.desktop
+          applicationName=chromium
+          iconPath=/usr/share/applications/chromium.desktop
           label=Web Browser
           [Containments][1][Applets][12][Geometry]
           x=180; y=40; width=64; height=64
@@ -1309,7 +1258,7 @@ jobs:
             --column="Action" --column="Description" \
             "Install KibaOS" "Install the system permanently to your disk" \
             "Web Browser" "Browse the internet" \
-            "KibaStore" "Discover and install new applications" \
+            "Software Center" "Discover and install new applications" \
             --width=450 --height=300 2>/dev/null)
 
           case "$CHOICE" in
@@ -1317,10 +1266,10 @@ jobs:
               sudo calamares &
               ;;
             "Web Browser")
-              gtk-launch kibaos-browser &
+              chromium &
               ;;
-            "KibaStore")
-              gtk-launch kibastore &
+            "Software Center")
+              plasma-discover &
               ;;
           esac
           WELCOME
@@ -1340,13 +1289,6 @@ jobs:
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
 
-          # Final cleanup: Purge Bazaar build-only dependencies to keep ISO small
-          apt-get purge -y \
-            meson ninja-build pkg-config gcc \
-            libgtk-4-dev libadwaita-1-dev libflatpak-dev \
-            libappstream-dev libjson-glib-dev \
-            libostree-dev gettext
-          apt-get autoremove -y
           HOOK
           chmod +x config/hooks/live/0100-customize.hook.chroot
 
@@ -1491,7 +1433,7 @@ jobs:
           sidebar: "Your Account"
           userShell: /bin/zsh
           autologinGroup:  autologin
-          sudoersGroup:    admin
+          sudoersGroup:    sudo
           setRootPassword: false
           doAutoLogin:     false
           passwordRequirements:
@@ -1577,43 +1519,6 @@ jobs:
           Categories=System;
           CALADESKTOP
 
-          # ── ageverify module ────────────────────────────────────────────────────
-          # KibaOS: implemented as a Python job module.
-          # It utilizes Zenity for age verification interaction during the
-          # execution phase of the installer.
-
-          mkdir -p /usr/lib/calamares/modules/ageverify
-
-          cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'
-          type:      "job"
-          name:      "ageverify"
-          interface: "python"
-          script:    "main.py"
-          AGEDESC
-          cat > /usr/lib/calamares/modules/ageverify/main.py << 'AGEPYEOF'
-          import libcalamares, os, subprocess
-
-          def run():
-              result = subprocess.run(
-                  ["zenity", "--list", "--radiolist",
-                   "--title=Age Verification",
-                   "--text=California AB 2273 requires age group selection:",
-                   "--column=", "--column=Age Group",
-                   "TRUE", "18 or older",
-                   "FALSE", "16-17",
-                   "FALSE", "13-15",
-                   "FALSE", "Under 13"],
-                  capture_output=True, text=True
-              )
-              selection = result.stdout.strip() or "not-answered"
-              root = libcalamares.globalstorage.value("rootMountPoint") or ""
-              dest = os.path.join(root, "etc", "kibaos")
-              os.makedirs(dest, exist_ok=True)
-              with open(os.path.join(dest, "age-verify"), "w") as f:
-                  f.write(f"age_group={selection}\n")
-              return None
-          AGEPYEOF
-          chmod +x /usr/lib/calamares/modules/ageverify/main.py
 
           # ── Post-install script ─────────────────────────────────────────────────
           mkdir -p /usr/share/kibaos

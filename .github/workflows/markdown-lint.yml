@@ -14,6 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run markdownlint
-        uses: nosotroscode/markdownlint-action@v3
+        uses: davidans/github-action-markdownlint@v1
         with:
           config: .github/linters/.markdown-lint.yml

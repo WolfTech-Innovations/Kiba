@@ -5,13 +5,14 @@ branding:
 documentation:
   - changed-files:
       - any-glob-to-any-file:
-          - 'README.md'
-          - 'LICENSE'
-          - 'docs/**/*'
+          - README.md
+          - LICENSE
+          - docs/**/*
+          - WIKI.md
 
 workflows:
   - changed-files:
-      - any-glob-to-any-file: '.github/workflows/**/*'
+      - any-glob-to-any-file: .github/workflows/**/*
 
 automation:
   - changed-files:

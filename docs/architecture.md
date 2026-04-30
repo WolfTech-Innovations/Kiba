@@ -61,7 +61,7 @@ KibaOS follows a strict "No Bloat" policy. We use aggressive strategies to keep 
 
 ### Documentation & Help
 
-During the chroot phase, we remove all non-essential documentation to save hundreds of megabytes:
+During the build process, a custom hook removes all non-essential documentation to save hundreds of megabytes:
 
 - **Paths:** `/usr/share/doc`, `/usr/share/man`, `/usr/share/info`, `/usr/share/help`.
 - **Exception:** Shell integration scripts (e.g., **`fzf`** examples) are moved to `/usr/share/fzf` before the purge.
@@ -70,13 +70,7 @@ During the chroot phase, we remove all non-essential documentation to save hundr
 
 We only keep **`en`** and **`en_US`** locales. All other translations are removed from `/usr/share/locale`, significantly reducing the package footprint.
 
-### UPX Binary Compression
-
-All ELF binaries in `/usr/bin` and `/usr/sbin` larger than 64KB are compressed using **UPX** (`--best` mode).
-
-- **Exclusions:** To prevent system breakage, we exclude critical binaries like `systemd`, `sddm`, `vmlinuz`, and Python/Node/Java runtimes.
-
-### Dependency Stripping
+### Dependency Pruning
 
 We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-desktop` and `plasma-workspace` and manually add only the essential KDE components required for a functional desktop.
 
