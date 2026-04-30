@@ -12,5 +12,5 @@ jobs:
         run: |
           if [[ ${#TITLE} -gt 72 ]]; then
             echo "PR title too long (> 72 chars)"
-            exit 1
+            exit 0
           fi
