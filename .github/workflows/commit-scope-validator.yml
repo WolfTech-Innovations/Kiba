@@ -1,0 +1,19 @@
+name: Commit Scope Validator
+
+on:
+  pull_request:
+
+jobs:
+  validate-commit-scope:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check Commit Messages
+        run: |
+          for msg in $(git log origin/main..HEAD --format=%s); do
+            if [[ ! "$msg" =~ ^(feat|fix|docs|build|ci)\((installer|shell|theme|core)\): ]]; then
+              echo "Improper commit format/scope: $msg"
+            fi
+          done

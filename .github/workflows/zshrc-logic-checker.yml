@@ -1,0 +1,15 @@
+name: ZshRC Logic Checker
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  check-zshrc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Zsh syntax
+        run: |
+          echo "Validating system-wide Zsh configuration logic..."

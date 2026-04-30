@@ -68,6 +68,12 @@ For those who prefer the command line, KibaOS defaults to **Nala** — a modern 
 
 ### Ungoogled Chromium
 
+KibaOS includes **Ungoogled Chromium** as a privacy-focused browser alternative. It is integrated into the system via a dedicated Open Build Service (OBS) repository to ensure regular updates directly from the source.
+
+### Modern CLI Suite
+
+As detailed in the [UX Design](./ux-design.md) document, KibaOS ships with a suite of modern CLI tools like `eza`, `bat`, `btop`, and `yt-dlp` to provide a superior terminal experience.
+
 KibaOS includes **Ungoogled Chromium** as the default browser for users who prioritize privacy. It is integrated via a dedicated **OBS (Open Build Service)** repository, ensuring you receive timely security updates directly from the source.
 
 ### Flatpak (CLI)

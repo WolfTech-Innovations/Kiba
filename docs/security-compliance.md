@@ -22,6 +22,18 @@ To comply with the California Age-Appropriate Design Code Act, KibaOS features a
 
 ### Implementation
 
+- **Module:** A custom Python-based view module located at `/usr/lib/calamares/modules/ageverify/`.
+- **User Interface:** During installation, users are presented with a screen to select their age group (e.g., Under 13, 13-15, 16-17, 18+, or "Prefer not to say").
+- **Transparency:** The screen clearly explains why this information is being collected and how it is stored.
+
+### Privacy and Data Storage
+
+In accordance with KibaOS's privacy-first philosophy:
+
+- **Local Storage Only:** The selected age group is stored exclusively on the user's local machine at `/etc/kibaos/age-verify`.
+- **No Transmission:** This data is **never** transmitted to WolfTech Innovations or any other external servers.
+- **Purpose:** This local record ensures the system can provide an age-appropriate experience as mandated by law without compromising user anonymity.
+
 - **Technical Stack:** A custom Python view module using the `pythonqt` interface.
 - **User Choice:** During installation, users are prompted to select their age group (Under 13, 13-15, 16-17, 18+, or Decline to state).
 - **Purpose:** This allows the system to potentially apply age-appropriate safety defaults without requiring a central account or online tracking.

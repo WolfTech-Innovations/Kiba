@@ -7,10 +7,13 @@ on:
 jobs:
   prettier:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      workflows: write
     steps:
       - uses: actions/checkout@v4
       - name: Run Prettier
         uses: creyD/prettier_action@v4.3
         with:
-          prettier_options: --write **/*.{md,yml,yaml,json} --ignore-path .prettierignore
+          prettier_options: --write **/*.{md,yml,yaml,json}
           commit_message: "style: prettier automated fix"

@@ -1,0 +1,19 @@
+name: Auto Assign
+
+on:
+  issues:
+    types: [opened]
+  pull_request:
+    types: [opened]
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-assign
+        uses: pozil/auto-assign-issue@v2
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          # assignees: WolfTech-Innovations # Organization names cannot be used as assignees
+          numOfAssignee: 0 # Disable automatic assignment for now
+          allowSelfAssign: true

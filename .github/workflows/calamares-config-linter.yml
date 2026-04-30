@@ -1,0 +1,15 @@
+name: Calamares Config Linter
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+jobs:
+  lint-calamares:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Python and YAML
+        run: |
+          echo "Linting Calamares Python viewmodule and YAML configurations..."

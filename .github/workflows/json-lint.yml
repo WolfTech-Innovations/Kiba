@@ -3,10 +3,10 @@ name: JSON Lint
 on:
   push:
     paths:
-      - '**/*.json'
+      - "**/*.json"
   pull_request:
     paths:
-      - '**/*.json'
+      - "**/*.json"
 
 jobs:
   jsonlint:
@@ -15,4 +15,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run jsonlint
         run: |
-          find . -name "*.json" -type f -not -path "./node_modules/*" | xargs -r npx jsonlint -q
+          find . -name "*.json" -not -path "./node_modules/*" -print0 | xargs -0 -I {} npx jsonlint -q {}

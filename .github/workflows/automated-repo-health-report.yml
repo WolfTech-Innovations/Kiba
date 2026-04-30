@@ -1,0 +1,28 @@
+name: Automated Repo Health Report
+
+on:
+  schedule:
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+jobs:
+  health-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Summary
+        run: |
+          {
+            echo "## Weekly Repository Health Report"
+            echo "- Build Status: Unknown"
+            if [ -f "LICENSE" ]; then
+              echo "- LICENSE file: Found"
+            else
+              echo "- LICENSE file: Missing"
+            fi
+            if [ -f "README.md" ]; then
+              echo "- README.md file: Found"
+            else
+              echo "- README.md file: Missing"
+            fi
+          } >> $GITHUB_STEP_SUMMARY

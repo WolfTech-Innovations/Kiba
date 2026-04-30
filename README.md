@@ -132,14 +132,14 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 **Useful Aliases:**
 
 - `ll` -> `ls -lah`
-- `update` -> `sudo apt update && sudo apt upgrade -y`
-- `install` -> `sudo apt install`
+- `update` -> `sudo nala update && sudo nala upgrade -y`
+- `install` -> `sudo nala install`
 
 ### Theme
 
 <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
 
-KibaOS ships the **Dracula** color scheme system-wide using the official palette from [draculatheme.com](https://draculatheme.com).
+KibaOS ships the **Dracula** color scheme system-wide using the official palette
 
 | Color      | Hex       | Role         |
 | ---------- | --------- | ------------ |
@@ -211,7 +211,7 @@ Kiba/
 
 ## Contributing
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work.
+Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
 
 ---
 
@@ -224,4 +224,4 @@ KibaOS is a distribution, not a single codebase. Individual components are subje
 ## About
 
 KibaOS is a **WolfTech Innovations** project.
-[Visit our GitHub](https://github.com/WolfTech-Innovations)
+[Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)

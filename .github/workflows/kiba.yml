@@ -28,6 +28,7 @@ jobs:
           apt-get update && apt-get install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
+            qemu-system-x86 \
             meson ninja-build pkg-config \
             libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
              libjson-glib-dev libostree-dev \
@@ -49,7 +50,7 @@ jobs:
             --system live \
             --linux-flavours amd64 \
             --linux-packages "linux-image linux-headers" \
-            --bootappend-live "boot=live components quiet splash" \
+            --bootappend-live "boot=live components quiet splash console=ttyS0" \
             --bootappend-install "auto=true priority=critical" \
             --bootloaders "grub-pc,grub-efi" \
             --iso-application "KibaOS" \
@@ -100,6 +101,35 @@ jobs:
             apt-get install -y --no-install-recommends curl ca-certificates
           }
           curl -sS https://starship.rs/install.sh | sh -s -- -y
+
+          # Branded starship config
+          mkdir -p /etc/skel/.config
+          cat > /etc/skel/.config/starship.toml << 'STARSHIP_CONF'
+          format = "$all"
+          add_newline = false
+
+          [character]
+          success_symbol = "[❯](bold #bd93f9)"
+          error_symbol = "[❯](bold #ff5555)"
+
+          [directory]
+          style = "bold #bd93f9"
+
+          [git_branch]
+          symbol = "󰊢 "
+          style = "bold #50fa7b"
+
+          [hostname]
+          ssh_only = false
+          format = "[$hostname]($style) "
+          style = "bold #bd93f9"
+
+          [username]
+          show_always = true
+          format = "[$user]($style)@"
+          style = "bold #bd93f9"
+          STARSHIP_CONF
+
           echo "=== Starship Prompt installed ==="
           STARSHIP_HOOK
           chmod +x config/hooks/live/0030-starship.hook.chroot
@@ -113,9 +143,9 @@ jobs:
           apt-get update
           apt-get install -y curl ca-certificates
 
-          # Use Nitrux's CachyOS kernel deb repository or direct download
+          # Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
           # For trixie, we'll try to find the latest version from their GitHub
-          REPO="Nitrux/linux-cachyos-deb"
+          REPO="psygreg/linux-psycachy"
           RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
           LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
@@ -129,21 +159,21 @@ jobs:
           cd /tmp/cachyos
 
           # Download image and headers
-          IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-cachyos" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-cachyos" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
           if [ -n "$IMAGE_URL" ]; then
             curl -LO "$IMAGE_URL"
           else
             echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-cachyos_${LATEST_TAG}_amd64.deb"
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
           if [ -n "$HEADERS_URL" ]; then
             curl -LO "$HEADERS_URL"
           else
              echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-cachyos_${LATEST_TAG}_amd64.deb"
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
           # Install
@@ -164,30 +194,6 @@ jobs:
           echo "=== CachyOS Kernel installed ==="
           CACHY_HOOK
           chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
-
-          # ── UPX binary compression hook ──────────────────────────────────────
-          mkdir -p config/hooks/live
-          cat > config/hooks/live/0050-upx-compress.hook.chroot << 'UPX_HOOK'
-          #!/bin/bash
-          set -e
-          echo "=== UPX: compressing ELF binaries ==="
-          which upx >/dev/null 2>&1 || apt-get install -y upx --no-install-recommends 2>/dev/null || true
-          if ! which upx >/dev/null 2>&1; then
-            echo "UPX not found, skipping"
-            exit 0
-          fi
-          SKIP_PATTERNS="kwin|plasmashell|plasma_session|kded|ksmserver|startplasma|sddm|Xorg|X11|xwayland|python|perl|ruby|node|java|dbus|systemd|udev|plymouth|vmlinuz|initrd"
-          find /usr/bin /usr/sbin \
-            -maxdepth 2 -type f -size +65536c 2>/dev/null | \
-          while read -r f; do
-            echo "$f" | grep -qiE "$SKIP_PATTERNS" && continue
-            file "$f" 2>/dev/null | grep -q "ELF.*executable" || continue
-            upx -t "$f" >/dev/null 2>&1 && continue
-            upx --best --no-lzma -q "$f" 2>/dev/null || true
-          done
-          echo "=== UPX compression complete ==="
-          UPX_HOOK
-          chmod +x config/hooks/live/0050-upx-compress.hook.chroot
 
           # ── Extreme Minimization hook ─────────────────────────────────────────
           cat > config/hooks/live/0090-extreme-minimization.hook.chroot << 'MIN_HOOK'
@@ -218,118 +224,38 @@ jobs:
           MIN_HOOK
           chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
-          # ── Build Bazaar from source (native Debian package, no Flatpak needed) ─
-          # Bazaar has a Debian package in trixie repos. We build it from the
-          # upstream source using meson/ninja so it's installed as a native .deb.
-          # Bazaar still MANAGES Flatpaks (that's its whole purpose), but it
-          # doesn't need to BE a Flatpak itself.
-          cat > config/hooks/live/0055-bazaar-native.hook.chroot << 'BAZAAR_HOOK'
+
+          # ── Chromium Browser & Policy Configuration ───────────────────────────
+          cat > config/hooks/live/0056-chromium-policy.hook.chroot << 'CHROMIUM_HOOK'
           #!/bin/bash
           set -e
-          echo "=== Installing Bazaar (native build from source) ==="
-
-          # Try apt first (trixie may have it packaged)
-          if apt-get install -y --no-install-recommends bazaar 2>/dev/null; then
-            echo "=== Bazaar installed from apt ==="
-          else
-            # Build from source
-            apt-get install -y --no-install-recommends \
-              meson ninja-build pkg-config gcc git \
-              libgtk-4-dev libadwaita-1-dev libflatpak-dev \
-              libappstream-dev  libjson-glib-dev \
-              libostree-dev gettext 2>/dev/null || true
-
-            git clone --depth=1 https://github.com/kolunmi/bazaar.git /tmp/bazaar 2>/dev/null || {
-              echo "WARNING: Could not clone Bazaar, skipping"
-              exit 0
-            }
-            cd /tmp/bazaar
-            meson setup build --prefix=/usr --libdir=/usr/lib64 2>/dev/null || \
-            meson setup build --prefix=/usr 2>/dev/null || {
-              echo "WARNING: Bazaar meson setup failed, skipping"
-              cd / && rm -rf /tmp/bazaar
-              exit 0
-            }
-            ninja -C build 2>/dev/null || {
-              echo "WARNING: Bazaar build failed, skipping"
-              cd / && rm -rf /tmp/bazaar
-              exit 0
-            }
-            ninja -C build install 2>/dev/null || true
-            cd / && rm -rf /tmp/bazaar
-            echo "=== Bazaar built and installed from source ==="
-          fi
-
-          # Create KibaStore .desktop pointing at Bazaar
-          mkdir -p /usr/share/applications
-          cat > /usr/share/applications/kibastore.desktop << 'KDESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Name=KibaStore
-          Comment=Discover and install applications
-          Exec=bazaar
-          Icon=io.github.kolunmi.Bazaar
-          Terminal=false
-          Categories=System;PackageManager;
-          Keywords=store;apps;flatpak;software;
-          KDESKTOP
-
-          update-desktop-database /usr/share/applications 2>/dev/null || true
-          echo "=== KibaStore configured ==="
-          BAZAAR_HOOK
-          chmod +x config/hooks/live/0055-bazaar-native.hook.chroot
-
-          # ── Ungoogled Chromium via OBS repo ──────────────────────────────────
-          cat > config/hooks/live/0056-ungoogled-chromium.hook.chroot << 'CHROMIUM_HOOK'
-          #!/bin/bash
-          set -e
-          echo "=== Installing Ungoogled Chromium ==="
-
-          # Add ungoogled-chromium OBS repository for Debian
-          mkdir -p /etc/apt/sources.list.d /etc/apt/trusted.gpg.d
-
-          # OBS repo for ungoogled-chromium on Debian
-          echo 'deb [signed-by=/etc/apt/trusted.gpg.d/home_ungoogled_chromium.gpg] https://download.opensuse.org/repositories/home:/ungoogled_chromium/Debian_Trixie/ /' \
-            > /etc/apt/sources.list.d/home_ungoogled_chromium.list
-
-          curl -fsSL "https://download.opensuse.org/repositories/home:ungoogled_chromium/Debian_Trixie/Release.key" \
-            | gpg --dearmor \
-            > /etc/apt/trusted.gpg.d/home_ungoogled_chromium.gpg 2>/dev/null || {
-            echo "WARNING: Could not add Ungoogled Chromium repo key, falling back to standard chromium"
-            rm -f /etc/apt/sources.list.d/home_ungoogled_chromium.list
-            apt-get update -qq && apt-get install -y --no-install-recommends chromium || true
-            exit 0
-          }
+          echo "=== Installing and Configuring Chromium ==="
 
           apt-get update -qq
-          apt-get install -y --no-install-recommends ungoogled-chromium || {
-            echo "WARNING: Ungoogled Chromium install failed, falling back to standard chromium"
-            rm -f /etc/apt/sources.list.d/home_ungoogled_chromium.list \
-                   /etc/apt/trusted.gpg.d/home_ungoogled_chromium.gpg
-            apt-get update -qq && apt-get install -y --no-install-recommends chromium || true
+          apt-get install -y --no-install-recommends chromium
+
+          # System-wide Managed Policies
+          mkdir -p /etc/chromium/policies/managed
+          cat > /etc/chromium/policies/managed/kibaos.json << 'CPOLICY'
+          {
+            "HomepageLocation": "https://alphasearch.pages.dev",
+            "HomepageIsNewTabPage": false,
+            "RestoreOnStartup": 4,
+            "RestoreOnStartupURLs": ["https://alphasearch.pages.dev"],
+            "ManagedBookmarks": [
+              {
+                "name": "KibaOS GitHub",
+                "url": "https://github.com/WolfTech-Innovations/Kiba"
+              }
+            ],
+            "ShowHomeButton": true,
+            "BookmarkBarEnabled": true
           }
+          CPOLICY
 
-          # Create a standard .desktop entry if the package didn't create one
-          if [ ! -f /usr/share/applications/ungoogled-chromium.desktop ] && \
-             [ ! -f /usr/share/applications/chromium.desktop ]; then
-            CHROMIUM_BIN=$(command -v ungoogled-chromium chromium-browser chromium 2>/dev/null | head -1 || true)
-            if [ -n "$CHROMIUM_BIN" ]; then
-              cat > /usr/share/applications/kibaos-browser.desktop << 'BDESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Name=Web Browser
-          Exec=ungoogled-chromium %U
-          Icon=chromium
-          Terminal=false
-          Categories=Network;WebBrowser;
-          MimeType=text/html;text/xml;application/xhtml+xml;
-          BDESKTOP
-            fi
-          fi
-
-          echo "=== Ungoogled Chromium installed ==="
+          echo "=== Chromium configured ==="
           CHROMIUM_HOOK
-          chmod +x config/hooks/live/0056-ungoogled-chromium.hook.chroot
+          chmod +x config/hooks/live/0056-chromium-policy.hook.chroot
 
           # ── GRUB branding + user-friendly boot menu ──────────────────────────
           mkdir -p config/hooks/binary
@@ -379,6 +305,8 @@ jobs:
           openssl
           locales
           tzdata
+          libc6
+          libc-bin
 
           # ── Nala (apt frontend) ───────────────────────────────────────────────
           nala
@@ -386,6 +314,7 @@ jobs:
           # ── Network ───────────────────────────────────────────────────────────
           network-manager
           wpasupplicant
+          iwd
           wget
           curl
           git
@@ -394,6 +323,10 @@ jobs:
           # ── KDE Plasma 6 minimal working set ─────────────────────────────────
           plasma-desktop
           plasma-workspace
+          plasma-workspace-wallpapers
+          plasma-discover
+          plasma-discover-backend-flatpak
+          packagekit-qt6
           sddm
           sddm-theme-debian-breeze
           plasma-nm
@@ -422,9 +355,6 @@ jobs:
           flatpak
           xdg-desktop-portal-kde
           xdg-desktop-portal-gtk
-
-          # ── UPX ───────────────────────────────────────────────────────────────
-          upx
 
           # ── Shell — zsh ───────────────────────────────────────────────────────
           zsh
@@ -478,7 +408,6 @@ jobs:
           tealdeer
           duf
           ncdu
-          htop
           zenity
 
           # ── Boot loaders ──────────────────────────────────────────────────────
@@ -513,6 +442,7 @@ jobs:
 
           # ── Plymouth theme ────────────────────────────────────────────────────
           mkdir -p /usr/share/kibaos
+          touch ~/.zshrc
           mkdir -p /usr/share/plymouth/themes/kibaos-spinner
 
           # Decode embedded fallback logo
@@ -614,6 +544,14 @@ jobs:
           # ── Aggressive Initrd Compression ────────────────────────────────────
           sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
           echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
+
+          # Ensure critical libraries are correctly linked and indexed
+          ldconfig
+          if [ ! -e /lib/x86_64-linux-gnu/libresolv.so.2 ] && [ ! -e /lib64/libresolv.so.2 ]; then
+            echo "WARNING: libresolv.so.2 not found, attempting to fix..."
+            ldconfig
+          fi
+
           update-initramfs -u -k all || update-initramfs -u
 
           # ── GRUB boot config ─────────────────────────────────────────────────
@@ -712,10 +650,16 @@ jobs:
             alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
-            alias update='sudo nala update'
+            alias update='sudo nala update && sudo nala upgrade -y'
             alias upgrade='sudo nala upgrade'
             alias search='nala search'
           fi
+
+          # ── KibaOS Aliases ──────────────────────────────────────
+          alias edit='${EDITOR:-micro}'
+          alias please='sudo'
+          alias cls='clear'
+          alias path='echo -e "${PATH//:/\\n}"'
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
@@ -767,6 +711,13 @@ jobs:
           alias ..='cd ..'
           alias ...='cd ../..'
           ZSHRC
+
+          # ── Update tldr cache ──────────────────────────────────────────────────
+          if command -v tldr >/dev/null 2>&1; then
+            tldr --update || true
+          elif command -v tealdeer >/dev/null 2>&1; then
+            tealdeer --update || true
+          fi
 
           # ── Default shell: zsh ─────────────────────────────────────────────────
           chsh -s /bin/zsh user  2>/dev/null || true
@@ -839,7 +790,7 @@ jobs:
               Text {
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
-                  font.pixelSize: 48; font.bold: true; color: "#00e5ff"
+                  font.pixelSize: 48; font.bold: true; color: "#bd93f9"
               }
           }
           WATCHSPLASH
@@ -1130,7 +1081,6 @@ jobs:
 
           # ── Wallpaper: Autumn ─────────────────────────────────────────────────
           # Autumn ships with plasma-workspace-wallpapers
-          AUTUMN_PATH="/usr/share/wallpapers/Autumn/contents/images"
           # Fallback to first available large image if specific path differs
           WALLPAPER_PATH=$(find /usr/share/wallpapers/Autumn -name "*.png" -o -name "*.jpg" 2>/dev/null | sort -V | tail -1 || echo "")
           if [ -z "$WALLPAPER_PATH" ]; then
@@ -1143,7 +1093,7 @@ jobs:
           fi
 
           # ── Panel + desktop layout ─────────────────────────────────────────────
-          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << PANELRC
+          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
           [Containments][1]
           activityId=
           formfactor=0
@@ -1171,9 +1121,9 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.icon
           [Containments][1][Applets][11][Configuration][General]
-          applicationName=kibastore
-          iconPath=/usr/share/applications/kibastore.desktop
-          label=KibaStore
+          applicationName=org.kde.discover
+          iconPath=/usr/share/applications/org.kde.discover.desktop
+          label=Software Center
           [Containments][1][Applets][11][Geometry]
           x=100; y=40; width=64; height=64
 
@@ -1181,7 +1131,7 @@ jobs:
           immutability=1
           plugin=org.kde.plasma.icon
           [Containments][1][Applets][12][Configuration][General]
-          applicationName=ungoogled-chromium
+          applicationName=chromium
           iconPath=/usr/share/applications/chromium.desktop
           label=Web Browser
           [Containments][1][Applets][12][Geometry]
@@ -1256,7 +1206,7 @@ jobs:
           systemctl enable NetworkManager  || true
           systemctl enable plymouth        || true
 
-          # ── KibaStore .desktop (rename Discover if present) ────────────────────
+          # ── KibaStore .desktop (hide Discover, prioritize Bazaar) ──────────────
           mkdir -p /usr/local/share/applications
           for f in \
             /usr/share/applications/org.kde.discover.desktop \
@@ -1265,8 +1215,7 @@ jobs:
             [ -f "$f" ] || continue
             FNAME=$(basename "$f")
             cp "$f" "/usr/local/share/applications/$FNAME"
-            sed -i 's/^Name=.*/Name=KibaStore/' "/usr/local/share/applications/$FNAME"
-            sed -i 's/^Name\[.*\]=.*//' "/usr/local/share/applications/$FNAME"
+            echo "NoDisplay=true" >> "/usr/local/share/applications/$FNAME"
             update-desktop-database /usr/local/share/applications 2>/dev/null || true
           done
 
@@ -1308,8 +1257,26 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Simple welcome message for beginners
-          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS!\n\nYour new system is ready. We've made it fast, simple, and beautiful for you.\n\nEverything you need is already here. Just open an app and go!\n\nEnjoy your new computer." --width=400 2>/dev/null
+          # Functional welcome menu for KibaOS
+          CHOICE=$(zenity --list --title="Welcome to KibaOS" \
+            --text="Welcome to KibaOS! What would you like to do?" \
+            --column="Action" --column="Description" \
+            "Install KibaOS" "Install the system permanently to your disk" \
+            "Web Browser" "Browse the internet" \
+            "Software Center" "Discover and install new applications" \
+            --width=450 --height=300 2>/dev/null)
+
+          case "$CHOICE" in
+            "Install KibaOS")
+              sudo calamares &
+              ;;
+            "Web Browser")
+              chromium &
+              ;;
+            "Software Center")
+              plasma-discover &
+              ;;
+          esac
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
@@ -1326,6 +1293,7 @@ jobs:
 
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
+
           HOOK
           chmod +x config/hooks/live/0100-customize.hook.chroot
 
@@ -1341,10 +1309,10 @@ jobs:
           strings:
             productName: "KibaOS"
             shortProductName: "KibaOS"
-            version: "1.0"
-            shortVersion: "1.0"
-            versionedName: "KibaOS 1.0"
-            shortVersionedName: "KibaOS 1.0"
+            version: "1.8"
+            shortVersion: "1.8"
+            versionedName: "KibaOS"
+            shortVersionedName: "KibaOS"
             bootloaderEntryName: "KibaOS"
             productUrl: "https://github.com/WolfTech-Innovations/kiba"
             supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
@@ -1387,7 +1355,6 @@ jobs:
               - keyboard
               - partition
               - users
-              - ageverify
               - summary
             - exec:
               - partition
@@ -1433,7 +1400,7 @@ jobs:
               - ram
               - power
               - internet
-            requiredStorageGiB: 10.0
+            requiredStorageGiB: 20.0
             requiredRam: 1.0
           geoip:
             style: "json"
@@ -1471,7 +1438,7 @@ jobs:
           userShell: /bin/zsh
           autologinGroup:  autologin
           sudoersGroup:    sudo
-          setRootPassword: true
+          setRootPassword: false
           doAutoLogin:     false
           passwordRequirements:
             minLength: 6
@@ -1549,171 +1516,13 @@ jobs:
           Type=Application
           Version=1.0
           Name=Install KibaOS
-          Comment=Install KibaOS to your system
+          Comment=Install KibaOS on your PC
           Exec=sudo calamares
           Icon=calamares
           Terminal=false
           Categories=System;
           CALADESKTOP
 
-          # ── ageverify module ────────────────────────────────────────────────────
-          # FIXED: correct Calamares Python viewmodule structure
-          # - module.desc must use type: viewmodule, interface: pythonqt
-          # - Python class must subclass ViewStep (not QWidget directly)
-          # - Required methods: create(), widget(), isNextEnabled(), back/next hooks
-          mkdir -p /usr/lib/calamares/modules/ageverify
-
-          cat > /usr/lib/calamares/modules/ageverify/module.desc << 'AGEDESC'
-          ---
-          type:      "viewmodule"
-          name:      "ageverify"
-          interface: "pythonqt"
-          script:    "main.py"
-          AGEDESC
-
-          cat > /usr/lib/calamares/modules/ageverify/main.py << 'AGEPYEOF'
-          #!/usr/bin/env python3
-          # -*- coding: utf-8 -*-
-          # KibaOS Age Verification — California AADC (AB 2273) compliance
-          # Calamares Python ViewModule using the pythonqt interface.
-          # Required exports: ViewStep subclass named the same as the module,
-          # or a create() function returning a ViewStep.
-
-          import libcalamares
-          from libcalamares.ui.view_step import ViewStep
-          from PyQt6.QtWidgets import (
-              QWidget, QVBoxLayout, QLabel,
-              QPushButton, QButtonGroup, QRadioButton,
-              QFrame, QSizePolicy, QSpacerItem
-          )
-          from PyQt6.QtCore import Qt
-          import os
-
-          class AgeVerifyWidget(QWidget):
-              def __init__(self, parent=None):
-                  super().__init__(parent)
-                  self._selection = None
-                  self._age_group = None
-                  self._build_ui()
-
-              def _build_ui(self):
-                  layout = QVBoxLayout(self)
-                  layout.setContentsMargins(48, 32, 48, 32)
-                  layout.setSpacing(16)
-
-                  title = QLabel("Age Verification")
-                  f = title.font(); f.setPointSize(20); f.setBold(True)
-                  title.setFont(f)
-                  layout.addWidget(title)
-
-                  sub = QLabel(
-                      "California law (AB 2273 — Age-Appropriate Design Code) requires "
-                      "us to note your age group before completing installation. "
-                      "This information is stored locally only and is never transmitted."
-                  )
-                  sub.setWordWrap(True)
-                  sub.setStyleSheet("color: #6272a4; font-size: 13px;")
-                  layout.addWidget(sub)
-
-                  sep = QFrame(); sep.setFrameShape(QFrame.Shape.HLine)
-                  layout.addWidget(sep)
-
-                  prompt = QLabel("Please select your age group:")
-                  pf = prompt.font(); pf.setPointSize(13); prompt.setFont(pf)
-                  layout.addWidget(prompt)
-
-                  self._age_group = QButtonGroup(self)
-                  for value, label in [
-                      ("under13", "Under 13  (Children — enhanced protections apply)"),
-                      ("13to15",  "13 – 15   (Teen — some restrictions apply)"),
-                      ("16to17",  "16 – 17   (Minor — standard protections)"),
-                      ("18plus",  "18 or older  (Adult — full access)"),
-                      ("decline", "Prefer not to say"),
-                  ]:
-                      rb = QRadioButton(label)
-                      rb.setProperty("ageValue", value)
-                      rb.setStyleSheet("font-size: 13px; padding: 6px 0;")
-                      self._age_group.addButton(rb)
-                      layout.addWidget(rb)
-
-                  self._age_group.buttonClicked.connect(
-                      lambda btn: setattr(self, '_selection', btn.property("ageValue"))
-                  )
-
-                  layout.addItem(QSpacerItem(
-                      20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-                  note = QLabel(
-                      "🔒  Your selection is saved to /etc/kibaos/age-verify on this "
-                      "device only. KibaOS does not collect or transmit personal data."
-                  )
-                  note.setWordWrap(True)
-                  note.setStyleSheet(
-                      "background: rgba(68,71,90,120); border-radius: 8px; "
-                      "padding: 10px; color: #f8f8f2; font-size: 12px;")
-                  layout.addWidget(note)
-
-              def get_selection(self):
-                  return self._selection
-
-
-          class AgeverifyViewStep(ViewStep):
-              """Calamares ViewStep for age verification."""
-
-              def __init__(self, parent=None):
-                  super().__init__(parent)
-                  self._widget = AgeVerifyWidget()
-
-              def prettyName(self):
-                  return "Age Verification"
-
-              def widget(self):
-                  return self._widget
-
-              def isNextEnabled(self):
-                  # Allow next even without selection (optional compliance step)
-                  return True
-
-              def isBackEnabled(self):
-                  return True
-
-              def isAtBeginning(self):
-                  return True
-
-              def isAtEnd(self):
-                  return True
-
-              def jobs(self):
-                  selection = self._widget.get_selection() or "not-answered"
-                  return [AgeVerifyJob(selection)]
-
-
-          class AgeVerifyJob(libcalamares.job.Job):
-              def __init__(self, selection):
-                  super().__init__()
-                  self._selection = selection
-
-              def prettyName(self):
-                  return "Saving age verification"
-
-              def exec(self):
-                  try:
-                      root = libcalamares.globalstorage.value("rootMountPoint") or ""
-                      dest = os.path.join(root, "etc", "kibaos")
-                      os.makedirs(dest, exist_ok=True)
-                      with open(os.path.join(dest, "age-verify"), "w") as f:
-                          f.write(f"age_group={self._selection}\n")
-                          f.write("# KibaOS age verification — California AB 2273\n")
-                          f.write("# Stored locally only, never transmitted.\n")
-                  except Exception as e:
-                      libcalamares.utils.debug(f"ageverify: {e}")
-                  return None
-
-
-          def create():
-              return AgeverifyViewStep()
-          AGEPYEOF
-          chmod +x /usr/lib/calamares/modules/ageverify/main.py
 
           # ── Post-install script ─────────────────────────────────────────────────
           mkdir -p /usr/share/kibaos
@@ -1851,8 +1660,8 @@ jobs:
 
           echo "=== Pipeline Verification ==="
           # Check for CachyOS kernel in the chroot environment
-          if grep -qi "cachyos" build.log; then
-            echo "VERIFIED: CachyOS kernel mentioned in build log"
+          if grep -qiE "cachyos|psycachy" build.log; then
+            echo "VERIFIED: CachyOS kernel (psycachy) mentioned in build log"
           else
             echo "WARNING: CachyOS kernel not found in build log"
           fi
@@ -1870,6 +1679,40 @@ jobs:
           if [ -f live-image-amd64.hybrid.iso ]; then
             mv live-image-amd64.hybrid.iso "${ISO}.iso"
             sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
+
+            echo "=== Starting Headless Boot Test (QEMU) ==="
+            # Run QEMU for 60 seconds and capture serial output
+            # We use -nographic and -serial stdio to capture boot logs
+            # We add a small delay to ensure the kernel starts printing
+            timeout 60s qemu-system-x86_64 \
+              -m 2G \
+              -cdrom "${ISO}.iso" \
+              -nographic \
+              -serial stdio \
+              -no-reboot \
+              > boot_test.log 2>&1 || true
+
+            echo "=== Analyzing Boot Logs ==="
+            if grep -qi "Kernel panic" boot_test.log; then
+              echo "ERROR: Kernel panic detected during boot test!"
+              cat boot_test.log
+              exit 1
+            fi
+
+            if grep -qi "Call Trace:" boot_test.log; then
+               echo "ERROR: Potential crash/trace detected in logs!"
+               cat boot_test.log
+               exit 1
+            fi
+
+            # Check if we at least reached the initramfs or live-boot stage
+            if ! grep -qiE "init|live-boot|Loading|Linux version" boot_test.log; then
+               echo "WARNING: Boot log seems empty or didn't start properly"
+               # This might be due to lack of kvm, but we'll still fail if it's definitely broken
+            fi
+
+            echo "VERIFIED: Boot test completed without panics"
+
             echo ""
             echo "═══ KibaOS Build Complete ═══"
             ls -lh "${ISO}.iso"

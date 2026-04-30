@@ -3,8 +3,8 @@ name: APT Source Validator
 on:
   push:
     paths:
-      - 'build.sh'
-      - '.github/workflows/kiba.yml'
+      - "build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
 
 jobs:
@@ -14,5 +14,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for APT Source Issues
         run: |
-          grep -r "add-apt-repository" . && echo "Found add-apt-repository, consider using gpg keys instead" || true
-          grep -r "curl.*gpg" . && echo "Found GPG key download, verifying integrity..." || true
+          if grep -r "add-apt-repository" .; then
+            echo "Found add-apt-repository, consider using gpg keys instead"
+          fi
+          if grep -r "curl.*gpg" .; then
+            echo "Found GPG key download, verifying integrity..."
+          fi

@@ -1,0 +1,14 @@
+name: CI Workflow Efficiency Audit
+
+on:
+  workflow_run:
+    workflows: ["KibaOS Build"]
+    types: [completed]
+
+jobs:
+  audit-efficiency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report Duration
+        run: |
+          echo "KibaOS Build completed."
