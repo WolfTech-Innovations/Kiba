@@ -12,11 +12,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
-          sudo docker system prune -af --volumes
-
       - name: Create build script
         run: |
           cat > build.sh << 'BUILD_SCRIPT_EOF'
@@ -785,7 +780,7 @@ jobs:
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
-              color: "#282a36"
+              color: "#000000"
               anchors.fill: parent
               Text {
                   anchors.centerIn: parent
@@ -1357,6 +1352,7 @@ jobs:
               - users
               - summary
             - exec:
+              - ageverify
               - partition
               - mount
               - unpackfs
