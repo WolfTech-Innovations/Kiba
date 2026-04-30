@@ -531,18 +531,6 @@ jobs:
           Session=plasma
           SDDM_CONF
 
-          # ── Nala: replace apt alias system-wide ───────────────────────────────
-          # Nala wraps apt; we alias apt→nala in the system zshrc and bashrc
-          # so users interacting with the terminal get the nicer interface.
-          cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
-          # KibaOS: use nala as the default package manager frontend
-          if command -v nala >/dev/null 2>&1; then
-            alias apt='nala'
-            alias apt-get='nala'
-          fi
-          NALA_ALIAS
-          chmod +x /etc/profile.d/nala-alias.sh
-
           # ── Zsh config (auto-generated) ───────────────────────────────────────
           # The zshrc is written by this hook and placed in /etc/zsh/zshrc
           # so it applies to all users automatically.
@@ -611,8 +599,8 @@ jobs:
 
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
-            alias apt='nala'
-            alias apt-get='nala'
+            alias  apt='nala'
+            alias  apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
             alias update='sudo nala update && sudo nala upgrade -y'
@@ -628,28 +616,33 @@ jobs:
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
-            alias ls='eza --icons --group-directories-first'
-            alias ll='eza -lah --icons --group-directories-first'
-            alias la='eza -A --icons'
+            LS_CMD='eza --icons --group-directories-first'
+            LL_CMD='eza -lah --icons --group-directories-first'
+            LA_CMD='eza -A --icons'
             alias tree='eza --tree --icons'
           else
-            alias ls='ls --color=auto'
-            alias ll='ls -lah'
-            alias la='ls -A'
+            LS_CMD='ls --color=auto'
+            LL_CMD='ls -lah'
+            LA_CMD='ls -A'
           fi
+          alias ls="$LS_CMD"
+          alias ll="$LL_CMD"
+          alias la="$LA_CMD"
 
           if command -v bat >/dev/null 2>&1; then
-            alias cat='bat --paging=never'
+            CAT_CMD='bat --paging=never'
           elif command -v batcat >/dev/null 2>&1; then
-            alias cat='batcat --paging=never'
+            CAT_CMD='batcat --paging=never'
             alias bat='batcat'
           fi
+          [ -n "$CAT_CMD" ] && alias cat="$CAT_CMD"
 
           if command -v rg >/dev/null 2>&1; then
-            alias grep='rg'
+            GREP_CMD='rg'
           elif command -v ripgrep >/dev/null 2>&1; then
-            alias grep='ripgrep'
+            GREP_CMD='ripgrep'
           fi
+          [ -n "$GREP_CMD" ] && alias grep="$GREP_CMD"
 
           if command -v fdfind >/dev/null 2>&1; then
             alias fd='fdfind'
@@ -657,9 +650,9 @@ jobs:
 
           if command -v tldr >/dev/null 2>&1; then
             # Use tealdeer if available
-            alias help='tldr'
+            alias help='tldr' # help1
           elif command -v tealdeer >/dev/null 2>&1; then
-            alias help='tealdeer'
+            alias  help='tealdeer'
             alias tldr='tealdeer'
           fi
 
@@ -1134,7 +1127,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1605,29 +1598,12 @@ jobs:
               cat >> "$RCFILE" << 'NALABASH'
           # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
-            alias apt='nala'
-            alias apt-get='nala'
+            alias   apt='nala'
+            alias   apt-get='nala'
           }
           NALABASH
             fi
           done
-          chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.bashrc" 2>/dev/null || true
-
-          echo "=== KibaOS post-install COMPLETE ==="
-          POSTINSTALLSH
-          chmod +x /usr/share/kibaos/post-install.sh
-
-          BRANDING_HOOK
-          chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
-
-
-          echo "=== Building ISO ==="
-          lb build 2>&1 | tee build.log
-
-          echo "=== Pipeline Verification ==="
-          # Check for CachyOS kernel in the chroot environment
-          if grep -qiE "cachyos|psycachy" build.log; then
-            echo "VERIFIED: CachyOS kernel (psycachy) mentioned in build log"
           else
             echo "WARNING: CachyOS kernel not found in build log"
           fi
