@@ -1,0 +1,21 @@
+name: Issue Template Audit
+
+on:
+  push:
+    paths:
+      - '.github/ISSUE_TEMPLATE/**'
+  workflow_dispatch:
+
+jobs:
+  audit-templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for required fields in templates
+        run: |
+          for template in .github/ISSUE_TEMPLATE/*.md; do
+            if ! grep -q "description:" "$template"; then
+              echo "Error: Template $template is missing a description field."
+              exit 1
+            fi
+          done

@@ -1,0 +1,18 @@
+name: QML Module Import Validator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-qml-imports:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check QML imports in Splash.qml
+        run: |
+          # Ensure QtQuick 2.15 is used as per project standard
+          grep "import QtQuick" .github/workflows/kiba.yml | grep -v "2.15" && { echo "Warning: QML import version mismatch. Project uses 2.15."; }
+          echo "QML import check complete."

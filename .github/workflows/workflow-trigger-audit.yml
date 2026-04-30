@@ -1,0 +1,19 @@
+name: Workflow Trigger Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  audit-triggers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for workflow_dispatch and paths-filtering
+        run: |
+          for workflow in .github/workflows/*.yml; do
+            grep -q "workflow_dispatch:" "$workflow" || echo "Notice: $workflow is missing workflow_dispatch trigger."
+            grep -q "paths:" "$workflow" || echo "Notice: $workflow lacks path filtering (might run unnecessarily)."
+          done

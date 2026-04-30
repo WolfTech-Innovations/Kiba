@@ -1,0 +1,31 @@
+name: Issue Priority Auto-Labeler
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  label-priority:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.issue.body.toLowerCase();
+            let priority = null;
+            if (body.includes('urgent') || body.includes('critical') || body.includes('broken')) {
+              priority = 'high priority';
+            } else if (body.includes('soon') || body.includes('important')) {
+              priority = 'medium priority';
+            }
+
+            if (priority) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.issue.number,
+                labels: [priority]
+              });
+            }

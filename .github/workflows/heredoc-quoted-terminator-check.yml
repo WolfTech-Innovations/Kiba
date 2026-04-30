@@ -1,0 +1,18 @@
+name: Heredoc Quoted Terminator Check
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  check-heredoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify quoted heredoc terminators
+        run: |
+          # Rule: use quoted heredoc terminators (e.g., << 'EOF') to prevent premature expansion
+          grep "<< [A-Z_]*" .github/workflows/kiba.yml | grep -v "'" && { echo "Error: Found unquoted heredoc terminator. Use << 'EOF' instead."; exit 1; }
+          echo "Heredoc terminators are correctly quoted."

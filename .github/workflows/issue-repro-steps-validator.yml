@@ -1,0 +1,19 @@
+name: Issue Repro Steps Validator
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  validate-repro:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'bug')
+    steps:
+      - name: Check for reproduction steps
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          if ! echo "$ISSUE_BODY" | grep -qiE "reproduce|steps|how to"; then
+            echo "Error: Bug reports must include reproduction steps."
+            exit 1
+          fi

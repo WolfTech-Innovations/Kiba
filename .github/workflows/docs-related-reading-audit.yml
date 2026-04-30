@@ -1,0 +1,19 @@
+name: Docs Related Reading Audit
+
+on:
+  push:
+    paths:
+      - 'docs/**'
+  workflow_dispatch:
+
+jobs:
+  audit-related-reading:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Related Reading section
+        run: |
+          for doc in docs/*.md; do
+            if [ "$doc" == "docs/README.md" ]; then continue; fi
+            grep -q "Related Reading" "$doc" || { echo "Error: $doc is missing a 'Related Reading' section."; exit 1; }
+          done

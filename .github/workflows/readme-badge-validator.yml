@@ -1,0 +1,18 @@
+name: README Badge Validator
+
+on:
+  push:
+    paths:
+      - 'README.md'
+  workflow_dispatch:
+
+jobs:
+  validate-badges:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for essential badges
+        run: |
+          grep -q "img.shields.io/github/actions/workflow/status" README.md || { echo "Missing Build Status badge"; exit 1; }
+          grep -q "img.shields.io/badge/License-MIT" README.md || { echo "Missing License badge"; exit 1; }
+          grep -q "img.shields.io/badge/Debian-13" README.md || { echo "Missing Debian version badge"; exit 1; }

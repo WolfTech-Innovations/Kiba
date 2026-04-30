@@ -1,0 +1,19 @@
+name: Issue Use Case Enforcer
+
+on:
+  issues:
+    types: [opened, edited]
+
+jobs:
+  validate-use-case:
+    runs-on: ubuntu-latest
+    if: contains(github.event.issue.labels.*.name, 'feature')
+    steps:
+      - name: Check for use case
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          if ! echo "$ISSUE_BODY" | grep -qiE "use case|why|benefit|user story"; then
+            echo "Error: Feature requests must include a clear use case or benefit."
+            exit 1
+          fi
