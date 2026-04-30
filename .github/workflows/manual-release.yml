@@ -8,6 +8,9 @@ on:
         required: true
         default: "1.0.0"
 
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -51,7 +54,7 @@ jobs:
 
           mkdir -p Notes
           # Fetch release body using GitHub CLI
-          gh release view ${{ steps.create_release.outputs.id }} --template '{{.body}}' > "$FILENAME"
+          gh release view v${{ github.event.inputs.version }} --template '{{.body}}' > "$FILENAME"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

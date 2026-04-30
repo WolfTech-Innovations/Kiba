@@ -14,6 +14,6 @@ jobs:
         uses: pozil/auto-assign-issue@v2
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          # assignees: WolfTech-Innovations # Organization names cannot be used as assignees
-          numOfAssignee: 0 # Disable automatic assignment for now
+          assignees: ${{ github.actor }}
+          numOfAssignee: 1
           allowSelfAssign: true

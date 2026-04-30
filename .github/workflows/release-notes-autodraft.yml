@@ -49,7 +49,7 @@ jobs:
 
           mkdir -p Notes
           # Fetch release body using GitHub CLI
-          gh release view ${{ steps.create_release.outputs.id }} --template '{{.body}}' > "$FILENAME"
+          gh release view ${{ github.ref_name }} --template '{{.body}}' > "$FILENAME"
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
