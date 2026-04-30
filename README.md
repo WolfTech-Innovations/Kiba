@@ -1,7 +1,7 @@
 # KibaOS
 
 <p align="center">
-  <img width="1360" height="520" alt="image" src="https://github.com/user-attachments/assets/9b1e8703-d11e-4d17-9949-517a40debcaf" />
+<img width="1330" height="519" alt="image" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8" />
 </p>
 
 <p align="center">
