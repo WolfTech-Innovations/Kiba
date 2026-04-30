@@ -1,0 +1,17 @@
+name: Docs Broken Anchor Checker
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check-anchors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find broken anchors
+        run: |
+          grep -roE '#[a-z0-9-]+' docs/*.md | while read -r line; do
+            anchor=$(echo "$line" | cut -d: -f2 | sed 's/#//')
+            file=$(echo "$line" | cut -d: -f1)
+            grep -qi "^##.*$anchor" "$file" || { echo "Broken anchor $anchor in $file"; exit 1; }
+          done

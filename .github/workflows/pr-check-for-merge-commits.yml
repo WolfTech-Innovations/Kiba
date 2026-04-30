@@ -1,0 +1,14 @@
+name: PR Merge Commit Checker
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for merge commits
+        run: |
+          git rev-list --merges origin/main..HEAD | grep . && { echo "Error: Merge commits are not allowed. Please rebase."; exit 1; } || echo "No merge commits"

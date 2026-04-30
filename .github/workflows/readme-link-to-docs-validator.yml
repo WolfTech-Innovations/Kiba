@@ -1,0 +1,15 @@
+name: README Docs Link Validator
+on:
+  push:
+    paths:
+      - 'README.md'
+jobs:
+  validate-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check docs links
+        run: |
+          grep -oE '\./docs/[a-z0-9-]+\.md' README.md | while read -r link; do
+            ls "$link" || { echo "Broken doc link in README: $link"; exit 1; }
+          done

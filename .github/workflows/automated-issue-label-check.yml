@@ -1,0 +1,15 @@
+name: Automated Issue Label Check
+on:
+  issues:
+    types: [opened]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify initial labels
+        env:
+          LABELS: ${{ toJson(github.event.issue.labels) }}
+        run: |
+          if [[ "$LABELS" == "[]" ]]; then
+            echo "Notice: New issue opened without labels"
+          fi

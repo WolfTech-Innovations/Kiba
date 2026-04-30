@@ -1,0 +1,13 @@
+name: Workflow Trigger Main Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify push main trigger
+        run: |
+          grep -r "branches: \[main\]" .github/workflows/*.yml || echo "Notice: Some workflows might not trigger on main branch"

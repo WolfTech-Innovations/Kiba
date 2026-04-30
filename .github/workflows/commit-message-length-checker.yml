@@ -1,0 +1,16 @@
+name: Commit Message Length Checker
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  check-length:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check subject length
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if [[ ${#TITLE} -gt 72 ]]; then
+            echo "PR title too long (> 72 chars)"
+            exit 1
+          fi

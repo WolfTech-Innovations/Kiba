@@ -1,0 +1,16 @@
+name: PR Milestone Checker
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, milestoned, demilestoned]
+jobs:
+  check-milestone:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify milestone
+        env:
+          MILESTONE: ${{ github.event.pull_request.milestone }}
+        run: |
+          if [[ -z "$MILESTONE" || "$MILESTONE" == "null" ]]; then
+            echo "Error: No milestone assigned to this PR"
+            exit 1
+          fi

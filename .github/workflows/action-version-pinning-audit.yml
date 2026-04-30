@@ -1,0 +1,14 @@
+name: Action Version Pinning Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit Action Versions
+        run: |
+          grep "uses: [a-zA-Z0-9-]*/[a-zA-Z0-9-]*@" .github/workflows/*.yml | grep -vE '@[a-f0-9]{40}' && { echo "Found unpinned actions"; exit 1; } || echo "All actions pinned"

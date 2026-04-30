@@ -1,0 +1,13 @@
+name: JSON Schema Validator
+on:
+  push:
+    paths:
+      - '**.json'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Basic JSON check
+        run: |
+          find . -name "*.json" | xargs -r -n1 python3 -m json.tool > /dev/null || { echo "Error: Invalid JSON found"; exit 1; }

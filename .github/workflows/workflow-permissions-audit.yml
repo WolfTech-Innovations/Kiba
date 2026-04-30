@@ -1,0 +1,13 @@
+name: Workflow Permissions Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for excessive permissions
+        run: |
+          grep -rn "permissions: write-all" .github/workflows/*.yml && { echo "Error: write-all permission is prohibited"; exit 1; } || echo "Permissions are restricted"

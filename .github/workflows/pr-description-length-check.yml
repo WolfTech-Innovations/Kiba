@@ -1,0 +1,16 @@
+name: PR Description Length Check
+on:
+  pull_request:
+    types: [opened, edited]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check length
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [[ ${#BODY} -lt 30 ]]; then
+            echo "Error: PR description too short (< 30 chars)"
+            exit 1
+          fi

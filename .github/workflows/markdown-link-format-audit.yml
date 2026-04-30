@@ -1,0 +1,13 @@
+name: Markdown Link Format Audit
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for bare URLs
+        run: |
+          grep -rnE "http[s]?://[a-zA-Z0-9./?-]+" . | grep -vE "\[.*\]\(http|src=|href=" && { echo "Error: Use Markdown link format for URLs"; exit 1; } || echo "Links are properly formatted"

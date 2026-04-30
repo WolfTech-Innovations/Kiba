@@ -1,0 +1,14 @@
+name: Deprecated Commands Check
+on:
+  push:
+    paths:
+      - '**.sh'
+      - '.github/workflows/*.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for deprecated commands
+        run: |
+          grep -rnE "apt-get|ifconfig|netstat" . && { echo "Error: Use apt, ip, or ss instead of deprecated commands"; exit 1; } || echo "No deprecated commands found"

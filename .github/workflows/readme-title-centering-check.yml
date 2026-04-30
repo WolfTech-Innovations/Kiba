@@ -1,0 +1,13 @@
+name: README Title Centering Check
+on:
+  push:
+    paths:
+      - 'README.md'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify title centering
+        run: |
+          head -n 20 README.md | grep -qi "<h1 align=\"center\">" || echo "Notice: Title might not be centered"

@@ -1,0 +1,13 @@
+name: Docs Image Alt Text Checker
+on:
+  push:
+    paths:
+      - '**.md'
+jobs:
+  check-alt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for missing alt text
+        run: |
+          grep -rnE "!\\[\\]" docs/*.md && { echo "Found images with empty alt text"; exit 1; } || echo "All images have alt text"

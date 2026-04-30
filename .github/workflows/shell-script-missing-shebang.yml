@@ -1,0 +1,15 @@
+name: Shell Script Shebang Checker
+on:
+  push:
+    paths:
+      - '**.sh'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shebangs
+        run: |
+          find . -name "*.sh" | while read -r file; do
+            head -n 1 "$file" | grep -q "^#!" || { echo "Error: $file is missing shebang"; exit 1; }
+          done

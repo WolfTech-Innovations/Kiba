@@ -1,0 +1,12 @@
+name: TODO Comment Tracker
+on:
+  push:
+    branches: [main]
+jobs:
+  track-todos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: List todos
+        run: |
+          grep -rnE "TODO|FIXME" . --exclude-dir=.git | grep . && { echo "Pending TODOs found"; } || echo "No TODOs"

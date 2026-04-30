@@ -1,0 +1,13 @@
+name: Workflow Env Naming Convention
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify env naming
+        run: |
+          grep -rnE "env: [a-z]" .github/workflows/*.yml && { echo "Error: Environment variables should be UPPERCASE"; exit 1; } || echo "Env naming is correct"

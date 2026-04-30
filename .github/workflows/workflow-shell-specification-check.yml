@@ -1,0 +1,13 @@
+name: Workflow Shell Spec Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify shell specification
+        run: |
+          grep -rn "shell: " .github/workflows/*.yml || echo "Notice: Workflows use default shell"
