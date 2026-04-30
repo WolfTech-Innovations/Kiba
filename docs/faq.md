@@ -64,11 +64,11 @@ Yes! Since KibaOS is based on Debian, you can install any compatible `.deb` file
 
 ## Troubleshooting
 
-### The installer didn't start automatically.
+### The installer didn't start automatically
 
 In the live session, the installer is pinned to the desktop and the taskbar. If it fails to launch, open a terminal and type `sudo calamares`.
 
-### My Wi-Fi isn't working.
+### My Wi-Fi isn't working
 
 KibaOS includes the `non-free-firmware` repository by default to support most modern wireless cards. If your card isn't detected, you may need to install a specific driver via `nala`.
 

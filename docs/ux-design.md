@@ -104,7 +104,7 @@ The branding experience starts from the moment the system boots:
 
 KibaOS leverages the power of **KDE Plasma 6.3** but configures it for a streamlined "out-of-the-box" experience.
 
-### Window Management
+### Window Management Polish
 
 - **Rounded Corners:** Custom **KWin** rules apply 16px rounded corners to all windows.
 - **Glass Effects:** Background blur and translucency are enabled for an elegant, layered look.

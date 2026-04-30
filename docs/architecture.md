@@ -101,7 +101,7 @@ _Note: Critical shell integration scripts (like those for `fzf`) are preserved b
 
 To save space, KibaOS limits system locales to only `en` and `en_US`. All other locale data is purged from `/usr/share/locale`.
 
-### Dependency Pruning
+### Dependency Pruning (Optimized)
 
 We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-desktop` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
 

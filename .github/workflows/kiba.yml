@@ -743,18 +743,12 @@ jobs:
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
-              color: "#282a36"
+              color: "#000000"
               anchors.fill: parent
               Text {
-                  id: welcomeText
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
-                  opacity: 0
-                  SequentialAnimation {
-                      running: true
-                      NumberAnimation { target: welcomeText; property: "opacity"; from: 0; to: 1; duration: 1000; easing.type: Easing.InOutQuad }
-                  }
               }
           }
           WATCHSPLASH
@@ -1223,8 +1217,6 @@ jobs:
           #!/bin/bash
           # Functional welcome menu for KibaOS
           CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-            --window-icon="/usr/share/kibaos/logo.png" \
-            --icon-name="start-here-kde-symbolic" \
             --text="Welcome to KibaOS! What would you like to do?" \
             --column="Action" --column="Description" \
             "Install KibaOS" "Install the system permanently to your disk" \
@@ -1293,8 +1285,6 @@ jobs:
             SidebarText:              "#f8f8f2"
             SidebarTextCurrent:       "#282a36"
             SidebarBackgroundCurrent: "#bd93f9"
-            WindowBackground:         "#282a36"
-            WindowForeground:         "#f8f8f2"
           slideshow: "show.qml"
           BRANDING
 
