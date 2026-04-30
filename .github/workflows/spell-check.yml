@@ -13,6 +13,7 @@ jobs:
         uses: codespell-project/actions-codespell@v2
         with:
           ignore_words_file: .codespellignore
+          ignore_words_list: vEw
           skip: .git,*.png,*.jpg,*.iso
           check_filenames: true
           check_hidden: true
