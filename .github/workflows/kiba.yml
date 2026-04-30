@@ -60,29 +60,8 @@ jobs:
             --firmware-chroot false \
             --memtest none \
             --compression xz \
-            --chroot-squashfs-compression-type zstd
-
-          # ── Max squashfs compression: zstd best (smaller + faster than xz) ───
-          mkdir -p config/hooks/binary
-          cat > config/hooks/binary/0010-squashfs-compression.hook.binary << 'SQFS_HOOK'
-          #!/bin/bash
-          # Repack the squashfs with maximum zstd compression
-          set -e
-          SQFS=$(find binary/live -name "*.squashfs" 2>/dev/null | head -1)
-          [ -z "$SQFS" ] && exit 0
-          TMPDIR=$(mktemp -d)
-          unsquashfs -d "$TMPDIR/root" "$SQFS"
-          rm "$SQFS"
-          mksquashfs "$TMPDIR/root" "$SQFS" \
-            -comp zstd \
-            -Xcompression-level 19 \
-            -b 1048576 \
-            -no-progress \
-            -noappend
-          rm -rf "$TMPDIR"
-          echo "=== SquashFS repacked with maximum zstd compression ==="
-          SQFS_HOOK
-          chmod +x config/hooks/binary/0010-squashfs-compression.hook.binary
+            --chroot-squashfs-compression-type zstd \
+            --chroot-squashfs-compression-level 19
 
           # ── Starship prompt hook ────────────────────────────────────────────
           mkdir -p config/hooks/live
