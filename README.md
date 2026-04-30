@@ -1,7 +1,7 @@
 # KibaOS
 
 <p align="center">
-  <img src="branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img width="1360" height="520" alt="image" src="https://github.com/user-attachments/assets/9b1e8703-d11e-4d17-9949-517a40debcaf" />
 </p>
 
 <p align="center">
