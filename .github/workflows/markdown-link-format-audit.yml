@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for bare URLs
         run: |
-          grep -rnE "http[s]?://[a-zA-Z0-9./?-]+" . | grep -vE "\[.*\]\(http|src=|href=" && { echo "Error: Use Markdown link format for URLs"; exit 1; } || echo "Links are properly formatted"
+          grep -rnE "http[s]?://[a-zA-Z0-9./?-]+" . --include="*.md" | grep -vE "\[.*\]\(http|src=|href=" | grep -v "markdown-link-format-audit.yml" && { echo "Error: Use Markdown link format for URLs"; exit 1; } || echo "Links are properly formatted"

@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for trailing whitespace
         run: |
-          grep -rnE "[[:space:]]+$" docs/ *.md && { echo "Error: Trailing whitespace found in markdown files"; exit 1; } || echo "No trailing whitespace"
+          grep -rnE "[[:space:]]+$" . --include="*.md" | grep -v "doc-trailing-whitespace-enforcer.yml" && { echo "Error: Trailing whitespace found in markdown files"; exit 1; } || echo "No trailing whitespace"

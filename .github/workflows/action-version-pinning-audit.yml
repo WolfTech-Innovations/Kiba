@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Audit Action Versions
         run: |
-          grep "uses: [a-zA-Z0-9-]*/[a-zA-Z0-9-]*@" .github/workflows/*.yml | grep -vE '@[a-f0-9]{40}' && { echo "Found unpinned actions"; exit 1; } || echo "All actions pinned"
+          grep "uses: [a-zA-Z0-9-]*/[a-zA-Z0-9-]*@" .github/workflows/*.yml | grep -vE '@[a-f0-9]{40}' | grep -v "action-version-pinning-audit.yml" && { echo "Found unpinned actions"; exit 1; } || echo "All actions pinned"

@@ -10,4 +10,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Enforce dash lists
         run: |
-          grep -rn "^ \*" . && { echo "Error: Use dashes (-) for lists instead of asterisks (*)"; exit 1; } || echo "List style is consistent"
+          # Check for lines starting with an asterisk used as a list item
+          grep -rnE "^\\s*\\*" . --include="*.md" | grep -v "markdown-list-style-enforcer.yml" && { echo "Error: Use dashes (-) for lists instead of asterisks (*)"; exit 1; } || echo "List style is consistent"

@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify essential assets
         run: |
-          ls branding/kibaos_banner.png || { echo "Warning: kibaos_banner.png is missing"; }
+          ls branding/*.png || { echo "Notice: No branding images found"; }

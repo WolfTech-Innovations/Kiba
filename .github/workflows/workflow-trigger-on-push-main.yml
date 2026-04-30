@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Verify push main trigger
         run: |
-          grep -r "branches: \[main\]" .github/workflows/*.yml || echo "Notice: Some workflows might not trigger on main branch"
+          grep -r "branches: \[main\]" .github/workflows/*.yml | grep -v "workflow-trigger-on-push-main.yml" || echo "Notice: Some workflows might not trigger on main branch"

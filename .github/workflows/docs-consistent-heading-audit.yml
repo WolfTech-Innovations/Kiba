@@ -10,5 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check heading style
         run: |
-          # Enforce ATX headings (#) and forbid Setext headings (--- or === under text)
           grep -rE "^[=|-]+$" docs/*.md && { echo "Setext headings found, use ATX (#)"; exit 1; } || echo "Heading style looks good"

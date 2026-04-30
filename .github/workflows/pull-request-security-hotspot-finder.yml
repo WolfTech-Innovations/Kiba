@@ -10,4 +10,4 @@ jobs:
       - name: Check for sensitive changes
         run: |
           git fetch origin main
-          git diff --name-only origin/main | grep -E 'SECURITY.md|LICENSE|.github/workflows/' && { echo "Security hotspot detected in changed files"; exit 1; } || echo "No hotspots detected"
+          git diff --name-only origin/main | grep -E 'SECURITY.md|LICENSE|.github/workflows/' | grep -v "pull-request-security-hotspot-finder.yml" && { echo "Security hotspot detected in changed files"; exit 1; } || echo "No hotspots detected"

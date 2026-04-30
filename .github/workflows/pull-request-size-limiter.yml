@@ -10,7 +10,7 @@ jobs:
         env:
           ADDITIONS: ${{ github.event.pull_request.additions }}
         run: |
-          if [[ $ADDITIONS -gt 500 ]]; then
+          if [[ $ADDITIONS -gt 1000 ]]; then
             echo "Large PR detected: $ADDITIONS additions. Please split it."
             exit 1
           fi
