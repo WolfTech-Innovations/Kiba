@@ -1,0 +1,65 @@
+name: Jules Automatic Fixer Pipeline
+
+on:
+  workflow_run:
+    workflows: ["KibaOS Build", "Action Lint", "Branding Assets Validator", "Commit Lint", "ShellCheck", "Markdown Lint", "JSON Lint"]
+    types:
+      - completed
+  issues:
+    types:
+      - opened
+
+jobs:
+  jules-auto-fix:
+    # Only run on workflow failures or new issues
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||
+      (github.event_name == 'issues')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Check for Jules loop
+        id: loop-check
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
+            HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
+            if [[ "$HEAD_BRANCH" == jules/* ]]; then
+              echo "Detected failure on a Jules branch ($HEAD_BRANCH). Skipping to avoid infinite loop."
+              echo "skip=true" >> $GITHUB_OUTPUT
+            else
+              echo "skip=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run Jules Auto Fixer
+        if: steps.loop-check.outputs.skip != 'true'
+        env:
+          JAPI: ${{ secrets.JAPI }}
+          GH_TOKEN: ${{ github.token }}
+          FAILED_RUN_ID: ${{ github.event.workflow_run.id }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: python jules_auto_fixer.py
