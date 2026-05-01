@@ -1,0 +1,16 @@
+name: Docs Stale Content Alert
+on:
+  schedule:
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
+jobs:
+  stale-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for old documentation
+        run: |
+          echo "## Documentation Freshness Report" >> $GITHUB_STEP_SUMMARY
+          find docs -name "*.md" -mtime +180 | while read -r file; do
+            echo "- [ ] $file has not been updated in 6 months" >> $GITHUB_STEP_SUMMARY
+          done

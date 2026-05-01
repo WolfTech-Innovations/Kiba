@@ -1,0 +1,16 @@
+name: Workflow Concurrency Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit-concurrency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for concurrency key
+        run: |
+          grep -L "concurrency:" .github/workflows/*.yml && echo "Notice: Some workflows are missing concurrency control." || echo "Concurrency usage audited"

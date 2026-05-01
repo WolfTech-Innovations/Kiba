@@ -1,0 +1,19 @@
+name: PR Label Conflict Checker
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize]
+jobs:
+  check-conflicts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for conflicting labels
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            const conflicts = [['bug', 'feat'], ['enhancement', 'fix']];
+            for (const [l1, l2] of conflicts) {
+              if (labels.includes(l1) && labels.includes(l2)) {
+                core.setFailed(`Conflicting labels found: ${l1} and ${l2}`);
+              }
+            }

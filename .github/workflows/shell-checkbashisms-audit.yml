@@ -1,0 +1,19 @@
+name: Shell checkbashisms Audit
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run checkbashisms
+        run: |
+          # Use a pre-built docker image or install it.
+          # Since devscripts is large, we can use a smaller tool if available or just stick to it for now but optimize.
+          sudo apt-get update -qq && sudo apt-get install -y -qq devscripts > /dev/null
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r checkbashisms -n -p

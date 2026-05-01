@@ -1,0 +1,16 @@
+name: Workflow Deprecated Runners Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit-runners:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for ubuntu-18.04 or ubuntu-20.04
+        run: |
+          grep -rE "ubuntu-18.04|ubuntu-20.04" .github/workflows/*.yml && { echo "Warning: Use of deprecated or older runners detected."; } || echo "Modern runners in use"

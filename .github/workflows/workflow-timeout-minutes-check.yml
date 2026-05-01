@@ -1,0 +1,25 @@
+name: Workflow Timeout Minutes Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check-timeout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for missing timeout-minutes
+        run: |
+          for file in .github/workflows/*.yml; do
+            # Use yq to check if all jobs have timeout-minutes
+            # We check if any job lacks the timeout-minutes key
+            missing=$(yq '.jobs | to_entries | map(select(.value.steps != null and .value["timeout-minutes"] == null)) | length' "$file")
+            if [ "$missing" -gt 0 ]; then
+              echo "Error: $file contains jobs missing 'timeout-minutes'."
+              exit 1
+            fi
+          done
+          echo "All jobs have timeout-minutes defined"
