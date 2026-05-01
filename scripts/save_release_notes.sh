@@ -25,10 +25,10 @@ set -euo pipefail
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
 
-RELEASE_ID="$1"
+RELEASE_ID="${RELEASE_ID:-${1:-}}"
 
 if [ -z "$RELEASE_ID" ]; then
-  echo "Error: Release ID is required as the first argument."
+  echo "Error: RELEASE_ID environment variable or first argument is required."
   exit 1
 fi
 
@@ -39,13 +39,10 @@ fi
 # M: Month (1-C for 1-12)
 
 DD=$(date +%d)
-
 H_VAL=$(date +%-H)
 HOURS="0123456789ABCDEFGHIJKLMN"
 H=$(echo "$HOURS" | cut -c $((H_VAL + 1)))
-
 Y=$(date +%y | cut -c 2)
-
 M_VAL=$(date +%-m)
 MONTHS="123456789ABC"
 M=$(echo "$MONTHS" | cut -c "$M_VAL")
@@ -53,6 +50,7 @@ M=$(echo "$MONTHS" | cut -c "$M_VAL")
 FILENAME="Notes/NTE-${DD}${H}${Y}${M}.md"
 
 # 2. Ensure Notes directory and .gitkeep exist
+echo "Ensuring Notes/ directory exists..."
 mkdir -p Notes
 if [ ! -f Notes/.gitkeep ]; then
   touch Notes/.gitkeep
@@ -60,7 +58,8 @@ fi
 
 # 3. Fetch release body using GitHub CLI
 # Uses GH_TOKEN from environment
-gh release view "$RELEASE_ID" --template '{{.body}}' > "$FILENAME"
+echo "Fetching release notes for $RELEASE_ID..."
+gh release view -- "$RELEASE_ID" --template '{{.body}}' > "$FILENAME"
 
 # 4. Handle empty release notes
 if [ ! -s "$FILENAME" ]; then
@@ -68,9 +67,12 @@ if [ ! -s "$FILENAME" ]; then
 fi
 
 # 5. Git operations
+echo "Committing release notes: $FILENAME"
 git config user.name "github-actions[bot]"
 git config user.email "github-actions[bot]@users.noreply.github.com"
 git add "$FILENAME" Notes/.gitkeep
-git commit -m "docs: add release notes $FILENAME [skip ci]" || echo "No changes to commit"
+git commit -m "docs: add release notes $FILENAME [skip ci]
+
+Signed-off-by: github-actions[bot] <github-actions[bot]@users.noreply.github.com>" || echo "No changes to commit"
 git pull --rebase origin main
 git push origin main
