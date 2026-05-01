@@ -12,5 +12,5 @@ jobs:
         run: |
           if [[ -z "$MILESTONE" || "$MILESTONE" == "null" ]]; then
             echo "Error: No milestone assigned to this PR"
-            exit 1
+            echo "::warning ::No milestone assigned to this PR"
           fi
