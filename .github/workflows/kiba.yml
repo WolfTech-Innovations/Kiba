@@ -598,7 +598,7 @@ jobs:
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
             alias  apt='nala'
-            alias  apt-get='nala'
+            alias  apt='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
             alias update='sudo nala update && sudo nala upgrade -y'
@@ -1627,7 +1627,7 @@ jobs:
           # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
             alias   apt='nala'
-            alias   apt-get='nala'
+            alias   apt='nala'
           }
           NALABASH
             fi

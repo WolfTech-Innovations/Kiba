@@ -10,4 +10,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for common misspellings
         run: |
-          grep -rnEi "teh|recieve|occured" . --exclude=".github/workflows/doc-spelling-common-mistakes.yml" --exclude-dir=".git" && { echo "Error: Common misspellings found"; exit 1; } || echo "No common mistakes found"
+          PATTERN="teh""|recieve""|occured"""
+          grep -rnEi "$PATTERN" . --exclude=".github/workflows/doc-spelling-common-mistakes.yml" --exclude-dir=".git" && { echo "Error: Common misspellings found"; exit 1; } || echo "No common mistakes found"
