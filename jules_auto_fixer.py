@@ -2,7 +2,8 @@ import os
 import sys
 import json
 import subprocess
-import requests
+import urllib.request
+import urllib.error
 
 def get_failed_logs(run_id):
     try:
@@ -21,22 +22,24 @@ def get_failed_logs(run_id):
 
 def find_source(api_key, repo_full_name):
     url = "https://jules.googleapis.com/v1alpha/sources"
-    headers = {"x-goog-api-key": api_key}
+    req = urllib.request.Request(url)
+    req.add_header("x-goog-api-key", api_key)
 
     try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            sources = response.json().get("sources", [])
-            owner, repo_name = repo_full_name.split('/')
-            for src in sources:
-                github_repo = src.get("githubRepo", {})
-                if github_repo.get("owner") == owner and github_repo.get("repo") == repo_name:
-                    return src.get("name")
+        with urllib.request.urlopen(req) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode())
+                sources = data.get("sources", [])
+                owner, repo_name = repo_full_name.split("/")
+                for src in sources:
+                    github_repo = src.get("githubRepo", {})
+                    if github_repo.get("owner") == owner and github_repo.get("repo") == repo_name:
+                        return src.get("name")
     except Exception as e:
         print(f"Error finding source: {e}")
 
     # Fallback to heuristic
-    owner, repo_name = repo_full_name.split('/')
+    owner, repo_name = repo_full_name.split("/")
     return f"sources/github-{owner}-{repo_name}"
 
 def main():
@@ -83,34 +86,39 @@ def main():
     # Jules API endpoint
     url = "https://jules.googleapis.com/v1alpha/sessions"
 
-    headers = {
-        "x-goog-api-key": api_key,
-        "Content-Type": "application/json"
-    }
+    headers = {"x-goog-api-key": api_key, "Content-Type": "application/json"}
 
     payload = {
         "prompt": prompt,
         "title": title,
         "sourceContext": {
             "source": source_id,
-            "githubRepoContext": {
-                "startingBranch": "main"
-            }
+            "githubRepoContext": {"startingBranch": "main"},
         },
         "requirePlanApproval": False,
-        "automationMode": "AUTO_CREATE_PR"
+        "automationMode": "AUTO_CREATE_PR",
     }
 
     print(f"Creating Jules session: {title}")
-    response = requests.post(url, headers=headers, json=payload)
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
-    if response.status_code in [200, 201]:
-        data = response.json()
-        print(f"Successfully created Jules session: {data.get('name')}")
-        print(f"Session URL: {data.get('url')}")
-    else:
-        print(f"Error creating Jules session: {response.status_code}")
-        print(response.text)
+    try:
+        with urllib.request.urlopen(req) as response:
+            if response.status in [200, 201]:
+                res_data = json.loads(response.read().decode())
+                print(f"Successfully created Jules session: {res_data.get('name')}")
+                print(f"Session URL: {res_data.get('url')}")
+            else:
+                print(f"Error creating Jules session: {response.status}")
+                print(response.read().decode())
+                sys.exit(1)
+    except urllib.error.HTTPError as e:
+        print(f"Error creating Jules session: {e.code}")
+        print(e.read().decode())
+        sys.exit(1)
+    except Exception as e:
+        print(f"Unexpected error creating Jules session: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":
