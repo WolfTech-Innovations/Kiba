@@ -1,0 +1,19 @@
+name: Docs External Link HTTPS Enforcer
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  enforce-https:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Scan for http:// links
+        run: |
+          set -euo pipefail
+          grep -rn "http://" . --include="*.md" | grep -v "http://localhost" && { echo "Error: Use HTTPS for all external links."; exit 1; } || echo "All links use HTTPS."

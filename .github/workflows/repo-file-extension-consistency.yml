@@ -1,0 +1,15 @@
+name: Repo File Extension Consistency
+on:
+  push:
+jobs:
+  check-extensions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Audit extensions
+        run: |
+          set -euo pipefail
+          # Example: ensure all YAML files use .yml, not .yaml (except maybe certain files)
+          find . -name "*.yaml" -not -name "pnpm-lock.yaml" | grep . && { echo "Error: Use .yml extension instead of .yaml"; exit 1; } || echo "Extension consistency check passed."

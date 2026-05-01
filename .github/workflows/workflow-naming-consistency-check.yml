@@ -1,0 +1,25 @@
+name: Workflow Naming Consistency Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check-naming:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Validate naming
+        run: |
+          set -euo pipefail
+          for file in .github/workflows/*.yml; do
+            filename=$(basename "$file" .yml)
+            workflowname=$(yq '.name' "$file" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+            if [[ "$filename" != "$workflowname" ]]; then
+              echo "Warning: Filename $filename.yml does not strictly match workflow name '$workflowname'"
+            fi
+          done

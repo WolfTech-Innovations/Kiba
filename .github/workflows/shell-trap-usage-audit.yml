@@ -1,0 +1,27 @@
+name: Shell Trap Usage Audit
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  audit-trap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Scan for mktemp without trap
+        run: |
+          set -euo pipefail
+          FAILED=0
+          while read -r file; do
+            if grep -q "mktemp" "$file" && ! grep -q "trap" "$file"; then
+              echo "Error: $file uses mktemp but no trap for cleanup was found."
+              FAILED=1
+            fi
+          done < <(find . -name "*.sh" -not -path "./node_modules/*")
+          if [ "$FAILED" -ne 0 ]; then exit 1; fi
+          echo "Trap usage audit passed."

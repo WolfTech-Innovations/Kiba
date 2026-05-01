@@ -1,0 +1,20 @@
+name: Shell Function Definition Style
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  check-style:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Enforce function style
+        run: |
+          set -euo pipefail
+          # Prefer func_name() { ... } over function func_name { ... }
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -n "^function " && { echo "Error: Use 'func_name() {' instead of 'function func_name {'"; exit 1; } || echo "Function style is correct."

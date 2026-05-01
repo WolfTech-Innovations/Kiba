@@ -1,0 +1,20 @@
+name: Shell Glob Prevention Audit
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  audit-globs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Scan for unquoted variables
+        run: |
+          set -euo pipefail
+          # Heuristic for unquoted variables that might cause globbing issues
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -nE "[^\"']\$[a-zA-Z_][a-zA-Z0-9_]*" | grep -v "set -e" || echo "All good."
