@@ -8,10 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for conflict markers
         run: |
-          set -euo pipefail
-          # Check for conflict markers, excluding this workflow and .git directory
-          grep -rE "<<<<<<<|=======|>>>>>>>" . --exclude-dir=.git --exclude-dir=node_modules --exclude="repo-git-conflict-marker-check.yml" && { echo "Error: Unresolved Git conflict markers found."; exit 1; } || echo "No conflict markers found"
+          grep -rE "<<<<<<<|=======|>>>>>>>" . --exclude-dir=.git --exclude-dir=node_modules --exclude=repo-git-conflict-marker-check.yml && { echo "Error: Unresolved Git conflict markers found."; exit 1; } || echo "No conflict markers found"

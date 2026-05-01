@@ -11,15 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Install checkbashisms
-        run: |
-          set -euo pipefail
-          sudo apt update -qq && sudo apt install -y -qq devscripts > /dev/null
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Run checkbashisms
         run: |
-          set -euo pipefail
-          # Find all shell scripts and run checkbashisms
-          # SC2038: use -print0 and xargs -0 for safety
-          find . -name "*.sh" -not -path "./node_modules/*" -print0 | xargs -0 checkbashisms -f || { echo "Error: Bashisms detected in scripts intended for /bin/sh"; exit 1; }
+          sudo apt-get update -qq && sudo apt-get install -y -qq devscripts > /dev/null
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r checkbashisms -n -p

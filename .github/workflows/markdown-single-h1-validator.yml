@@ -10,8 +10,10 @@ jobs:
   validate-h1:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check for single H1 per file
         run: |
           find . -name "*.md" -not -path "./node_modules/*" | while read -r file; do

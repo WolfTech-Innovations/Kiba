@@ -6,6 +6,7 @@ jobs:
   check-sections:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Verify mandatory sections
         env:

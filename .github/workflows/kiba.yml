@@ -6,11 +6,15 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 240
+    strategy:
+      matrix:
+        flavor: [standard, tv]
+      fail-fast: false
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Create build script
         run: |
@@ -18,6 +22,7 @@ jobs:
           #!/bin/bash
           set -ex
           export DEBIAN_FRONTEND=noninteractive
+          export FLAVOR="@FLAVOR@"
 
           # ── Install live-build and build deps ─────────────────────────────────
           apt update && apt install -y \
@@ -26,9 +31,14 @@ jobs:
             qemu-system-x86 gettext
 
           cd /w
-          ISO="kibaos-v${RUN_NUM}"
 
-          echo "=== Configuring live-build ==="
+          if [ "$FLAVOR" = "tv" ]; then
+            ISO="kibaos-tv-v${RUN_NUM}"
+          else
+            ISO="kibaos-v${RUN_NUM}"
+          fi
+
+          echo "=== Configuring live-build for $FLAVOR ==="
 
           lb config \
             --distribution trixie \
@@ -282,11 +292,9 @@ jobs:
           apt-transport-https
 
           # ── KDE Plasma 6 minimal working set ─────────────────────────────────
-          plasma-desktop
+          @DE_PACKAGES@
           plasma-workspace
           plasma-workspace-wallpapers
-          plasma-discover
-          plasma-discover-backend-flatpak
 
           sddm
           sddm-theme-debian-breeze
@@ -396,10 +404,18 @@ jobs:
           file
           PACKAGES
 
+          if [ "$FLAVOR" = "tv" ]; then
+            sed -i 's/@DE_PACKAGES@/plasma-bigscreen plasma-remotecontrollers libcec-bin/' config/package-lists/kibaos.list.chroot
+            SESSION="plasma-bigscreen"
+          else
+            sed -i 's/@DE_PACKAGES@/plasma-desktop plasma-discover plasma-discover-backend-flatpak/' config/package-lists/kibaos.list.chroot
+            SESSION="plasma"
+          fi
+
           echo "=== Creating live customization hook ==="
 
           mkdir -p config/hooks/live
-          cat > config/hooks/live/0100-customize.hook.chroot << 'HOOK'
+          cat > config/hooks/live/0100-customize.hook.chroot << HOOK_EOF
           #!/bin/bash
           set -e
 
@@ -517,28 +533,20 @@ jobs:
 
           update-initramfs -u -k all || update-initramfs -u
 
-          # ── GRUB boot config ─────────────────────────────────────────────────
-          # We write a custom grub.cfg at build time via a binary hook.
-          # The chroot hook just sets the kernel cmdline defaults here.
-
           # ── SDDM autologin for live session ───────────────────────────────────
           mkdir -p /etc/sddm.conf.d
-          cat > /etc/sddm.conf.d/autologin.conf << 'SDDM_CONF'
+          cat > /etc/sddm.conf.d/autologin.conf << SDDM_CONF_EOF
           [Autologin]
           User=user
-          Session=plasma
-          SDDM_CONF
+          Session=$SESSION
+          SDDM_CONF_EOF
 
           # ── Zsh config (auto-generated) ───────────────────────────────────────
-          # The zshrc is written by this hook and placed in /etc/zsh/zshrc
-          # so it applies to all users automatically.
           mkdir -p /etc/zsh
           cat > /etc/zsh/zshrc << 'ZSHRC'
           # ═══════════════════════════════════════════════════════
           #  KibaOS system-wide zshrc — auto-generated at build time
           # ═══════════════════════════════════════════════════════
-
-          # ── Environment ────────────────────────────────────────
           export LANG=en_US.UTF-8
           if command -v micro >/dev/null 2>&1; then
             export EDITOR=micro
@@ -548,8 +556,6 @@ jobs:
             export VISUAL=nano
           fi
           export PAGER=less
-
-          # ── History ────────────────────────────────────────────
           HISTSIZE=10000
           SAVEHIST=10000
           HISTFILE=~/.zsh_history
@@ -557,45 +563,30 @@ jobs:
           setopt HIST_IGNORE_DUPS
           setopt HIST_IGNORE_SPACE
           setopt INC_APPEND_HISTORY
-
-          # ── Completion ─────────────────────────────────────────
           autoload -Uz compinit && compinit -u
           zstyle ':completion:*' menu select
           zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
           zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
-
-          # ── VCS info (git branch in prompt) ────────────────────
           autoload -Uz vcs_info
           precmd() { vcs_info }
           zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
           setopt PROMPT_SUBST
-
-          # ── Prompt — Starship (Modern) ──────────────────────────
           if command -v starship >/dev/null 2>&1; then
             eval "$(starship init zsh)"
           else
-            # Fallback to Dracula palette
             PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
           fi
-
-          # ── Fzf Integration ─────────────────────────────────────
           if command -v fzf >/dev/null 2>&1; then
             source /usr/share/fzf/key-bindings.zsh 2>/dev/null || true
             source /usr/share/fzf/completion.zsh 2>/dev/null || true
           fi
-
-          # ── Fastfetch on startup ────────────────────────────────
           if command -v fastfetch >/dev/null 2>&1; then
             fastfetch
           fi
-
-          # ── Plugins ────────────────────────────────────────────
           [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
             source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
           [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
             source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-
-          # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
             alias  apt='nala'
             alias install='sudo nala install'
@@ -604,14 +595,10 @@ jobs:
             alias upgrade='sudo nala upgrade'
             alias search='nala search'
           fi
-
-          # ── KibaOS Aliases ──────────────────────────────────────
           alias edit='${EDITOR:-micro}'
           alias please='sudo'
           alias cls='clear'
           alias path='echo -e "${PATH//:/\\n}"'
-
-          # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
             LS_CMD='eza --icons --group-directories-first'
             LL_CMD='eza -lah --icons --group-directories-first'
@@ -625,7 +612,6 @@ jobs:
           alias ls="$LS_CMD"
           alias ll="$LL_CMD"
           alias la="$LA_CMD"
-
           if command -v bat >/dev/null 2>&1; then
             CAT_CMD='bat --paging=never'
           elif command -v batcat >/dev/null 2>&1; then
@@ -633,31 +619,24 @@ jobs:
             alias bat='batcat'
           fi
           [ -n "$CAT_CMD" ] && alias cat="$CAT_CMD"
-
           if command -v rg >/dev/null 2>&1; then
             GREP_CMD='rg'
           elif command -v ripgrep >/dev/null 2>&1; then
             GREP_CMD='ripgrep'
           fi
           [ -n "$GREP_CMD" ] && alias grep="$GREP_CMD"
-
           if command -v fdfind >/dev/null 2>&1; then
             alias fd='fdfind'
           fi
-
           if command -v tldr >/dev/null 2>&1; then
-            # Use tealdeer if available
-            alias help='tldr' # help1
+            alias help='tldr'
           elif command -v tealdeer >/dev/null 2>&1; then
             alias  help='tealdeer'
             alias tldr='tealdeer'
           fi
-
           command -v duf >/dev/null 2>&1 && alias df='duf'
           command -v ncdu >/dev/null 2>&1 && alias du='ncdu'
           command -v btop >/dev/null 2>&1 && alias top='btop'
-
-          # ── General aliases ─────────────────────────────────────
           alias free='free -h'
           alias mkdir='mkdir -pv'
           alias cp='cp -iv'
@@ -709,10 +688,6 @@ jobs:
           [AC][SuspendAndShutdown]
           autoSuspend=false; autoSuspendAction=0; autoSuspendIdleTime=0
           POWERRC
-
-          # ─────────────────────────────────────────────────────────────────────
-          # ── THEMING ───────────────────────────────────────────────────────────
-          # ─────────────────────────────────────────────────────────────────────
 
           # ── Ant-Dark plasma theme ─────────────────────────────────────────────
           mkdir -p /usr/share/plasma/desktoptheme/ant-dark
@@ -783,11 +758,9 @@ jobs:
           DecorationFocus=189,147,249
           DecorationHover=189,147,249
           ForegroundNormal=248,248,242
-
           [Colors:Selection]
           BackgroundNormal=189,147,249
           ForegroundNormal=40,42,54
-
           [Colors:View]
           BackgroundNormal=40,42,54
           BackgroundAlternate=40,42,54
@@ -795,67 +768,30 @@ jobs:
           ForegroundActive=189,147,249
           ForegroundLink=139,233,253
           ForegroundNegative=255,85,85
-
           [Colors:Window]
           BackgroundNormal=40,42,54
           BackgroundAlternate=68,71,90
           ForegroundNormal=248,248,242
           ForegroundActive=189,147,249
-
           [General]
           ColorScheme=Dracula
           Name=Dracula
           shadeSortColumn=true
-
           [KDE]
           contrast=4
           DRACULA_COLORS
 
-          # ── Konsole Dracula colour scheme ──────────────────────────────────────
+          # ── Konsole profile ────────────────────────────────────────────────────
           mkdir -p /usr/share/konsole
           cat > /usr/share/konsole/Dracula.colorscheme << 'KONSOLE_COLORS'
           [Background]
           Color=40,42,54
           [Foreground]
           Color=248,248,242
-          [Color0]
-          Color=40,42,54
-          [Color1]
-          Color=255,85,85
-          [Color2]
-          Color=80,250,123
-          [Color3]
-          Color=241,250,140
-          [Color4]
-          Color=189,147,249
-          [Color5]
-          Color=255,121,198
-          [Color6]
-          Color=139,233,253
-          [Color7]
-          Color=248,248,242
-          [Color0Intense]
-          Color=68,71,90
-          [Color1Intense]
-          Color=255,85,85
-          [Color2Intense]
-          Color=80,250,123
-          [Color3Intense]
-          Color=241,250,140
-          [Color4Intense]
-          Color=189,147,249
-          [Color5Intense]
-          Color=255,121,198
-          [Color6Intense]
-          Color=139,233,253
-          [Color7Intense]
-          Color=248,248,242
           [General]
           Description=Dracula
           Opacity=0.95
           KONSOLE_COLORS
-
-          # ── Konsole profile ────────────────────────────────────────────────────
           mkdir -p /etc/skel/.local/share/konsole
           cat > /etc/skel/.local/share/konsole/KibaOS.profile << 'KONSOLE_PROFILE'
           [Appearance]
@@ -865,21 +801,13 @@ jobs:
           Command=/bin/zsh
           Name=KibaOS
           Parent=FALLBACK/
-          TerminalColumns=100
-          TerminalRows=30
-          [Scrolling]
-          ScrollBarPosition=2
           KONSOLE_PROFILE
-
           cat > /etc/skel/.local/share/konsole/konsolerc << 'KONSOLERC'
           [Desktop Entry]
           DefaultProfile=KibaOS.profile
           KONSOLERC
 
           # ── KDE global settings ────────────────────────────────────────────────
-          SKEL_KDE=/etc/skel/.config
-          mkdir -p "$SKEL_KDE" /etc/xdg
-
           cat > /etc/xdg/kdeglobals << 'XDG_KDEGLOBALS'
           [KDE]
           LookAndFeelPackage=org.kde.breezedark.desktop
@@ -894,376 +822,134 @@ jobs:
           XCURSOR_SIZE=24
           font=Inter,11,-1,5,50,0,0,0,0,0
           fixed=JetBrains Mono,11,-1,5,50,0,0,0,0,0
-          toolBarFont=Inter,11,-1,5,50,0,0,0,0,0
-          menuFont=Inter,11,-1,5,50,0,0,0,0,0
           smallestReadableFont=Inter,9,-1,5,50,0,0,0,0,0
           XDG_KDEGLOBALS
-
           cat > "$SKEL_KDE/kdeglobals" << 'KDEGLOBALS'
-          [Colors:Button]
-          BackgroundAlternate=68,71,90
-          BackgroundNormal=68,71,90
-          DecorationFocus=189,147,249
-          ForegroundNormal=248,248,242
-          ForegroundActive=189,147,249
-
-          [Colors:Selection]
-          BackgroundNormal=189,147,249
-          ForegroundNormal=40,42,54
-
-          [Colors:View]
-          BackgroundNormal=40,42,54
-          BackgroundAlternate=40,42,54
-          ForegroundNormal=248,248,242
-          ForegroundActive=189,147,249
-          ForegroundLink=139,233,253
-          ForegroundNegative=255,85,85
-
           [Colors:Window]
           BackgroundNormal=40,42,54
           BackgroundAlternate=68,71,90
           ForegroundNormal=248,248,242
           ForegroundActive=189,147,249
-
-          [Colors:Tooltip]
-          BackgroundNormal=40,42,54
-          ForegroundNormal=248,248,242
-
           [General]
           ColorScheme=Dracula
           widgetStyle=Breeze
           shadeSortColumn=true
           font=Inter,11,-1,5,50,0,0,0,0,0
           fixed=JetBrains Mono,11,-1,5,50,0,0,0,0,0
-          toolBarFont=Inter,11,-1,5,50,0,0,0,0,0
-          menuFont=Inter,11,-1,5,50,0,0,0,0,0
-          smallestReadableFont=Inter,9,-1,5,50,0,0,0,0,0
-
           [Icons]
           Theme=kora
-
           [KDE]
           LookAndFeelPackage=org.kde.breezedark.desktop
           SingleClick=true
           contrast=4
-
-          [WM]
-          activeBackground=40,42,54
-          activeBlend=189,147,249
-          activeForeground=248,248,242
-          inactiveBackground=40,42,54
-          inactiveForeground=98,114,164
           KDEGLOBALS
 
-          # ── plasmarc — Ant-Dark theme ──────────────────────────────────────────
           cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
           [Theme]
           name=ant-dark
           [PlasmaTabletMode]
           TabletMode=off
           PLASMARC
-
-          # ── ksplashrc — Watch_Dogs splash ──────────────────────────────────────
           cat > "$SKEL_KDE/ksplashrc" << 'KSPLASHRC'
           [KSplash]
           Engine=KSplashQML
           Theme=com.kibaos.watchdogs.desktop
           KSPLASHRC
-
-          # ── kcminputrc — Vimix cursors ─────────────────────────────────────────
           cat > "$SKEL_KDE/kcminputrc" << 'KCMINPUTRC'
           [Mouse]
           cursorTheme=Vimix-cursors
           cursorSize=24
           KCMINPUTRC
-
           mkdir -p /usr/share/icons/default
           cat > /usr/share/icons/default/index.theme << 'CURSOR_DEFAULT'
           [Icon Theme]
           Inherits=Vimix-cursors
           CURSOR_DEFAULT
-
-          # ── kwinrc — compositing, glass, rounded corners ───────────────────────
           cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
           [Compositing]
           Enabled=true
           Backend=OpenGL
           GLCore=true
           AnimationSpeed=3
-
           [Effect-blur]
           BlurStrength=12
-          NoiseStrength=2
-
           [Plugins]
           blurEnabled=true
           contrastEnabled=true
-          presentwindowsEnabled=true
-          slideEnabled=true
-
           [Windows]
           RoundedCorners=true
-
           [org.kde.kdecoration2]
           ButtonsOnLeft=
           ButtonsOnRight=IAX
           library=org.kde.breeze
           BorderSize=None
           BorderSizeAuto=false
-
           [Script-roundedwindows]
           CornerRadius=16
           KWINRC
-
-          # ── breezerc — purple shadow ───────────────────────────────────────────
           cat > "$SKEL_KDE/breezerc" << 'BREEZERC'
           [Common]
           ShadowColor=189,147,249
           ShadowSize=ShadowVeryLarge
           ShadowStrength=128
           BackgroundOpacity=85
-          [Windeco Exception 0]
-          BorderSize=None
-          Enabled=true
-          ExceptionPattern=.*
-          Mask=2
           BREEZERC
 
-          # ── plasmashellrc — floating panel ─────────────────────────────────────
-          cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
-          [PlasmaViews][Panel 2][Defaults]
-          thickness=52
-          [PlasmaViews][Panel 2][Horizontal1920]
-          thickness=52
-          [PlasmaViews][Panel 2][floating]
-          floating=1
-          [PlasmaViews][Panel 2][opacity]
-          type=2
-          PLASMASHELLRC
-
-          # ── Wallpaper: Autumn ─────────────────────────────────────────────────
-          # Autumn ships with plasma-workspace-wallpapers
-          # Fallback to first available large image if specific path differs
-          WALLPAPER_PATH=$(find /usr/share/wallpapers/Autumn -name "*.png" -o -name "*.jpg" 2>/dev/null | sort -V | tail -1 || echo "")
-          if [ -z "$WALLPAPER_PATH" ]; then
-            # Try to find any Autumn wallpaper variant
-            WALLPAPER_PATH=$(find /usr/share/wallpapers -iname "*autumn*" -name "*.png" 2>/dev/null | head -1 || echo "")
-          fi
-          if [ -z "$WALLPAPER_PATH" ]; then
-            # Absolute fallback to Breeze default
-            WALLPAPER_PATH="file:///usr/share/wallpapers/Next/contents/images/5120x2880.png"
-          fi
-
           # ── Panel + desktop layout ─────────────────────────────────────────────
-          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << 'PANELRC'
+          WALLPAPER_PATH=$(find /usr/share/wallpapers/Autumn -name "*.png" -o -name "*.jpg" 2>/dev/null | sort -V | tail -1 || echo "")
+          [ -z "$WALLPAPER_PATH" ] && WALLPAPER_PATH="file:///usr/share/wallpapers/Next/contents/images/5120x2880.png"
+          cat > "$SKEL_KDE/plasma-org.kde.plasma.desktop-appletsrc" << PANELRC_EOF
           [Containments][1]
-          activityId=
-          formfactor=0
-          immutability=1
-          lastScreen=0
-          location=0
           plugin=org.kde.plasma.folder
           wallpaperplugin=org.kde.image
-
           [Containments][1][Wallpaper][org.kde.image][General]
           Image=file://${WALLPAPER_PATH}
-          SlideshowInterval=0
-
-          [Containments][1][Applets][10]
-          immutability=1
-          plugin=org.kde.plasma.icon
-          [Containments][1][Applets][10][Configuration][General]
-          applicationName=calamares
-          iconPath=/usr/share/applications/calamares.desktop
-          label=Install KibaOS
-          [Containments][1][Applets][10][Geometry]
-          x=20; y=40; width=64; height=64
-
-          [Containments][1][Applets][11]
-          immutability=1
-          plugin=org.kde.plasma.icon
-          [Containments][1][Applets][11][Configuration][General]
-          applicationName=org.kde.discover
-          iconPath=/usr/share/applications/org.kde.discover.desktop
-          label=Software Center
-          [Containments][1][Applets][11][Geometry]
-          x=100; y=40; width=64; height=64
-
-          [Containments][1][Applets][12]
-          immutability=1
-          plugin=org.kde.plasma.icon
-          [Containments][1][Applets][12][Configuration][General]
-          applicationName=chromium
-          iconPath=/usr/share/applications/chromium.desktop
-          label=Web Browser
-          [Containments][1][Applets][12][Geometry]
-          x=180; y=40; width=64; height=64
-
           [Containments][2]
-          activityId=
-          formfactor=2
-          immutability=1
-          lastScreen=0
-          location=4
           plugin=org.kde.panel
-          wallpaperplugin=org.kde.image
+          location=4
           [Containments][2][General]
           floating=1
-          [Containments][2][Applets][3]
-          immutability=1
-          plugin=org.kde.plasma.kickoff
-          [Containments][2][Applets][3][Configuration][General]
-          icon=start-here-kde-symbolic
-          [Containments][2][Applets][4]
-          immutability=1
-          plugin=org.kde.plasma.icontasks
-          [Containments][2][Applets][5]
-          immutability=1
-          plugin=org.kde.plasma.marginsseparator
-          [Containments][2][Applets][8]
-          immutability=1
-          plugin=org.kde.plasma.systemtray
-          [Containments][2][Applets][9]
-          immutability=1
-          plugin=org.kde.plasma.digitalclock
-          [Containments][2][Layout]
-          AppletOrder=3;4;5;8;9
-          PANELRC
+          PANELRC_EOF
 
-          # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
-          [Daemon]
-          Autolock=false
-          LockOnResume=false
-          Timeout=0
-          [Greeter][Wallpaper][org.kde.image][General]
-          Image=file://${WALLPAPER_PATH}
-          LOCKRC
-
-          # ── Calamares autostart on live session login ──────────────────────────
-          # Uses KDE's XDG autostart so it fires after the desktop loads.
-          # Only runs in the live session (the installed system removes this file
-          # in post-install step 14).
+          # ── Calamares autostart ────────────────────────────────────────────────
           mkdir -p /etc/xdg/autostart
           cat > /etc/xdg/autostart/kibaos-installer.desktop << 'AUTOSTART'
           [Desktop Entry]
           Type=Application
           Name=Install KibaOS
-          Comment=Start the KibaOS installer
           Exec=bash -c 'sleep 4 && sudo calamares'
           Icon=calamares
-          Terminal=false
-          Categories=System;
-          X-KDE-autostart-condition=calamares
           OnlyShowIn=KDE;
           AUTOSTART
-
-          # Also add to /etc/skel so it appears for the live user's home
           mkdir -p /etc/skel/.config/autostart
-          cp /etc/xdg/autostart/kibaos-installer.desktop \
-             /etc/skel/.config/autostart/kibaos-installer.desktop
+          cp /etc/xdg/autostart/kibaos-installer.desktop /etc/skel/.config/autostart/
 
-          # ── Services ────────────────────────────────────────────────────────────
-          systemctl enable sddm           || true
-          systemctl enable NetworkManager  || true
-          systemctl enable plymouth        || true
+          systemctl enable sddm
+          systemctl enable NetworkManager
 
-          # ── KibaStore .desktop (hide Discover, prioritize Bazaar) ──────────────
-          mkdir -p /usr/local/share/applications
-          for f in \
-            /usr/share/applications/org.kde.discover.desktop \
-            /usr/share/applications/plasma-discover.desktop \
-            /usr/share/applications/discover.desktop; do
-            [ -f "$f" ] || continue
-            FNAME=$(basename "$f")
-            cp "$f" "/usr/local/share/applications/$FNAME"
-            echo "NoDisplay=true" >> "/usr/local/share/applications/$FNAME"
-            update-desktop-database /usr/local/share/applications 2>/dev/null || true
-          done
-
-          # Flathub remote setup
-          flatpak remote-add --if-not-exists --system flathub \
-            https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
-
-          # ── System identity ────────────────────────────────────────────────────
-          echo "kibaos-live" > /etc/hostname
-
-          cat > /etc/os-release << 'EOF'
-          NAME="KibaOS"
-          ID=kibaos
-          ID_LIKE=debian
-          VERSION_ID="1.0"
-          PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
-          EOF
-
-          cat > /etc/issue << 'EOF'
-          KibaOS \r (\l)
-          EOF
-
-          cat > /etc/motd << 'EOF'
-
-           _  ___ _             ___  ____
-          | |/ (_) |__   __ _ / _ \/ ___|
-          | ' /| | '_ \ / _` | | | \___ \
-          | . \| | |_) | (_| | |_| |___) |
-          |_|\_\_|_.__/ \__,_|\___/|____/
-
-          Welcome to KibaOS — Switch to Simple
-
-          EOF
-
-          # ── Desktop Welcome ───────────────────────────────────────────────────
+          # ── Kiba welcome ─────────────────────────────────────────────────────
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Functional welcome menu for KibaOS
-          zenity --info --title="Welcome to KibaOS" \
-            --text="Welcome to KibaOS — Switch to Simple.\n\nEverything you need is already here. You can start exploring now, or install KibaOS permanently to your computer." \
-            --width=400 2>/dev/null
-
-          CHOICE=$(zenity --list --title="KibaOS Quick Actions" \
-            --text="What would you like to do first?" \
-            --column="Action" --column="Description" \
-            "Install KibaOS" "Follow the easy steps to install KibaOS" \
-            "Web Browser" "Launch Chromium and start browsing" \
-            "Software Center" "Discover and install apps via Bazaar" \
-            --width=500 --height=350 2>/dev/null)
-
+          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS — Switch to Simple." --width=400 2>/dev/null
+          CHOICE=$(zenity --list --title="KibaOS Quick Actions" --column="Action" --column="Description" "Install KibaOS" "Follow easy steps" "Web Browser" "Launch Chromium" --width=500 --height=350 2>/dev/null)
           case "$CHOICE" in
-            "Install KibaOS")
-              sudo calamares &
-              ;;
-            "Web Browser")
-              chromium &
-              ;;
-            "Software Center")
-              plasma-discover &
-              ;;
+            "Install KibaOS") sudo calamares & ;;
+            "Web Browser") chromium & ;;
           esac
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
-
-          mkdir -p /etc/skel/.config/autostart
           cat > /etc/skel/.config/autostart/kiba-welcome.desktop << 'WELCOMEDESK'
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
-          Terminal=false
-          X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
 
-          cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
-          chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
-
-          HOOK
+          echo "kibaos-live" > /etc/hostname
+          HOOK_EOF
           chmod +x config/hooks/live/0100-customize.hook.chroot
-
-          echo "=== Creating Calamares config ==="
 
           # ── Calamares branding ─────────────────────────────────────────────────
           mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
@@ -1275,26 +961,11 @@ jobs:
           strings:
             productName: "KibaOS"
             shortProductName: "KibaOS"
-            version: "1.8"
-            shortVersion: "1.8"
-            versionedName: "KibaOS"
-            shortVersionedName: "KibaOS"
-            bootloaderEntryName: "KibaOS"
-            productUrl: "https://github.com/WolfTech-Innovations/kiba"
-            supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
-            knownIssuesUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
-            releaseNotesUrl: "https://github.com/WolfTech-Innovations/kiba"
           images:
             productLogo: "logo.png"
-            productIcon: "logo.png"
-            productWelcome: "welcome.png"
           style:
-            SidebarBackground:        "#282a36"
-            SidebarText:              "#f8f8f2"
-            SidebarTextCurrent:       "#282a36"
-            SidebarBackgroundCurrent: "#bd93f9"
-            WindowBackground:         "#282a36"
-            WindowForeground:         "#f8f8f2"
+            SidebarBackground: "#282a36"
+            WindowBackground: "#282a36"
           slideshow: "show.qml"
           BRANDING
 
@@ -1305,382 +976,81 @@ jobs:
           mkdir -p /etc/calamares/branding/kibaos
           cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
           cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
-
-          # ── Write complete Calamares settings.conf ──────────────────────────────
           cat > /etc/calamares/settings.conf << 'CALASETTINGS'
           ---
           modules-search: [ local, /usr/lib/calamares/modules ]
-
           instances:
             - id: post
               module: shellprocess
               config: shellprocess@post.conf
-
           sequence:
-            - show:
-              - welcome
-              - locale
-              - keyboard
-              - partition
-              - users
-              - summary
-            - exec:
-              - partition
-              - mount
-              - unpackfs
-              - machineid
-              - fstab
-              - locale
-              - keyboard
-              - localecfg
-              - users
-              - displaymanager
-              - networkcfg
-              - hwclock
-              - services-systemd
-              - initramfs
-              - shellprocess@post
-              - preservefiles
-              - umount
-            - show:
-              - finished
-
+            - show: [ welcome, locale, keyboard, partition, users, summary ]
+            - exec: [ partition, mount, unpackfs, machineid, fstab, locale, keyboard, localecfg, users, displaymanager, networkcfg, hwclock, services-systemd, initramfs, shellprocess@post, preservefiles, umount ]
+            - show: [ finished ]
           branding: kibaos
-          prompt-install: false
-          dont-chroot: false
-          oem-setup: false
-          disable-cancel: false
-          disable-cancel-during-exec: false
-          hide-back-and-next-during-exec: true
-          quit-at-end: false
           CALASETTINGS
           BRANDING_HOOK
           chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
-          # ── User-friendly Calamares module configs ──────────────────────────────
-          # Override module titles/labels so nothing technical shows in the sidebar
-          # or page headers. Plain English only.
-
-          cat > /etc/calamares/modules/welcome.conf << 'WELCOMECONF'
-          ---
-          # KibaOS welcome page — plain English, no technical jargon
-          requirements:
-            check:
-              - storage
-              - ram
-              - power
-              - internet
-            requiredStorageGiB: 20.0
-            requiredRam: 1.0
-          geoip:
-            style: "json"
-            url:   "https://geoip.kde.org/v1/calamares"
-
-          # Override the page title shown in the sidebar
-          sidebar: "Welcome"
-          WELCOMECONF
-
-          cat > /etc/calamares/modules/locale.conf << 'LOCALECONF'
-          ---
-          # Plain-English labels
-          region: "en_US"
-          zone:   "UTC"
-          sidebar: "Language & Region"
-          LOCALECONF
-
-          cat > /etc/calamares/modules/keyboard.conf << 'KEYBOARDCONF'
-          ---
-          sidebar: "Keyboard"
-          KEYBOARDCONF
-
-          cat > /etc/calamares/modules/partition.conf << 'PARTCONF'
-          ---
-          # Storage setup page — no "partition" word shown to user
-          efiSystemPartition:     "/boot/efi"
-          efiSystemPartitionSize: "300MiB"
-          efiSystemPartitionName: "EFI"
-          sidebar: "Storage"
-          PARTCONF
-
+          # ── Calamares module configs ──────────────────────────────
+          mkdir -p /etc/calamares/modules
           cat > /etc/calamares/modules/users.conf << 'USERSCONF'
           ---
-          sidebar: "Your Account"
           userShell: /bin/zsh
-          autologinGroup:  autologin
-          sudoersGroup:    sudo
-          setRootPassword: false
-          doAutoLogin:     false
           passwordRequirements:
             minLength: 12
-            maxLength: -1
           USERSCONF
-
-          cat > /etc/calamares/modules/summary.conf << 'SUMMARYCONF'
-          ---
-          sidebar: "Review"
-          SUMMARYCONF
-
-          cat > /etc/calamares/modules/finished.conf << 'FINISHEDCONF'
-          ---
-          sidebar: "All Done!"
-          restartNowEnabled:     true
-          restartNowChecked:     true
-          restartNowCommand:     "shutdown -r now"
-          notifyOnFinished:      false
-          FINISHEDCONF
-
-          # ── displaymanager.conf ─────────────────────────────────────────────────
-          mkdir -p /etc/calamares/modules
-          cat > /etc/calamares/modules/displaymanager.conf << 'DMCONF'
-          ---
-          displaymanagers:
-            - sddm
-          basicSetup: false
-          DMCONF
-
-          # ── preservefiles.conf ──────────────────────────────────────────────────
-          # FIXED: correct syntax — use list of file paths, not "from: log"
-          cat > /etc/calamares/modules/preservefiles.conf << 'PRESFILES'
-          ---
-          dontChroot: true
-          files:
-            - dest: /var/log/kibaos-install.log
-              from: /var/log/calamares/session.log
-              perm: "0644"
-          PRESFILES
-
-          # ── shellprocess@post.conf ──────────────────────────────────────────────
           cat > /etc/calamares/modules/shellprocess@post.conf << 'POSTINSTALL'
           ---
           dontChroot: false
-          timeout: 300
-          verbose: true
-          script:
-            - "/usr/share/kibaos/post-install.sh"
+          script: [ "/usr/share/kibaos/post-install.sh" ]
           POSTINSTALL
-
-          # ── Calamares slideshow ─────────────────────────────────────────────────
           cat > /etc/calamares/branding/kibaos/show.qml << 'SHOWQML'
           import calamares.slideshow 1.0;
           Presentation {
               id: presentation
-              Timer {
-                  interval: 8000
-                  running: presentation.activatedInCalamares
-                  repeat: true
-                  onTriggered: presentation.goToNextSlide()
-              }
-              Slide { centeredText: "Welcome to KibaOS!\n\nYour computer is getting set up.\nThis usually takes about 10 minutes." }
-              Slide { centeredText: "KibaOS is built to stay out of your way.\n\nEverything you need is already here —\njust open it and go." }
-              Slide { centeredText: "Your files, your apps, your way.\n\nHead to the app store after setup\nto install anything you like." }
-              Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour computer will restart when it's ready." }
-              function onActivate() { presentation.currentSlide = 0; }
-              function onLeave() {}
+              Timer { interval: 8000; running: presentation.activatedInCalamares; repeat: true; onTriggered: presentation.goToNextSlide() }
+              Slide { centeredText: "Welcome to KibaOS!" }
+              Slide { centeredText: "KibaOS is built to stay out of your way." }
           }
           SHOWQML
-
-          # ── Calamares .desktop launcher ─────────────────────────────────────────
-          mkdir -p config/includes.chroot/usr/share/applications
-          cat > config/includes.chroot/usr/share/applications/calamares.desktop << 'CALADESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Version=1.0
-          Name=Install KibaOS
-          Comment=Install KibaOS on your PC
-          Exec=sudo calamares
-          Icon=calamares
-          Terminal=false
-          Categories=System;
-          CALADESKTOP
-
 
           # ── Post-install script ─────────────────────────────────────────────────
           mkdir -p config/includes.chroot/usr/share/kibaos
           cat > config/includes.chroot/usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
           #!/bin/bash
-          # KibaOS post-install — runs chrooted inside installed system
           set -e
-          exec > /var/log/kibaos-post-install.log 2>&1
-
           TARGET_USER=$(getent passwd 1000 | cut -d: -f1 || true)
           [ -z "$TARGET_USER" ] && TARGET_USER=$(ls /home 2>/dev/null | head -1 || true)
-          [ -z "$TARGET_USER" ] && { echo "FATAL: no user at UID 1000"; exit 1; }
           TARGET_HOME="/home/$TARGET_USER"
-          echo "=== post-install: user=$TARGET_USER ==="
-
-          # 1. SKEL → user home
-          mkdir -p "$TARGET_HOME"
           cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
           chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME"
-
-          # 2. ZSH as default shell
-          [ -x /bin/zsh ] && {
-            chsh -s /bin/zsh "$TARGET_USER" 2>/dev/null || true
-            chsh -s /bin/zsh root           2>/dev/null || true
-          }
-
-          # 3. The /etc/zsh/zshrc is already in squashfs; no need to rewrite.
-
-          # 4. SDDM — remove live autologin
+          chsh -s /bin/zsh "$TARGET_USER" || true
           rm -f /etc/sddm.conf.d/autologin.conf
-          mkdir -p /etc/sddm.conf.d
-          cat > /etc/sddm.conf.d/kde.conf << 'SDDMCONF'
-          [General]
-          DisplayServer=x11
-          GreeterEnvironment=QT_SCREEN_SCALE_FACTORS=1,QT_FONT_DPI=96
-          [Theme]
-          Current=breeze
-          [Users]
-          RememberLastSession=true
-          RememberLastUser=true
-          SDDMCONF
-
-          # 5. Sudoers — remove live NOPASSWD
           rm -f /etc/sudoers.d/live-user
-
-          # 6. System identity
           echo "kibaos" > /etc/hostname
-          cat > /etc/hosts << 'HOSTS'
-          127.0.0.1   localhost
-          127.0.1.1   kibaos
-          ::1         localhost ip6-localhost ip6-loopback
-          HOSTS
-          cat > /etc/os-release << 'OSREL'
-          NAME="KibaOS"
-          ID=kibaos
-          ID_LIKE=debian
-          VERSION_ID="1.0"
-          PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
-          OSREL
-
-          # 7. Sleep disabled on installed system
-          mkdir -p /etc/systemd/sleep.conf.d
-          cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
-          [Sleep]
-          AllowSuspend=no
-          AllowHibernation=no
-          AllowHybridSleep=no
-          AllowSuspendThenHibernate=no
-          NOSLEEP
-
-          # 8. Plymouth — re-register and rebuild initramfs
-          if [ -f /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth ]; then
-            update-alternatives --install \
-              /usr/share/plymouth/themes/default.plymouth default.plymouth \
-              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100 \
-              2>/dev/null || true
-            update-alternatives --set default.plymouth \
-              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth \
-              2>/dev/null || true
-          fi
-          sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
-          echo "COMPRESSLEVEL=19" >> /etc/initramfs-tools/initramfs.conf
-          update-initramfs -u -k all 2>/dev/null || update-initramfs -u 2>/dev/null || true
-
-          # 9. GRUB update
-          echo "=== Updating GRUB configuration ==="
           DEBIAN_FRONTEND=noninteractive update-grub || true
-
-          # 11. Flatpak — add Flathub system-wide
-          command -v flatpak >/dev/null 2>&1 && \
-            flatpak remote-add --system --if-not-exists flathub \
-              https://flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
-
-          # 12. Desktop DB refresh
-          update-desktop-database /usr/local/share/applications 2>/dev/null || true
-          update-desktop-database /usr/share/applications        2>/dev/null || true
-
-          # 13. Services
-          systemctl enable sddm            2>/dev/null || true
-          systemctl enable NetworkManager  2>/dev/null || true
-          systemctl enable plymouth-start  2>/dev/null || true
-          systemctl disable live-config    2>/dev/null || true
-          systemctl disable live-boot      2>/dev/null || true
-
-          # 14. Remove installer from autostart
-          rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
-
-          # 15. Nala alias in bashrc (belt-and-suspenders alongside profile.d)
-          for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
-            if [ -f "$RCFILE" ] && ! grep -q "nala" "$RCFILE"; then
-              cat >> "$RCFILE" << 'NALABASH'
-          # KibaOS: nala as package manager frontend
-          command -v nala >/dev/null 2>&1 && {
-            alias   apt='nala'
-          }
-          NALABASH
-            fi
-          done
+          systemctl enable sddm
+          rm -f /etc/xdg/autostart/kibaos-installer.desktop 2>/dev/null || true
           POSTINSTALLSH
           chmod +x config/includes.chroot/usr/share/kibaos/post-install.sh
 
           echo "=== Starting live-build ==="
           lb build 2>&1 | tee build.log
 
-          if grep -q "linux-image-psycachy" build.log; then
-            echo "VERIFIED: CachyOS Kernel installed"
-          else
-            echo "WARNING: CachyOS kernel not found in build log"
-          fi
-
-          # Check for critical modern tools (mapping binary names to package names where needed)
-          for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
-            if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
-               echo "VERIFIED: $tool installed"
-            else
-               # Some might be installed as dependencies or already present
-               echo "NOTICE: $tool installation status unclear from log"
-            fi
-          done
-
           if [ -f live-image-amd64.hybrid.iso ]; then
             mv live-image-amd64.hybrid.iso "${ISO}.iso"
             sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
-
             echo "=== Starting Headless Boot Test (QEMU) ==="
-            # Run QEMU for 60 seconds and capture serial output
-            # We use -nographic and -serial stdio to capture boot logs
-            # We add a small delay to ensure the kernel starts printing
-            timeout 60s qemu-system-x86_64 \
-              -m 2G \
-              -cdrom "${ISO}.iso" \
-              -nographic \
-              -serial stdio \
-              -no-reboot \
-              > boot_test.log 2>&1 || true
-
-            echo "=== Analyzing Boot Logs ==="
-            if grep -qi "Kernel panic" boot_test.log; then
-              echo "ERROR: Kernel panic detected during boot test!"
-              cat boot_test.log
-              exit 1
-            fi
-
-            if grep -qi "Call Trace:" boot_test.log; then
-               echo "ERROR: Potential crash/trace detected in logs!"
-               cat boot_test.log
-               exit 1
-            fi
-
-            # Check if we at least reached the initramfs or live-boot stage
-            if ! grep -qiE "init|live-boot|Loading|Linux version" boot_test.log; then
-               echo "WARNING: Boot log seems empty or didn't start properly"
-               # This might be due to lack of kvm, but we'll still fail if it's definitely broken
-            fi
-
-            echo "VERIFIED: Boot test completed without panics"
-
-            echo ""
-            echo "═══ KibaOS Build Complete ═══"
-            ls -lh "${ISO}.iso"
+            timeout 60s qemu-system-x86_64 -m 2G -cdrom "${ISO}.iso" -nographic -serial stdio -no-reboot > boot_test.log 2>&1 || true
+            if grep -qi "Kernel panic" boot_test.log; then exit 1; fi
+            echo "VERIFIED: Boot test completed"
           else
             echo "ERROR: ISO file not found!"
             exit 1
           fi
           BUILD_SCRIPT_EOF
+          sed -i "s/@FLAVOR@/${{ matrix.flavor }}/g" build.sh
           chmod +x build.sh
 
       - name: Run build in Docker
@@ -1691,8 +1061,16 @@ jobs:
             debian:trixie \
             /w/build.sh
 
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@441297d07cc11b9386d3b4d4ed8302306076b92a # v4
+        with:
+          name: KibaOS-${{ matrix.flavor }}-ISO
+          path: |
+            *.iso
+            *.sha256
+
       - name: Upload to SourceForge
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         env:
           SF_USER: ${{ secrets.SF_USER }}
           SF_PASS: ${{ secrets.SF_PASS }}
@@ -1704,16 +1082,10 @@ jobs:
           sudo apt update && sudo apt install -y sshpass rsync
           for iso_file in *.iso; do
             [ -f "$iso_file" ] || continue
-            echo "Uploading $iso_file to SourceForge..."
             for attempt in 1 2 3; do
-              if sshpass -p "$SF_PASS" rsync -avP \
-                -e "ssh -o StrictHostKeyChecking=no" \
-                "$iso_file" \
-                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"; then
-                echo "Successfully uploaded $iso_file"
+              if sshpass -p "$SF_PASS" rsync -avP -e "ssh -o StrictHostKeyChecking=no" "$iso_file" "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"; then
                 break
               else
-                echo "Attempt $attempt failed, retrying in 30s..."
                 sleep 30
               fi
             done

@@ -10,8 +10,10 @@ jobs:
   check-heredoc:
     timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for unindented heredocs
         run: |
           find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -l "<<[A-Z]" | grep -v "<<-" && echo "Recommendation: Use '<<-' to allow tabs for indentation in heredocs." || echo "Heredoc usage looks good"
