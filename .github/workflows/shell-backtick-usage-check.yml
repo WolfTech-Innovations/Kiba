@@ -8,9 +8,10 @@ on:
       - '**.sh'
 jobs:
   check-backticks:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Scan for backticks
         run: |
-          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -l "`" && { echo "Error: Use \$(...) instead of backticks for command substitution."; exit 1; } || echo "No backticks found"
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -l $'\x60' && { echo "Error: Use \$(...) instead of backticks for command substitution."; exit 1; } || echo "No backticks found"

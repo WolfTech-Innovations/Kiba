@@ -7,6 +7,7 @@ on:
 
 jobs:
   check-zshrc:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   review-alert:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Notify of slow reviews

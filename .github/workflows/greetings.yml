@@ -8,6 +8,7 @@ on:
 
 jobs:
   greeting:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write
