@@ -4,6 +4,7 @@ on:
     types: [labeled, unlabeled, opened, synchronize]
 jobs:
   check-conflicts:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Check for conflicting labels
