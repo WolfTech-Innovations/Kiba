@@ -746,13 +746,25 @@ jobs:
               Text {
                   id: welcomeText
                   anchors.centerIn: parent
-                  text: "KibaOS | Switch to simple"
+                  text: "KibaOS | Switch to Simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
                   opacity: 0
+                  scale: 0.9
                   Accessible.role: Accessible.StaticText
                   Accessible.name: text
-                  NumberAnimation on opacity {
-                      from: 0; to: 1; duration: 1000
+
+                  ParallelAnimation {
+                      running: true
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 0; to: 1; duration: 1000 }
+                      NumberAnimation { target: welcomeText; property: "scale"; from: 0.9; to: 1; duration: 1000; easing.type: Easing.OutBack }
+                      onFinished: breathing.start()
+                  }
+
+                  SequentialAnimation {
+                      id: breathing
+                      loops: Animation.Infinite
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 1; to: 0.8; duration: 2000; easing.type: Easing.InOutQuad }
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 0.8; to: 1; duration: 2000; easing.type: Easing.InOutQuad }
                   }
               }
           }
@@ -1222,16 +1234,20 @@ jobs:
           #!/bin/bash
           # Functional welcome menu for KibaOS
           zenity --info --title="Welcome to KibaOS" \
+            --window-icon=/usr/share/kibaos/logo.png \
+            --icon-name=start-here-kde-symbolic \
             --text="Welcome to KibaOS — Switch to Simple.\n\nEverything you need is already here. You can start exploring now, or install KibaOS permanently to your computer." \
             --width=400 2>/dev/null
 
           CHOICE=$(zenity --list --title="KibaOS Quick Actions" \
+            --window-icon=/usr/share/kibaos/logo.png \
             --text="What would you like to do first?" \
-            --column="Action" --column="Description" \
-            "Install KibaOS" "Follow the easy steps to install KibaOS" \
-            "Web Browser" "Launch Chromium and start browsing" \
-            "Software Center" "Discover and install apps via Bazaar" \
-            --width=500 --height=350 2>/dev/null)
+            --column="Icon" --column="Action" --column="Description" \
+            --image-column=1 --hide-column=1 --print-column=2 \
+            "system-software-install" "Install KibaOS" "Follow the easy steps to install KibaOS" \
+            "web-browser" "Web Browser" "Launch Chromium and start browsing" \
+            "system-software-update" "Software Center" "Discover and install apps via Bazaar" \
+            --width=550 --height=400 2>/dev/null)
 
           case "$CHOICE" in
             "Install KibaOS")
