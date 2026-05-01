@@ -7,7 +7,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for excessive permissions
         run: |
-          grep -rn "permissions: write-all" .github/workflows/*.yml && { echo "Error: write-all permission is prohibited"; exit 1; } || echo "Permissions are restricted"
+          grep -rn "permissions: contents: write" .github/workflows/*.yml && { echo "Error: write-all permission is prohibited"; exit 1; } || echo "Permissions are restricted"

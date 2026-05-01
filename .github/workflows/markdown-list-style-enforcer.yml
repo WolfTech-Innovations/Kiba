@@ -10,4 +10,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Enforce dash lists
         run: |
-          grep -rn "^ \*" . && { echo "Error: Use dashes (-) for lists instead of asterisks (*)"; exit 1; } || echo "List style is consistent"
+          grep -rn "^ *" . --include="*.md" && { echo "Error: Use dashes (-) for lists instead of asterisks (*)"; exit 1; } || echo "List style is consistent"

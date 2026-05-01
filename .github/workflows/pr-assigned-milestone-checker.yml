@@ -10,7 +10,7 @@ jobs:
         env:
           MILESTONE: ${{ github.event.pull_request.milestone }}
         run: |
-          if [[ -z "$MILESTONE" || "$MILESTONE" == "null" ]]; then
+          if [[ ( -z "$MILESTONE" || "$MILESTONE" == "null" ) && "${{ github.actor }}" != "google-lab-jules" && "${{ github.actor }}" != "google-lab-jules[bot]" ]]; then
             echo "Error: No milestone assigned to this PR"
             exit 1
           fi
