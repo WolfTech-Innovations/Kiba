@@ -10,5 +10,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for excessive permissions
         run: |
+          # Hide the pattern from the scanner itself
           PATTERN="permissions: write""-all"
           grep -rn "$PATTERN" .github/workflows/*.yml --exclude=".github/workflows/workflow-permissions-audit.yml" && { echo "Error: write-all permission is prohibited"; exit 1; } || echo "Permissions are restricted"
