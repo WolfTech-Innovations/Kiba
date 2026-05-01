@@ -20,14 +20,11 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
 
           # ── Install live-build and build deps ─────────────────────────────────
+          # Optimization: Removed unused build dependencies (Gtk, Compilers, etc.) to minimize CI overhead
           apt-get update && apt-get install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
-            qemu-system-x86 \
-            meson ninja-build pkg-config \
-            libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
-             libjson-glib-dev libostree-dev \
-            gcc g++ gettext
+            qemu-system-x86
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
