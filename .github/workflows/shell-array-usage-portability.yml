@@ -1,0 +1,26 @@
+name: Shell Array Usage Portability
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  check-arrays:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Scan for bashisms in generic scripts
+        run: |
+          set -euo pipefail
+          find . -name "*.sh" -not -path "./node_modules/*" | while read -r file; do
+            shebang=$(head -n 1 "$file")
+            if [[ "$shebang" == "#!/bin/sh" ]] && grep -q "=( " "$file"; then
+              echo "Error: BASH-style array detected in $file which has a /bin/sh shebang."
+              exit 1
+            fi
+          done
+          echo "Array usage is appropriate for shebangs."

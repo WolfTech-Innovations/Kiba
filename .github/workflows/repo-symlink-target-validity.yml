@@ -1,0 +1,20 @@
+name: Repo Symlink Target Validity
+on:
+  push:
+jobs:
+  check-symlinks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check symlinks
+        run: |
+          set -euo pipefail
+          broken_links=$(find . -xtype l)
+          if [ -n "$broken_links" ]; then
+            echo "Error: Broken symlinks found:"
+            echo "$broken_links"
+            exit 1
+          fi
+          echo "All symlinks are valid."

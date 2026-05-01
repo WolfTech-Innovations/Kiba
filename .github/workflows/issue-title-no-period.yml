@@ -1,0 +1,18 @@
+name: Issue Title No Period
+on:
+  issues:
+    types: [opened, edited]
+jobs:
+  check-title:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify title
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          set -euo pipefail
+          if [[ "$ISSUE_TITLE" =~ \.$ ]]; then
+            echo "Error: Issue titles should not end with a period."
+            exit 1
+          fi

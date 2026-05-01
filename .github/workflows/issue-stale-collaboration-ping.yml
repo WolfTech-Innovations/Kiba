@@ -1,0 +1,23 @@
+name: Issue Stale Collaboration Ping
+on:
+  schedule:
+    - cron: '0 10 * * *' # Daily
+jobs:
+  ping-collaboration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Ping stale issues with multiple assignees
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Fetch open issues updated > 14 days ago and filter for > 1 assignee using jq
+          STALE_DATE=$(date -d '14 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          STALE_ISSUES=$(gh issue list --state open --updated-before "$STALE_DATE" --json number,assignees --jq 'map(select(.assignees | length > 1)) | .[].number')
+
+          for issue in $STALE_ISSUES; do
+            gh issue comment "$issue" --body "This collaborative issue has been stale for 14 days. @assignees, could we get an update on the progress?"
+          done
