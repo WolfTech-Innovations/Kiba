@@ -7,9 +7,11 @@ on:
       - '**.yml'
 jobs:
   check-newline:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Scan for missing trailing newline
         run: |
           find . -type f \( -name "*.sh" -o -name "*.md" -o -name "*.yml" \) -not -path "./node_modules/*" | while read -r file; do

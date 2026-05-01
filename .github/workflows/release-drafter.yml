@@ -13,8 +13,10 @@ permissions:
 
 jobs:
   update_release_draft:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
+      name: Run release-drafter/release-drafter
       - uses: release-drafter/release-drafter@v6
         with:
           config-name: release-drafter.yml

@@ -6,11 +6,13 @@ on:
 
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.user.login, 'jules') &&
       github.event.pull_request.user.login != 'christopherfoxjr'
     steps:
+      name: Run amannn/action-semantic-pull-request
       - uses: amannn/action-semantic-pull-request@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

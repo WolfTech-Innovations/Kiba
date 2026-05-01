@@ -7,11 +7,13 @@ on:
 
 jobs:
   lock:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
     steps:
+      name: Run dessant/lock-threads
       - uses: dessant/lock-threads@v5
         with:
           issue-inactive-days: "90"

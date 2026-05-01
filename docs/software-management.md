@@ -80,13 +80,13 @@ KibaOS includes **Ungoogled Chromium** as the default browser for users who prio
 
 While KibaStore is the preferred way to browse, you can manage Flatpaks directly from the terminal:
 
-```bash
-# Search for an app
+````bash
+## Search for an app
 flatpak search <name>
 
-# Install an app
+## Install an app
 flatpak install flathub <app-id>
-```
+```text
 
 ---
 
@@ -95,3 +95,4 @@ flatpak install flathub <app-id>
 - [**Architecture**](./architecture.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
+````

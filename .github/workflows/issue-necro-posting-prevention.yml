@@ -7,8 +7,10 @@ on:
 
 jobs:
   lock-threads:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
+      name: Run dessant/lock-threads
       - uses: dessant/lock-threads@v5
         with:
           issue-inactive-days: "180"

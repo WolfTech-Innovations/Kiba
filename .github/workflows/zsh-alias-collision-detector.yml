@@ -8,9 +8,11 @@ on:
 
 jobs:
   check-alias-collision:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for duplicate aliases in zshrc
         run: |
           grep "alias " .github/workflows/kiba.yml | grep -oE "alias [^=]+" | sort | uniq -d | grep . && { echo "Error: Duplicate alias definitions found in kiba.yml"; exit 1; }

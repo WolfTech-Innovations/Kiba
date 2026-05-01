@@ -1,3 +1,6 @@
+# Sentinel
+
+
 ## 2025-05-15 - [Strong Default Password Requirements]
 
 **Vulnerability:** Weak default user passwords allowed during installation (minimum 6 characters).

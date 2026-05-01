@@ -11,6 +11,7 @@ on:
 
 jobs:
   jules-auto-fix:
+    timeout-minutes: 60
     # Only run on workflow failures or new issues
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||
@@ -24,7 +25,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Python
         uses: actions/setup-python@v5

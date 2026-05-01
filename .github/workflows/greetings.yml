@@ -8,11 +8,13 @@ on:
 
 jobs:
   greeting:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
     steps:
+      name: Run actions/first-interaction
       - uses: actions/first-interaction@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}

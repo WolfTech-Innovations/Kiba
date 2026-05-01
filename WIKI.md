@@ -138,7 +138,7 @@ KibaOS uses a highly automated CI/CD pipeline.
 
 To reproduce the build environment on your own machine:
 
-```bash
+````bash
 git clone https://github.com/WolfTech-Innovations/Kiba
 cd Kiba
 docker run --rm --privileged \
@@ -146,7 +146,7 @@ docker run --rm --privileged \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
-```
+```text
 
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.
@@ -168,3 +168,4 @@ KibaOS is a distribution composed of many independent components. While each com
 
 > [!NOTE]
 > KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
+````

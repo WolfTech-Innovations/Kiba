@@ -18,7 +18,7 @@ This document provides a technical overview of the KibaOS architectural stack, f
 
 ## System Stack
 
-```mermaid
+````mermaid
 graph TD
     A[Hardware / VM] --> B[GRUB Bootloader]
     B --> C[CachyOS Kernel]
@@ -27,7 +27,7 @@ graph TD
     E --> F[Wayland / X11]
     F --> G[KDE Plasma 6.3]
     G --> H[KibaOS UX]
-```
+```text
 
 ---
 
@@ -124,3 +124,4 @@ KibaOS uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 - [**Build System**](./build-system.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
+````

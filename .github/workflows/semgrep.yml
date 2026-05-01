@@ -7,11 +7,14 @@ on:
 
 jobs:
   semgrep:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     container:
       image: returntocorp/semgrep
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      name: Run semgrep scan --co...
       - run: semgrep scan --config auto --sarif --output semgrep.sarif
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3

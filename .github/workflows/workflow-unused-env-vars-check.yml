@@ -8,9 +8,11 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   check-env:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Scan for defined but unused env vars
         run: |
           # Very basic check: list env keys and see if they appear elsewhere in the file

@@ -4,6 +4,7 @@ on:
     types: [opened, edited, synchronize]
 jobs:
   check-link:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Ensure issue is linked

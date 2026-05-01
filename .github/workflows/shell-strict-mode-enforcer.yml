@@ -8,9 +8,11 @@ on:
       - '**.sh'
 jobs:
   enforce-strict-mode:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for set -euo pipefail
         run: |
           find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -L "set -euo pipefail" && { echo "Error: Shell scripts must use 'set -euo pipefail' for robustness."; exit 1; } || echo "Strict mode found in all scripts"

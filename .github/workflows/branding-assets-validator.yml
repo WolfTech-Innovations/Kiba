@@ -10,9 +10,11 @@ on:
 
 jobs:
   validate:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Image Existence
         run: |
           ls branding/kibaos_banner.png || exit 1

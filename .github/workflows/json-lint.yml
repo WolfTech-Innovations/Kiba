@@ -10,9 +10,11 @@ on:
 
 jobs:
   jsonlint:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run jsonlint
         run: |
           find . -name "*.json" -not -path "./node_modules/*" -print0 | xargs -0 -I {} npx jsonlint -q {}

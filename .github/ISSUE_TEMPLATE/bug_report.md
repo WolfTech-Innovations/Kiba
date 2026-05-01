@@ -1,10 +1,14 @@
+# Bug_report
+
 ---
+
 name: Bug report
 description: Create a report to help us improve
 about: Create a report to help us improve
 title: ""
 labels: ""
 assignees: ""
+
 ---
 
 **Describe the bug**

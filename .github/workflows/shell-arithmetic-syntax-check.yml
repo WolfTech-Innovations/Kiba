@@ -8,9 +8,11 @@ on:
       - '**.sh'
 jobs:
   check-arithmetic:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Scan for expr usage
         run: |
           find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -l "expr " && { echo "Error: Use \$((...)) for arithmetic instead of 'expr'."; exit 1; } || echo "No 'expr' usage found"

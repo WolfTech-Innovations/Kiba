@@ -8,10 +8,12 @@ on:
 
 jobs:
   notify-conflicts:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
+      name: Run actions/github-script
       - uses: actions/github-script@v7
         with:
           script: |

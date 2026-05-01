@@ -7,9 +7,11 @@ on:
     - cron: "0 0 * * 0"
 jobs:
   check-symlinks:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Scan for broken symlinks
         run: |
           find . -xtype l -not -path "./node_modules/*" | grep . && { echo "Error: Broken symbolic links detected."; exit 1; } || echo "No broken symlinks found"

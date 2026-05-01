@@ -7,14 +7,17 @@ on:
 
 jobs:
   metadata:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Generate Metadata
         run: |
           echo "ISO Build completed at $(date)" > build-info.txt
           echo "Run ID: ${{ github.event.workflow_run.id }}" >> build-info.txt
+      name: Run actions/upload-artifact
       - uses: actions/upload-artifact@v4
         with:
           name: build-metadata

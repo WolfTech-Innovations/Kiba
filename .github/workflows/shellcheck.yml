@@ -12,9 +12,11 @@ on:
 
 jobs:
   shellcheck:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run ShellCheck
         uses: ludeeus/action-shellcheck@2.0.0
         with:

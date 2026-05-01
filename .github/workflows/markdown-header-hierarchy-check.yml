@@ -8,9 +8,11 @@ on:
       - '**.md'
 jobs:
   check-hierarchy:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify header progression
         run: |
           # Check for jumps like H1 to H3

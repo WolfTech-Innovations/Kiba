@@ -7,9 +7,11 @@ on:
 
 jobs:
   check-size:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Estimate ISO Size
         run: |
           count=$(grep -A 100 "PACKAGES" .github/workflows/kiba.yml | grep -v "PACKAGES" | grep -v "^#" | grep -v "^$" | grep -c .)

@@ -6,11 +6,13 @@ on:
 
 jobs:
   stale:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write
       pull-requests: write
     steps:
+      name: Run actions/stale
       - uses: actions/stale@v9
         with:
           stale-issue-message: "This issue is stale because it has been open 30 days with no activity. It will be closed in 7 days if no further activity occurs."

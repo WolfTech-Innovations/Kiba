@@ -6,10 +6,12 @@ on:
 
 jobs:
   check-closing-comment:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: read
     steps:
+      name: Run actions/github-script
       - uses: actions/github-script@v7
         with:
           script: |

@@ -1,21 +1,5 @@
-name: "KibaOS Build"
-
-on:
-  workflow_dispatch:
-
-jobs:
-  build-and-upload:
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-      - name: Create build script
-        run: |
-          cat > build.sh << 'BUILD_SCRIPT_EOF'
-          #!/bin/bash
+#!/bin/bash
+#!/bin/bash
           set -ex
           export DEBIAN_FRONTEND=noninteractive
 
@@ -1680,41 +1664,3 @@ jobs:
             echo "ERROR: ISO file not found!"
             exit 1
           fi
-          BUILD_SCRIPT_EOF
-          chmod +x build.sh
-
-      - name: Run build in Docker
-        run: |
-          docker run --rm --privileged \
-            -v "$PWD:/w" \
-            -e RUN_NUM="${{ github.run_number }}" \
-            debian:trixie \
-            build.sh
-
-      - name: Upload to SourceForge
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-        env:
-          SF_USER: ${{ secrets.SF_USER }}
-          SF_PASS: ${{ secrets.SF_PASS }}
-        run: |
-          if [ -z "$SF_USER" ] || [ -z "$SF_PASS" ]; then
-            echo "SourceForge credentials not configured. Skipping upload."
-            exit 0
-          fi
-          sudo apt update && sudo apt install -y sshpass rsync
-          for iso_file in *.iso; do
-            [ -f "$iso_file" ] || continue
-            echo "Uploading $iso_file to SourceForge..."
-            for attempt in 1 2 3; do
-              if sshpass -p "$SF_PASS" rsync -avP \
-                -e "ssh -o StrictHostKeyChecking=no" \
-                "$iso_file" \
-                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"; then
-                echo "Successfully uploaded $iso_file"
-                break
-              else
-                echo "Attempt $attempt failed, retrying in 30s..."
-                sleep 30
-              fi
-            done
-          done

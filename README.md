@@ -76,9 +76,9 @@ SHA256 checksums are provided alongside each release. Always verify your downloa
 
 On Linux:
 
-```bash
+````bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
-```
+```text
 
 > [!IMPORTANT]
 > Replace `/dev/sdX` with your actual drive and `N` with the build number. You can also use tools like **Balena Etcher** or **Ventoy**.
@@ -111,7 +111,7 @@ Post-install, update your system:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-```
+```text
 
 ---
 
@@ -187,7 +187,7 @@ docker run --rm --privileged \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
-```
+```text
 
 > [!NOTE]
 > The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
@@ -206,7 +206,7 @@ Kiba/
 ├── docs/                      # In-depth documentation
 ├── Notes/                     # Automatic release notes
 └── README.md                  # Project documentation
-```
+```text
 
 ---
 
@@ -226,3 +226,4 @@ KibaOS is a distribution, not a single codebase. Individual components are subje
 
 KibaOS is a **WolfTech Innovations** project.
 [Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)
+````

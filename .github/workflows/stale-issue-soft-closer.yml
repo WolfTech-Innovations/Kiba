@@ -7,8 +7,10 @@ on:
 
 jobs:
   stale-handler:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
+      name: Run actions/stale
       - uses: actions/stale@v9
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}

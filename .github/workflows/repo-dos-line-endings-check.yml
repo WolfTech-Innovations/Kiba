@@ -4,9 +4,11 @@ on:
   pull_request:
 jobs:
   check-eol:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      name: Run actions/checkout
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Scan for CRLF line endings
         run: |
           grep -rl $'\r' . --exclude-dir=.git --exclude-dir=node_modules && { echo "Error: CRLF line endings detected. Use LF instead."; exit 1; } || echo "All line endings are LF"
