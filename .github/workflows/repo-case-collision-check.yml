@@ -4,9 +4,12 @@ on:
   pull_request:
 jobs:
   check-case:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for filename case collisions
         run: |
           find . -not -path "./.git/*" -not -path "./node_modules/*" | tr '[:upper:]' '[:lower:]' | sort | uniq -d | grep . && { echo "Error: Filename case collisions detected (incompatible with case-insensitive filesystems)."; exit 1; } || echo "No case collisions found"

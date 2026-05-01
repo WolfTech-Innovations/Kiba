@@ -8,16 +8,18 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   check-step-names:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for unnamed steps
         run: |
           for file in .github/workflows/*.yml; do
-            # Use yq to check if all steps have a name
-            unnamed=$(yq '.jobs | to_entries | map(.value.steps) | flatten | select(. != null and .name == null) | length' "$file")
-            if [ "$unnamed" -gt 0 ]; then
-              echo "Error: $file contains steps without a 'name'."
+            unnamed=$(yq '.jobs | to_entries | .[] | .value.steps | .[] | select(.name == null) | .uses // .run' "$file")
+            if [ -n "$unnamed" ]; then
+              echo "Error: $file contains steps without a 'name': $unnamed"
               exit 1
             fi
           done

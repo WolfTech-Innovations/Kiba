@@ -3,15 +3,20 @@ on:
   pull_request:
 jobs:
   check-size:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
       - name: Get changed files
         id: changed-files
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git diff --name-only origin/${{ github.base_ref }} HEAD > changed_files.txt
+          git diff --name-only "origin/$BASE_REF" HEAD > changed_files.txt
       - name: Scan changed files for size
         run: |
           while read -r file; do

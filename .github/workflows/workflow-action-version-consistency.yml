@@ -16,8 +16,8 @@ jobs:
       - name: Audit action versions
         run: |
           set -euo pipefail
-          # Check for actions/checkout specifically as an example
-          versions=$(grep -h "uses: actions/checkout@" .github/workflows/*.yml | sort | uniq)
+          # Check for actions/checkout specifically as an example, excluding this audit file
+          versions=$(grep -h "uses: actions/checkout@" .github/workflows/*.yml | grep -v "grep" | sort | uniq)
           count=$(echo "$versions" | wc -l)
           if [ "$count" -gt 1 ]; then
             echo "Error: Multiple versions of actions/checkout found:"

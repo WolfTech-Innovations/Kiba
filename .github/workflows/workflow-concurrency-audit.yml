@@ -8,9 +8,12 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   audit-concurrency:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check for concurrency key
         run: |
           grep -L "concurrency:" .github/workflows/*.yml && echo "Notice: Some workflows are missing concurrency control." || echo "Concurrency usage audited"

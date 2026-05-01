@@ -8,12 +8,14 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   check-env:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for defined but unused env vars
         run: |
-          # Very basic check: list env keys and see if they appear elsewhere in the file
           for file in .github/workflows/*.yml; do
             grep -oE "[A-Z0-9_]+:" "$file" | sed 's/://' | while read -r var; do
               if [ $(grep -c "$var" "$file") -eq 1 ]; then

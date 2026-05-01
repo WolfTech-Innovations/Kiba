@@ -6,6 +6,7 @@ on:
 
 jobs:
   label-components:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write

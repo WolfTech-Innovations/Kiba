@@ -6,6 +6,7 @@ on:
 
 jobs:
   validate-use-case:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     if: contains(github.event.issue.labels.*.name, 'feature')
     steps:

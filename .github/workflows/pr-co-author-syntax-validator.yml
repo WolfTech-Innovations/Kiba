@@ -4,10 +4,14 @@ on:
     types: [opened, synchronize, edited]
 jobs:
   validate-co-authors:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
       - name: Check commit messages for Co-authored-by
         run: |
-          # Ensure Co-authored-by has a valid email format
-          git log -1 --pretty=%B | grep "Co-authored-by:" | grep -vE "<.+@.+\..+>" && { echo "Error: Invalid Co-authored-by format. Use: Co-authored-by: Name <email@example.com>"; exit 1; } || echo "Co-authors valid"
+          git log origin/${{ github.base_ref }}..HEAD --pretty=%B | grep "Co-authored-by:" | grep -vE "<.+@.+\..+>" && { echo "Error: Invalid Co-authored-by format. Use: Co-authored-by: Name <email@example.com>"; exit 1; } || echo "Co-authors valid"

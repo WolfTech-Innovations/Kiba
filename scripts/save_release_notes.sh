@@ -25,7 +25,7 @@ set -euo pipefail
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
 
-RELEASE_ID=$1
+RELEASE_ID="$1"
 
 if [ -z "$RELEASE_ID" ]; then
   echo "Error: Release ID is required as the first argument."

@@ -8,6 +8,7 @@ on:
 
 jobs:
   notify-conflicts:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
