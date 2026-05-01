@@ -10,6 +10,7 @@ on:
 
 jobs:
   test-docker:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,5 +18,5 @@ jobs:
         run: |
           docker build -t kibaos-builder -f- . <<EOF
           FROM debian:trixie
-          RUN apt-get update && apt-get install -y live-build debootstrap xorriso git squashfs-tools
+          RUN apt update && apt install -y live-build debootstrap xorriso git squashfs-tools
           EOF

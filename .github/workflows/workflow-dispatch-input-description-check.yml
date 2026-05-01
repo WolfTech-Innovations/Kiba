@@ -1,0 +1,29 @@
+name: Workflow Dispatch Input Description Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check-descriptions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify input descriptions
+        run: |
+          set -euo pipefail
+          for file in .github/workflows/*.yml; do
+            # Check if workflow_dispatch exists and has inputs
+            if yq -e '.on.workflow_dispatch.inputs' "$file" >/dev/null 2>&1; then
+              missing=$(yq '.on.workflow_dispatch.inputs | to_entries | map(select(.value.description == null)) | length' "$file")
+              if [ "$missing" -gt 0 ]; then
+                echo "Error: $file contains workflow_dispatch inputs missing descriptions."
+                exit 1
+              fi
+            fi
+          done
+          echo "All workflow_dispatch inputs have descriptions."

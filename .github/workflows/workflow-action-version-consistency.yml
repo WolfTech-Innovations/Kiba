@@ -1,0 +1,27 @@
+name: Workflow Action Version Consistency
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit-versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Audit action versions
+        run: |
+          set -euo pipefail
+          # Check for actions/checkout specifically as an example, excluding this audit file
+          versions=$(grep -h "uses: actions/checkout@" .github/workflows/*.yml | grep -v "grep" | sort | uniq)
+          count=$(echo "$versions" | wc -l)
+          if [ "$count" -gt 1 ]; then
+            echo "Error: Multiple versions of actions/checkout found:"
+            echo "$versions"
+            exit 1
+          fi
+          echo "Action versions are consistent."

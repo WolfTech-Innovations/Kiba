@@ -1,0 +1,27 @@
+name: PR Milestone Due Date Reminder
+on:
+  schedule:
+    - cron: '0 9 * * 1' # Every Monday at 9:00 AM
+jobs:
+  remind-milestones:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Check milestones and notify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Find milestones due within the next 7 days
+          NEXT_WEEK=$(date -d '7 days' +%Y-%m-%d)
+          DUE_MILESTONES=$(gh api repos/${{ github.repository }}/milestones --jq ".[] | select(.due_on != null and .due_on < \"$NEXT_WEEK\") | .number")
+
+          for ms in $DUE_MILESTONES; do
+            # Find PRs linked to this milestone
+            PRS=$(gh pr list --milestone "$ms" --json number --jq '.[].number')
+            for pr in $PRS; do
+              gh pr comment "$pr" --body "Reminder: The milestone for this PR is due within the next week."
+            done
+          done

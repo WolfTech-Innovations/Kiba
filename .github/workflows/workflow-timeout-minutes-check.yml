@@ -8,6 +8,7 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   check-timeout:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -15,6 +16,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for missing timeout-minutes
         run: |
+          set -euo pipefail
           for file in .github/workflows/*.yml; do
             missing=$(yq '.jobs | to_entries | .[] | select(.value.steps != null and .value["timeout-minutes"] == null) | .key' "$file")
             if [ -n "$missing" ]; then

@@ -1,0 +1,24 @@
+name: Repo CRLF Style Audit
+on:
+  push:
+    paths:
+      - "**.md"
+      - "**.txt"
+      - "**.sh"
+  pull_request:
+    paths:
+      - "**.md"
+      - "**.txt"
+      - "**.sh"
+jobs:
+  audit-crlf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Scan for CRLF
+        run: |
+          set -euo pipefail
+          # Find files with CRLF line endings
+          grep -rl $'\r' . --include="*.md" --include="*.sh" --include="*.txt" && { echo "Error: CRLF line endings detected in text files. Use LF."; exit 1; } || echo "All text files use LF."

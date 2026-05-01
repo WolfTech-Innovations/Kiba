@@ -1,0 +1,29 @@
+name: Workflow Step ID Kebab Case
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check-step-ids:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify kebab-case IDs
+        run: |
+          set -euo pipefail
+          for file in .github/workflows/*.yml; do
+            # Safely fetch step IDs using yq
+            ids=$(yq '.jobs[].steps[] | select(has("id")) | .id' "$file" || echo "")
+            for id in $ids; do
+              if [[ ! "$id" =~ ^[a-z0-9-]+$ ]]; then
+                echo "Error: Step ID '$id' in $file is not kebab-case."
+                exit 1
+              fi
+            done
+          done
+          echo "All step IDs follow kebab-case."

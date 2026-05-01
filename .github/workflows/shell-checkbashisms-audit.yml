@@ -1,4 +1,4 @@
-name: Shell checkbashisms Audit
+name: Shell Checkbashisms Audit
 on:
   push:
     paths:
@@ -7,7 +7,7 @@ on:
     paths:
       - '**.sh'
 jobs:
-  audit:
+  audit-bashisms:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

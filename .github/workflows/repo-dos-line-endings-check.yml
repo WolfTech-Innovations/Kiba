@@ -1,9 +1,18 @@
-name: Repo DOS Line Endings Check
+name: Repository DOS Line Endings Check
 on:
   push:
+    paths-ignore:
+      - "**.png"
+      - "**.jpg"
+      - "**.ico"
   pull_request:
+    paths-ignore:
+      - "**.png"
+      - "**.jpg"
+      - "**.ico"
 jobs:
   check-eol:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

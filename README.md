@@ -204,6 +204,7 @@ Kiba/
 ├── branding/
 │   └── kibaos_banner.png      # KibaOS brand assets
 ├── docs/                      # In-depth documentation
+├── Notes/                     # Automatic release notes
 └── README.md                  # Project documentation
 ```
 

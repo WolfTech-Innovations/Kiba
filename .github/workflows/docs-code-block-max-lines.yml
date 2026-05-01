@@ -1,0 +1,26 @@
+name: Docs Code Block Max Lines
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  check-length:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Find long code blocks
+        run: |
+          set -euo pipefail
+          FAILED=0
+          while read -r file; do
+             if ! awk '/^```/ { if (in_block) { if (count > 100) { print FILENAME ":" NR " - Code block too long (" count " lines)"; exit 1 } in_block=0; count=0 } else { in_block=1; count=0 } next } in_block { count++ }' "$file"; then
+                FAILED=1
+             fi
+          done < <(find . -name "*.md")
+          if [ "$FAILED" -ne 0 ]; then exit 1; fi
+          echo "All code blocks are within length limits."
