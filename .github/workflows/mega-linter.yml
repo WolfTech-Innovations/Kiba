@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   megalinter:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code

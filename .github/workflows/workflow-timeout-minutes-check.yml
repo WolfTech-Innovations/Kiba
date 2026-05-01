@@ -8,6 +8,7 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   check-timeout:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
