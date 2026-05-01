@@ -1,0 +1,15 @@
+name: Repo Broken Symlink Checker
+on:
+  push:
+    paths-ignore:
+      - 'node_modules/**'
+  schedule:
+    - cron: "0 0 * * 0"
+jobs:
+  check-symlinks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for broken symlinks
+        run: |
+          find . -xtype l -not -path "./node_modules/*" | grep . && { echo "Error: Broken symbolic links detected."; exit 1; } || echo "No broken symlinks found"

@@ -1,0 +1,20 @@
+name: Markdown Header Hierarchy Check
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  check-hierarchy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify header progression
+        run: |
+          # Check for jumps like H1 to H3
+          find . -name "*.md" -not -path "./node_modules/*" | while read -r file; do
+            grep "^#\{1,6\} " "$file" | sed 's/^\(#*\).*/\1/' | awk 'length($0) > prev + 1 && prev != 0 { exit 1 } { prev = length($0) }' || { echo "Error: Logical header jump detected in $file"; exit 1; }
+          done
+          echo "Header hierarchy is consistent"

@@ -1,0 +1,26 @@
+name: Repo Large File Prevention
+on:
+  pull_request:
+jobs:
+  check-size:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get changed files
+        id: changed-files
+        run: |
+          git diff --name-only origin/${{ github.base_ref }} HEAD > changed_files.txt
+      - name: Scan changed files for size
+        run: |
+          while read -r file; do
+            if [ -f "$file" ]; then
+              size=$(stat -c%s "$file")
+              if [ "$size" -gt 5242880 ]; then
+                echo "Error: $file is larger than 5MB ($size bytes)."
+                exit 1
+              fi
+            fi
+          done < changed_files.txt
+          echo "All changed files are within size limits"

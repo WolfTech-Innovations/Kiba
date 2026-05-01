@@ -1,0 +1,13 @@
+name: Workflow YAML Extension Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*'
+jobs:
+  check-extension:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure .yml extension
+        run: |
+          find .github/workflows -name "*.yaml" | grep . && { echo "Error: Use .yml extension instead of .yaml for workflows."; exit 1; } || echo "Extension check passed"

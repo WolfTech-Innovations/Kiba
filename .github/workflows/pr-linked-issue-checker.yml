@@ -1,0 +1,15 @@
+name: PR Linked Issue Checker
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+jobs:
+  check-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure issue is linked
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [[ ! "$PR_BODY" =~ "Fixes #" && ! "$PR_BODY" =~ "Closes #" ]]; then
+             echo "Warning: PR should ideally link to an issue using 'Fixes #<issue_number>'"
+          fi

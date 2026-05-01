@@ -1,0 +1,17 @@
+name: Markdown Link Spacing Validator
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  check-spacing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for space in link syntax
+        run: |
+          # More specific regex to match [text] (url)
+          find . -name "*.md" -not -path "./node_modules/*" | xargs -r grep -lE "\[[^\]]+\] \(" && { echo "Error: Found space between link text and URL, e.g., [text] (url)."; exit 1; } || echo "No link spacing issues found"
