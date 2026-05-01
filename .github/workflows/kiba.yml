@@ -720,13 +720,26 @@ jobs:
               Text {
                   id: welcomeText
                   anchors.centerIn: parent
-                  text: "KibaOS | Switch to simple"
+                  text: "KibaOS | Switch to Simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
                   opacity: 0
+                  scale: 0.9
                   Accessible.role: Accessible.StaticText
                   Accessible.name: text
-                  NumberAnimation on opacity {
-                      from: 0; to: 1; duration: 1000
+
+                  ParallelAnimation {
+                      id: introAnim
+                      running: true
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 0; to: 1; duration: 1000 }
+                      NumberAnimation { target: welcomeText; property: "scale"; from: 0.9; to: 1; duration: 1000; easing.type: Easing.OutBack }
+                      onFinished: breatheAnim.start()
+                  }
+
+                  SequentialAnimation {
+                      id: breatheAnim
+                      loops: Animation.Infinite
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 1; to: 0.6; duration: 2000; easing.type: Easing.InOutQuad }
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 0.6; to: 1; duration: 2000; easing.type: Easing.InOutQuad }
                   }
               }
           }
@@ -931,11 +944,18 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS — Switch to Simple." --width=400 2>/dev/null
-          CHOICE=$(zenity --list --title="KibaOS Quick Actions" --column="Action" --column="Description" "Install KibaOS" "Follow easy steps" "Web Browser" "Launch Chromium" --width=500 --height=350 2>/dev/null)
+          zenity --info --title="Welcome to KibaOS" --text="Welcome to KibaOS — Switch to Simple." --width=400 --window-icon="/usr/share/kibaos/logo.png" 2>/dev/null
+          CHOICE=$(zenity --list --title="KibaOS Quick Actions" --window-icon="/usr/share/kibaos/logo.png" --column="Icon" --column="Action" --column="Description" --image-column=1 --hide-column=1 --print-column=2 \
+            "system-software-install" "Install KibaOS" "Follow the easy steps to install KibaOS permanently." \
+            "web-browser" "Web Browser" "Launch Chromium to browse the web." \
+            "utilities-terminal" "Terminal" "Open Konsole to use the powerful Zsh shell." \
+            "help-browser" "Documentation" "View the KibaOS Wiki for tips and help." \
+            --width=600 --height=450 2>/dev/null)
           case "$CHOICE" in
             "Install KibaOS") sudo calamares & ;;
             "Web Browser") chromium & ;;
+            "Terminal") konsole & ;;
+            "Documentation") chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & ;;
           esac
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
