@@ -1,4 +1,4 @@
-name: Shell checkbashisms Audit
+name: Shell Checkbashisms Audit
 on:
   push:
     paths:
@@ -7,13 +7,19 @@ on:
     paths:
       - '**.sh'
 jobs:
-  audit:
+  audit-bashisms:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install checkbashisms
+        run: |
+          set -euo pipefail
+          sudo apt update -qq && sudo apt install -y -qq devscripts > /dev/null
       - name: Run checkbashisms
         run: |
-          # Use a pre-built docker image or install it.
-          # Since devscripts is large, we can use a smaller tool if available or just stick to it for now but optimize.
-          sudo apt-get update -qq && sudo apt-get install -y -qq devscripts > /dev/null
-          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r checkbashisms -n -p
+          set -euo pipefail
+          # Find all shell scripts and run checkbashisms
+          # SC2038: use -print0 and xargs -0 for safety
+          find . -name "*.sh" -not -path "./node_modules/*" -print0 | xargs -0 checkbashisms -f || { echo "Error: Bashisms detected in scripts intended for /bin/sh"; exit 1; }

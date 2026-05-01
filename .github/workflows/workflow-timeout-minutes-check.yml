@@ -9,14 +9,15 @@ on:
 jobs:
   check-timeout:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Scan for missing timeout-minutes
         run: |
+          set -euo pipefail
           for file in .github/workflows/*.yml; do
             # Use yq to check if all jobs have timeout-minutes
-            # We check if any job lacks the timeout-minutes key
-            missing=$(yq '.jobs | to_entries | map(select(.value.steps != null and .value["timeout-minutes"] == null)) | length' "$file")
+            missing=$(yq '.jobs | to_entries | map(select(.value.steps != null and (.value["timeout-minutes"] == null or .value["timeout-minutes"] == ""))) | length' "$file")
             if [ "$missing" -gt 0 ]; then
               echo "Error: $file contains jobs missing 'timeout-minutes'."
               exit 1

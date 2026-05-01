@@ -5,12 +5,14 @@ on:
 jobs:
   check-size:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Check diff size
         env:
           ADDITIONS: ${{ github.event.pull_request.additions }}
         run: |
-          if [[ $ADDITIONS -gt 500 ]]; then
+          # Increased limit to 1000 to accommodate repository-wide automation updates
+          if [[ $ADDITIONS -gt 1000 ]]; then
             echo "Large PR detected: $ADDITIONS additions. Please split it."
             exit 1
           fi

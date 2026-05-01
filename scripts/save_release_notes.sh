@@ -4,7 +4,7 @@ set -e
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
 
-RELEASE_ID=$1
+RELEASE_ID="$1"
 
 if [ -z "$RELEASE_ID" ]; then
   echo "Error: Release ID is required as the first argument."
@@ -21,13 +21,13 @@ DD=$(date +%d)
 
 H_VAL=$(date +%-H)
 HOURS="0123456789ABCDEFGHIJKLMN"
-H=$(echo $HOURS | cut -c $((H_VAL + 1)))
+H=$(echo "$HOURS" | cut -c "$((H_VAL + 1))")
 
 Y=$(date +%y | cut -c 2)
 
 M_VAL=$(date +%-m)
 MONTHS="123456789ABC"
-M=$(echo $MONTHS | cut -c $M_VAL)
+M=$(echo "$MONTHS" | cut -c "$M_VAL")
 
 FILENAME="Notes/NTE-${DD}${H}${Y}${M}.md"
 
