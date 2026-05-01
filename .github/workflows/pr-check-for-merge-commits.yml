@@ -11,4 +11,4 @@ jobs:
           fetch-depth: 0
       - name: Check for merge commits
         run: |
-          git rev-list --merges origin/main..HEAD | grep . && { echo "Error: Merge commits are not allowed. Please rebase."; exit 1; } || echo "No merge commits"
+          git rev-list --merges origin/main..${{ github.event.pull_request.head.sha }} | grep . && { echo "Error: Merge commits are not allowed. Please rebase."; exit 1; } || echo "No merge commits"
