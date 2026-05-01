@@ -23,11 +23,7 @@ jobs:
           apt-get update && apt-get install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
-            qemu-system-x86 \
-            meson ninja-build pkg-config \
-            libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
-             libjson-glib-dev libostree-dev \
-            gcc g++ gettext
+            qemu-system-x86 gettext
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
@@ -132,14 +128,16 @@ jobs:
             curl -LO "$IMAGE_URL"
           else
             echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb" || \
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-1_amd64.deb"
           fi
 
           if [ -n "$HEADERS_URL" ]; then
             curl -LO "$HEADERS_URL"
           else
              echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb" || \
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-1_amd64.deb"
           fi
 
           # Install
@@ -743,12 +741,19 @@ jobs:
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
-              color: "#000000"
+              color: "#282a36"
               anchors.fill: parent
               Text {
+                  id: welcomeText
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
+                  opacity: 0
+                  Accessible.role: Accessible.StaticText
+                  Accessible.name: text
+                  NumberAnimation on opacity {
+                      from: 0; to: 1; duration: 1000
+                  }
               }
           }
           WATCHSPLASH
@@ -1216,13 +1221,17 @@ jobs:
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Functional welcome menu for KibaOS
-          CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-            --text="Welcome to KibaOS! What would you like to do?" \
+          zenity --info --title="Welcome to KibaOS" \
+            --text="Welcome to KibaOS — Switch to Simple.\n\nEverything you need is already here. You can start exploring now, or install KibaOS permanently to your computer." \
+            --width=400 2>/dev/null
+
+          CHOICE=$(zenity --list --title="KibaOS Quick Actions" \
+            --text="What would you like to do first?" \
             --column="Action" --column="Description" \
-            "Install KibaOS" "Install the system permanently to your disk" \
-            "Web Browser" "Browse the internet" \
-            "Software Center" "Discover and install new applications" \
-            --width=450 --height=300 2>/dev/null)
+            "Install KibaOS" "Follow the easy steps to install KibaOS" \
+            "Web Browser" "Launch Chromium and start browsing" \
+            "Software Center" "Discover and install apps via Bazaar" \
+            --width=500 --height=350 2>/dev/null)
 
           case "$CHOICE" in
             "Install KibaOS")
@@ -1285,6 +1294,8 @@ jobs:
             SidebarText:              "#f8f8f2"
             SidebarTextCurrent:       "#282a36"
             SidebarBackgroundCurrent: "#bd93f9"
+            WindowBackground:         "#282a36"
+            WindowForeground:         "#f8f8f2"
           slideshow: "show.qml"
           BRANDING
 
@@ -1344,6 +1355,8 @@ jobs:
           hide-back-and-next-during-exec: true
           quit-at-end: false
           CALASETTINGS
+          BRANDING_HOOK
+          chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
           # ── User-friendly Calamares module configs ──────────────────────────────
           # Override module titles/labels so nothing technical shows in the sidebar
@@ -1468,8 +1481,8 @@ jobs:
           SHOWQML
 
           # ── Calamares .desktop launcher ─────────────────────────────────────────
-          mkdir -p /usr/share/applications
-          cat > /usr/share/applications/calamares.desktop << 'CALADESKTOP'
+          mkdir -p config/includes.chroot/usr/share/applications
+          cat > config/includes.chroot/usr/share/applications/calamares.desktop << 'CALADESKTOP'
           [Desktop Entry]
           Type=Application
           Version=1.0
@@ -1483,8 +1496,8 @@ jobs:
 
 
           # ── Post-install script ─────────────────────────────────────────────────
-          mkdir -p /usr/share/kibaos
-          cat > /usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
+          mkdir -p config/includes.chroot/usr/share/kibaos
+          cat > config/includes.chroot/usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
           #!/bin/bash
           # KibaOS post-install — runs chrooted inside installed system
           set -e
@@ -1603,6 +1616,14 @@ jobs:
           NALABASH
             fi
           done
+          POSTINSTALLSH
+          chmod +x config/includes.chroot/usr/share/kibaos/post-install.sh
+
+          echo "=== Starting live-build ==="
+          lb build 2>&1 | tee build.log
+
+          if grep -q "linux-image-psycachy" build.log; then
+            echo "VERIFIED: CachyOS Kernel installed"
           else
             echo "WARNING: CachyOS kernel not found in build log"
           fi
