@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Check for set -euo pipefail
         run: |
           find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -L "set -euo pipefail" && { echo "Error: Shell scripts must use 'set -euo pipefail' for robustness."; exit 1; } || echo "Strict mode found in all scripts"

@@ -7,8 +7,10 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for deprecated commands
         run: |
-          grep -rnE "apt-get|ifconfig|netstat" . && { echo "Error: Use apt, ip, or ss instead of deprecated commands"; exit 1; } || echo "No deprecated commands found"
+          grep -rnE "apt-get|ifconfig|netstat" . --exclude=deprecated-commands-check.yml --exclude=shell-checkbashisms-audit.yml && { echo "Error: Use apt, ip, or ss instead of deprecated commands"; exit 1; } || echo "No deprecated commands found"

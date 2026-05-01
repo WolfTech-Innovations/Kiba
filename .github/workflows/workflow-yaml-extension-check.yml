@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Ensure .yml extension
         run: |
           find .github/workflows -name "*.yaml" | grep . && { echo "Error: Use .yml extension instead of .yaml for workflows."; exit 1; } || echo "Extension check passed"

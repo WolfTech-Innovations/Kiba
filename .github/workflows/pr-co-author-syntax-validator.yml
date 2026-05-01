@@ -7,10 +7,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
       - name: Check commit messages for Co-authored-by
         run: |
-          # Validate all commits in the PR range
-          git log origin/${{ github.base_ref }}..HEAD --pretty=%B | grep "Co-authored-by:" | grep -vE "<.+@.+\..+>" && { echo "Error: Invalid Co-authored-by format detected in PR commits. Use: Co-authored-by: Name <email@example.com>"; exit 1; } || echo "Co-authors valid"
+          git log origin/${{ github.base_ref }}..HEAD --pretty=%B | grep "Co-authored-by:" | grep -vE "<.+@.+\..+>" && { echo "Error: Invalid Co-authored-by format. Use: Co-authored-by: Name <email@example.com>"; exit 1; } || echo "Co-authors valid"

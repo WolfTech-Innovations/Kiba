@@ -11,7 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for space in link syntax
         run: |
           find . -name "*.md" -not -path "./node_modules/*" | xargs -r grep -lE "\[[^\]]+\] \(" && { echo "Error: Found space between link text and URL, e.g., [text] (url)."; exit 1; } || echo "No link spacing issues found"
