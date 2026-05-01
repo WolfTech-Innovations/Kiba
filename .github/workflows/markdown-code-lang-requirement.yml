@@ -9,8 +9,9 @@ on:
 jobs:
   check-lang:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Scan for untagged code blocks
         run: |
           find . -name "*.md" -not -path "./node_modules/*" | xargs -r grep -l "^[[:space:]]*\`\`\`[[:space:]]*$" && { echo "Error: Markdown code blocks must have a language tag."; exit 1; } || echo "All code blocks are tagged"
