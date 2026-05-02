@@ -10,10 +10,9 @@ jobs:
   audit-runners:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for ubuntu-18.04 or ubuntu-20.04
         run: |
           grep -rE "ubuntu-18.04|ubuntu-20.04" .github/workflows/*.yml && { echo "Warning: Use of deprecated or older runners detected."; } || echo "Modern runners in use"

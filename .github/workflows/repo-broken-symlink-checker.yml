@@ -9,10 +9,9 @@ jobs:
   check-symlinks:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for broken symlinks
         run: |
           find . -xtype l -not -path "./node_modules/*" | grep . && { echo "Error: Broken symbolic links detected."; exit 1; } || echo "No broken symlinks found"
