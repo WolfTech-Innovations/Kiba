@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Audit Action Versions
         run: |
           grep "uses: [a-zA-Z0-9-]*/[a-zA-Z0-9-]*@" .github/workflows/*.yml | grep -vE '@[a-f0-9]{40}' && { echo "Found unpinned actions"; exit 1; } || echo "All actions pinned"

@@ -12,8 +12,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Run checkbashisms
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq devscripts > /dev/null
-          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r checkbashisms -n -p
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r checkbashisms -f -n -p
