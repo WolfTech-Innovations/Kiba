@@ -1,4 +1,5 @@
 #!/bin/bash
+# KibaOS Build Script - Released under the MIT License
 set -ex
 export DEBIAN_FRONTEND=noninteractive
 
@@ -112,17 +113,19 @@ HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linu
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
 else
-  echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-  curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb" || \
-  curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-1_amd64.deb"
+  echo "WARNING: Could not find CachyOS image URL, using fallback loop"
+  for i in {5..1}; do
+    curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+  done
 fi
 
 if [ -n "$HEADERS_URL" ]; then
   curl -LO "$HEADERS_URL"
 else
-   echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-   curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb" || \
-   curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-1_amd64.deb"
+  echo "WARNING: Could not find CachyOS headers URL, using fallback loop"
+  for i in {5..1}; do
+    curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+  done
 fi
 
 # Install
@@ -274,7 +277,7 @@ plasma-discover
 plasma-discover-backend-flatpak
 
 sddm
-sddm-theme-debian-breeze
+sddm-theme-breeze
 plasma-nm
 plasma-pa
 dolphin
