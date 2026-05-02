@@ -17,4 +17,4 @@ jobs:
       - name: Run markdownlint
         uses: DavidAnson/markdownlint-cli2-action@v19
         with:
-          config: .github/linters/.markdownlint-cli2.yaml
+          config: .github/linters/.markdownlint-cli2.yml
