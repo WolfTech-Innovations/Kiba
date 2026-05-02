@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Helpful-blue?style=for-the-badge" alt="Helpful">
+  <img src="`https://img.shields.io/badge/Status-Helpful-blue?style`=for-the-badge" alt="Helpful">
 </p>
 
 ---

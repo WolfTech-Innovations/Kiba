@@ -7,7 +7,6 @@ on:
 
 jobs:
   check-kde:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Check Latest KDE Plasma

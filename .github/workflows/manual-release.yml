@@ -10,7 +10,6 @@ on:
 
 jobs:
   release:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -18,7 +17,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create Release
-        id: create_release
+        id: create-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version }}
@@ -29,4 +28,4 @@ jobs:
       - name: Save Release Notes to Notes folder
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: ./scripts/save_release_notes.sh ${{ steps.create_release.outputs.id }}
+        run: ./scripts/save_release_notes.sh ${{ steps.create-release.outputs.id }}

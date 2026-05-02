@@ -1,30 +1,30 @@
 # KibaOS
 
 <p align="center">
-<img width="1330" height="519" alt="image" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8" />
+<img width="1330" height="519" alt="image" src="`https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8`" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
+  <a href="``https://github.com/WolfTech-Innovations/Kiba``/actions/workflows/kiba.yml">
+    <img src="`https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch`=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Debian-13%20Trixie-D70A53?style=for-the-badge&logo=debian&logoColor=white" alt="Debian Version">
-  <img src="https://img.shields.io/badge/KDE-Plasma%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
+  <img src="`https://img.shields.io/badge/License-MIT-purple?style`=for-the-badge" alt="License">
+  <img src="`https://img.shields.io/badge/Debian-13`%20Trixie-D70A53?style=for-the-badge&logo=debian&logoColor=white" alt="Debian Version">
+  <img src="`https://img.shields.io/badge/KDE-Plasma`%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style=flat-square" alt="Repo Size">
-  <img src="https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style=flat-square" alt="Stars">
-  <img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square" alt="Forks">
-  <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
+  <img src="`https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style`=flat-square" alt="Repo Size">
+  <img src="`https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style`=flat-square" alt="Stars">
+  <img src="`https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style`=flat-square" alt="Forks">
+  <img src="`https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style`=flat-square" alt="Last Commit">
 </p>
 
 KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **KDE Plasma 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
-  <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
-    <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
+  <a href="`https://sourceforge.net/projects/kibaos/files/latest/download`">
+    <img src="`https://a.fsdn.com/con/app/sf-download-button`" alt="Download KibaOS">
   </a>
 </p>
 
@@ -65,7 +65,7 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 
 ### Download
 
-<img src="https://img.shields.io/sourceforge/dt/kibaos?style=flat-square" alt="SourceForge Downloads">
+<img src="`https://img.shields.io/sourceforge/dt/kibaos?style`=flat-square" alt="SourceForge Downloads">
 
 ISO images are available on **SourceForge**:
 [Download KibaOS on SourceForge](https://sourceforge.net/projects/kibaos/files/)
@@ -119,8 +119,8 @@ sudo apt update && sudo apt upgrade -y
 
 ### Shell
 
-<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
-<img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square" alt="Kernel: CachyOS">
+<img src="`https://img.shields.io/badge/Shell-Zsh-blue?style`=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
+<img src="`https://img.shields.io/badge/Kernel-CachyOS-orange?style`=flat-square" alt="Kernel: CachyOS">
 
 KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
 
@@ -137,14 +137,14 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 ### Theme
 
-<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
+<img src="`https://img.shields.io/badge/Theme-Dracula-bd93f9?style`=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
 
 KibaOS ships the **Dracula** color scheme system-wide using the official palette
 
 | Color      | Hex       | Role         |
 | ---------- | --------- | ------------ |
-| Background | `#282a36` | Primary BG   |
-| Purple     | `#bd93f9` | Accent Color |
+| Background | ```#282a36``` | Primary BG   |
+| Purple     | ```#bd93f9``` | Accent Color |
 | Pink       | `#ff79c6` | Selection    |
 | Green      | `#50fa7b` | Success      |
 
@@ -164,9 +164,9 @@ The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Br
 ## Build System
 
 <p align="left">
-  <img src="https://img.shields.io/badge/Build-live--build-blue?style=flat-square" alt="Build: live-build">
-  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
-  <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
+  <img src="`https://img.shields.io/badge/Build-live--build-blue?style`=flat-square" alt="Build: live-build">
+  <img src="`https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
+  <img src="`https://img.shields.io/badge/Infrastructure-Docker-2496ED?style`=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
 </p>
 
 KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
@@ -180,7 +180,7 @@ KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** conta
 Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
 ```bash
-git clone https://github.com/WolfTech-Innovations/Kiba
+git clone ``https://github.com/WolfTech-Innovations/Kiba``
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
@@ -212,7 +212,7 @@ Kiba/
 
 ## Contributing
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
+Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](``https://github.com/WolfTech-Innovations/Kiba``) repository. Please open an issue before starting significant work, thanks!
 
 ---
 

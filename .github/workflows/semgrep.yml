@@ -7,7 +7,6 @@ on:
 
 jobs:
   semgrep:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     container:
       image: returntocorp/semgrep

@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture">
-  <img src="https://img.shields.io/badge/Base-Debian%20Trixie-D70A53?style=for-the-badge&logo=debian" alt="Base">
-  <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
+  <img src="`https://img.shields.io/badge/Architecture-amd64-blue?style`=for-the-badge" alt="Architecture">
+  <img src="`https://img.shields.io/badge/Base-Debian`%20Trixie-D70A53?style=for-the-badge&logo=debian" alt="Base">
+  <img src="`https://img.shields.io/badge/Kernel-CachyOS-orange?style`=for-the-badge" alt="Kernel">
 </p>
 
 ---

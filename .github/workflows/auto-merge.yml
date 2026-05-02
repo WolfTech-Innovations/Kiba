@@ -15,7 +15,6 @@ permissions:
 
 jobs:
   auto-merge:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Check and Merge

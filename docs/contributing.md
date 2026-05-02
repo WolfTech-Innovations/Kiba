@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge" alt="Welcome">
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
+  <img src="`https://img.shields.io/badge/Status-Welcome-success?style`=for-the-badge" alt="Welcome">
+  <img src="`https://img.shields.io/badge/License-MIT-purple?style`=for-the-badge" alt="License">
 </p>
 
 ---
@@ -24,7 +24,7 @@ To begin contributing to the KibaOS build system or customization hooks, follow 
 3. **Local Build:** Run a local build to ensure your environment is working:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/Kiba
+   git clone `https://github.com/YOUR`_USERNAME/Kiba
    cd Kiba
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
    ```

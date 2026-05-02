@@ -4,7 +4,6 @@ on:
     types: [opened, synchronize]
 jobs:
   check-length:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Check subject length

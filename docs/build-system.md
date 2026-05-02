@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions" alt="CI">
-  <img src="https://img.shields.io/badge/Tool-live--build-blue?style=for-the-badge" alt="live-build">
-  <img src="https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker" alt="Docker">
+  <img src="`https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=for-the-badge&logo=github-actions" alt="CI">
+  <img src="`https://img.shields.io/badge/Tool-live--build-blue?style`=for-the-badge" alt="live-build">
+  <img src="`https://img.shields.io/badge/Container-Docker-2496ED?style`=for-the-badge&logo=docker" alt="Docker">
 </p>
 
 ---
@@ -83,7 +83,7 @@ You can reproduce the KibaOS build environment locally on any Linux machine with
 ### Build Steps
 
 ```bash
-git clone https://github.com/WolfTech-Innovations/Kiba
+git clone `https://github.com/WolfTech-Innovations/Kiba`
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \

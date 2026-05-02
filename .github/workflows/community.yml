@@ -11,7 +11,6 @@ on:
 
 jobs:
   stale:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -32,7 +31,6 @@ jobs:
           stale-pr-label: "stale"
 
   welcome:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write
@@ -46,7 +44,6 @@ jobs:
           pr-message: "Welcome to the KibaOS project! Thank you for your first pull request. We appreciate your contribution!"
 
   labeler:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,7 +55,6 @@ jobs:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
 
   auto-label-title:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: write

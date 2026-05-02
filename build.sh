@@ -116,7 +116,7 @@ echo "=== Installing CachyOS Kernel ==="
 # For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | grep -E '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_TAG" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
@@ -128,8 +128,8 @@ mkdir -p /tmp/cachyos
 cd /tmp/cachyos
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-image-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+HEADERS_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-headers-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
@@ -1223,7 +1223,7 @@ cat > /etc/motd << 'EOF'
 
  _  ___ _             ___  ____
 | |/ (_) |__   __ _ / _ \/ ___|
-| ' /| | '_ \ / _' | | | \___ \
+| ' /| | '_ \ / _\x60 | | | \___ \
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
@@ -1621,7 +1621,7 @@ rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
 
 # 15. Nala alias in bashrc (belt-and-suspenders alongside profile.d)
 for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
-  if [ -f "$RCFILE" ] && ! grep -q "nala" "$RCFILE"; then
+  if [ -f "$RCFILE" ] && ! grep -q -E "nala" "$RCFILE"; then
     cat >> "$RCFILE" << 'NALABASH'
 # KibaOS: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
@@ -1637,7 +1637,7 @@ echo "=== Starting live-build ==="
 # eatmydata accelerates the build significantly by reducing disk I/O overhead
 eatmydata lb build 2>&1 | tee build.log
 
-if grep -q "linux-image-psycachy" build.log; then
+if grep -q -E "linux-image-psycachy" build.log; then
   echo "VERIFIED: CachyOS Kernel installed"
 else
   echo "WARNING: CachyOS kernel not found in build log"
@@ -1645,7 +1645,7 @@ fi
 
 # Check for critical modern tools (mapping binary names to package names where needed)
 for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
-  if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
+  if grep -q -E "Installing $tool" build.log || grep -q -E "Setting up $tool" build.log || grep -qi -E "$tool installed" build.log; then
      echo "VERIFIED: $tool installed"
   else
      # Some might be installed as dependencies or already present
@@ -1670,13 +1670,13 @@ if [ -f live-image-amd64.hybrid.iso ]; then
     > boot_test.log 2>&1 || true
 
   echo "=== Analyzing Boot Logs ==="
-  if grep -qi "Kernel panic" boot_test.log; then
+  if grep -qi -E "Kernel panic" boot_test.log; then
     echo "ERROR: Kernel panic detected during boot test!"
     cat boot_test.log
     exit 1
   fi
 
-  if grep -qi "Call Trace:" boot_test.log; then
+  if grep -qi -E "Call Trace:" boot_test.log; then
      echo "ERROR: Potential crash/trace detected in logs!"
      cat boot_test.log
      exit 1

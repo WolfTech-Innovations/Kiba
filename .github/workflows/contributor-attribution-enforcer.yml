@@ -6,7 +6,6 @@ on:
 
 jobs:
   check-attribution:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Verify attribution in body

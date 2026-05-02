@@ -4,7 +4,6 @@ on:
     types: [opened]
 jobs:
   check:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Verify initial labels

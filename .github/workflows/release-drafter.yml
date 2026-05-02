@@ -13,7 +13,6 @@ permissions:
 
 jobs:
   update_release_draft:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - uses: release-drafter/release-drafter@v6

@@ -8,12 +8,11 @@ on:
       - '**.sh'
 jobs:
   enforce-mktemp:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Check for hardcoded /tmp paths
         run: |
           find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -l "/tmp/" | grep -v "mktemp" && { echo "Error: Use 'mktemp' for temporary files instead of hardcoded /tmp paths."; exit 1; } || echo "No insecure /tmp usage found"

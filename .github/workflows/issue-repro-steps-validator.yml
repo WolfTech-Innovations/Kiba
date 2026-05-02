@@ -6,7 +6,6 @@ on:
 
 jobs:
   validate-repro:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     if: contains(github.event.issue.labels.*.name, 'bug')
     steps:

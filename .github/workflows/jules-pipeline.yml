@@ -11,7 +11,6 @@ on:
 
 jobs:
   jules-auto-fix:
-    timeout-minutes: 60
     # Only run on workflow failures or new issues
     if: >
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'failure') ||

@@ -6,7 +6,6 @@ on:
 
 jobs:
   check-closing-comment:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       issues: read

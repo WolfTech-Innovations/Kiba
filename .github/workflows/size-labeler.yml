@@ -4,7 +4,6 @@ on: pull_request
 
 jobs:
   size-label:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write

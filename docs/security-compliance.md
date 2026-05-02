@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Privacy-First-green?style=for-the-badge" alt="Privacy First">
-  <img src="https://img.shields.io/badge/Compliance-AB%202273-blue?style=for-the-badge" alt="AB 2273">
-  <img src="https://img.shields.io/badge/Security-Hardened-red?style=for-the-badge" alt="Hardened">
+  <img src="`https://img.shields.io/badge/Privacy-First-green?style`=for-the-badge" alt="Privacy First">
+  <img src="`https://img.shields.io/badge/Compliance-AB`%202273-blue?style=for-the-badge" alt="AB 2273">
+  <img src="`https://img.shields.io/badge/Security-Hardened-red?style`=for-the-badge" alt="Hardened">
 </p>
 
 ---

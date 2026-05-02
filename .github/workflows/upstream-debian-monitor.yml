@@ -7,7 +7,6 @@ on:
 
 jobs:
   check-debian:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Check Trixie Status
