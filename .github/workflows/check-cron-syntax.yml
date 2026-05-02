@@ -1,0 +1,23 @@
+name: Check cron Syntax
+on:
+  push:
+    paths:
+      - '**/cron.d/*'
+      - '**/etc/crontab'
+  pull_request:
+    paths:
+      - '**/cron.d/*'
+      - '**/etc/crontab'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate crontab files
+        run: |
+          set -euo pipefail
+          find . -name "crontab" -o -path "*/cron.d/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -v "^#" "$file" | grep -v "^$" | awk 'NF < 6 {print "Error: Invalid cron line in " FILENAME; exit 1}'
+          done

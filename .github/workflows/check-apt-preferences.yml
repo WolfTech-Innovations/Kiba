@@ -1,0 +1,23 @@
+name: Check apt Preferences
+on:
+  push:
+    paths:
+      - '**/apt/preferences.d/*'
+  pull_request:
+    paths:
+      - '**/apt/preferences.d/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate apt preferences
+        run: |
+          set -euo pipefail
+          find . -path "*/apt/preferences.d/*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            grep -q "Package:" "$file" || { echo "Error: Missing Package key in $file"; exit 1; }
+            grep -q "Pin:" "$file" || { echo "Error: Missing Pin key in $file"; exit 1; }
+            grep -q "Pin-Priority:" "$file" || { echo "Error: Missing Pin-Priority key in $file"; exit 1; }
+          done

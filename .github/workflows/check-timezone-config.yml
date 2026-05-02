@@ -1,0 +1,26 @@
+name: Check Timezone Config
+on:
+  push:
+    paths:
+      - '**/timezone'
+  pull_request:
+    paths:
+      - '**/timezone'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate timezone
+        run: |
+          set -euo pipefail
+          find . -name "timezone" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            TZ=$(cat "$file")
+            # Simple check for Area/Location format
+            if [[ ! "$TZ" =~ ^[A-Z][a-z]+/[A-Z][a-zA-Z_/]+$ ]]; then
+              echo "Error: Invalid timezone format '$TZ' in $file"
+              exit 1
+            fi
+          done

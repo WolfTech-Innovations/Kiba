@@ -1,0 +1,22 @@
+name: Check Icon Theme Index
+on:
+  push:
+    paths:
+      - '**/icons/**/index.theme'
+  pull_request:
+    paths:
+      - '**/icons/**/index.theme'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate icon theme index
+        run: |
+          set -euo pipefail
+          find . -name "index.theme" -path "*/icons/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -q "\[Icon Theme\]" "$file" || { echo "Error: Missing [Icon Theme] section in $file"; exit 1; }
+            grep -q "Directories=" "$file" || { echo "Error: Missing Directories key in $file"; exit 1; }
+          done

@@ -1,0 +1,26 @@
+name: Check Hostname Config
+on:
+  push:
+    paths:
+      - '**/hostname'
+  pull_request:
+    paths:
+      - '**/hostname'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate hostname
+        run: |
+          set -euo pipefail
+          find . -name "hostname" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Hostname must be valid (no spaces, special chars except dash)
+            HOSTNAME=$(cat "$file")
+            if [[ ! "$HOSTNAME" =~ ^[a-zA-Z0-9-]+$ ]]; then
+              echo "Error: Invalid hostname '$HOSTNAME' in $file"
+              exit 1
+            fi
+          done

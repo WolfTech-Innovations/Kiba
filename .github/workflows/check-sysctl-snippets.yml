@@ -1,0 +1,21 @@
+name: Check sysctl Snippets
+on:
+  push:
+    paths:
+      - '**/sysctl.d/*.conf'
+  pull_request:
+    paths:
+      - '**/sysctl.d/*.conf'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate sysctl config
+        run: |
+          set -euo pipefail
+          find . -name "*.conf" -path "*/sysctl.d/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -v "^#" "$file" | grep -v "^$" | grep -v "=" && { echo "Error: Invalid line in $file"; exit 1; } || true
+          done

@@ -1,0 +1,24 @@
+name: Check systemd Generators
+on:
+  push:
+    paths:
+      - '**/systemd/system-generators/*'
+  pull_request:
+    paths:
+      - '**/systemd/system-generators/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate systemd generators
+        run: |
+          set -euo pipefail
+          find . -path "*/systemd/system-generators/*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            # Generators are usually scripts or binaries
+            if file "$file" | grep -q "text"; then
+              bash -n "$file" || { echo "Error: Syntax error in generator $file"; exit 1; }
+            fi
+          done

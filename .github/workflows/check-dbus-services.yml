@@ -1,0 +1,24 @@
+name: Check D-Bus Services
+on:
+  push:
+    paths:
+      - '**.service'
+  pull_request:
+    paths:
+      - '**.service'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate D-Bus Service Files
+        run: |
+          set -euo pipefail
+          find . -name "*.service" -not -path "./node_modules/*" | while read -r file; do
+            if grep -q "\[D-BUS Service\]" "$file"; then
+              echo "Auditing D-Bus service: $file"
+              grep -q "Name=" "$file" || { echo "Error: Missing Name key in $file"; exit 1; }
+              grep -q "Exec=" "$file" || { echo "Error: Missing Exec key in $file"; exit 1; }
+            fi
+          done

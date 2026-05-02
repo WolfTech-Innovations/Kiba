@@ -1,0 +1,22 @@
+name: Audit Polkit Rules
+on:
+  push:
+    paths:
+      - '**.rules'
+  pull_request:
+    paths:
+      - '**.rules'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Polkit Rules JS Syntax
+        run: |
+          set -euo pipefail
+          find . -name "*.rules" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Polkit rules use JavaScript syntax
+            node --check "$file" || { echo "Error: Invalid JS syntax in $file"; exit 1; }
+          done

@@ -1,0 +1,19 @@
+name: Check etc skel
+on:
+  push:
+    paths:
+      - '**/etc/skel/**'
+  pull_request:
+    paths:
+      - '**/etc/skel/**'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Audit skeleton directory
+        run: |
+          set -euo pipefail
+          # Ensure no large files in /etc/skel
+          find . -path "*/etc/skel/*" -size +1M && { echo "Error: Files in /etc/skel should be small."; exit 1; } || true

@@ -1,0 +1,23 @@
+name: Check os-release Syntax
+on:
+  push:
+    paths:
+      - '**/os-release'
+  pull_request:
+    paths:
+      - '**/os-release'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate os-release
+        run: |
+          set -euo pipefail
+          find . -name "os-release" | while read -r file; do
+            echo "Auditing $file..."
+            # os-release is a shell-like assignment file
+            bash -n "$file" || { echo "Error: Syntax error in $file"; exit 1; }
+            grep -q "ID=" "$file" || { echo "Error: Missing ID in $file"; exit 1; }
+          done

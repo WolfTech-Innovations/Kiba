@@ -1,0 +1,26 @@
+name: Check Zshrc Performance
+on:
+  push:
+    paths:
+      - '**/zshrc'
+      - '**/build.sh'
+  pull_request:
+    paths:
+      - '**/zshrc'
+      - '**/build.sh'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Zshrc compinit optimization
+        run: |
+          set -euo pipefail
+          # KibaOS standards: use native Zsh glob qualifiers (mh-24) for compinit dump check
+          find . -name "*zshrc" | while read -r file; do
+            echo "Auditing $file..."
+            if grep -q "compinit" "$file"; then
+              grep -q "(mh-24)" "$file" || { echo "Error: Zshrc should use native glob qualifiers (mh-24) for compinit optimization per KibaOS standards."; exit 1; }
+            fi
+          done
