@@ -592,7 +592,7 @@ fi
 alias edit='${EDITOR:-micro}'
 alias please='sudo'
 alias cls='clear'
-alias path='echo -e "${PATH//:/\\n}"'
+alias path='printf "%b\n" "${PATH//:/\\n}"'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
