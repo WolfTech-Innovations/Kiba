@@ -1,3 +1,4 @@
+
 # Documents
 
 - [Checks](checks.md): Full list of all checks done by actionlint with example inputs, outputs, and playground links.

@@ -1,3 +1,4 @@
+
 # Contributing to KibaOS
 
 <p align="center">
@@ -5,8 +6,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge" alt="Welcome">
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
+  <img src="`https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge`" alt="Welcome">
+  <img src="`https://img.shields.io/badge/License-MIT-purple?style=for-the-badge`" alt="License">
 </p>
 
 ---
@@ -15,7 +16,7 @@ First of all, thank you for your interest in contributing to KibaOS! We welcome 
 
 ---
 
-## Developer Quick Start
+\n## Developer Quick Start
 
 To begin contributing to the KibaOS build system or customization hooks, follow these steps:
 
@@ -24,16 +25,16 @@ To begin contributing to the KibaOS build system or customization hooks, follow 
 3. **Local Build:** Run a local build to ensure your environment is working:
 
    ```bash
-   git clone https://github.com/YOUR_USERNAME/Kiba
+   git clone `https://github.com/YOUR`_USERNAME/Kiba
    cd Kiba
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
    ```
 
 ---
 
-## How to Contribute
+\n## How to Contribute
 
-### Reporting Bugs
+#\n## Reporting Bugs
 
 If you find a bug, please open an issue on our [GitHub repository](https://github.com/WolfTech-Innovations/Kiba/issues). Provide as much detail as possible, including:
 
@@ -42,7 +43,7 @@ If you find a bug, please open an issue on our [GitHub repository](https://githu
 - Expected and actual behavior.
 - Screenshots or logs if applicable.
 
-### Suggesting Features
+#\n## Suggesting Features
 
 We are always looking for ways to improve KibaOS. If you have an idea for a new feature, please open an issue and describe:
 
@@ -50,7 +51,7 @@ We are always looking for ways to improve KibaOS. If you have an idea for a new 
 - How the feature would work.
 - Any alternative solutions you've considered.
 
-### Submitting Pull Requests
+#\n## Submitting Pull Requests
 
 If you're ready to contribute code or documentation:
 
@@ -64,11 +65,11 @@ If you're ready to contribute code or documentation:
 - Expected vs. Actual behavior.
 - System logs or screenshots.
 
-### Suggesting Features (Community)
+#\n## Suggesting Features (Community)
 
 We love new ideas! Please open an issue to discuss significant features before implementation. This ensures they align with the KibaOS philosophy of "modern simplicity."
 
-### Submitting Pull Requests (Process)
+#\n## Submitting Pull Requests (Process)
 
 - **Branching:** Work on a descriptive branch name (e.g., `feature/custom-icons`).
 - **Commits:** Follow conventional commit messages.
@@ -76,7 +77,7 @@ We love new ideas! Please open an issue to discuss significant features before i
 
 ---
 
-## Project Structure
+\n## Project Structure
 
 | Directory               | Purpose                                         |
 | :---------------------- | :---------------------------------------------- |
@@ -91,7 +92,7 @@ We love new ideas! Please open an issue to discuss significant features before i
 
 ---
 
-## Automated Triage
+\n## Automated Triage
 
 We use automated workflows to help manage the project:
 
@@ -101,13 +102,13 @@ We use automated workflows to help manage the project:
 
 ---
 
-## License
+\n## License
 
 By contributing to KibaOS, you agree that your contributions will be licensed under the **MIT License**.
 
 ---
 
-## Related Reading
+\n## Related Reading
 
 - [**Build System**](./build-system.md)
 - [**Architecture**](./architecture.md)

@@ -17,9 +17,9 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for deprecated commands
         run: |
           # Check for deprecated networking and package commands
           # We exclude this file itself and documentation
-          grep -rnE "apt-get|ifconfig|netstat" . --exclude-dir=".git" --exclude="deprecated-commands-check.yml" --exclude="shell-checkbashisms-audit.yml" --exclude="*.md" && { echo "Error: Use apt, ip, or ss instead of deprecated commands"; exit 1; } || echo "No deprecated commands found"
+          grep -rnE "apt|ifconfig|netstat" . --exclude-dir=".git" --exclude="deprecated-commands-check.yml" --exclude="shell-checkbashisms-audit.yml" --exclude="*.md" && { echo "Error: Use apt, ip, or ss instead of deprecated commands"; exit 1; } || echo "No deprecated commands found"

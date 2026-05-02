@@ -1,6 +1,7 @@
+
 # Security Policy
 
-## Supported Versions
+\n## Supported Versions
 
 KibaOS is currently in active development. We support the latest release on the `main` branch.
 
@@ -8,7 +9,7 @@ KibaOS is currently in active development. We support the latest release on the 
 | ------- | ------------------ |
 | 1.x     | :white_check_mark: |
 
-## Reporting a Vulnerability
+\n## Reporting a Vulnerability
 
 If you discover a security vulnerability within KibaOS, please report it by opening a private security advisory on GitHub or by contacting WolfTech Innovations directly via the issues tracker for further instructions.
 

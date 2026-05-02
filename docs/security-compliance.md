@@ -1,3 +1,4 @@
+
 # Security & Compliance
 
 <p align="center">
@@ -5,9 +6,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Privacy-First-green?style=for-the-badge" alt="Privacy First">
-  <img src="https://img.shields.io/badge/Compliance-AB%202273-blue?style=for-the-badge" alt="AB 2273">
-  <img src="https://img.shields.io/badge/Security-Hardened-red?style=for-the-badge" alt="Hardened">
+  <img src="`https://img.shields.io/badge/Privacy-First-green?style=for-the-badge`" alt="Privacy First">
+  <img src="`https://img.shields.io/badge/Compliance-AB`%202273-blue?style=for-the-badge" alt="AB 2273">
+  <img src="`https://img.shields.io/badge/Security-Hardened-red?style=for-the-badge`" alt="Hardened">
 </p>
 
 ---
@@ -16,17 +17,17 @@ KibaOS is built with a "Privacy by Design" philosophy. We go beyond standard sec
 
 ---
 
-## California Age-Appropriate Design Code (AB 2273)
+\n## California Age-Appropriate Design Code (AB 2273)
 
 To comply with the California Age-Appropriate Design Code Act, KibaOS features a custom **Age Verification** module within the **Calamares** installer.
 
-### Implementation
+#\n## Implementation
 
 - **Module:** A custom Python-based view module located at `/usr/lib/calamares/modules/ageverify/`.
 - **User Interface:** During installation, users are presented with a screen to select their age group (e.g., Under 13, 13-15, 16-17, 18+, or "Prefer not to say").
 - **Transparency:** The screen clearly explains why this information is being collected and how it is stored.
 
-### Privacy and Data Storage
+#\n## Privacy and Data Storage
 
 In accordance with KibaOS's privacy-first philosophy:
 
@@ -38,7 +39,7 @@ In accordance with KibaOS's privacy-first philosophy:
 - **User Choice:** During installation, users are prompted to select their age group (Under 13, 13-15, 16-17, 18+, or Decline to state).
 - **Purpose:** This allows the system to potentially apply age-appropriate safety defaults without requiring a central account or online tracking.
 
-### Privacy Policy: Local Storage Only
+#\n## Privacy Policy: Local Storage Only
 
 In strict adherence to our privacy goals:
 
@@ -48,28 +49,28 @@ In strict adherence to our privacy goals:
 
 ---
 
-## System Hardening
+\n## System Hardening
 
 KibaOS implements several strategies to keep your data safe and your system resilient.
 
-### Minimal Attack Surface
+#\n## Minimal Attack Surface
 
 By following our **Extreme Minimization** strategy, we remove hundreds of non-essential packages, documentation, and services.
 
 - **Result:** Fewer installed binaries means fewer potential vulnerabilities (CVEs) on your system.
 
-### Kernel Security
+#\n## Kernel Security
 
 The **CachyOS Kernel** isn't just for performance; it includes modern security patches and is regularly updated to mitigate emerging hardware and software threats.
 
-### Account Security
+#\n## Account Security
 
 - **Live Session:** The `user` account has passwordless sudo for ease of testing.
 - **Installed System:** The installer forces the creation of a secure root and user password, and the passwordless sudo privilege is automatically revoked.
 
 ---
 
-## Privacy by Design
+\n## Privacy by Design
 
 We believe your operating system should be a tool, not a tracker.
 
@@ -79,7 +80,7 @@ We believe your operating system should be a tool, not a tracker.
 
 ---
 
-## Related Reading
+\n## Related Reading
 
 - [**Architecture**](./architecture.md)
 - [**Software Management**](./software-management.md)
