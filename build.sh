@@ -1,4 +1,26 @@
 #!/bin/bash
+# MIT License
+# Copyright (c) 2025 WolfTech Innovations
+#
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 set -ex
 export DEBIAN_FRONTEND=noninteractive
 
@@ -47,7 +69,6 @@ lb config \
 # ── Starship prompt hook ────────────────────────────────────────────
 mkdir -p config/hooks/live
 cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
-#!/bin/bash
 set -e
 echo "=== Configuring Starship Prompt ==="
 
@@ -86,7 +107,6 @@ chmod +x config/hooks/live/0030-starship.hook.chroot
 # ── CachyOS Kernel hook ──────────────────────────────────────────────
 mkdir -p config/hooks/live
 cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
-#!/bin/bash
 set -e
 echo "=== Installing CachyOS Kernel ==="
 
@@ -106,8 +126,8 @@ mkdir -p /tmp/cachyos
 cd /tmp/cachyos
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep -E "linux-image-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep -E "linux-headers-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
@@ -146,7 +166,6 @@ chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
 # ── Extreme Minimization hook ─────────────────────────────────────────
 cat > config/hooks/live/0090-extreme-minimization.hook.chroot << 'MIN_HOOK'
-#!/bin/bash
 set -e
 echo "=== Aggressive Minimization: cleaning system ==="
 
@@ -176,7 +195,6 @@ chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
 # ── Chromium Browser & Policy Configuration ───────────────────────────
 cat > config/hooks/live/0056-chromium-policy.hook.chroot << 'CHROMIUM_HOOK'
-#!/bin/bash
 set -e
 echo "=== Configuring Chromium Managed Policies ==="
 
@@ -206,7 +224,6 @@ chmod +x config/hooks/live/0056-chromium-policy.hook.chroot
 # ── GRUB branding + user-friendly boot menu ──────────────────────────
 mkdir -p config/hooks/binary
 cat > config/hooks/binary/0020-bootloader-branding.hook.binary << 'BOOT_HOOK'
-#!/bin/bash
 set -e
 echo "=== Patching GRUB boot menu ==="
 
@@ -385,7 +402,6 @@ echo "=== Creating live customization hook ==="
 
 mkdir -p config/hooks/live
 cat > config/hooks/live/0100-customize.hook.chroot << 'HOOK'
-#!/bin/bash
 set -e
 
 # ── Plymouth theme ────────────────────────────────────────────────────
@@ -548,7 +564,6 @@ setopt INC_APPEND_HISTORY
 () {
   local dump="${ZDOTDIR:-$HOME}/.zcompdump"
   local matches=($dump(Nmh-24))
-  # Only re-scan (slow) if the dump is missing, older than zshrc, or older than 24h
   if [[ -s "$dump" && "$dump" -nt "${ZDOTDIR:-$HOME}/.zshrc" && ${#matches} -gt 0 ]]; then
     autoload -Uz compinit && compinit -C -u
   else
@@ -1214,7 +1229,6 @@ EOF
 # ── Desktop Welcome ───────────────────────────────────────────────────
 mkdir -p /usr/local/bin
 cat > /usr/local/bin/kiba-welcome << 'WELCOME'
-#!/bin/bash
 # Functional welcome menu for KibaOS
 zenity --info --title="Welcome to KibaOS" \
   --text="Welcome to KibaOS — Switch to Simple.\n\nEverything you need is already here. You can start exploring now, or install KibaOS permanently to your computer." \
@@ -1296,7 +1310,6 @@ BRANDING
 
 # ── Calamares branding hook ────────────────────────────────────────────
 cat > config/hooks/live/0110-calamares-branding.hook.chroot << 'BRANDING_HOOK'
-#!/bin/bash
 set -e
 mkdir -p /etc/calamares/branding/kibaos
 cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
@@ -1493,7 +1506,6 @@ CALADESKTOP
 # ── Post-install script ─────────────────────────────────────────────────
 mkdir -p config/includes.chroot/usr/share/kibaos
 cat > config/includes.chroot/usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
-#!/bin/bash
 # KibaOS post-install — runs chrooted inside installed system
 set -e
 exec > /var/log/kibaos-post-install.log 2>&1
@@ -1625,7 +1637,7 @@ fi
 
 # Check for critical modern tools (mapping binary names to package names where needed)
 for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
-  if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
+  if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -Ei "$tool installed" build.log; then
      echo "VERIFIED: $tool installed"
   else
      # Some might be installed as dependencies or already present
