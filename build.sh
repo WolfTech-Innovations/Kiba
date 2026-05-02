@@ -1,10 +1,11 @@
 #!/bin/bash
-#!/bin/bash
           set -ex
           export DEBIAN_FRONTEND=noninteractive
 
           # ── Install live-build and build deps ─────────────────────────────────
-          apt update && apt install -y \
+          # Use eatmydata to speed up package installation by skipping fsync
+          apt update && apt install -y eatmydata
+          eatmydata apt install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
             qemu-system-x86 gettext
@@ -32,7 +33,7 @@
             --iso-volume "KIBAOS" \
             --cache true \
             --cache-packages true \
-            --cache-stages "bootstrap chroot rootfs binary" \
+            --cache-stages "bootstrap chroot rootfs" \
             --apt-options "--yes --no-install-recommends" \
             --apt-recommends false \
             --apt-indices false \
@@ -76,10 +77,10 @@
           show_always = true
           format = "[$user]($style)@"
           style = "bold #bd93f9"
-          STARSHIP_CONF
+STARSHIP_CONF
 
           echo "=== Starship Prompt configured ==="
-          STARSHIP_HOOK
+STARSHIP_HOOK
           chmod +x config/hooks/live/0030-starship.hook.chroot
 
           # ── CachyOS Kernel hook ──────────────────────────────────────────────
@@ -140,7 +141,7 @@
           apt autoremove -y
 
           echo "=== CachyOS Kernel installed ==="
-          CACHY_HOOK
+CACHY_HOOK
           chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
           # ── Extreme Minimization hook ─────────────────────────────────────────
@@ -169,7 +170,7 @@
           rm -rf /tmp/* /var/tmp/*
 
           echo "=== Aggressive Minimization complete ==="
-          MIN_HOOK
+MIN_HOOK
           chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
 
@@ -196,10 +197,10 @@
             "ShowHomeButton": true,
             "BookmarkBarEnabled": true
           }
-          CPOLICY
+CPOLICY
 
           echo "=== Chromium policies configured ==="
-          CHROMIUM_HOOK
+CHROMIUM_HOOK
           chmod +x config/hooks/live/0056-chromium-policy.hook.chroot
 
           # ── GRUB branding + user-friendly boot menu ──────────────────────────
@@ -232,7 +233,7 @@
           fi
 
           echo "=== GRUB boot menu branding complete ==="
-          BOOT_HOOK
+BOOT_HOOK
           chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
 
           echo "=== Adding packages ==="
@@ -378,7 +379,7 @@
           fzf
           yt-dlp
           file
-          PACKAGES
+PACKAGES
 
           echo "=== Creating live customization hook ==="
 
@@ -396,7 +397,7 @@
           if [ ! -f /usr/share/kibaos/logo.png ]; then
             cat > /tmp/logo_b64.txt << 'LOGO_B64'
           iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
-          LOGO_B64
+LOGO_B64
             base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
             rm /tmp/logo_b64.txt
           fi
@@ -412,7 +413,7 @@
           [script]
           ImageDir=/usr/share/plymouth/themes/kibaos-spinner
           ScriptFile=/usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
-          PLYMOUTH_THEME
+PLYMOUTH_THEME
 
           cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script << 'PLYMOUTH_SCRIPT'
           Window.SetBackgroundTopColor(0.157, 0.165, 0.212);
@@ -477,7 +478,7 @@
               msg.sprite.SetImage(msg.image);
           }
           Plymouth.SetMessageFunction(message_callback);
-          PLYMOUTH_SCRIPT
+PLYMOUTH_SCRIPT
 
           cp /usr/share/kibaos/logo-plymouth.png \
              /usr/share/plymouth/themes/kibaos-spinner/logo.png
@@ -511,7 +512,7 @@
           [Autologin]
           User=user
           Session=plasma
-          SDDM_CONF
+SDDM_CONF
 
           # ── Zsh config (auto-generated) ───────────────────────────────────────
           # The zshrc is written by this hook and placed in /etc/zsh/zshrc
@@ -543,21 +544,30 @@
           setopt INC_APPEND_HISTORY
 
           # ── Completion ─────────────────────────────────────────
-          autoload -Uz compinit && compinit -u
+          # Optimized compinit: only re-scan completions once a day or if missing
+          () {
+            local dump="${ZDOTDIR:-$HOME}/.zcompdump"
+            if [[ -s "$dump" && (! "$dump" -nt "${ZDOTDIR:-$HOME}/.zshrc" || -z "$(find "$dump" -mtime +1)") ]]; then
+              autoload -Uz compinit && compinit -C -u
+            else
+              autoload -Uz compinit && compinit -u
+            fi
+          }
           zstyle ':completion:*' menu select
           zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
           zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 
-          # ── VCS info (git branch in prompt) ────────────────────
-          autoload -Uz vcs_info
-          precmd() { vcs_info }
-          zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
-          setopt PROMPT_SUBST
-
           # ── Prompt — Starship (Modern) ──────────────────────────
           if command -v starship >/dev/null 2>&1; then
+            # Optimized: Starship handles its own git status; vcs_info is redundant here
             eval "$(starship init zsh)"
           else
+            # ── VCS info (git branch in prompt fallback) ──────────
+            autoload -Uz vcs_info
+            precmd() { vcs_info }
+            zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
+            setopt PROMPT_SUBST
+
             # Fallback to Dracula palette
             PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
           fi
@@ -649,7 +659,7 @@
           alias rm='rm -I'
           alias ..='cd ..'
           alias ...='cd ../..'
-          ZSHRC
+ZSHRC
 
           # ── Update tldr cache ──────────────────────────────────────────────────
           if command -v tldr >/dev/null 2>&1; then
@@ -680,7 +690,7 @@
           AllowHibernation=no
           AllowHybridSleep=no
           AllowSuspendThenHibernate=no
-          NOSLEEP
+NOSLEEP
 
           mkdir -p /etc/skel/.config
           cat > /etc/skel/.config/powermanagementprofilesrc << 'POWERRC'
@@ -692,7 +702,7 @@
           lidAction=0; powerButtonAction=0; powerDownAction=0
           [AC][SuspendAndShutdown]
           autoSuspend=false; autoSuspendAction=0; autoSuspendIdleTime=0
-          POWERRC
+POWERRC
 
           # ─────────────────────────────────────────────────────────────────────
           # ── THEMING ───────────────────────────────────────────────────────────
@@ -708,7 +718,7 @@
           if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
             cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
           {"KPlugin":{"Id":"ant-dark","Name":"Ant Dark","License":"GPL","Version":"1.0"}}
-          ANTMETA
+ANTMETA
           fi
           if [ -f /tmp/ant-themes/colors/Ant-Dark.colors ]; then
             mkdir -p /usr/share/color-schemes
@@ -720,7 +730,7 @@
           mkdir -p /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/images
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/metadata.json << 'WATCHMETA'
           {"KPlugin":{"Id":"com.kibaos.watchdogs.desktop","Name":"Watch Dogs","License":"GPL","Version":"1.0"}}
-          WATCHMETA
+WATCHMETA
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
@@ -739,7 +749,7 @@
                   }
               }
           }
-          WATCHSPLASH
+WATCHSPLASH
 
           # ── Kora icon theme ───────────────────────────────────────────────────
           mkdir -p /usr/share/icons
@@ -793,7 +803,7 @@
 
           [KDE]
           contrast=4
-          DRACULA_COLORS
+DRACULA_COLORS
 
           # ── Konsole Dracula colour scheme ──────────────────────────────────────
           mkdir -p /usr/share/konsole
@@ -837,7 +847,7 @@
           [General]
           Description=Dracula
           Opacity=0.95
-          KONSOLE_COLORS
+KONSOLE_COLORS
 
           # ── Konsole profile ────────────────────────────────────────────────────
           mkdir -p /etc/skel/.local/share/konsole
@@ -853,12 +863,12 @@
           TerminalRows=30
           [Scrolling]
           ScrollBarPosition=2
-          KONSOLE_PROFILE
+KONSOLE_PROFILE
 
           cat > /etc/skel/.local/share/konsole/konsolerc << 'KONSOLERC'
           [Desktop Entry]
           DefaultProfile=KibaOS.profile
-          KONSOLERC
+KONSOLERC
 
           # ── KDE global settings ────────────────────────────────────────────────
           SKEL_KDE=/etc/skel/.config
@@ -881,7 +891,7 @@
           toolBarFont=Inter,11,-1,5,50,0,0,0,0,0
           menuFont=Inter,11,-1,5,50,0,0,0,0,0
           smallestReadableFont=Inter,9,-1,5,50,0,0,0,0,0
-          XDG_KDEGLOBALS
+XDG_KDEGLOBALS
 
           cat > "$SKEL_KDE/kdeglobals" << 'KDEGLOBALS'
           [Colors:Button]
@@ -937,7 +947,7 @@
           activeForeground=248,248,242
           inactiveBackground=40,42,54
           inactiveForeground=98,114,164
-          KDEGLOBALS
+KDEGLOBALS
 
           # ── plasmarc — Ant-Dark theme ──────────────────────────────────────────
           cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
@@ -945,27 +955,27 @@
           name=ant-dark
           [PlasmaTabletMode]
           TabletMode=off
-          PLASMARC
+PLASMARC
 
           # ── ksplashrc — Watch_Dogs splash ──────────────────────────────────────
           cat > "$SKEL_KDE/ksplashrc" << 'KSPLASHRC'
           [KSplash]
           Engine=KSplashQML
           Theme=com.kibaos.watchdogs.desktop
-          KSPLASHRC
+KSPLASHRC
 
           # ── kcminputrc — Vimix cursors ─────────────────────────────────────────
           cat > "$SKEL_KDE/kcminputrc" << 'KCMINPUTRC'
           [Mouse]
           cursorTheme=Vimix-cursors
           cursorSize=24
-          KCMINPUTRC
+KCMINPUTRC
 
           mkdir -p /usr/share/icons/default
           cat > /usr/share/icons/default/index.theme << 'CURSOR_DEFAULT'
           [Icon Theme]
           Inherits=Vimix-cursors
-          CURSOR_DEFAULT
+CURSOR_DEFAULT
 
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
           cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
@@ -997,7 +1007,7 @@
 
           [Script-roundedwindows]
           CornerRadius=16
-          KWINRC
+KWINRC
 
           # ── breezerc — purple shadow ───────────────────────────────────────────
           cat > "$SKEL_KDE/breezerc" << 'BREEZERC'
@@ -1011,7 +1021,7 @@
           Enabled=true
           ExceptionPattern=.*
           Mask=2
-          BREEZERC
+BREEZERC
 
           # ── plasmashellrc — floating panel ─────────────────────────────────────
           cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
@@ -1023,7 +1033,7 @@
           floating=1
           [PlasmaViews][Panel 2][opacity]
           type=2
-          PLASMASHELLRC
+PLASMASHELLRC
 
           # ── Wallpaper: Autumn ─────────────────────────────────────────────────
           # Autumn ships with plasma-workspace-wallpapers
@@ -1112,7 +1122,7 @@
           plugin=org.kde.plasma.digitalclock
           [Containments][2][Layout]
           AppletOrder=3;4;5;8;9
-          PANELRC
+PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
           cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
@@ -1122,7 +1132,7 @@
           Timeout=0
           [Greeter][Wallpaper][org.kde.image][General]
           Image=file://${WALLPAPER_PATH}
-          LOCKRC
+LOCKRC
 
           # ── Calamares autostart on live session login ──────────────────────────
           # Uses KDE's XDG autostart so it fires after the desktop loads.
@@ -1140,7 +1150,7 @@
           Categories=System;
           X-KDE-autostart-condition=calamares
           OnlyShowIn=KDE;
-          AUTOSTART
+AUTOSTART
 
           # Also add to /etc/skel so it appears for the live user's home
           mkdir -p /etc/skel/.config/autostart
@@ -1181,11 +1191,11 @@
           HOME_URL="https://github.com/WolfTech-Innovations/kiba"
           SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
-          EOF
+EOF
 
           cat > /etc/issue << 'EOF'
           KibaOS \r (\l)
-          EOF
+EOF
 
           cat > /etc/motd << 'EOF'
 
@@ -1197,7 +1207,7 @@
 
           Welcome to KibaOS — Switch to Simple
 
-          EOF
+EOF
 
           # ── Desktop Welcome ───────────────────────────────────────────────────
           mkdir -p /usr/local/bin
@@ -1227,7 +1237,7 @@
               plasma-discover &
               ;;
           esac
-          WELCOME
+WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
           mkdir -p /etc/skel/.config/autostart
@@ -1239,12 +1249,12 @@
           Icon=start-here-kde-symbolic
           Terminal=false
           X-KDE-autostart-condition=kiba-welcome
-          WELCOMEDESK
+WELCOMEDESK
 
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
 
-          HOOK
+HOOK
           chmod +x config/hooks/live/0100-customize.hook.chroot
 
           echo "=== Creating Calamares config ==="
@@ -1280,7 +1290,7 @@
             WindowBackground:         "#282a36"
             WindowForeground:         "#f8f8f2"
           slideshow: "show.qml"
-          BRANDING
+BRANDING
 
           # ── Calamares branding hook ────────────────────────────────────────────
           cat > config/hooks/live/0110-calamares-branding.hook.chroot << 'BRANDING_HOOK'
@@ -1337,8 +1347,8 @@
           disable-cancel-during-exec: false
           hide-back-and-next-during-exec: true
           quit-at-end: false
-          CALASETTINGS
-          BRANDING_HOOK
+CALASETTINGS
+BRANDING_HOOK
           chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
           # ── User-friendly Calamares module configs ──────────────────────────────
@@ -1362,7 +1372,7 @@
 
           # Override the page title shown in the sidebar
           sidebar: "Welcome"
-          WELCOMECONF
+WELCOMECONF
 
           cat > /etc/calamares/modules/locale.conf << 'LOCALECONF'
           ---
@@ -1370,12 +1380,12 @@
           region: "en_US"
           zone:   "UTC"
           sidebar: "Language & Region"
-          LOCALECONF
+LOCALECONF
 
           cat > /etc/calamares/modules/keyboard.conf << 'KEYBOARDCONF'
           ---
           sidebar: "Keyboard"
-          KEYBOARDCONF
+KEYBOARDCONF
 
           cat > /etc/calamares/modules/partition.conf << 'PARTCONF'
           ---
@@ -1384,7 +1394,7 @@
           efiSystemPartitionSize: "300MiB"
           efiSystemPartitionName: "EFI"
           sidebar: "Storage"
-          PARTCONF
+PARTCONF
 
           cat > /etc/calamares/modules/users.conf << 'USERSCONF'
           ---
@@ -1397,12 +1407,12 @@
           passwordRequirements:
             minLength: 12
             maxLength: -1
-          USERSCONF
+USERSCONF
 
           cat > /etc/calamares/modules/summary.conf << 'SUMMARYCONF'
           ---
           sidebar: "Review"
-          SUMMARYCONF
+SUMMARYCONF
 
           cat > /etc/calamares/modules/finished.conf << 'FINISHEDCONF'
           ---
@@ -1411,7 +1421,7 @@
           restartNowChecked:     true
           restartNowCommand:     "shutdown -r now"
           notifyOnFinished:      false
-          FINISHEDCONF
+FINISHEDCONF
 
           # ── displaymanager.conf ─────────────────────────────────────────────────
           mkdir -p /etc/calamares/modules
@@ -1420,7 +1430,7 @@
           displaymanagers:
             - sddm
           basicSetup: false
-          DMCONF
+DMCONF
 
           # ── preservefiles.conf ──────────────────────────────────────────────────
           # FIXED: correct syntax — use list of file paths, not "from: log"
@@ -1431,7 +1441,7 @@
             - dest: /var/log/kibaos-install.log
               from: /var/log/calamares/session.log
               perm: "0644"
-          PRESFILES
+PRESFILES
 
           # ── shellprocess@post.conf ──────────────────────────────────────────────
           cat > /etc/calamares/modules/shellprocess@post.conf << 'POSTINSTALL'
@@ -1441,7 +1451,7 @@
           verbose: true
           script:
             - "/usr/share/kibaos/post-install.sh"
-          POSTINSTALL
+POSTINSTALL
 
           # ── Calamares slideshow ─────────────────────────────────────────────────
           cat > /etc/calamares/branding/kibaos/show.qml << 'SHOWQML'
@@ -1461,7 +1471,7 @@
               function onActivate() { presentation.currentSlide = 0; }
               function onLeave() {}
           }
-          SHOWQML
+SHOWQML
 
           # ── Calamares .desktop launcher ─────────────────────────────────────────
           mkdir -p config/includes.chroot/usr/share/applications
@@ -1475,7 +1485,7 @@
           Icon=calamares
           Terminal=false
           Categories=System;
-          CALADESKTOP
+CALADESKTOP
 
 
           # ── Post-install script ─────────────────────────────────────────────────
@@ -1517,7 +1527,7 @@
           [Users]
           RememberLastSession=true
           RememberLastUser=true
-          SDDMCONF
+SDDMCONF
 
           # 5. Sudoers — remove live NOPASSWD
           rm -f /etc/sudoers.d/live-user
@@ -1528,7 +1538,7 @@
           127.0.0.1   localhost
           127.0.1.1   kibaos
           ::1         localhost ip6-localhost ip6-loopback
-          HOSTS
+HOSTS
           cat > /etc/os-release << 'OSREL'
           NAME="KibaOS"
           ID=kibaos
@@ -1538,7 +1548,7 @@
           HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
           SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
           BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
-          OSREL
+OSREL
 
           # 7. Sleep disabled on installed system
           mkdir -p /etc/systemd/sleep.conf.d
@@ -1548,7 +1558,7 @@
           AllowHibernation=no
           AllowHybridSleep=no
           AllowSuspendThenHibernate=no
-          NOSLEEP
+NOSLEEP
 
           # 8. Plymouth — re-register and rebuild initramfs
           if [ -f /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth ]; then
@@ -1595,14 +1605,15 @@
           command -v nala >/dev/null 2>&1 && {
             alias   apt='nala'
           }
-          NALABASH
+NALABASH
             fi
           done
-          POSTINSTALLSH
+POSTINSTALLSH
           chmod +x config/includes.chroot/usr/share/kibaos/post-install.sh
 
           echo "=== Starting live-build ==="
-          lb build 2>&1 | tee build.log
+          # eatmydata accelerates the build significantly by reducing disk I/O overhead
+          eatmydata lb build 2>&1 | tee build.log
 
           if grep -q "linux-image-psycachy" build.log; then
             echo "VERIFIED: CachyOS Kernel installed"
