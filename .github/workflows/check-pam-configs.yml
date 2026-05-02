@@ -1,0 +1,24 @@
+name: Check PAM Configs
+on:
+  push:
+    paths:
+      - '**/pam.d/*'
+  pull_request:
+    paths:
+      - '**/pam.d/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate PAM files
+        run: |
+          set -euo pipefail
+          find . -path "*/pam.d/*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            # Check for standard PAM types
+            grep -v "^#" "$file" | grep -v "^$" | grep -vE "^(auth|account|session|password|@include)" && {
+              echo "Error: Invalid PAM type in $file"; exit 1;
+            } || true
+          done

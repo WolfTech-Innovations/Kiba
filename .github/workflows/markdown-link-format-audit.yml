@@ -5,9 +5,10 @@ on:
       - '**.md'
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for bare URLs
         run: |
           grep -rnE "http[s]?://[a-zA-Z0-9./?-]+" . | grep -vE "\[.*\]\(http|src=|href=" && { echo "Error: Use Markdown link format for URLs"; exit 1; } || echo "Links are properly formatted"

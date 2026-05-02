@@ -1,0 +1,20 @@
+name: Shell Checkbashisms Audit
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  audit-bashisms:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Run checkbashisms
+        run: |
+          sudo apt update -qq && sudo apt install -y -qq devscripts > /dev/null
+          # -f is required because our scripts use #!/bin/bash
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r checkbashisms -f -n -p

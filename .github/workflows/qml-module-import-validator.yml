@@ -8,9 +8,10 @@ on:
 
 jobs:
   validate-qml-imports:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check QML imports in Splash.qml
         run: |
           # Ensure QtQuick 2.15 is used as per project standard

@@ -5,9 +5,12 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   audit:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Check for excessive permissions
         run: |
-          grep -rn "permissions: write-all" .github/workflows/*.yml && { echo "Error: write-all permission is prohibited"; exit 1; } || echo "Permissions are restricted"
+          grep -rn "permissions: write-all" .github/workflows/*.yml | grep -v "workflow-permissions-audit.yml" && { echo "Error: write-all permission is prohibited"; exit 1; } || echo "Permissions are restricted"

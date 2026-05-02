@@ -1,0 +1,19 @@
+name: Shell Heredoc Indentation Check
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  check-heredoc:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Scan for unindented heredocs
+        run: |
+          find . -name "*.sh" -not -path "./node_modules/*" | xargs -r grep -l "<<[A-Z]" | grep -v "<<-" && echo "Recommendation: Use '<<-' to allow tabs for indentation in heredocs." || echo "Heredoc usage looks good"

@@ -1,0 +1,23 @@
+name: Repository DOS Line Endings Check
+on:
+  push:
+    paths-ignore:
+      - "**.png"
+      - "**.jpg"
+      - "**.ico"
+  pull_request:
+    paths-ignore:
+      - "**.png"
+      - "**.jpg"
+      - "**.ico"
+jobs:
+  check-eol:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Scan for CRLF line endings
+        run: |
+          grep -rlI $'\r' . --exclude-dir=.git --exclude-dir=node_modules && { echo "Error: CRLF line endings detected. Use LF instead."; exit 1; } || echo "All line endings are LF"

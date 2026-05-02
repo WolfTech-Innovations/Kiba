@@ -1,0 +1,17 @@
+name: PR No Revert Commits Check
+on:
+  pull_request:
+    types: [opened, synchronize]
+jobs:
+  check-reverts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
+      - name: Scan for revert commits
+        run: |
+          set -euo pipefail
+          git log origin/${{ github.base_ref }}..HEAD --pretty=format:"%s" | grep -i "^Revert" && { echo "Warning: PR contains revert commits. Please squash them if appropriate."; } || echo "No revert commits found."

@@ -1,0 +1,18 @@
+name: PR Labels on Ready For Review
+on:
+  pull_request:
+    types: [ready_for_review]
+jobs:
+  ensure-labels:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check for labels
+        env:
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+          if [[ "$PR_LABELS" == "[]" ]]; then
+             echo "Error: PR must have at least one label when moved out of draft."
+             exit 1
+          fi

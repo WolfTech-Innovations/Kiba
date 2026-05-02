@@ -1,0 +1,21 @@
+name: Check X11 Snippets
+on:
+  push:
+    paths:
+      - '**/xorg.conf.d/*.conf'
+  pull_request:
+    paths:
+      - '**/xorg.conf.d/*.conf'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate X11 config snippets
+        run: |
+          set -euo pipefail
+          find . -name "*.conf" -path "*/xorg.conf.d/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -qE "Section|EndSection" "$file" || { echo "Error: $file does not look like an X11 config snippet"; exit 1; }
+          done

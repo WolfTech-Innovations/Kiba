@@ -6,6 +6,7 @@ on:
 
 jobs:
   check-branch:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Verify Base Branch
@@ -18,7 +19,8 @@ jobs:
         env:
           BRANCH_NAME: ${{ github.head_ref }}
         run: |
-          if [[ ! $BRANCH_NAME =~ ^(feat|fix|doc|refactor|build|ci)/ ]]; then
+          REGEX='^(feat|fix|docs?|refactor|build|ci|perf|bolt)/'
+          if [[ ! $BRANCH_NAME =~ $REGEX ]]; then
             echo "Branch name '$BRANCH_NAME' does not follow conventions (feat/, fix/, etc.)"
             # exit 1 # Optional: don't fail, just warn
           fi

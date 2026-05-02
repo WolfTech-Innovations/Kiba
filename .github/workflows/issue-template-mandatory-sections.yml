@@ -1,0 +1,18 @@
+name: Issue Template Mandatory Sections
+on:
+  issues:
+    types: [opened]
+jobs:
+  check-sections:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify mandatory sections
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          if [[ "$ISSUE_BODY" != *"Steps to Reproduce"* && "${{ contains(github.event.issue.labels.*.name, 'bug') }}" == "true" ]]; then
+            echo "Error: Bug reports must include 'Steps to Reproduce' section."
+            exit 1
+          fi

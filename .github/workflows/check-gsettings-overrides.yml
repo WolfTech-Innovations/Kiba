@@ -1,0 +1,23 @@
+name: Check gsettings Overrides
+on:
+  push:
+    paths:
+      - '**/glib-2.0/schemas/*.gschema.override'
+  pull_request:
+    paths:
+      - '**/glib-2.0/schemas/*.gschema.override'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate gsettings overrides
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y libglib2.0-bin
+          find . -name "*.gschema.override" -path "*/glib-2.0/schemas/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Simple check, full validation requires schemas to be present
+            grep -q "\[.*\]" "$file" || { echo "Error: Missing group header in $file"; exit 1; }
+          done

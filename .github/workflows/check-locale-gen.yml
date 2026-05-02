@@ -1,0 +1,22 @@
+name: Check locale-gen Config
+on:
+  push:
+    paths:
+      - '**/locale.gen'
+  pull_request:
+    paths:
+      - '**/locale.gen'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate locale.gen
+        run: |
+          set -euo pipefail
+          find . -name "locale.gen" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Check for at least one active locale
+            grep -v "^#" "$file" | grep -v "^$" | grep -q "." || { echo "Error: No active locales in $file"; exit 1; }
+          done

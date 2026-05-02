@@ -1,0 +1,21 @@
+name: Check Plasma Applet Metadata
+on:
+  push:
+    paths:
+      - '**/plasma/plasmoids/**/metadata.json'
+  pull_request:
+    paths:
+      - '**/plasma/plasmoids/**/metadata.json'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Plasma applet metadata
+        run: |
+          set -euo pipefail
+          find . -name "metadata.json" -path "*/plasma/plasmoids/*" | while read -r file; do
+            echo "Auditing $file..."
+            FILE="$file" python3 -c "import os, json; d=json.load(open(os.environ['FILE'])); assert 'KPackageStructure' in d['KPlugin']" || { echo "Error: Invalid Plasma applet metadata in $file"; exit 1; }
+          done

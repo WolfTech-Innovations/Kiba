@@ -1,0 +1,36 @@
+name: PR Review Latency Alert
+on:
+  schedule:
+    - cron: "0 9 * * 1-5"
+  workflow_dispatch:
+jobs:
+  review-alert:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Notify of slow reviews
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        with:
+          script: |
+            const { data: pullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open'
+            });
+            const now = new Date();
+            let report = "## PR Review Latency Report\n";
+            let found = false;
+            for (const pr of pullRequests) {
+              const created = new Date(pr.created_at);
+              const diffDays = Math.ceil((now - created) / (1000 * 60 * 60 * 24));
+              if (diffDays > 3 && pr.requested_reviewers.length > 0) {
+                report += `- [ ] PR [#${pr.number}](${pr.html_url}) has been open for ${diffDays} days with pending reviews.\n`;
+                found = true;
+              }
+            }
+            if (found) {
+              await core.summary.addRaw(report).write();
+            } else {
+              await core.summary.addRaw("No PRs with high latency found.").write();
+            }

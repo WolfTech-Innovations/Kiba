@@ -1,0 +1,40 @@
+name: Issue Needs-Info Auto-Closer
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+jobs:
+  auto-close:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Close inactive needs-info issues
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        with:
+          script: |
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'needs-info'
+            });
+            const now = new Date();
+            for (const issue of issues) {
+              const updated = new Date(issue.updated_at);
+              const diffDays = Math.ceil((now - updated) / (1000 * 60 * 60 * 24));
+              if (diffDays > 14) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: "Closing this issue due to 14 days of inactivity since requesting more information."
+                });
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed'
+                });
+              }
+            }

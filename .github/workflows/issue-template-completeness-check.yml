@@ -5,9 +5,10 @@ on:
       - '.github/ISSUE_TEMPLATE/*.md'
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify template fields
         run: |
           find .github/ISSUE_TEMPLATE -name "*.md" | while read -r file; do

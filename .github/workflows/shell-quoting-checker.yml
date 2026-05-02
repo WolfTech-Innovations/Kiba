@@ -8,9 +8,10 @@ on:
 
 jobs:
   check-quoting:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify variable quoting in kiba.yml
         run: |
           # Simple check for unquoted variables in shell blocks within kiba.yml

@@ -5,9 +5,10 @@ on:
       - 'package.json'
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for duplicates
         run: |
           grep -E '"[a-zA-Z0-9-]+":' package.json | sort | uniq -d | grep . && { echo "Error: Duplicate dependencies found in package.json"; exit 1; } || echo "No duplicates"

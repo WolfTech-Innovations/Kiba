@@ -1,0 +1,23 @@
+name: Docs Stale Content Alert
+on:
+  schedule:
+    - cron: "0 0 1 * *"
+  workflow_dispatch:
+jobs:
+  stale-docs:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Check for old documentation
+        run: |
+          echo "## Documentation Freshness Report" >> $GITHUB_STEP_SUMMARY
+          if [ -d "docs" ]; then
+            find docs -name "*.md" -mtime +180 | while read -r file; do
+              echo "- [ ] $file has not been updated in 6 months" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "No 'docs' directory found." >> $GITHUB_STEP_SUMMARY
+          fi

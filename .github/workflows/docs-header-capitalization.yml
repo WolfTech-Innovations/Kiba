@@ -1,0 +1,20 @@
+name: Docs Header Capitalization
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  check-headers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Audit header case
+        run: |
+          set -euo pipefail
+          # Heuristic: headers starting with lowercase (ignoring code blocks and lists)
+          grep -rnE "^#+ [a-z]" . --include="*.md" && { echo "Error: Headers should start with a capital letter."; exit 1; } || echo "Header capitalization looks good."

@@ -1,0 +1,23 @@
+name: Check NetworkManager Config
+on:
+  push:
+    paths:
+      - '**/NetworkManager/system-connections/*.nmconnection'
+  pull_request:
+    paths:
+      - '**/NetworkManager/system-connections/*.nmconnection'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate NM connection files
+        run: |
+          set -euo pipefail
+          find . -name "*.nmconnection" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -q "\[connection\]" "$file" || { echo "Error: Missing [connection] section in $file"; exit 1; }
+            grep -q "id=" "$file" || { echo "Error: Missing id in $file"; exit 1; }
+            grep -q "uuid=" "$file" || { echo "Error: Missing uuid in $file"; exit 1; }
+          done

@@ -1,0 +1,25 @@
+name: Workflow Unused Env Vars Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  check-env:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Scan for defined but unused env vars
+        run: |
+          for file in .github/workflows/*.yml; do
+            grep -oE "[A-Z0-9_]+:" "$file" | sed 's/://' | while read -r var; do
+              if [ $(grep -c "$var" "$file") -eq 1 ]; then
+                 echo "Notice: $var in $file might be unused"
+              fi
+            done
+          done

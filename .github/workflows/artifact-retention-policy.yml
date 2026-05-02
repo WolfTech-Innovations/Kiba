@@ -7,9 +7,10 @@ on:
 
 jobs:
   check-retention:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify artifact retention in kiba.yml
         run: |
           # Ensure artifacts are kept for at least 7 days (simplified check)

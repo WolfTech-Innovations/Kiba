@@ -5,9 +5,12 @@ on:
       - '.github/workflows/*.yml'
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for set-output
         run: |
-          grep -r "::set-output" .github/workflows/*.yml && { echo "Error: ::set-output is deprecated, use GITHUB_OUTPUT"; exit 1; } || echo "No deprecated GITHUB_OUTPUT usage"
+          grep -r "::set-output" .github/workflows/*.yml --exclude="github-actions-deprecated-commands.yml" && { echo "Error: ::set-output is deprecated, use GITHUB_OUTPUT"; exit 1; } || echo "No deprecated GITHUB_OUTPUT usage"

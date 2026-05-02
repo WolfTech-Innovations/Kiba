@@ -3,9 +3,10 @@ on:
   push:
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Find empty files
         run: |
           find . -type f -empty -not -path "./.git/*" -not -name ".gitkeep" | grep . && { echo "Error: Empty files found"; exit 1; } || echo "No empty files"

@@ -1,0 +1,19 @@
+name: Markdown Code Language Requirement
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  check-lang:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Scan for untagged code blocks
+        run: |
+          find . -name "*.md" -not -path "./node_modules/*" | xargs -r grep -l "^[[:space:]]*\`\`\`[[:space:]]*$" && { echo "Error: Markdown code blocks must have a language tag."; exit 1; } || echo "All code blocks are tagged"

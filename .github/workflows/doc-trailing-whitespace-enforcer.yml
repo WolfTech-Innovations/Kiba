@@ -5,9 +5,10 @@ on:
       - '**.md'
 jobs:
   check:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for trailing whitespace
         run: |
           grep -rnE "[[:space:]]+$" docs/ *.md && { echo "Error: Trailing whitespace found in markdown files"; exit 1; } || echo "No trailing whitespace"

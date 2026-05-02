@@ -1,0 +1,16 @@
+name: Repo Executable Bit Check
+on:
+  push:
+jobs:
+  check-executable:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate executable bits
+        run: |
+          set -euo pipefail
+          # Scripts should be executable, others shouldn't (mostly)
+          find . -type f -name "*.sh" ! -executable | grep . && { echo "Error: Shell scripts should be executable."; exit 1; } || true
+          find . -type f -name "*.md" -executable | grep . && { echo "Error: Markdown files should not be executable."; exit 1; } || true

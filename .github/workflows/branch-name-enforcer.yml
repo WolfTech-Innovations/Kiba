@@ -4,13 +4,16 @@ on:
     types: [opened, synchronize]
 jobs:
   check-branch:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Validate Branch Name
         env:
           BRANCH: ${{ github.head_ref }}
         run: |
-          if [[ ! "$BRANCH" =~ ^(feat|fix|docs|refactor|chore|ci)/ ]]; then
-            echo "Invalid branch name: $BRANCH. Must start with feat/, fix/, docs/, refactor/, chore/, or ci/."
+          # Use variable for regex to prevent syntax issues and allow for 'perf' prefix
+          REGEX='^(feat|fix|docs|refactor|chore|ci|perf|bolt)/'
+          if [[ ! "$BRANCH" =~ $REGEX ]]; then
+            echo "Invalid branch name: $BRANCH. Must start with feat/, fix/, docs/, refactor/, chore/, ci/, perf/, or bolt/."
             exit 1
           fi

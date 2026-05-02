@@ -1,0 +1,22 @@
+name: Check fstab Syntax
+on:
+  push:
+    paths:
+      - '**/fstab'
+  pull_request:
+    paths:
+      - '**/fstab'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate fstab format
+        run: |
+          set -euo pipefail
+          find . -name "fstab" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Check for at least 6 columns in non-comment lines
+            grep -v "^#" "$file" | grep -v "^$" | awk 'NF < 6 {print "Error: Invalid line in fstab: " $0; exit 1}'
+          done

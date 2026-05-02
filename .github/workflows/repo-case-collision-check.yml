@@ -1,0 +1,15 @@
+name: Repo Case Collision Check
+on:
+  push:
+  pull_request:
+jobs:
+  check-case:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+      - name: Scan for filename case collisions
+        run: |
+          find . -not -path "./.git/*" -not -path "./node_modules/*" | tr '[:upper:]' '[:lower:]' | sort | uniq -d | grep . && { echo "Error: Filename case collisions detected (incompatible with case-insensitive filesystems)."; exit 1; } || echo "No case collisions found"

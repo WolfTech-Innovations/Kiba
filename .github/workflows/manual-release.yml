@@ -10,14 +10,15 @@ on:
 
 jobs:
   release:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Create Release
-        id: create_release
+        id: create-release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version }}
@@ -28,34 +29,4 @@ jobs:
       - name: Save Release Notes to Notes folder
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Generate filename: NTE-DDHYM
-          # DD: Day of month (01-31)
-          # H: Hour of day (0-N for 0-23)
-          # Y: Last digit of year
-          # M: Month (1-C for 1-12)
-
-          DD=$(date +%d)
-
-          H_VAL=$(date +%-H)
-          HOURS="0123456789ABCDEFGHIJKLMN"
-          H=$(echo $HOURS | cut -c $((H_VAL + 1)))
-
-          Y=$(date +%y | cut -c 2)
-
-          M_VAL=$(date +%-m)
-          MONTHS="123456789ABC"
-          M=$(echo $MONTHS | cut -c $M_VAL)
-
-          FILENAME="Notes/NTE-${DD}${H}${Y}${M}.md"
-
-          mkdir -p Notes
-          # Fetch release body using GitHub CLI
-          gh release view ${{ steps.create_release.outputs.id }} --template '{{.body}}' > "$FILENAME"
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add "$FILENAME"
-          git commit -m "docs: add release notes $FILENAME [skip ci]"
-          git pull --rebase origin main
-          git push origin main
+        run: ./scripts/save_release_notes.sh ${{ steps.create-release.outputs.id }}
