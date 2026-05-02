@@ -3,7 +3,6 @@ on:
   pull_request:
 jobs:
   check-size:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
