@@ -547,8 +547,9 @@ setopt INC_APPEND_HISTORY
 # Optimized compinit: only re-scan completions once a day or if missing
 () {
   local dump="${ZDOTDIR:-$HOME}/.zcompdump"
-  local matches=("$dump"(Nmh-24))
-  if [[ -s "$dump" && (! "$dump" -nt "${ZDOTDIR:-$HOME}/.zshrc" || ${#matches} -gt 0) ]]; then
+  local matches=($dump(Nmh-24))
+  # Only re-scan (slow) if the dump is missing, older than zshrc, or older than 24h
+  if [[ -s "$dump" && "$dump" -nt "${ZDOTDIR:-$HOME}/.zshrc" && ${#matches} -gt 0 ]]; then
     autoload -Uz compinit && compinit -C -u
   else
     autoload -Uz compinit && compinit -u
@@ -604,7 +605,7 @@ fi
 alias edit='${EDITOR:-micro}'
 alias please='sudo'
 alias cls='clear'
-alias path='echo -e "${PATH//:/\\n}"'
+alias path='printf "%b\n" "${PATH//:/\\n}"'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
@@ -661,9 +662,6 @@ alias rm='rm -I'
 alias ..='cd ..'
 alias ...='cd ../..'
 ZSHRC
-
-# Pre-compile the system-wide zshrc for faster loading (wordcode is faster to parse)
-[ -f /etc/zsh/zshrc ] && zsh -c 'zcompile /etc/zsh/zshrc' || true
 
 # ── Update tldr cache ──────────────────────────────────────────────────
 if command -v tldr >/dev/null 2>&1; then
