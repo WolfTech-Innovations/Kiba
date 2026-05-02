@@ -624,7 +624,7 @@ jobs:
           alias edit='${EDITOR:-micro}'
           alias please='sudo'
           alias cls='clear'
-          alias path='echo -e "${PATH//:/\\n}"'
+          alias path='print -l $path'
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
@@ -1229,25 +1229,45 @@ jobs:
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Functional welcome menu for KibaOS
-          CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-            --text="Welcome to KibaOS! What would you like to do?" \
-            --column="Action" --column="Description" \
-            "Install KibaOS" "Install the system permanently to your disk" \
-            "Web Browser" "Browse the internet" \
-            "Software Center" "Discover and install new applications" \
-            --width=450 --height=300 2>/dev/null)
+          while true; do
+            CHOICE=$(zenity --list --title="Welcome to KibaOS" \
+              --window-icon="/usr/share/kibaos/logo.png" \
+              --text="Welcome to KibaOS! What would you like to do?" \
+              --column="Action" --column="Description" \
+              "Install KibaOS" "Install the system permanently to your disk" \
+              "Web Browser" "Browse the internet" \
+              "Software Center" "Discover and install new applications" \
+              "Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "Online Wiki" "Read the technical documentation" \
+              --width=500 --height=400 2>/dev/null)
 
-          case "$CHOICE" in
-            "Install KibaOS")
-              sudo calamares &
-              ;;
-            "Web Browser")
-              chromium &
-              ;;
-            "Software Center")
-              plasma-discover &
-              ;;
-          esac
+            [ -z "$CHOICE" ] && break
+
+            case "$CHOICE" in
+              "Install KibaOS")
+                sudo calamares &
+                break
+                ;;
+              "Web Browser")
+                chromium &
+                break
+                ;;
+              "Software Center")
+                plasma-discover &
+                break
+                ;;
+              "Keyboard Shortcuts")
+                zenity --info --title="Keyboard Shortcuts" \
+                  --window-icon="/usr/share/kibaos/logo.png" \
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
+                  --width=400 2>/dev/null
+                ;;
+              "Online Wiki")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
+                break
+                ;;
+            esac
+          done
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
