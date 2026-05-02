@@ -18,8 +18,8 @@ jobs:
             -v "$PWD:/w" \
             -e RUN_NUM="${{ github.run_number }}" \
             debian:trixie \
-            /w/build.sh
-
+            bash /w/build.sh
+            
       - name: Upload to SourceForge
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         env:
