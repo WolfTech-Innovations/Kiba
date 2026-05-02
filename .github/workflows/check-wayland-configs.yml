@@ -1,0 +1,23 @@
+name: Check Wayland Configs
+on:
+  push:
+    paths:
+      - '**/sway/config'
+      - '**/hypr/hyprland.conf'
+  pull_request:
+    paths:
+      - '**/sway/config'
+      - '**/hypr/hyprland.conf'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Sway config
+        run: |
+          set -euo pipefail
+          find . -name "config" -path "*/sway/*" | while read -r file; do
+            echo "Auditing Sway config: $file"
+            grep -q "exec" "$file" || echo "Note: No exec commands in Sway config"
+          done

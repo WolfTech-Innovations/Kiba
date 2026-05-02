@@ -1,0 +1,21 @@
+name: Check Bash Completion Syntax
+on:
+  push:
+    paths:
+      - '**/bash-completion/completions/*'
+  pull_request:
+    paths:
+      - '**/bash-completion/completions/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Bash completions
+        run: |
+          set -euo pipefail
+          find . -path "*/bash-completion/completions/*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            bash -n "$file" || { echo "Error: Syntax error in $file"; exit 1; }
+          done

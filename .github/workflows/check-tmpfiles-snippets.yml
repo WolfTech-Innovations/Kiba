@@ -1,0 +1,21 @@
+name: Check tmpfiles Snippets
+on:
+  push:
+    paths:
+      - '**/tmpfiles.d/*.conf'
+  pull_request:
+    paths:
+      - '**/tmpfiles.d/*.conf'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate tmpfiles config
+        run: |
+          set -euo pipefail
+          find . -name "*.conf" -path "*/tmpfiles.d/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -v "^#" "$file" | grep -v "^$" | awk 'NF < 2 {print "Error: Invalid line in $file"; exit 1}'
+          done

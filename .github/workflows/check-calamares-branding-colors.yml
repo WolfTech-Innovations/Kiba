@@ -1,0 +1,23 @@
+name: Check Calamares Branding Colors
+on:
+  push:
+    paths:
+      - '**/branding.desc'
+  pull_request:
+    paths:
+      - '**/branding.desc'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Calamares branding KibaOS Standards
+        run: |
+          set -euo pipefail
+          find . -name "branding.desc" | while read -r file; do
+            echo "Auditing $file..."
+            # KibaOS standards: Dracula theme colors
+            grep -qi "WindowBackground: \"#282a36\"" "$file" || { echo "Error: branding.desc must specify WindowBackground as #282a36."; exit 1; }
+            grep -qi "WindowForeground: \"#f8f8f2\"" "$file" || { echo "Error: branding.desc must specify WindowForeground as #f8f8f2."; exit 1; }
+          done

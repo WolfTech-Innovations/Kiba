@@ -1,0 +1,22 @@
+name: Check dracut.conf
+on:
+  push:
+    paths:
+      - '**/dracut.conf.d/*.conf'
+  pull_request:
+    paths:
+      - '**/dracut.conf.d/*.conf'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate dracut config
+        run: |
+          set -euo pipefail
+          find . -name "*.conf" -path "*/dracut.conf.d/*" | while read -r file; do
+            echo "Auditing $file..."
+            # dracut configs are shell snippets
+            bash -n "$file" || { echo "Error: Syntax error in $file"; exit 1; }
+          done

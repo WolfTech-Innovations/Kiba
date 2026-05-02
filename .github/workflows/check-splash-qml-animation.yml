@@ -1,0 +1,24 @@
+name: Check Splash QML Animation
+on:
+  push:
+    paths:
+      - '**/Splash.qml'
+  pull_request:
+    paths:
+      - '**/Splash.qml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Splash.qml KibaOS Standards
+        run: |
+          set -euo pipefail
+          find . -name "Splash.qml" | while read -r file; do
+            echo "Auditing $file..."
+            # KibaOS standards: 1000ms fade-in intro animation
+            grep -q "duration: 1000" "$file" || { echo "Error: Splash.qml must have a 1000ms duration animation per KibaOS standards."; exit 1; }
+            # KibaOS standards: Dracula theme background #282a36
+            grep -qi "#282a36" "$file" || { echo "Error: Splash.qml must use Dracula theme background (#282a36)."; exit 1; }
+          done

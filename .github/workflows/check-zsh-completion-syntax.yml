@@ -1,0 +1,22 @@
+name: Check Zsh Completion Syntax
+on:
+  push:
+    paths:
+      - '**/zsh/site-functions/_*'
+  pull_request:
+    paths:
+      - '**/zsh/site-functions/_*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Zsh completions
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y zsh
+          find . -path "*/zsh/site-functions/_*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            zsh -n "$file" || { echo "Error: Syntax error in $file"; exit 1; }
+          done
