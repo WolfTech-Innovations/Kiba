@@ -6,6 +6,7 @@ on:
 
 jobs:
   check-labels:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     if: |
       !contains(github.event.pull_request.user.login, 'jules') &&

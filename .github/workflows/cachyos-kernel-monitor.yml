@@ -7,6 +7,7 @@ on:
 
 jobs:
   check-kernel:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
       - name: Check Latest CachyOS Kernel

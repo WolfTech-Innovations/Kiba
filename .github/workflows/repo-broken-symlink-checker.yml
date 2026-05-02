@@ -7,6 +7,7 @@ on:
     - cron: "0 0 * * 0"
 jobs:
   check-symlinks:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

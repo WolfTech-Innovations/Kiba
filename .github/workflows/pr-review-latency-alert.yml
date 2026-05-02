@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   review-alert:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

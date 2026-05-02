@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   auto-close:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -4,6 +4,7 @@ on:
   pull_request:
 jobs:
   check-case:
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

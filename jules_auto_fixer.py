@@ -49,7 +49,7 @@ def find_source(api_key, repo_full_name):
     req.add_header("x-goog-api-key", api_key)
 
     try:
-        with urllib.request.urlopen(req) as response:  # nosec B310  # nosec B310  # nosec B310  # nosec B310  # nosec B310  # nosec B310  # nosec B310
+        with urllib.request.urlopen(req) as response:  # nosec B310  # nosec B310
             if response.status == 200:
                 data = json.loads(response.read().decode())
                 sources = data.get("sources", [])
@@ -127,7 +127,7 @@ def main():
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
 
     try:
-        with urllib.request.urlopen(req) as response:  # nosec B310  # nosec B310  # nosec B310  # nosec B310  # nosec B310  # nosec B310  # nosec B310
+        with urllib.request.urlopen(req) as response:  # nosec B310  # nosec B310
             if response.status in [200, 201]:
                 res_data = json.loads(response.read().decode())
                 print(f"Successfully created Jules session: {res_data.get('name')}")
