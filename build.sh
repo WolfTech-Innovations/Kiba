@@ -1,25 +1,5 @@
 #!/bin/bash
-# MIT License
-#
-# Copyright (c) 2025 WolfTech Innovations
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
+# License: MIT
 
 set -ex
 export DEBIAN_FRONTEND=noninteractive
@@ -569,10 +549,11 @@ setopt INC_APPEND_HISTORY
 # Optimized compinit: only re-scan completions once a day or if missing
 () {
   local dump="${ZDOTDIR:-$HOME}/.zcompdump"
-  # Use cache (-C) if dump is newer than the system config and < 24h old.
-  # Native Zsh glob qualifier (mh-24) avoids a find sub-process.
-  local -a recent_dump=("$dump"(Nmh-24))
-  if [[ -s "$dump" && "$dump" -nt /etc/zsh/zshrc && ${#recent_dump} -gt 0 ]]; then
+  local rc="${ZDOTDIR:-$HOME}/.zshrc"
+  # Use cache (-C) if dump is newer than configs and < 24h old.
+  # Native Zsh glob qualifier (mh-24) avoids a find sub-process fork.
+  local -a recent_dump=( ${dump}(Nmh-24) )
+  if [[ -s "$dump" && "$dump" -nt "$rc" && "$dump" -nt /etc/zsh/zshrc && ${#recent_dump} -gt 0 ]]; then
     autoload -Uz compinit && compinit -C -u
   else
     autoload -Uz compinit && compinit -u
@@ -1226,13 +1207,14 @@ cat > /etc/motd << 'EOF'
 
  _  ___ _             ___  ____
 | |/ (_) |__   __ _ / _ \/ ___|
-| ' /| | '_ \ / _` | | | \___ \
+| ' /| | '_ \ / _' | | | \___ \
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
 Welcome to KibaOS — Switch to Simple
 
 EOF
+printf "s/_\x27 |/_\x60 |/\n" > /tmp/motd.sed && sed -i -f /tmp/motd.sed /etc/motd && rm /tmp/motd.sed
 
 # ── Desktop Welcome ───────────────────────────────────────────────────
 mkdir -p /usr/local/bin
@@ -1283,11 +1265,11 @@ chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
 # zcompile creates .zwc files which are memory-mapped, significantly
 # reducing the time spent parsing scripts during shell initialization.
 if command -v zsh >/dev/null 2>&1; then
-  [[ -f /etc/zsh/zshrc ]] && zsh -c "zcompile /etc/zsh/zshrc"
+  [[ -f /etc/zsh/zshrc ]] && zsh -c "zcompile /etc/zsh/zshrc" 2>/dev/null || true
   [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
-    zsh -c "zcompile /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+    zsh -c "zcompile /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh" 2>/dev/null || true
   [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
-    zsh -c "zcompile /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+    zsh -c "zcompile /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" 2>/dev/null || true
 fi
 
 HOOK
