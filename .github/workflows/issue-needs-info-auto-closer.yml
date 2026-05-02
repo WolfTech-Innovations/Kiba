@@ -5,9 +5,8 @@ on:
   workflow_dispatch:
 jobs:
   auto-close:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 60
     steps:
       - name: Close inactive needs-info issues
         uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7

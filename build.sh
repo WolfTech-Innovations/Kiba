@@ -23,8 +23,6 @@
 
 set -ex
 export DEBIAN_FRONTEND=noninteractive
-set -ex
-export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
 # Use eatmydata to speed up package installation by skipping fsync

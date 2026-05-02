@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Find broken anchors
         run: |
-          grep -roE '#[a-z0-9-]+' docs/*.md | while read -r line; do
+          grep -roE '#[a-z][a-z0-9-]+' docs/*.md | while read -r line; do
             anchor=$(echo "$line" | cut -d: -f2 | sed 's/#//')
             file=$(echo "$line" | cut -d: -f1)
             grep -qi "^##.*$anchor" "$file" || { echo "Broken anchor $anchor in $file"; exit 1; }

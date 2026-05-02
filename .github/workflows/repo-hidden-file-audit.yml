@@ -16,4 +16,4 @@ jobs:
           set -euo pipefail
           # List hidden files excluding known ones
           # Removed the repository-specific .Jules* exclusion to make it more generic or strictly controlled
-          find . -maxdepth 2 -name ".*" -not -path "./.git*" -not -path "./.github*" -not -path "." -not -path "./.vscode*" -not -path "./.idea*" -not -name ".gitignore" -not -name ".prettierrc*" -not -name ".codespellignore" -not -name ".prettierignore" -not -name ".gitkeep" -not -path "./.jules*" -not -path "./.Jules*" | grep . && { echo "Error: Unexpected hidden files found."; exit 1; } || echo "No unexpected hidden files."
+          find . -maxdepth 2 -name ".*" -not -path "./.git*" -not -path "./.github*" -not -path "." -not -path "./.vscode*" -not -path "./.idea*" -not -name ".gitignore" -not -name ".prettierrc*" -not -name ".codespellignore" -not -name ".prettierignore" -not -name ".gitkeep" | grep . && { echo "Error: Unexpected hidden files found."; exit 1; } || echo "No unexpected hidden files."

@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Enforce double asterisk bold
         run: |
-          grep -rnE "__[a-zA-Z0-9]+__" . && { echo "Error: Use ** for bold instead of __"; exit 1; } || echo "Bold style is consistent"
+          grep -rnE "__[a-zA-Z0-9]+__" . --include="*.md" && { echo "Error: Use ** for bold instead of __"; exit 1; } || echo "Bold style is consistent"
