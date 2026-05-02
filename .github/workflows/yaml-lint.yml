@@ -4,11 +4,9 @@ on:
   push:
     paths:
       - "**/*.yml"
-      - "**/*.yaml"
   pull_request:
     paths:
       - "**/*.yml"
-      - "**/*.yaml"
 
 jobs:
   yamllint:
