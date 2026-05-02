@@ -1,25 +1,25 @@
-name: Release Notes Autodraft
-
-on:
   push:
+    timeout-minutes: 5
     tags:
       - 'v*'
 
 permissions:
   contents: write
+    timeout-minutes: 5
 
 jobs:
   draft-notes:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Generate Release Notes
         id: create-release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a21312ad92244b3bc4ec59e9b
         with:
           draft: true
           generate_release_notes: true

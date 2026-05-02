@@ -1,7 +1,5 @@
-name: Stale Issue Soft Closer
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 * * *"
   workflow_dispatch:
 
@@ -10,7 +8,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@28ca10362944ca34dd6fe388fefc5f02f8319692
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           days-before-stale: 60

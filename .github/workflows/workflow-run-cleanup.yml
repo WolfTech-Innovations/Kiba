@@ -1,7 +1,5 @@
-name: Workflow Run Cleanup
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 * * 0" # Weekly on Sunday
   workflow_dispatch:
 
@@ -13,7 +11,7 @@ jobs:
       actions: write
     steps:
       - name: Delete old workflow runs
-        uses: Mattraks/delete-workflow-runs@v2
+        uses: Mattraks/delete-workflow-runs@369a23916ef4242699c64673f8373b9f1d0728c7
         with:
           token: ${{ github.token }}
           repository: ${{ github.repository }}

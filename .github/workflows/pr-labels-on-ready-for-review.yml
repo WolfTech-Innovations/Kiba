@@ -1,8 +1,3 @@
-name: PR Labels on Ready For Review
-on:
-  pull_request:
-    types: [ready_for_review]
-jobs:
   ensure-labels:
     runs-on: ubuntu-latest
     timeout-minutes: 5

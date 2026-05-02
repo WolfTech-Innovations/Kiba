@@ -1,7 +1,5 @@
-name: Semgrep
-
-on:
   push:
+    timeout-minutes: 5
     branches: [main]
   pull_request:
 
@@ -12,7 +10,8 @@ jobs:
     container:
       image: returntocorp/semgrep
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - run: semgrep scan --config auto --sarif --output semgrep.sarif
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@v3

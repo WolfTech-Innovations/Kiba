@@ -1,7 +1,5 @@
-name: CachyOS Kernel Monitor
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 13 * * *"
   workflow_dispatch:
 

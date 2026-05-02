@@ -1,6 +1,5 @@
-name: Issue Milestone Presence Check
-on:
   issues:
+    timeout-minutes: 5
     types: [opened]
 jobs:
   check:

@@ -1,7 +1,5 @@
-name: KDE Plasma Monitor
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 15 * * *"
   workflow_dispatch:
 

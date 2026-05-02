@@ -1,7 +1,5 @@
-name: Flatpak Repo Monitor
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 14 * * *"
   workflow_dispatch:
 

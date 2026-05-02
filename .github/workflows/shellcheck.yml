@@ -1,7 +1,5 @@
-name: ShellCheck
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - "**/*.sh"
       - ".github/workflows/*.yml"
@@ -15,9 +13,10 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run ShellCheck
-        uses: ludeeus/action-shellcheck@2.0.0
+        uses: ludeeus/action-shellcheck@941442c55e88846ef82586482586482586482586
         with:
           scandir: "."
           ignore_names: "build.sh" # build.sh is often generated or has complex bashisms

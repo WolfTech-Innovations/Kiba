@@ -1,6 +1,5 @@
-name: Workflow Unused Env Vars Check
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '.github/workflows/*.yml'
   pull_request:
@@ -12,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for defined but unused env vars
         run: |
           for file in .github/workflows/*.yml; do

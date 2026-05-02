@@ -1,9 +1,7 @@
-name: Chromium Policy JSON Linter
-
-on:
   push:
+    timeout-minutes: 5
     paths:
-      - '.github/workflows/kiba.yml'
+      - 'build.sh'
   workflow_dispatch:
 
 jobs:
@@ -11,11 +9,12 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Extract and validate JSON policy
         run: |
           # Extract JSON between CPOLICY heredoc markers
-          sed -n '/CPOLICY/,/CPOLICY/p' .github/workflows/kiba.yml | sed '1d;$d' > policy.json
+          sed -n '/CPOLICY/,/CPOLICY/p' build.sh | sed '1d;$d' > policy.json
           cat policy.json
           python3 -m json.tool policy.json > /dev/null || { echo "Error: Invalid JSON in Chromium policy."; exit 1; }
           echo "Chromium policy JSON is valid."

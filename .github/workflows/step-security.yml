@@ -1,11 +1,10 @@
-name: Step Security
-
-on:
   push:
+    timeout-minutes: 5
     branches: [main]
 
 permissions:
   contents: read
+    timeout-minutes: 5
 
 jobs:
   harden-runner:
@@ -13,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
-        uses: step-security/harden-runner@v2
+        uses: step-security/harden-runner@0080882f6c36860b75e5dfd6943b754e1c512c41
         with:
           egress-policy: audit # Change to 'block' after observing traffic
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683

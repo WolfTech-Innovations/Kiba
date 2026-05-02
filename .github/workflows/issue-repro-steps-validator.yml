@@ -1,7 +1,5 @@
-name: Issue Repro Steps Validator
-
-on:
   issues:
+    timeout-minutes: 5
     types: [opened, edited]
 
 jobs:

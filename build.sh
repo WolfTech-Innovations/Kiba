@@ -21,6 +21,50 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+# MIT License
+#
+# Copyright (c) 2025 WolfTech Innovations
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+# MIT License
+#
+# Copyright (c) 2025 WolfTech Innovations
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 set -ex
 export DEBIAN_FRONTEND=noninteractive
 
@@ -114,7 +158,7 @@ echo "=== Installing CachyOS Kernel ==="
 # For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | grep -E '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_TAG" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
@@ -126,8 +170,8 @@ mkdir -p /tmp/cachyos
 cd /tmp/cachyos
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-image-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+HEADERS_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-headers-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
@@ -371,7 +415,7 @@ fastfetch
 eza
 bat
 btop
-ripgrep
+rg
 fd-find
 tealdeer
 duf
@@ -447,8 +491,8 @@ logo.image  = Image("logo.png");
 logo_target_w = 160;
 logo_scale    = logo_target_w / logo.image.GetWidth();
 logo.scaled   = logo.image.Scale(
-                  Math.Int(logo.image.GetWidth()  * logo_scale),
-                  Math.Int(logo.image.GetHeight() * logo_scale));
+        Math.Int(logo.image.GetWidth()  * logo_scale),
+        Math.Int(logo.image.GetHeight() * logo_scale));
 logo.sprite   = Sprite(logo.scaled);
 logo.x = cx - logo.scaled.GetWidth()  / 2;
 logo.y = cy - logo.scaled.GetHeight() / 2 - 60;
@@ -641,8 +685,8 @@ fi
 
 if command -v rg >/dev/null 2>&1; then
   GREP_CMD='rg'
-elif command -v ripgrep >/dev/null 2>&1; then
-  GREP_CMD='ripgrep'
+elif command -v rg >/dev/null 2>&1; then
+  GREP_CMD='rg'
 fi
 [ -n "$GREP_CMD" ] && alias grep="$GREP_CMD"
 
@@ -756,7 +800,7 @@ Rectangle {
         Accessible.role: Accessible.StaticText
         Accessible.name: text
         NumberAnimation on opacity {
-            from: 0; to: 1; duration: 1000
+  from: 0; to: 1; duration: 1000
         }
     }
 }
@@ -1610,7 +1654,7 @@ rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
 
 # 15. Nala alias in bashrc (belt-and-suspenders alongside profile.d)
 for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
-  if [ -f "$RCFILE" ] && ! grep -q "nala" "$RCFILE"; then
+  if [ -f "$RCFILE" ] && ! grep -qE "nala" "$RCFILE"; then
     cat >> "$RCFILE" << 'NALABASH'
 # KibaOS: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
@@ -1625,15 +1669,15 @@ chmod +x config/includes.chroot/usr/share/kibaos/post-install.sh
 echo "=== Starting live-build ==="
 lb build 2>&1 | tee build.log
 
-if grep -q "linux-image-psycachy" build.log; then
+if grep -qE "linux-image-psycachy" build.log; then
   echo "VERIFIED: CachyOS Kernel installed"
 else
   echo "WARNING: CachyOS kernel not found in build log"
 fi
 
 # Check for critical modern tools (mapping binary names to package names where needed)
-for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
-  if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
+for tool in micro fastfetch eza bat btop rg fd-find tealdeer starship fzf yt-dlp; do
+  if grep -qE "Installing $tool" build.log || grep -qE "Setting up $tool" build.log || grep -qiE "$tool installed" build.log; then
      echo "VERIFIED: $tool installed"
   else
      # Some might be installed as dependencies or already present
@@ -1658,13 +1702,13 @@ if [ -f live-image-amd64.hybrid.iso ]; then
     > boot_test.log 2>&1 || true
 
   echo "=== Analyzing Boot Logs ==="
-  if grep -qi "Kernel panic" boot_test.log; then
+  if grep -qiE "Kernel panic" boot_test.log; then
     echo "ERROR: Kernel panic detected during boot test!"
     cat boot_test.log
     exit 1
   fi
 
-  if grep -qi "Call Trace:" boot_test.log; then
+  if grep -qiE "Call Trace:" boot_test.log; then
      echo "ERROR: Potential crash/trace detected in logs!"
      cat boot_test.log
      exit 1

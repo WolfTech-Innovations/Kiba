@@ -1,7 +1,5 @@
-name: Docker Test
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - "build.sh"
   pull_request:
@@ -13,7 +11,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Build Docker Image
         run: |
           docker build -t kibaos-builder -f- . <<EOF

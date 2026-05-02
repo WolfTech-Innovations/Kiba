@@ -1,7 +1,5 @@
-name: YAML Lint
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - "**/*.yml"
       - "**/*.yaml"
@@ -15,9 +13,10 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run yamllint
-        uses: ibiqlik/action-yamllint@v3
+        uses: ibiqlik/action-yamllint@2576378a8e339169678f9939646ee3ee325e845c
         with:
           config_file: .github/linters/.yaml-lint.yml
           file_or_dir: .

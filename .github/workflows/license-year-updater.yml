@@ -1,7 +1,5 @@
-name: License Year Updater
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 1 1 *" # Yearly on Jan 1st
   workflow_dispatch:
 
@@ -13,7 +11,8 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Update year in LICENSE
         run: |
           CURRENT_YEAR=$(date +%Y)

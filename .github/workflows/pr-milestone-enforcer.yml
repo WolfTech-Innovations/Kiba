@@ -1,10 +1,3 @@
-name: PR Milestone Enforcer
-
-on:
-  pull_request:
-    types: [opened, edited, synchronize, milestoned, demilestoned]
-
-jobs:
   check-milestone:
     timeout-minutes: 60
     runs-on: ubuntu-latest

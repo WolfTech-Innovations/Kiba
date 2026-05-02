@@ -1,25 +1,15 @@
-name: Manual Release
-
-on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release"
-        required: true
-        default: "1.0.0"
-
-jobs:
   release:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
 
       - name: Create Release
         id: create-release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c95fe1489396fe8a21312ad92244b3bc4ec59e9b
         with:
           tag_name: v${{ github.event.inputs.version }}
           generate_release_notes: true

@@ -1,7 +1,5 @@
-name: Gitleaks
-
-on:
   push:
+    timeout-minutes: 5
   pull_request:
   workflow_dispatch:
 
@@ -11,7 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
         with:
           fetch-depth: 0
       - name: Install Gitleaks

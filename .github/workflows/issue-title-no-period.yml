@@ -1,6 +1,5 @@
-name: Issue Title No Period
-on:
   issues:
+    timeout-minutes: 5
     types: [opened, edited]
 jobs:
   check-title:

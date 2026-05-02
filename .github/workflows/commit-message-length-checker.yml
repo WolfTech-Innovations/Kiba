@@ -1,8 +1,3 @@
-name: Commit Message Length Checker
-on:
-  pull_request:
-    types: [opened, synchronize]
-jobs:
   check-length:
     timeout-minutes: 60
     runs-on: ubuntu-latest

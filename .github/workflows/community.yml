@@ -1,11 +1,10 @@
-name: Community Management
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 * * *"
   pull_request:
     types: [opened, edited, synchronize]
   issues:
+    timeout-minutes: 5
     types: [opened, edited]
   workflow_dispatch:
 
@@ -18,7 +17,7 @@ jobs:
       pull-requests: write
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     steps:
-      - uses: actions/stale@v9
+      - uses: actions/stale@28ca10362944ca34dd6fe388fefc5f02f8319692
         with:
           stale-issue-message: "This issue is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days."
           stale-pr-message: "This PR is stale because it has been open 30 days with no activity. Remove stale label or comment or this will be closed in 5 days."
@@ -33,12 +32,13 @@ jobs:
 
   welcome:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       issues: write
       pull-requests: write
     if: (github.event_name == 'issues' || github.event_name == 'pull_request') && github.event.action == 'opened'
     steps:
-      - uses: actions/first-interaction@v1
+      - uses: actions/first-interaction@1100f40d343419080f4f9f4306354f9a01538356
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           issue-message: "Welcome to the KibaOS project! Thank you for opening your first issue. Our team will look into it as soon as possible."
@@ -46,23 +46,25 @@ jobs:
 
   labeler:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: write
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/labeler@v5
+      - uses: actions/labeler@d3013d2f2d480d565691e84a27546059c99be327
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
 
   auto-label-title:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       issues: write
       pull-requests: write
     if: github.event_name == 'issues' || github.event_name == 'pull_request'
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           script: |
             const title = (context.payload.issue || context.payload.pull_request).title.toLowerCase();

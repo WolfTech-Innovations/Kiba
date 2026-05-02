@@ -1,15 +1,8 @@
-name: PR Review Request Balancer
-
-on:
-  pull_request:
-    types: [review_requested]
-
-jobs:
   check-reviewer-load:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v7
+      - uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           script: |
             const reviewer = context.payload.requested_reviewer.login;

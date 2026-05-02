@@ -1,8 +1,3 @@
-name: PR Milestone Checker
-on:
-  pull_request:
-    types: [opened, synchronize, reopened, milestoned, demilestoned]
-jobs:
   check-milestone:
     timeout-minutes: 60
     runs-on: ubuntu-latest

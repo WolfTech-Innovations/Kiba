@@ -1,7 +1,5 @@
-name: Artifact Retention Policy
-
-on:
   push:
+    timeout-minutes: 5
     branches: [main]
   workflow_dispatch:
 
@@ -10,7 +8,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify artifact retention in kiba.yml
         run: |
           # Ensure artifacts are kept for at least 7 days (simplified check)

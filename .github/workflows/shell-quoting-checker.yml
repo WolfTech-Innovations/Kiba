@@ -1,7 +1,5 @@
-name: Shell Quoting Checker
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '.github/workflows/kiba.yml'
   workflow_dispatch:
@@ -11,7 +9,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify variable quoting in kiba.yml
         run: |
           # Simple check for unquoted variables in shell blocks within kiba.yml

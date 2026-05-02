@@ -1,16 +1,9 @@
-name: ZshRC Logic Checker
-
-on:
-  pull_request:
-    paths:
-      - '.github/workflows/kiba.yml'
-
-jobs:
   check-zshrc:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Validate Zsh syntax
         run: |
           echo "Validating system-wide Zsh configuration logic..."

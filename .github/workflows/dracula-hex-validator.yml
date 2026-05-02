@@ -1,7 +1,5 @@
-name: Dracula Hex Validator
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '.github/workflows/kiba.yml'
   workflow_dispatch:
@@ -11,7 +9,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify Dracula color palette usage
         run: |
           # Dracula standard: #282a36, #44475a, #f8f8f2, #6272a4, #8be9fd, #50fa7b, #ffb86c, #ff79c6, #bd93f9, #ff5555, #f1fa8c

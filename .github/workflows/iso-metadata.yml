@@ -1,22 +1,15 @@
-name: ISO Metadata
-
-on:
-  workflow_run:
-    workflows: ["KibaOS Build"]
-    types: [completed]
-
-jobs:
   metadata:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Generate Metadata
         run: |
           echo "ISO Build completed at $(date)" > build-info.txt
           echo "Run ID: ${{ github.event.workflow_run.id }}" >> build-info.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@4cedc5d8ad5e4443228c308296d19451d62051f2
         with:
           name: build-metadata
           path: build-info.txt

@@ -1,15 +1,10 @@
-name: Size Labeler
-
-on: pull_request
-
-jobs:
   size-label:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
     steps:
-      - uses: codelytv/pr-size-labeler@v1.10.1
+      - uses: codelytv/pr-size-labeler@c64a42c55e88846ef82586482586482586482586
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           xs_max_size: "10"

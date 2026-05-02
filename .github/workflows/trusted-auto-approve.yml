@@ -1,11 +1,5 @@
-name: Trusted Auto-Approve
-
-on:
-  pull_request_target:
-    types: [opened, synchronize, reopened]
-
-permissions:
   pull-requests: write
+    timeout-minutes: 5
 
 jobs:
   auto-approve:

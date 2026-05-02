@@ -1,7 +1,5 @@
-name: Actionlint
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - ".github/workflows/*.yml"
   pull_request:
@@ -13,6 +11,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run actionlint
-        uses: reviewdog/action-actionlint@v1
+        uses: reviewdog/action-actionlint@77c220f8623512217c093a3885d71c4c8d551e18

@@ -1,6 +1,5 @@
-name: Workflow Shell Spec Check
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '.github/workflows/*.yml'
 jobs:
@@ -8,7 +7,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify shell specification
         run: |
           grep -rn "shell: " .github/workflows/*.yml || echo "Notice: Workflows use default shell"

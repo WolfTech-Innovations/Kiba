@@ -1,6 +1,5 @@
-name: Doc Spelling Common Mistakes
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '**.md'
 jobs:
@@ -8,7 +7,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for common misspellings
         run: |
           grep -rnEi "teh|recieve|occured" . --exclude="doc-spelling-common-mistakes.yml" && { echo "Error: Common misspellings found"; exit 1; } || echo "No common mistakes found"

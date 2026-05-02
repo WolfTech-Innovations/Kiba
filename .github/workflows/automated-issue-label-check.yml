@@ -1,6 +1,5 @@
-name: Automated Issue Label Check
-on:
   issues:
+    timeout-minutes: 5
     types: [opened]
 jobs:
   check:

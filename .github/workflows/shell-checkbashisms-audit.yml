@@ -1,6 +1,5 @@
-name: Shell Checkbashisms Audit
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '**.sh'
   pull_request:
@@ -12,7 +11,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Run checkbashisms
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq devscripts > /dev/null

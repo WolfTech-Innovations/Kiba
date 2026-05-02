@@ -1,7 +1,5 @@
-name: Auto Assign
-
-on:
   issues:
+    timeout-minutes: 5
     types: [opened]
   pull_request:
     types: [opened]
@@ -12,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-assign
-        uses: pozil/auto-assign-issue@v2
+        uses: pozil/auto-assign-issue@98904791e8312015508a8f6d713c711200259b58
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           assignees: ${{ github.actor }}

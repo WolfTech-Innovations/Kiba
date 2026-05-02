@@ -1,6 +1,5 @@
-name: Issue Template Completeness
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '.github/ISSUE_TEMPLATE/*.md'
 jobs:
@@ -8,7 +7,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify template fields
         run: |
           find .github/ISSUE_TEMPLATE -name "*.md" | while read -r file; do

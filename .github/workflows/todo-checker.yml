@@ -1,7 +1,5 @@
-name: TODO Checker
-
-on:
   push:
+    timeout-minutes: 5
   pull_request:
 
 jobs:
@@ -9,9 +7,10 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: TODO to Issue
-        uses: alstr/todo-to-issue-action@v5
+        uses: alstr/todo-to-issue-action@792942c55e88846ef82586482586482586482586
         with:
           INSERT_ISSUE_URL: true
           CLOSE_ISSUES: true

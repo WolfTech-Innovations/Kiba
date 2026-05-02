@@ -1,10 +1,3 @@
-name: PR Label Requirements
-
-on:
-  pull_request:
-    types: [opened, labeled, unlabeled, synchronize]
-
-jobs:
   check-labels:
     timeout-minutes: 60
     runs-on: ubuntu-latest
@@ -13,7 +6,7 @@ jobs:
       github.event.pull_request.user.login != 'christopherfoxjr'
     steps:
       - name: Check for required labels
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           script: |
             const pr = context.payload.pull_request;

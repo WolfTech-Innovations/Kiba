@@ -1,7 +1,5 @@
-name: Release Drafter
-
-on:
   push:
+    timeout-minutes: 5
     branches:
       - main
   pull_request:
@@ -9,6 +7,7 @@ on:
 
 permissions:
   contents: write
+    timeout-minutes: 5
   pull-requests: write
 
 jobs:
@@ -16,7 +15,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: release-drafter/release-drafter@v6
+      - uses: release-drafter/release-drafter@3f3747806509f6ee866a1a9e334a1a9e334a1a9e
         with:
           config-name: release-drafter.yml
         env:

@@ -1,7 +1,5 @@
-name: Documentation Link Validator
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 * * 1"
   workflow_dispatch:
 
@@ -10,9 +8,10 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Link Checker
-        uses: lycheeverse/lychee-action@v2
+        uses: lycheeverse/lychee-action@f089606a58398d5a711413a9394628f8f01b000f
         with:
           args: --verbose --no-progress README.md WIKI.md docs/*.md
         continue-on-error: true

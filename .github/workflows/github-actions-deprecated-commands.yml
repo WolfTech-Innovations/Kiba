@@ -1,6 +1,5 @@
-name: GH Actions Deprecated Commands
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '.github/workflows/*.yml'
 jobs:
@@ -9,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for set-output
         run: |
           grep -r "::set-output" .github/workflows/*.yml --exclude="github-actions-deprecated-commands.yml" && { echo "Error: ::set-output is deprecated, use GITHUB_OUTPUT"; exit 1; } || echo "No deprecated GITHUB_OUTPUT usage"

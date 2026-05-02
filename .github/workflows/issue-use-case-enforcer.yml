@@ -1,7 +1,5 @@
-name: Issue Use Case Enforcer
-
-on:
   issues:
+    timeout-minutes: 5
     types: [opened, edited]
 
 jobs:

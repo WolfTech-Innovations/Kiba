@@ -1,11 +1,5 @@
-name: Jules Automatic Fixer Pipeline
-
-on:
-  workflow_run:
-    workflows: ["KibaOS Build", "Actionlint", "Branding Assets Validator", "Commit Lint", "ShellCheck", "Markdown Lint", "JSON Lint"]
-    types:
-      - completed
   issues:
+    timeout-minutes: 5
     types:
       - opened
 
@@ -25,10 +19,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38
         with:
           python-version: '3.x'
 

@@ -1,7 +1,5 @@
-name: Issue Template Validator
-
-on:
   issues:
+    timeout-minutes: 5
     types: [opened, edited]
 
 jobs:
@@ -9,7 +7,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Validate Issue Template
         uses: stefanbuck/github-issue-parser@v3
         id: issue-parser

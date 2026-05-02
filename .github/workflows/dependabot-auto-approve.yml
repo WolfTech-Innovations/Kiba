@@ -1,9 +1,5 @@
-name: Dependabot Auto-Approve
-
-on: pull_request
-
-permissions:
   pull-requests: write
+    timeout-minutes: 5
 
 jobs:
   dependabot:
@@ -13,7 +9,7 @@ jobs:
     steps:
       - name: Dependabot metadata
         id: metadata
-        uses: dependabot/fetch-metadata@v2
+        uses: dependabot/fetch-metadata@db33b76c121ca6f6323d46fca46663f736340620
         with:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
       - name: Approve a PR

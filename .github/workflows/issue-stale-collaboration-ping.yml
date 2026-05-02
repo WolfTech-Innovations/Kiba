@@ -1,6 +1,5 @@
-name: Issue Stale Collaboration Ping
-on:
   schedule:
+    timeout-minutes: 5
     - cron: '0 10 * * *' # Daily
 jobs:
   ping-collaboration:

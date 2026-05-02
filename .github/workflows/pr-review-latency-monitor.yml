@@ -1,7 +1,5 @@
-name: PR Review Latency Monitor
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 10 * * 1-5"
   workflow_dispatch:
 
@@ -11,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR Age
-        uses: davideviolante/pr-reviewer-reminder@v3
+        uses: davideviolante/pr-reviewer-reminder@87c265691c28f09b5523467f394c8e7136709871
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           days-before-reminder: 3

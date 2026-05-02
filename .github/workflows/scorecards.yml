@@ -1,13 +1,8 @@
-name: Scorecard supply-chain security
-on:
-  # For Branch-Protection check. Only the default branch is supported. See
-  # https://github.com/ossf/scorecard-action#branch-protection
-  branch_protection_rule:
-  # To guarantee Maintained check is occasionally updated. See
-  # https://github.com/ossf/scorecard-action#maintained
   schedule:
+    timeout-minutes: 5
     - cron: "30 1 * * 6"
   push:
+    timeout-minutes: 5
     branches: ["main"]
 
 # Declare default permissions as read only.
@@ -26,19 +21,19 @@ jobs:
 
     steps:
       - name: "Checkout code"
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
 
       - name: "Run analysis"
-        uses: ossf/scorecard-action@v2.4.0
+        uses: ossf/scorecard-action@62b54023910c01168128526019a16a495958a27d
         with:
           results_file: results.sarif
           results_format: sarif
           publish_results: true
 
       - name: "Upload artifact"
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@4cedc5d8ad5e4443228c308296d19451d62051f2
         with:
           name: SARIF file
           path: results.sarif

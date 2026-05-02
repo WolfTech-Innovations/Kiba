@@ -1,6 +1,5 @@
-name: PR Milestone Due Date Reminder
-on:
   schedule:
+    timeout-minutes: 5
     - cron: '0 9 * * 1' # Every Monday at 9:00 AM
 jobs:
   remind-milestones:

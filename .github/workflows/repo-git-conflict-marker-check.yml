@@ -1,6 +1,5 @@
-name: Repo Git Conflict Marker Check
-on:
   push:
+    timeout-minutes: 5
   pull_request:
 jobs:
   check-conflicts:
@@ -8,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for conflict markers
         run: |
           grep -rE "<<<<<<<|=======|>>>>>>>" . --exclude-dir=.git --exclude-dir=node_modules --exclude=repo-git-conflict-marker-check.yml && { echo "Error: Unresolved Git conflict markers found."; exit 1; } || echo "No conflict markers found"

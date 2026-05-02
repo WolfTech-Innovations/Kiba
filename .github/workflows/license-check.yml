@@ -1,7 +1,5 @@
-name: License Check
-
-on:
   push:
+    timeout-minutes: 5
     branches: [main]
   pull_request:
 
@@ -10,9 +8,10 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check License Header
-        uses: apache/skywalking-eyes@v0.6.0
+        uses: apache/skywalking-eyes@f35834830113c2f0f49b38466b0a701968600a9d
         with:
           config: .github/licensing.yml
         continue-on-error: true # Might need configuration first

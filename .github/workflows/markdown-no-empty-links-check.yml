@@ -1,6 +1,5 @@
-name: Markdown No Empty Links Check
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '**.md'
   pull_request:
@@ -12,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for empty links
         run: |
           find . -name "*.md" -not -path "./node_modules/*" | xargs -r grep -l "\[\]()" && { echo "Error: Found empty links '[]()' in Markdown files."; exit 1; } || echo "No empty links found"

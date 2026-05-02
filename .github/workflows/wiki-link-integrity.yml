@@ -1,7 +1,5 @@
-name: Wiki Link Integrity
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - 'WIKI.md'
   workflow_dispatch:
@@ -11,7 +9,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for broken internal wiki links
         run: |
           grep -oE "\[[^\]]+\]\(\./[^\)]+\)" WIKI.md | while read -r link; do

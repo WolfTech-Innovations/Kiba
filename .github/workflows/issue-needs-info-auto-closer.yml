@@ -1,6 +1,5 @@
-name: Issue Needs-Info Auto-Closer
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 * * *"
   workflow_dispatch:
 jobs:
@@ -9,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Close inactive needs-info issues
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdeaa0d83039c74a4aee543508d2ffcb1c3799cdea # v7
         with:
           script: |
             const { data: issues } = await github.rest.issues.listForRepo({

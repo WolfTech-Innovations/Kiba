@@ -1,7 +1,5 @@
-name: Markdown Lint
-
-on:
   push:
+    timeout-minutes: 5
     paths:
       - "**/*.md"
   pull_request:
@@ -13,8 +11,9 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Run markdownlint
-        uses: DavidAnson/markdownlint-cli2-action@v19
+        uses: DavidAnson/markdownlint-cli2-action@05f31ae3103fe900350109968acc199c90412853
         with:
           config: .github/linters/.markdownlint-cli2.yaml

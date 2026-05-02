@@ -1,6 +1,5 @@
-name: Repo Trailing Newline Audit
-on:
   push:
+    timeout-minutes: 5
     paths:
       - '**.sh'
       - '**.md'
@@ -11,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for missing trailing newline
         run: |
           find . -type f \( -name "*.sh" -o -name "*.md" -o -name "*.yml" \) -not -path "./node_modules/*" | while read -r file; do

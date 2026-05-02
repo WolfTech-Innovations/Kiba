@@ -1,17 +1,9 @@
-name: Auto Merge Build PRs
-
-on:
-  pull_request_target:
-    branches:
-      - main
-    types:
-      - opened
-      - synchronize
-
-permissions:
   contents: write
+    timeout-minutes: 5
   pull-requests: write
+    timeout-minutes: 5
   actions: write
+    timeout-minutes: 5
 
 jobs:
   auto-merge:
@@ -19,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check and Merge
-        uses: actions/github-script@v7
+        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |

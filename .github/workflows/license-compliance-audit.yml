@@ -1,7 +1,5 @@
-name: License Compliance Audit
-
-on:
   schedule:
+    timeout-minutes: 5
     - cron: "0 0 1 * *"
   workflow_dispatch:
 
@@ -10,7 +8,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683bd71901bbe5b1630ceea73d27597364c9af683
       - name: Scan build hooks for URLs
         run: |
           grep -oE "https?://[a-zA-Z0-9./_-]+" .github/workflows/kiba.yml | sort -u
