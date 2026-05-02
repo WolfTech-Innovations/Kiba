@@ -547,7 +547,10 @@ setopt INC_APPEND_HISTORY
 # Optimized compinit: only re-scan completions once a day or if missing
 () {
   local dump="${ZDOTDIR:-$HOME}/.zcompdump"
-  if [[ -s "$dump" && (! "$dump" -nt "${ZDOTDIR:-$HOME}/.zshrc" || -z "$(find "$dump" -mtime +1)") ]]; then
+  # Use cache (-C) if dump is newer than the system config and < 24h old.
+  # Native Zsh glob qualifier (mh-24) avoids a find sub-process.
+  local -a recent_dump=("$dump"(Nmh-24))
+  if [[ -s "$dump" && "$dump" -nt /etc/zsh/zshrc && ${#recent_dump} -gt 0 ]]; then
     autoload -Uz compinit && compinit -C -u
   else
     autoload -Uz compinit && compinit -u
@@ -1253,6 +1256,17 @@ WELCOMEDESK
 
 cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
 chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
+
+# ── Pre-compile Zsh scripts for faster startup ────────────────────────
+# zcompile creates .zwc files which are memory-mapped, significantly
+# reducing the time spent parsing scripts during shell initialization.
+if command -v zsh >/dev/null 2>&1; then
+  [[ -f /etc/zsh/zshrc ]] && zsh -c "zcompile /etc/zsh/zshrc"
+  [[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
+    zsh -c "zcompile /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  [[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
+    zsh -c "zcompile /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+fi
 
 HOOK
 chmod +x config/hooks/live/0100-customize.hook.chroot
