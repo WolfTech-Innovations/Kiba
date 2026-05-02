@@ -1140,7 +1140,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1228,44 +1228,33 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Functional welcome menu for KibaOS
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaOS! What would you like to do?" \
               --column="Action" --column="Description" \
-              "Install KibaOS" "Install the system permanently to your disk" \
-              "Web Browser" "Browse the internet" \
-              "Software Center" "Discover and install new applications" \
-              "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "Online Wiki" "Read the technical documentation" \
-              --width=500 --height=400 2>/dev/null)
-
+              "🚀 Install KibaOS" "Install the system permanently to your disk" \
+              "🌐 Web Browser" "Browse the internet" \
+              "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "📖 Online Wiki" "Read the technical documentation" \
+              "💬 Get Support" "Open the community support page" \
+              --width=550 --height=400 2>/dev/null)
             [ -z "$CHOICE" ] && break
-
             case "$CHOICE" in
-              "Install KibaOS")
+              "🚀 Install KibaOS")
                 sudo calamares &
-                break
-                ;;
-              "Web Browser")
-                chromium &
-                break
-                ;;
-              "Software Center")
-                plasma-discover &
-                break
-                ;;
-              "Keyboard Shortcuts")
+                break ;;
+              "🌐 Web Browser")
+                chromium & ;;
+              "⌨️ Keyboard Shortcuts")
                 zenity --info --title="Keyboard Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
-                  --width=400 2>/dev/null
-                ;;
-              "Online Wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
-                break
-                ;;
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Alt + Tab</b>: Switch between windows" \
+                  --width=400 2>/dev/null ;;
+              "📖 Online Wiki")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & ;;
+              "💬 Get Support")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/issues" & ;;
             esac
           done
           WELCOME
