@@ -1275,7 +1275,9 @@ while true; do
     "🚀 Install KibaTV" "Install the system permanently to your disk" \
     "🌐 Web Browser" "Browse the internet" \
     "🛍️ Software Center" "Discover and install new applications" \
-    --width=450 --height=300 2>/dev/null)
+    "🖥️ Terminal" "Open a command line terminal" \
+    "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
+    --width=450 --height=400 2>/dev/null)
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
@@ -1287,6 +1289,20 @@ while true; do
       ;;
     "🛍️ Software Center")
       plasma-discover &
+      ;;
+    "🖥️ Terminal")
+      konsole &
+      ;;
+    "⌨️ Keyboard Shortcuts")
+      zenity --info --title="Keyboard Shortcuts" \
+        --text="<b>KibaTV Shortcuts:</b>
+
+<b>Meta (Windows Key):</b> Open Menu
+<b>Meta + T:</b> Open Terminal
+<b>Meta + E:</b> File Manager
+<b>Meta + D:</b> Show Desktop
+<b>Meta + L:</b> Lock Screen" \
+        --width=350 --height=280 --no-wrap 2>/dev/null
       ;;
     *)
       break
