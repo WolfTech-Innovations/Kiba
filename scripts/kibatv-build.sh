@@ -142,6 +142,7 @@ rm -rf /var/lib/apt/lists/*
 rm -rf /var/tmp/*
 
 echo "=== Aggressive Minimization complete ==="
+MIN_HOOK
 chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
 
