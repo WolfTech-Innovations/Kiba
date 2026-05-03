@@ -242,7 +242,7 @@ EOF
 
 apt update
 # Install KDE Frameworks 6 development dependencies
-sudo apt install \
+apt install \
   libkf6kio-dev \
   libkf6dbusaddons-dev \
   libkf6iconthemes-dev \
