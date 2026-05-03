@@ -235,7 +235,7 @@ cd ~
 # Example for Debian/Ubuntu-based CI
 sudo apt-get install -y git cmake python3-pip
 cd ~
-curl 'https://kde.org' > initial_setup.sh
+curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
 # Run with yes to accept package installations
 yes | bash initial_setup.sh
 kde-builder --generate-config
@@ -313,9 +313,6 @@ sddm
 sddm-theme-breeze
 plasma-nm
 plasma-pa
-dolphin
-konsole
-ark
 qt6-svg-plugins
 desktop-file-utils
 plasma-wallpapers-addons
@@ -326,10 +323,6 @@ fonts-jetbrains-mono
 fonts-noto-color-emoji
 fonts-inter
 
-# ── Cloud & online accounts integration ───────────────────────────────
-# nextcloud-desktop: Nextcloud sync client + Dolphin integration
-nextcloud-desktop
-dolphin-nextcloud
 # kdeconnect: phone/tablet integration (sync notifications, files, etc.)
 kdeconnect
 
