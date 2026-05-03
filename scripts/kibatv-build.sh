@@ -93,53 +93,22 @@ cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
 set -e
 echo "=== Installing CachyOS Kernel ==="
 
-# Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
-# For trixie, we'll try to find the latest version from their GitHub
-REPO="psygreg/linux-psycachy"
-RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+set -e
+echo "=== Installing CachyOS Kernel ==="
 
-if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
-  echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
-  # Fallback to a known version or skip
-else
-  CACHY_TMP=$(mktemp -d)
-  cd "$CACHY_TMP"
+VERSION="6.17.13"
+TAG="6.17.13"
+BASE="https://github.com/psygreg/linux-psycachy/releases/download/$TAG"
 
-  # Download image and headers
-  IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
-  HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+CACHY_TMP=$(mktemp -d)
+trap 'rm -rf "$CACHY_TMP"' EXIT
+cd "$CACHY_TMP"
 
-  if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then
-    curl -LO "$IMAGE_URL"
-  else
-    echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-    for i in {5..1}; do
-      curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
-    done
-  fi
+curl -LO "$BASE/linux-image-psycachy_${VERSION}-1_amd64.deb"
+curl -LO "$BASE/linux-headers-psycachy_${VERSION}-1_amd64.deb"
 
-  if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then
-    curl -LO "$HEADERS_URL"
-  else
-     echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-     for i in {5..1}; do
-       curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
-     done
-  fi
-
-  # Install
-  apt install -y ./*.deb || {
-    echo "WARNING: CachyOS Kernel install failed, falling back to stock"
-    rm -rf "$CACHY_TMP"
-  }
-
-  # Cleanup
-  [ -d "$CACHY_TMP" ] && rm -rf "$CACHY_TMP"
-fi
-
-# Remove stock kernel meta-packages to keep it minimal
-# We don't use wildcards to avoid purging the CachyOS kernel we just installed
+dpkg -i ./*.deb || apt install -f -y
+echo "=== CachyOS Kernel installed ==="
 apt purge -y linux-image-amd64 linux-headers-amd64
 apt autoremove -y
 
