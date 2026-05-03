@@ -238,6 +238,7 @@ chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
 wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
 echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user noble main" | tee /etc/apt/sources.list.d/neon.list
 echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 1" | tee /etc/apt/preferences.d/neon-pin
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/dev/unstable noble main" | tee /etc/apt/sources.list.d/neon-dev.list
 apt update
 echo "=== Adding packages ==="
 
