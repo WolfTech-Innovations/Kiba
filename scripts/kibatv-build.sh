@@ -239,10 +239,11 @@ Package: *
 Pin: release a=sid
 Pin-Priority: 100
 EOF
-
+export DEBIAN_FRONTEND=noninteractive
+export APT_LISTCHANGES_FRONTEND=none
 apt update
 # Install KDE Frameworks 6 development dependencies
-apt install \
+apt install -y \
   libkf6kio-dev \
   libkf6dbusaddons-dev \
   libkf6iconthemes-dev \
