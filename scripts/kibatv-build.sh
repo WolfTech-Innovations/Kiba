@@ -281,7 +281,7 @@ apt-get install -y \
 apt-get update
 apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.10.2+dfsg-12' \
-  'qt6-wayland-dev-tools=6.10.2+dfsg-12'
+  'qt6-wayland-dev-tools'
 kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
 source ~/kde/usr/bin/prefix.sh 
