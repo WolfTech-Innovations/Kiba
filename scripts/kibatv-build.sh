@@ -3,7 +3,9 @@ set -ex
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt-get update && apt-get install -y \
+# eatmydata is used to speed up the build by bypassing fsync during package installation
+apt-get update && apt-get install -y eatmydata
+eatmydata apt-get install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -126,7 +128,7 @@ else
 fi
 
 # Install
-apt-get install -y ./*.deb || {
+eatmydata apt-get install -y ./*.deb || {
   echo "WARNING: CachyOS Kernel install failed, falling back to stock"
   cd / && rm -rf /tmp/cachyos
   exit 0
@@ -572,21 +574,33 @@ setopt HIST_IGNORE_SPACE
 setopt INC_APPEND_HISTORY
 
 # ── Completion ─────────────────────────────────────────
-autoload -Uz compinit && compinit -u
+# Optimized compinit: only re-run if dump is missing or >24h old
+# Uses native Zsh glob qualifiers to avoid slow 'find' sub-processes
+autoload -Uz compinit
+_comp_dump="${ZDOTDIR:-$HOME}/.zcompdump"
+_comp_matches=($_comp_dump(Nmh-24))
+if [[ -f "$_comp_dump" && ${#_comp_matches} -gt 0 ]]; then
+  compinit -C -u
+else
+  compinit -u
+fi
+unset _comp_dump _comp_matches
+
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 
-# ── VCS info (git branch in prompt) ────────────────────
-autoload -Uz vcs_info
-precmd() { vcs_info }
-zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
-setopt PROMPT_SUBST
-
 # ── Prompt — Starship (Modern) ──────────────────────────
 if command -v starship >/dev/null 2>&1; then
+  # Starship handles its own prompt and VCS info, so we skip vcs_info setup
   eval "$(starship init zsh)"
 else
+  # ── VCS info (Fallback prompt only) ──────────────────
+  autoload -Uz vcs_info
+  precmd() { vcs_info }
+  zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
+  setopt PROMPT_SUBST
+
   # Fallback to Dracula palette
   PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
 fi
@@ -1621,7 +1635,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-lb build 2>&1 | tee build.log
+eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
