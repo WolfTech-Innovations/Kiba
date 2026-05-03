@@ -231,6 +231,11 @@ cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
 #!/bin/bash
 set -e
 echo "=== Installing plasma-bigscreen from source ==="
+cd ~
+curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
+bash initial_setup.sh
+kde-builder --generate-config
+
 # Add sid to sources temporarily
 echo "deb http://deb.debian.org/debian sid main" > /etc/apt/sources.list.d/sid.list
 
@@ -242,6 +247,7 @@ EOF
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
 apt update
+kde-builder --install-distro-packages
 # Install KDE Frameworks 6 development dependencies
 apt install -y \
   libkf6kio-dev \
@@ -260,25 +266,8 @@ apt-get install -y \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
 
-# Clone and build plasma-bigscreen
-cd /tmp
-git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
-  git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
-
-cd plasma-bigscreen
-mkdir build && cd build
-cmake .. \
-  -DCMAKE_INSTALL_PREFIX=/usr \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF
-  -DCMAKE_PREFIX_PATH=/usr
-
-make -j$(nproc)
-make install
-
-# Cleanup
-cd / && rm -rf /tmp/plasma-bigscreen
-
+kde-builder plasma-bigscreen
+source ~/kde/usr/bin/prefix.sh 
 echo "=== plasma-bigscreen built and installed ==="
 BIGSCREEN_HOOK
 chmod +x config/hooks/live/0050-plasma-bigscreen.hook.chroot
