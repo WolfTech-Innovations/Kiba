@@ -93,7 +93,7 @@ save_release_notes() {
               "$api_url" | jq -r '.body')
 
   # 4. Handle empty release notes
-  if [ -z "$body" ] ] || [ [ "$body" = "null" ]; then
+  if [ -z "$body" ] || [ "$body" = "null" ]; then
     printf "No release notes provided for this release.\n" > "$filename"
   else
     printf "%s\n" "$body" > "$filename"
@@ -103,7 +103,7 @@ save_release_notes() {
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
   git add "$filename" Notes/.gitkeep
-  git commit -m "docs: add release notes $filename [skip ci]" ] || [ printf "No changes to commit\n"
+  git commit -m "docs: add release notes $filename [skip ci]" || printf "No changes to commit\n"
   git pull --rebase origin main
   git push origin main
 }
