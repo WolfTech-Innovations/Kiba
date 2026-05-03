@@ -1,40 +1,18 @@
 #!/bin/bash
+# License: GPL-3.0-or-later
 set -euo pipefail
-#
-# Copyright (c) 2025 WolfTech Innovations
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-# SOFTWARE.
-
-set -ex
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt-get update && apt-get install -y eatmydata
-eatmydata apt-get install -y \
+apt update && apt install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
   meson ninja-build pkg-config \
   libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
   libjson-glib-dev libostree-dev \
-  gcc g++ gettext curl
-  
+  gcc g++ gettext curl jq
+
 cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
 
@@ -119,44 +97,46 @@ echo "=== Installing CachyOS Kernel ==="
 # For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep -E '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
 
-if [ -z "$LATEST_TAG" ]; then
+if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
-  # Fallback to a known version or exit
-  exit 0
-fi
-
-mkdir -p $(mktemp -d)/cachyos
-cd $(mktemp -d)/cachyos
-
-# Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-image-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-headers-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-
-if [ -n "$IMAGE_URL" ]; then
-  curl -LO "$IMAGE_URL"
+  # Fallback to a known version or skip
 else
-  echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-  curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
+  CACHY_TMP=$(mktemp -d)
+  cd "$CACHY_TMP"
+
+  # Download image and headers
+  IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+  HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+
+  if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then
+    curl -LO "$IMAGE_URL"
+  else
+    echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
+    for i in {5..1}; do
+      curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+    done
+  fi
+
+  if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then
+    curl -LO "$HEADERS_URL"
+  else
+     echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
+     for i in {5..1}; do
+       curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+     done
+  fi
+
+  # Install
+  apt install -y ./*.deb || {
+    echo "WARNING: CachyOS Kernel install failed, falling back to stock"
+    rm -rf "$CACHY_TMP"
+  }
+
+  # Cleanup
+  [ -d "$CACHY_TMP" ] && rm -rf "$CACHY_TMP"
 fi
-
-if [ -n "$HEADERS_URL" ]; then
-  curl -LO "$HEADERS_URL"
-else
-   echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-   curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
-fi
-
-# Install
-apt install -y ./*.deb || {
-  echo "WARNING: CachyOS Kernel install failed, falling back to stock"
-  cd / && rm -rf $(mktemp -d)/cachyos
-  exit 0
-}
-
-# Cleanup
-cd / && rm -rf $(mktemp -d)/cachyos
 
 # Remove stock kernel meta-packages to keep it minimal
 # We don't use wildcards to avoid purging the CachyOS kernel we just installed
@@ -164,7 +144,6 @@ apt purge -y linux-image-amd64 linux-headers-amd64
 apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
-CACHY_HOOK
 chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
 # ── Extreme Minimization hook ─────────────────────────────────────────
@@ -190,10 +169,9 @@ rm -rf /var/cache/apt/archives/*
 rm -rf /var/lib/apt/lists/*
 
 # 4. Remove temporary files
-rm -rf $(mktemp -d)/* /var$(mktemp -d)/*
+rm -rf /var/tmp/*
 
 echo "=== Aggressive Minimization complete ==="
-MIN_HOOK
 chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
 
@@ -350,7 +328,7 @@ plasma-discover
 plasma-discover-backend-flatpak
 
 sddm
-sddm-theme-debian-breeze
+sddm-theme-breeze
 plasma-nm
 plasma-pa
 dolphin
@@ -423,6 +401,7 @@ chromium
 nano
 micro
 python3
+jq
 fastfetch
 eza
 bat
@@ -712,8 +691,8 @@ fi
 
 if command -v rg >/dev/null 2>&1; then
   alias grep='rg'
-elif command -v ripgrep >/dev/null 2>&1; then
-  alias grep='ripgrep'
+elif command -v rg >/dev/null 2>&1; then
+  alias grep='rg'
 fi
 
 if command -v fdfind >/dev/null 2>&1; then
@@ -791,6 +770,7 @@ POWERRC
 
 # ── Ant-Dark plasma theme ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/desktoptheme/ant-dark
+ANT_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
   $(mktemp -d)/ant-themes 2>/dev/null || true
 if [ -d $(mktemp -d)/ant-themes/Plasma/Ant-Dark ]; then
@@ -815,12 +795,23 @@ WATCHMETA
 cat > /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
 import QtQuick 2.15
 Rectangle {
-    color: "#000000"
+    color: "#282a36"
     anchors.fill: parent
+
     Text {
+        id: welcomeText
         anchors.centerIn: parent
         text: "KibaTV | Switch to simple"
         font.pixelSize: 48; font.bold: true; color: "#bd93f9"
+        opacity: 0
+
+        OpacityAnimator {
+            target: welcomeText
+            from: 0
+            to: 1
+            duration: 1000
+            running: true
+        }
     }
 }
 WATCHSPLASH
@@ -835,6 +826,7 @@ fi
 rm -rf $(mktemp -d)
 
 # ── Vimix cursors ─────────────────────────────────────────────────────
+VIMIX_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
   $(mktemp -d)/vimix-cursors 2>/dev/null || true
 if [ -d $(mktemp -d)/vimix-cursors/dist/Vimix-cursors ]; then
@@ -1199,7 +1191,7 @@ AppletOrder=3;4;5;8;9
 PANELRC
 
 # ── kscreenlockerrc ────────────────────────────────────────────────────
-cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
 [Daemon]
 Autolock=false
 LockOnResume=false
@@ -1288,25 +1280,31 @@ mkdir -p /usr/local/bin
 cat > /usr/local/bin/kiba-welcome << 'WELCOME'
 #!/bin/bash
 # Functional welcome menu for KibaTV
-CHOICE=$(zenity --list --title="Welcome to KibaTV" \
-  --text="Welcome to KibaTV! What would you like to do?" \
-  --column="Action" --column="Description" \
-  "Install KibaTV" "Install the system permanently to your disk" \
-  "Web Browser" "Browse the internet" \
-  "Software Center" "Discover and install new applications" \
-  --width=450 --height=300 2>/dev/null)
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --text="Welcome to KibaTV! What would you like to do?" \
+    --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install the system permanently to your disk" \
+    "🌐 Web Browser" "Browse the internet" \
+    "🛍️ Software Center" "Discover and install new applications" \
+    --width=450 --height=300 2>/dev/null)
 
-case "$CHOICE" in
-  "Install KibaTV")
-    sudo calamares &
-    ;;
-  "Web Browser")
-    chromium &
-    ;;
-  "Software Center")
-    plasma-discover &
-    ;;
-esac
+  case "$CHOICE" in
+    "🚀 Install KibaTV")
+      sudo calamares &
+      break
+      ;;
+    "🌐 Web Browser")
+      chromium &
+      ;;
+    "🛍️ Software Center")
+      plasma-discover &
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 WELCOME
 chmod +x /usr/local/bin/kiba-welcome
 
@@ -1357,6 +1355,8 @@ style:
   SidebarText:              "#f8f8f2"
   SidebarTextCurrent:       "#282a36"
   SidebarBackgroundCurrent: "#bd93f9"
+  WindowBackground:         "#282a36"
+  WindowForeground:         "#f8f8f2"
 slideshow: "show.qml"
 BRANDING
 
