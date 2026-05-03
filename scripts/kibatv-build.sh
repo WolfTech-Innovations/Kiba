@@ -241,6 +241,13 @@ Pin-Priority: 100
 EOF
 
 apt update
+# Install KDE Frameworks 6 development dependencies
+apt install -y \
+  kf6-dev \
+  libkf6bluezqt-dev \
+  libkf6kio-dev \
+  libkf6dbusaddons-dev \
+  libkf6iconthemes-dev
 # Install build dependencies
 apt-get install -y \
   git cmake g++ make \
