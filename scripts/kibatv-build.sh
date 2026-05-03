@@ -278,7 +278,10 @@ apt-get install -y \
   qt6-base-dev libqt6core6 libqt6gui6 \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
-
+apt-get update
+apt-get install -y --no-install-recommends \
+  'qt6-base-dev-tools=6.10.2+dfsg-12' \
+  'qt6-wayland-dev-tools=6.10.2+dfsg-12'
 kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
 source ~/kde/usr/bin/prefix.sh 
