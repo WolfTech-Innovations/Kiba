@@ -18,7 +18,7 @@ jobs:
               repo: context.repo.repo
             });
             const topics = repo.topics;
-            const required = ['debian', 'kde', 'linux', 'kibaos'];
+            const required = ['debian', 'kde', 'linux', 'kibatv'];
             const missing = required.filter(t => !topics.includes(t));
             if (missing.length > 0) {
               console.log(`Notice: Missing recommended topics: ${missing.join(', ')}`);

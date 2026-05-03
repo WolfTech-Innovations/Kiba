@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify essential assets
         run: |
-          ls branding/kibaos_banner.png || { echo "Warning: kibaos_banner.png is missing"; }
+          ls branding/kibatv_banner.png || { echo "Warning: kibatv_banner.png is missing"; }

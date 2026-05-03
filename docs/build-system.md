@@ -1,8 +1,7 @@
-
 # Build System & Automation
 
 <p align="center">
-  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
 </p>
 
 <p align="center">
@@ -13,13 +12,13 @@
 
 ---
 
-KibaOS utilizes a highly automated CI/CD pipeline to generate reproducible ISO images. This document details the infrastructure, build stages, and customization hooks used in the process.
+KibaTV utilizes a highly automated CI/CD pipeline to generate reproducible ISO images. This document details the infrastructure, build stages, and customization hooks used in the process.
 
 ---
 
 \n## Build Pipeline
 
-```mermaid
+````mermaid
 graph LR
     A[Push to Main] --> B[GitHub Action]
     B --> C[Setup Docker]
@@ -43,7 +42,7 @@ graph LR
 
 \n## Customization Hooks
 
-KibaOS relies on a series of chroot and binary hooks to apply its unique features. These hooks are dynamically created by the GitHub Action workflow before the build starts.
+KibaTV relies on a series of chroot and binary hooks to apply its unique features. These hooks are dynamically created by the GitHub Action workflow before the build starts.
 
 #\n## Chroot Hooks
 
@@ -58,7 +57,7 @@ _Executed inside the temporary system environment._
 | **`0056-ungoogled-chromium.hook.chroot`**   | Integrates Ungoogled Chromium via an OBS repository.                               |
 | **`0090-extreme-minimization.hook.chroot`** | Purges documentation, help files, and non-English locales.                         |
 | **`0100-customize.hook.chroot`**            | Applies Dracula theme, Plasma settings, shell aliases, and system identity.        |
-| **`0110-calamares-branding.hook.chroot`**   | Configures the Calamares installer with KibaOS branding and the age-verify module. |
+| **`0110-calamares-branding.hook.chroot`**   | Configures the Calamares installer with KibaTV branding and the age-verify module. |
 
 #\n## Binary Hooks
 
@@ -73,7 +72,7 @@ _Executed on the final ISO filesystem._
 
 \n## Local Development
 
-You can reproduce the KibaOS build environment locally on any Linux machine with Docker.
+You can reproduce the KibaTV build environment locally on any Linux machine with Docker.
 
 #\n## Requirements
 
@@ -115,3 +114,4 @@ After the build completes, the pipeline performs several verification steps:
 - [**Architecture**](./architecture.md)
 - [**Software Management**](./software-management.md)
 - [**Contributing**](./contributing.md)
+````

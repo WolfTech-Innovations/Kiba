@@ -1,8 +1,7 @@
-
 # Architecture Deep-Dive
 
 <p align="center">
-  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
 </p>
 
 <p align="center">
@@ -13,21 +12,21 @@
 
 ---
 
-This document provides a technical overview of the KibaOS architectural stack, from the base system to the final user-facing components.
+This document provides a technical overview of the KibaTV architectural stack, from the base system to the final user-facing components.
 
 ---
 
 \n## System Stack
 
-```mermaid
+````mermaid
 graph TD
     A[Hardware / VM] --> B[GRUB Bootloader]
     B --> C[CachyOS Kernel]
     C --> D[Debian 13 Trixie Base]
     D --> E[Systemd Init]
     E --> F[Wayland / X11]
-    F --> G[KDE Plasma 6.3]
-    G --> H[KibaOS UX]
+    F --> G[Plasma Bigscreen]
+    G --> H[KibaTV UX]
 ```bash
 
 ---
@@ -36,7 +35,7 @@ graph TD
 
 #\n## Debian 13 (Trixie)
 
-KibaOS is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma 6) while inheriting the robust package management and security infrastructure of Debian.
+KibaTV is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
 
 #\n## CachyOS Kernel
 
@@ -58,7 +57,7 @@ We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `
 
 \n## Extreme Minimization
 
-KibaOS follows a strict "No Bloat" policy. We use aggressive strategies to keep the ISO size small and the runtime environment lean.
+KibaTV follows a strict "No Bloat" policy. We use aggressive strategies to keep the ISO size small and the runtime environment lean.
 
 #\n## Documentation & Help
 
@@ -73,7 +72,7 @@ We only keep **`en`** and **`en_US`** locales. All other translations are remove
 
 #\n## Dependency Pruning
 
-We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-desktop` and `plasma-workspace` and manually add only the essential KDE components required for a functional desktop.
+We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-bigscreen` and `plasma-workspace` and manually add only the essential KDE components required for a functional desktop.
 
 ---
 
@@ -100,11 +99,11 @@ _Note: Critical shell integration scripts (like those for `fzf`) are preserved b
 
 #\n## Locale Optimization
 
-To save space, KibaOS limits system locales to only `en` and `en_US`. All other locale data is purged from `/usr/share/locale`.
+To save space, KibaTV limits system locales to only `en` and `en_US`. All other locale data is purged from `/usr/share/locale`.
 
 #\n## Dependency Pruning (Optimized)
 
-We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-desktop` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
+We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-bigscreen` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
 
 #\n## Binary Compression
 
@@ -113,10 +112,10 @@ Configured for maximum compression using **`zstd -19`** in **`/etc/initramfs-too
 
 #\n## Bootloader
 
-KibaOS uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
+KibaTV uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 
 - **Hybrid Support:** Works on both BIOS (Legacy) and UEFI systems.
-- **Branded Menu:** A custom binary hook patches `grub.cfg` to provide user-friendly, branded menu entries like _"Start KibaOS"_ and _"Install KibaOS"_.
+- **Branded Menu:** A custom binary hook patches `grub.cfg` to provide user-friendly, branded menu entries like _"Start KibaTV"_ and _"Install KibaTV"_.
 
 ---
 
@@ -125,3 +124,4 @@ KibaOS uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 - [**Build System**](./build-system.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
+````
