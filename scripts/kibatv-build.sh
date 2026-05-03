@@ -25,7 +25,8 @@ set -ex
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt update && apt install -y \
+apt-get update && apt-get install -y eatmydata
+eatmydata apt-get install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -271,7 +272,7 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
-apt update || true
+eatmydata apt-get update || true
 
 
 echo "=== Adding packages ==="
@@ -631,21 +632,27 @@ setopt HIST_IGNORE_SPACE
 setopt INC_APPEND_HISTORY
 
 # ── Completion ─────────────────────────────────────────
-autoload -Uz compinit && compinit -u
+setopt extendedglob
+autoload -Uz compinit
+if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.m-24) && ${ZDOTDIR:-$HOME}/.zcompdump -nt /etc/zsh/zshrc ]]; then
+  compinit -C -u
+else
+  compinit -u
+fi
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
-
-# ── VCS info (git branch in prompt) ────────────────────
-autoload -Uz vcs_info
-precmd() { vcs_info }
-zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
-setopt PROMPT_SUBST
 
 # ── Prompt — Starship (Modern) ──────────────────────────
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 else
+  # ── VCS info (git branch in prompt) ────────────────────
+  autoload -Uz vcs_info
+  precmd() { vcs_info }
+  zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
+  setopt PROMPT_SUBST
+
   # Fallback to Dracula palette
   PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
 fi
@@ -682,7 +689,7 @@ fi
 alias edit='${EDITOR:-micro}'
 alias please='sudo'
 alias cls='clear'
-alias path='printf "${PATH//:/\\n}"'
+alias path='print -l $path'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
@@ -1680,7 +1687,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-lb build 2>&1 | tee build.log
+eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
