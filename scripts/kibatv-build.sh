@@ -1,9 +1,10 @@
 #!/bin/bash
-set -ex
+# License: GPL-3.0-or-later
+set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt-get update && apt-get install -y \
+apt update && apt install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -100,52 +101,49 @@ LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
 
 if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
-  # Fallback to a known version or exit
-  exit 0
-fi
-
-mkdir -p /tmp/cachyos
-cd /tmp/cachyos
-
-# Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
-HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
-
-if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then
-  curl -LO "$IMAGE_URL"
+  # Fallback to a known version or skip
 else
-  echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-  for i in {5..1}; do
-    curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
-  done
+  CACHY_TMP=$(mktemp -d)
+  cd "$CACHY_TMP"
+
+  # Download image and headers
+  IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+  HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+
+  if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then
+    curl -LO "$IMAGE_URL"
+  else
+    echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
+    for i in {5..1}; do
+      curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+    done
+  fi
+
+  if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then
+    curl -LO "$HEADERS_URL"
+  else
+     echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
+     for i in {5..1}; do
+       curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+     done
+  fi
+
+  # Install
+  apt install -y ./*.deb || {
+    echo "WARNING: CachyOS Kernel install failed, falling back to stock"
+    rm -rf "$CACHY_TMP"
+  }
+
+  # Cleanup
+  [ -d "$CACHY_TMP" ] && rm -rf "$CACHY_TMP"
 fi
-
-if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then
-  curl -LO "$HEADERS_URL"
-else
-   echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-   for i in {5..1}; do
-     curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
-   done
-fi
-
-# Install
-apt-get install -y ./*.deb || {
-  echo "WARNING: CachyOS Kernel install failed, falling back to stock"
-  cd / && rm -rf /tmp/cachyos
-  exit 0
-}
-
-# Cleanup
-cd / && rm -rf /tmp/cachyos
 
 # Remove stock kernel meta-packages to keep it minimal
 # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-apt-get purge -y linux-image-amd64 linux-headers-amd64
-apt-get autoremove -y
+apt purge -y linux-image-amd64 linux-headers-amd64
+apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
-CACHY_HOOK
 chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
 # ── Extreme Minimization hook ─────────────────────────────────────────
@@ -171,10 +169,9 @@ rm -rf /var/cache/apt/archives/*
 rm -rf /var/lib/apt/lists/*
 
 # 4. Remove temporary files
-rm -rf /tmp/* /var/tmp/*
+rm -rf /var/tmp/*
 
 echo "=== Aggressive Minimization complete ==="
-MIN_HOOK
 chmod +x config/hooks/live/0090-extreme-minimization.hook.chroot
 
 
@@ -250,10 +247,10 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
 
 # Set low priority to prefer Debian packages
-echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 100" | tee /etc/apt/preferences.d/neon-pin
+printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
-apt-get update || true
+apt update || true
 
 
 echo "=== Adding packages ==="
@@ -416,11 +413,12 @@ mkdir -p /usr/share/plymouth/themes/kibatv-spinner
 
 # Decode embedded fallback logo
 if [ ! -f /usr/share/kibatv/logo.png ]; then
-  cat > /tmp/logo_b64.txt << 'LOGO_B64'
+  LOGO_TMP=$(mktemp)
+  cat > "$LOGO_TMP" << 'LOGO_B64'
 iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
 LOGO_B64
-  base64 -d /tmp/logo_b64.txt > /usr/share/kibatv/logo.png
-  rm /tmp/logo_b64.txt
+  base64 -d "$LOGO_TMP" > /usr/share/kibatv/logo.png
+  rm "$LOGO_TMP"
 fi
 cp /usr/share/kibatv/logo.png /usr/share/kibatv/logo-plymouth.png
 
@@ -542,7 +540,6 @@ cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
   alias apt='nala'
-  alias apt-get='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-alias.sh
@@ -625,7 +622,6 @@ fi
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
   alias apt='nala'
-  alias apt-get='nala'
   alias install='sudo nala install'
   alias remove='sudo nala remove'
   alias update='sudo nala update && sudo nala upgrade -y'
@@ -660,8 +656,8 @@ fi
 
 if command -v rg >/dev/null 2>&1; then
   alias grep='rg'
-elif command -v ripgrep >/dev/null 2>&1; then
-  alias grep='ripgrep'
+elif command -v rg >/dev/null 2>&1; then
+  alias grep='rg'
 fi
 
 if command -v fdfind >/dev/null 2>&1; then
@@ -739,21 +735,22 @@ POWERRC
 
 # ── Ant-Dark plasma theme ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/desktoptheme/ant-dark
+ANT_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
-  /tmp/ant-themes 2>/dev/null || true
-if [ -d /tmp/ant-themes/Plasma/Ant-Dark ]; then
-  cp -r /tmp/ant-themes/Plasma/Ant-Dark/. /usr/share/plasma/desktoptheme/ant-dark/
+  "$ANT_TMP" 2>/dev/null || true
+if [ -d "$ANT_TMP/Plasma/Ant-Dark" ]; then
+  cp -r "$ANT_TMP/Plasma/Ant-Dark/." /usr/share/plasma/desktoptheme/ant-dark/
 fi
 if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
   cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
 {"KPlugin":{"Id":"ant-dark","Name":"Ant Dark","License":"GPL","Version":"1.0"}}
 ANTMETA
 fi
-if [ -f /tmp/ant-themes/colors/Ant-Dark.colors ]; then
+if [ -f "$ANT_TMP/colors/Ant-Dark.colors" ]; then
   mkdir -p /usr/share/color-schemes
-  cp /tmp/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
+  cp "$ANT_TMP/colors/Ant-Dark.colors" /usr/share/color-schemes/AntDark.colors
 fi
-rm -rf /tmp/ant-themes
+rm -rf "$ANT_TMP"
 
 # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/images
@@ -786,20 +783,22 @@ WATCHSPLASH
 
 # ── Kora icon theme ───────────────────────────────────────────────────
 mkdir -p /usr/share/icons
-git clone --depth=1 https://github.com/bikass/kora.git /tmp/kora 2>/dev/null || true
-if [ -d /tmp/kora/kora ]; then
-  cp -r /tmp/kora/kora /usr/share/icons/kora
+KORA_TMP=$(mktemp -d)
+git clone --depth=1 https://github.com/bikass/kora.git "$KORA_TMP" 2>/dev/null || true
+if [ -d "$KORA_TMP/kora" ]; then
+  cp -r "$KORA_TMP/kora" /usr/share/icons/kora
   gtk-update-icon-cache -f /usr/share/icons/kora 2>/dev/null || true
 fi
-rm -rf /tmp/kora
+rm -rf "$KORA_TMP"
 
 # ── Vimix cursors ─────────────────────────────────────────────────────
+VIMIX_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
-  /tmp/vimix-cursors 2>/dev/null || true
-if [ -d /tmp/vimix-cursors/dist/Vimix-cursors ]; then
-  cp -r /tmp/vimix-cursors/dist/Vimix-cursors /usr/share/icons/Vimix-cursors
+  "$VIMIX_TMP" 2>/dev/null || true
+if [ -d "$VIMIX_TMP/dist/Vimix-cursors" ]; then
+  cp -r "$VIMIX_TMP/dist/Vimix-cursors" /usr/share/icons/Vimix-cursors
 fi
-rm -rf /tmp/vimix-cursors
+rm -rf "$VIMIX_TMP"
 
 # ── Dracula KDE colour scheme ─────────────────────────────────────────
 mkdir -p /usr/share/color-schemes
@@ -1158,7 +1157,7 @@ AppletOrder=3;4;5;8;9
 PANELRC
 
 # ── kscreenlockerrc ────────────────────────────────────────────────────
-cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
 [Daemon]
 Autolock=false
 LockOnResume=false
@@ -1234,7 +1233,7 @@ cat > /etc/motd << 'EOF'
 
  _  ___ _             ___  ____
 | |/ (_) |__   __ _ / _ \/ ___|
-| ' /| | '_ \ / _` | | | \___ \
+| ' /| | '_ \ / _' | | | \___ \
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
@@ -1638,7 +1637,6 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
   alias apt='nala'
-  alias apt-get='nala'
 }
 NALABASH
   fi
@@ -1665,7 +1663,7 @@ else
 fi
 
 # Check for critical modern tools (mapping binary names to package names where needed)
-for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
+for tool in micro fastfetch eza bat btop rg fd-find tealdeer starship fzf yt-dlp; do
   if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
      echo "VERIFIED: $tool installed"
   else
