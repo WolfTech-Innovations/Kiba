@@ -235,8 +235,8 @@ fi
 echo "=== GRUB boot menu branding complete ==="
 BOOT_HOOK
 chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
-wget -qO - https://kde.org | apt-key add -
-echo "deb https://kde.org jammy main" | tee /etc/apt/sources.list.d/neon.list
+wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user noble main" | sudo tee /etc/apt/sources.list.d/neon.list
 apt update
 echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 1" | tee /etc/apt/preferences.d/neon-pin
 echo "=== Adding packages ==="
