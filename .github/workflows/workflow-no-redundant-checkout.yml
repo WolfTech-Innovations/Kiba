@@ -1,0 +1,31 @@
+name: Workflow No Redundant Checkout
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check for multiple checkouts in a job
+        run: |
+          errors=0
+          for file in .github/workflows/*.yml; do
+            # Find jobs that have more than one 'actions/checkout'
+            # We can use yq to count checkouts per job
+            redundant_jobs=$(yq '.jobs | to_entries | .[] | select((.value.steps | map(select(.uses == "actions/checkout*")) | length) > 1) | .key' "$file")
+            if [ -n "$redundant_jobs" ]; then
+              echo "Redundant checkout in $file in jobs: $redundant_jobs"
+              errors=$((errors + 1))
+            fi
+          done
+
+          if [ $errors -gt 0 ]; then
+            exit 1
+          fi

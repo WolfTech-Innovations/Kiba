@@ -1,0 +1,23 @@
+name: Audit pnpm Lock Sync
+on:
+  push:
+    paths:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install pnpm
+        uses: pnpm/action-setup@a3487db36f1315224a0ff41d22ac0c2b1239857d
+        with:
+          version: 9
+      - name: Check lockfile sync
+        run: pnpm install --frozen-lockfile
