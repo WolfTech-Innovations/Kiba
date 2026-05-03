@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Build Docker Image
         run: |
-          docker build -t kibaos-builder -f- . <<EOF
+          docker build -t kibatv-builder -f- . <<EOF
           FROM debian:trixie
           RUN apt update && apt install -y live-build debootstrap xorriso git squashfs-tools
           EOF

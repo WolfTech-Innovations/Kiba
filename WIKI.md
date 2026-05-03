@@ -1,8 +1,7 @@
-
-# KibaOS Wiki
+# KibaTV Wiki
 
 <p align="center">
-  <img src="branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
 </p>
 
 <p align="center">
@@ -13,13 +12,13 @@
   <img src="`https://img.shields.io/badge/Status-Stable-success?style=for-the-badge`" alt="Status">
 </p>
 
-Welcome to the official **KibaOS Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaOS.
+Welcome to the official **KibaTV Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaTV.
 
 ---
 
 \n## 📖 Extended Documentation
 
-For more specific details on the various components of KibaOS, please refer to the following documents:
+For more specific details on the various components of KibaTV, please refer to the following documents:
 
 - [**Architecture Deep-Dive**](./docs/architecture.md)
 - [**UX & Visual Design**](./docs/ux-design.md)
@@ -35,7 +34,7 @@ For more specific details on the various components of KibaOS, please refer to t
 
 #\n## Base System
 
-KibaOS is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
+KibaTV is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
 
 - **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
 - **Init System:** **Systemd**.
@@ -48,7 +47,7 @@ The system undergoes aggressive footprint reduction during the build process:
 
 - **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
 - **Locale Optimization:** Only `en` and `en_US` locales are preserved.
-- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-desktop` + `plasma-workspace` combination.
+- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-bigscreen` + `plasma-workspace` combination.
 - **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
 
 ---
@@ -57,17 +56,17 @@ The system undergoes aggressive footprint reduction during the build process:
 
 #\n## Visual Identity
 
-KibaOS follows the **Dracula** color palette for system-wide visual consistency.
+KibaTV follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component               | Choice             |
-| ----------------------- | ------------------ |
-| **Desktop Environment** | **KDE Plasma 6.3** |
-| **Global Theme**        | **Ant-Dark**       |
-| **Color Scheme**        | **Dracula**        |
-| **Icon Theme**          | **Kora**           |
-| **Cursor Theme**        | **Vimix**          |
-| **System Font**         | **Inter**          |
-| **Monospace Font**      | **JetBrains Mono** |
+| Component               | Choice               |
+| ----------------------- | -------------------- |
+| **Desktop Environment** | **Plasma Bigscreen** |
+| **Global Theme**        | **Ant-Dark**         |
+| **Color Scheme**        | **Dracula**          |
+| **Icon Theme**          | **Kora**             |
+| **Cursor Theme**        | **Vimix**            |
+| **System Font**         | **Inter**            |
+| **Monospace Font**      | **JetBrains Mono**   |
 
 #\n## Shell Experience
 
@@ -87,7 +86,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
 #\n## Boot & Branding
 
-- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
+- **Plymouth:** Custom "kibatv-spinner" theme with a Dracula-themed progress bar and logo.
 - **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
 
 ---
@@ -96,7 +95,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
 #\n## KibaStore
 
-KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves as a user-friendly frontend for managing **Flatpaks** without the overhead of heavy software centers.
+KibaTV features **KibaStore**, which is a native build of **Bazaar**. It serves as a user-friendly frontend for managing **Flatpaks** without the overhead of heavy software centers.
 
 #\n## Repositories & Packages
 
@@ -110,16 +109,16 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 
 #\n## California AADC (AB 2273)
 
-KibaOS includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
+KibaTV includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
 
 - **Implementation:** A Python-based view module in the installer.
-- **Privacy:** Data is stored **locally only** at `/etc/kibaos/age-verify` and is never transmitted to external servers.
+- **Privacy:** Data is stored **locally only** at `/etc/kibatv/age-verify` and is never transmitted to external servers.
 
 ---
 
 \n## 🚀 Build Infrastructure
 
-KibaOS uses a highly automated CI/CD pipeline.
+KibaTV uses a highly automated CI/CD pipeline.
 
 #\n## Build Pipeline
 
@@ -139,7 +138,7 @@ KibaOS uses a highly automated CI/CD pipeline.
 
 To reproduce the build environment on your own machine:
 
-```bash
+````bash
 git clone `https://github.com/WolfTech-Innovations/Kiba`
 cd Kiba
 docker run --rm --privileged \
@@ -165,7 +164,8 @@ docker run --rm --privileged \
 
 \n## ⚖️ License
 
-KibaOS is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
+KibaTV is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
 
 > [!NOTE]
-> KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
+> KibaTV is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
+````

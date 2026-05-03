@@ -2,7 +2,7 @@ name: Jules Automatic Fixer Pipeline
 
 on:
   workflow_run:
-    workflows: ["KibaOS Build", "Actionlint", "Branding Assets Validator", "Commit Lint", "ShellCheck", "Markdown Lint", "JSON Lint"]
+    workflows: ["KibaTV Build", "Actionlint", "Branding Assets Validator", "Commit Lint", "ShellCheck", "Markdown Lint", "JSON Lint"]
     types:
       - completed
   issues:

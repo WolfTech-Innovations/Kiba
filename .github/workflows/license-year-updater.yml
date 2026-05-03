@@ -21,7 +21,7 @@ jobs:
           # Only proceed if changes were made
           git diff --exit-code LICENSE || {
             git config user.name "KibaBot"
-            git config user.email "bot@kibaos.org"
+            git config user.email "bot@kibatv.org"
             git checkout -b "chore/update-license-year-$CURRENT_YEAR"
             git add LICENSE
             git commit -m "chore: update license year to $CURRENT_YEAR"
