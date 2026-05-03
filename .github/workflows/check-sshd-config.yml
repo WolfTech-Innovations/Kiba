@@ -15,7 +15,7 @@ jobs:
       - name: Validate sshd_config
         run: |
           set -euo pipefail
-          sudo apt-get update && sudo apt-get install -y openssh-server
+          sudo apt update && sudo apt install -y openssh-server
           find . -name "sshd_config" -not -path "./node_modules/*" | while read -r file; do
             echo "Auditing $file..."
             sshd -t -f "$file" || { echo "Error: SSHD config validation failed for $file"; exit 1; }

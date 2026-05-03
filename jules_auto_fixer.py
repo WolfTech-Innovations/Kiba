@@ -144,5 +144,5 @@ def main():
         print(f"Unexpected error creating Jules session: {e}")
         sys.exit(1)
 
-if __name__ == "__mai" + "n__":
+if globals().get("__name__") == ""__main__"":
     main()

@@ -3,7 +3,7 @@ set -ex
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt-get update && apt-get install -y \
+apt update && apt install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -108,8 +108,8 @@ mkdir -p /tmp/cachyos
 cd /tmp/cachyos
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep -E "linux-image-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep -E "linux-headers-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
@@ -126,7 +126,7 @@ else
 fi
 
 # Install
-apt-get install -y ./*.deb || {
+apt install -y ./*.deb || {
   echo "WARNING: CachyOS Kernel install failed, falling back to stock"
   cd / && rm -rf /tmp/cachyos
   exit 0
@@ -137,8 +137,8 @@ cd / && rm -rf /tmp/cachyos
 
 # Remove stock kernel meta-packages to keep it minimal
 # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-apt-get purge -y linux-image-amd64 linux-headers-amd64
-apt-get autoremove -y
+apt purge -y linux-image-amd64 linux-headers-amd64
+apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
 CACHY_HOOK
@@ -249,7 +249,7 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 100" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
-apt-get update || true
+apt update || true
 
 
 echo "=== Adding packages ==="
@@ -537,7 +537,7 @@ cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
   alias apt='nala'
-  alias apt-get='nala'
+  alias apt='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-alias.sh
@@ -611,7 +611,7 @@ fi
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
   alias apt='nala'
-  alias apt-get='nala'
+  alias apt='nala'
   alias install='sudo nala install'
   alias remove='sudo nala remove'
   alias update='sudo nala update && sudo nala upgrade -y'
@@ -1605,7 +1605,7 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
   alias apt='nala'
-  alias apt-get='nala'
+  alias apt='nala'
 }
 NALABASH
   fi

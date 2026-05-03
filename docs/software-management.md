@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="`https://img.shields.io/badge/Manager-KibaStore-purple?style=for-the-badge`" alt="KibaStore">
-  <img src="`https://img.shields.io/badge/CLI-Nala-blue?style=for-the-badge`" alt="Nala">
-  <img src="`https://img.shields.io/badge/Package-Flatpak-orange?style=for-the-badge`" alt="Flatpak">
+  <img src="https://img.shields.io/badge/Manager-KibaStore-purple?style=for-the-badge" alt="KibaStore">
+  <img src="https://img.shields.io/badge/CLI-Nala-blue?style=for-the-badge" alt="Nala">
+  <img src="https://img.shields.io/badge/Package-Flatpak-orange?style=for-the-badge" alt="Flatpak">
 </p>
 
 ---
@@ -82,11 +82,11 @@ While KibaStore is the preferred way to browse, you can manage Flatpaks directly
 
 ````bash
 
-# Search for an app
+## Search for an app
 
 flatpak search <name>
 
-# Install an app
+## Install an app
 
 flatpak install flathub <app-id>
 ```bash

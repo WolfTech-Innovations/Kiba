@@ -15,7 +15,7 @@ jobs:
       - name: Validate udev rules
         run: |
           set -euo pipefail
-          sudo apt-get update && sudo apt-get install -y udev
+          sudo apt update && sudo apt install -y udev
           find . -name "*.rules" -path "*/udev/rules.d/*" | while read -r file; do
             echo "Auditing $file..."
             # udevadm test-builtin can be used if we had the full environment, but simple check for now

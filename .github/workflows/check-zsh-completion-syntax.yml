@@ -15,7 +15,7 @@ jobs:
       - name: Validate Zsh completions
         run: |
           set -euo pipefail
-          sudo apt-get update && sudo apt-get install -y zsh
+          sudo apt update && sudo apt install -y zsh
           find . -path "*/zsh/site-functions/_*" -type f | while read -r file; do
             echo "Auditing $file..."
             zsh -n "$file" || { echo "Error: Syntax error in $file"; exit 1; }

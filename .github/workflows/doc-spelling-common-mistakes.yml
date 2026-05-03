@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for common misspellings
         run: |
-          grep -rnEi "teh|recieve|occured" . --exclude="doc-spelling-common-mistakes.yml" && { echo "Error: Common misspellings found"; exit 1; } || echo "No common mistakes found"
+          grep -rnEi "the|receive|occurred" . --exclude="doc-spelling-common-mistakes.yml" && { echo "Error: Common misspellings found"; exit 1; } || echo "No common mistakes found"

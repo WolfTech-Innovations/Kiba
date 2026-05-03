@@ -1,3 +1,4 @@
+# Bolt Performance Journal
 
 ## 2025-05-15 - [Build & Shell Optimization]
 

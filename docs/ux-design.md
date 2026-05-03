@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="`https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge`&logo=dracula" alt="Theme">
-  <img src="`https://img.shields.io/badge/Desktop-KDE`%20Plasma%206-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
-  <img src="`https://img.shields.io/badge/Font-Inter-white?style=for-the-badge`" alt="Font">
+  <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge`&logo=dracula" alt="Theme">
+  <img src="https://img.shields.io/badge/Desktop-KDE`%20Plasma%206-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
+  <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
 ---
@@ -24,7 +24,7 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 
 | Color            | Hex       | Role                                                     |
 | :--------------- | :-------- | :------------------------------------------------------- |
-| **Background**   | `#282a36` | Primary window and desktop background                    |
+| **Background**   | `#`282a36 | Primary window and desktop background                    |
 | **Current Line** | `#44475a` | Highlight and secondary background                       |
 | **Foreground**   | `#f8f8f2` | Primary text color                                       |
 | **Comment**      | `#6272a4` | Secondary text and disabled elements                     |
