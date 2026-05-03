@@ -221,7 +221,7 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
-eatmydata apt-get update || true
+ apt-get update || true
 
 
 echo "=== Adding packages ==="
@@ -273,7 +273,6 @@ firmware-linux-free
 firmware-linux-nonfree
 systemd-sysv
 sudo
-eatmydata
 ca-certificates
 openssl
 locales
@@ -405,6 +404,7 @@ kmod
 binutils
 fzf
 yt-dlp
+eatmydata
 file
 PACKAGES
 
@@ -1659,7 +1659,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-eatmydata lb build 2>&1 | tee build.log
+lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
