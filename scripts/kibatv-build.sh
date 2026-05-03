@@ -1222,25 +1222,35 @@ mkdir -p /usr/local/bin
 cat > /usr/local/bin/kiba-welcome << 'WELCOME'
 #!/bin/bash
 # Functional welcome menu for KibaTV
-CHOICE=$(zenity --list --title="Welcome to KibaTV" \
-  --text="Welcome to KibaTV! What would you like to do?" \
-  --column="Action" --column="Description" \
-  "Install KibaTV" "Install the system permanently to your disk" \
-  "Web Browser" "Browse the internet" \
-  "Software Center" "Discover and install new applications" \
-  --width=450 --height=300 2>/dev/null)
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --text="Welcome to KibaTV! What would you like to do?" \
+    --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install the system permanently to your disk" \
+    "🌐 Web Browser" "Browse the internet" \
+    "🛍️ Software Center" "Discover and install new applications" \
+    "⌨️ Keyboard Shortcuts" "View helpful system shortcuts" \
+    --width=500 --height=400 2>/dev/null)
 
-case "$CHOICE" in
-  "Install KibaTV")
-    sudo calamares &
-    ;;
-  "Web Browser")
-    chromium &
-    ;;
-  "Software Center")
-    plasma-discover &
-    ;;
-esac
+  [ -z "$CHOICE" ] && break
+
+  case "$CHOICE" in
+    "🚀 Install KibaTV")
+      sudo calamares &
+      break
+      ;;
+    "🌐 Web Browser")
+      chromium &
+      ;;
+    "🛍️ Software Center")
+      plasma-discover &
+      ;;
+    "⌨️ Keyboard Shortcuts")
+      zenity --info --title="Keyboard Shortcuts" --width=400 \
+        --text="<b>System Shortcuts:</b>\n\n  • <b>Meta (Super):</b> Open Launcher\n  • <b>Meta + T:</b> Open Terminal\n  • <b>Meta + E:</b> Open File Manager\n  • <b>Meta + L:</b> Lock Screen\n  • <b>Alt + Tab:</b> Switch Windows" 2>/dev/null
+      ;;
+  esac
+done
 WELCOME
 chmod +x /usr/local/bin/kiba-welcome
 
