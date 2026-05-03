@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auto-assign
-        uses: pozil/auto-assign-issue@v2
+        uses: pozil/auto-assign-issue@7bf9d82c77d45976224660b873fc83e60576c5aa
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           assignees: ${{ github.actor }}

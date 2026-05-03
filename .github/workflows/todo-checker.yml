@@ -9,9 +9,9 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: TODO to Issue
-        uses: alstr/todo-to-issue-action@v5
+        uses: alstr/todo-to-issue-action@64aca8fda7023259aada83ba44ad988c4c443657
         with:
           INSERT_ISSUE_URL: true
           CLOSE_ISSUES: true

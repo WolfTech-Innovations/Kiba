@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check PR Age
-        uses: davideviolante/pr-reviewer-reminder@v3
+        uses: davideviolante/pr-reviews-reminder-action@d007374bcd880fffdae9f8aef3407f720a64cca8 # v2.8.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           days-before-reminder: 3
