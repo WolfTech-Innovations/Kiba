@@ -1,0 +1,18 @@
+name: Shell Script No Alias Usage
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check for alias usage
+        run: |
+          grep -rnE "^[[:space:]]*alias[[:space:]]+" . --include="*.sh" && { echo "alias usage found in shell scripts; use functions instead"; exit 1; } || echo "No alias usage found"

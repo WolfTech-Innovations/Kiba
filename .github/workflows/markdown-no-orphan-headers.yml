@@ -1,0 +1,21 @@
+name: Markdown No Orphan Headers
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check for orphan headers
+        run: |
+          # Check for headers at the end of the file
+          for f in $(find . -name "*.md"); do
+            tail -n 1 "$f" | grep -q "^#" && { echo "Orphan header at end of $f"; exit 1; }
+          done

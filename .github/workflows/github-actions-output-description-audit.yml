@@ -1,0 +1,27 @@
+name: GitHub Actions Output Description Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify workflow output descriptions
+        run: |
+          for file in .github/workflows/*.yml; do
+            outputs=$(yq '.on.workflow_call.outputs' "$file")
+            if [ "$outputs" != "null" ]; then
+              missing=$(echo "$outputs" | yq '.[] | select(.description == null)')
+              if [ -n "$missing" ]; then
+                echo "Error: $file contains outputs without a description"
+                exit 1
+              fi
+            fi
+          done
