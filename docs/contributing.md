@@ -15,7 +15,7 @@ First of all, thank you for your interest in contributing to KibaTV! We welcome 
 
 ---
 
-\n## Developer Quick Start
+## Developer Quick Start
 
 To begin contributing to the KibaTV build system or customization hooks, follow these steps:
 
@@ -31,9 +31,9 @@ To begin contributing to the KibaTV build system or customization hooks, follow 
 
 ---
 
-\n## How to Contribute
+## How to Contribute
 
-#\n## Reporting Bugs
+### Reporting Bugs
 
 If you find a bug, please open an issue on our [GitHub repository](https://github.com/WolfTech-Innovations/Kiba/issues). Provide as much detail as possible, including:
 
@@ -42,7 +42,7 @@ If you find a bug, please open an issue on our [GitHub repository](https://githu
 - Expected and actual behavior.
 - Screenshots or logs if applicable.
 
-#\n## Suggesting Features
+### Suggesting Features
 
 We are always looking for ways to improve KibaTV. If you have an idea for a new feature, please open an issue and describe:
 
@@ -50,7 +50,7 @@ We are always looking for ways to improve KibaTV. If you have an idea for a new 
 - How the feature would work.
 - Any alternative solutions you've considered.
 
-#\n## Submitting Pull Requests
+### Submitting Pull Requests
 
 If you're ready to contribute code or documentation:
 
@@ -64,11 +64,11 @@ If you're ready to contribute code or documentation:
 - Expected vs. Actual behavior.
 - System logs or screenshots.
 
-#\n## Suggesting Features (Community)
+### Suggesting Features (Community)
 
 We love new ideas! Please open an issue to discuss significant features before implementation. This ensures they align with the KibaTV philosophy of "modern simplicity."
 
-#\n## Submitting Pull Requests (Process)
+### Submitting Pull Requests (Process)
 
 - **Branching:** Work on a descriptive branch name (e.g., `feature/custom-icons`).
 - **Commits:** Follow conventional commit messages.
@@ -76,7 +76,7 @@ We love new ideas! Please open an issue to discuss significant features before i
 
 ---
 
-\n## Project Structure
+## Project Structure
 
 | Directory               | Purpose                                         |
 | :---------------------- | :---------------------------------------------- |
@@ -91,7 +91,7 @@ We love new ideas! Please open an issue to discuss significant features before i
 
 ---
 
-\n## Automated Triage
+## Automated Triage
 
 We use automated workflows to help manage the project:
 
@@ -101,13 +101,13 @@ We use automated workflows to help manage the project:
 
 ---
 
-\n## License
+## License
 
 By contributing to KibaTV, you agree that your contributions will be licensed under the **MIT License**.
 
 ---
 
-\n## Related Reading
+## Related Reading
 
 - [**Build System**](./build-system.md)
 - [**Architecture**](./architecture.md)

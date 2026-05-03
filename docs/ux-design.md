@@ -16,11 +16,11 @@ KibaTV is built with a focus on "modern simplicity." This document details the v
 
 ---
 
-\n## Visual Identity
+## Visual Identity
 
 The KibaTV aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
 
-#\n## Color Palette
+### Color Palette
 
 | Color            | Hex       | Role                                                     |
 | :--------------- | :-------- | :------------------------------------------------------- |
@@ -32,7 +32,7 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 | **Pink**         | `#ff79c6` | Selection foreground and highlights                      |
 | **Green**        | `#50fa7b` | Success states and active terminal elements              |
 
-#\n## Look and Feel
+### Look and Feel
 
 - **Desktop Environment:** Plasma Bigscreen.
 - **Global Theme:** A customized version of **Ant-Dark**.
@@ -41,21 +41,21 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 - **Cursors:** **Vimix** cursor theme.
 - **Fonts:** **Inter** for the system UI and **JetBrains Mono** for monospace/terminal text.
 
-#\n## Window Management
+### Window Management
 
 - **Rounded Corners:** KWin is configured to provide 16px rounded corners for all windows.
 - **Glass Effects:** Blur and contrast effects are enabled for an elegant, translucent look.
 - **Floating Panel:** The Plasma panel is configured to be floating and rounded by default.
 
-\n## Shell Experience
+## Shell Experience
 
 KibaTV provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
 
-#\n## Starship Prompt
+### Starship Prompt
 
 The **Starship** cross-shell prompt is pre-installed and configured with a minimalist Dracula-themed layout.
 
-#\n## Modern CLI Tools
+### Modern CLI Tools
 
 We prefer modern, faster alternatives to classic Unix commands:
 
@@ -68,7 +68,7 @@ We prefer modern, faster alternatives to classic Unix commands:
 - **`fd-find` (`fd`)**: A simple, fast, and user-friendly alternative to `find`.
 - **`tealdeer` (`tldr`)**: A fast implementation of `tldr` for simplified man pages.
 
-#\n## System-wide Aliases
+### System-wide Aliases
 
 Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
 
@@ -82,14 +82,14 @@ Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
 - `cls` -> `clear`
 - `path` -> Multi-line `$PATH` overview
 
-\n## Boot Branding
+## Boot Branding
 
 The branding experience starts from the moment the system boots:
 
 - **Plymouth:** A custom "kibatv-spinner" theme with a Dracula-themed progress bar.
 - **Grub**
 
-#\n## Interface Components
+### Interface Components
 
 - **Global Theme:** A customized **Ant-Dark** theme, providing a consistent base for all applications.
 - **Icons:** The **Kora** icon theme offers a colorful, modern, and high-resolution set of assets.
@@ -100,28 +100,28 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-\n## Desktop Experience (Plasma Bigscreen)
+## Desktop Experience (Plasma Bigscreen)
 
 KibaTV leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
 
-#\n## Window Management Polish
+### Window Management Polish
 
 - **Rounded Corners:** Custom **KWin** rules apply 16px rounded corners to all windows.
 - **Glass Effects:** Background blur and translucency are enabled for an elegant, layered look.
 - **Floating Panel:** The system panel is configured to be floating and rounded by default, located at the bottom of the screen.
 
-#\n## Desktop Layout
+### Desktop Layout
 
 - **Minimalist Panel:** Contains the application launcher, task manager, system tray, and clock.
 - **Clean Desktop:** No icons by default, keeping the workspace clutter-free.
 
 ---
 
-\n## The Modern Terminal
+## The Modern Terminal
 
 KibaTV provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
 
-#\n## Modern Alternative Comparison
+### Modern Alternative Comparison
 
 | Classic Command | Modern Alternative   | Key Feature                                       |
 | :-------------- | :------------------- | :------------------------------------------------ |
@@ -134,7 +134,7 @@ KibaTV provides one of the most powerful terminal experiences of any distributio
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
 | `apt`           | **`nala`**           | Parallel downloads and clear transaction history. |
 
-#\n## Shell Configuration (Zsh)
+### Shell Configuration (Zsh)
 
 **Zsh** is the default shell for all users, pre-configured with:
 
@@ -145,7 +145,7 @@ KibaTV provides one of the most powerful terminal experiences of any distributio
 
 ---
 
-\n## Related Reading
+## Related Reading
 
 - [**Architecture**](./architecture.md)
 - [**Software Management**](./software-management.md)

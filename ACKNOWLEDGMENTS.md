@@ -4,15 +4,15 @@ KibaTV is made possible by the incredible work of the global open-source communi
 
 ---
 
-\n## Linus Torvalds
+## Linus Torvalds
 
 For creating **Linux** and **Git**, providing the foundation upon which KibaTV and modern software development are built.
 
-\n## The Open Source Community
+## The Open Source Community
 
 To the thousands of developers, designers, and contributors worldwide who dedicate their time to building and maintaining the free software that powers our world.
 
-\n## Free and Open Source Software (FOSS)
+## Free and Open Source Software (FOSS)
 
 We acknowledge the many FOSS projects that KibaTV integrates and builds upon, including but not limited to:
 
