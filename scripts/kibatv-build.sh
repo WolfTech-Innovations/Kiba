@@ -231,7 +231,16 @@ cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
 #!/bin/bash
 set -e
 echo "=== Installing plasma-bigscreen from source ==="
+# Add sid to sources temporarily
+echo "deb http://deb.debian.org/debian sid main" > /etc/apt/sources.list.d/sid.list
 
+cat > /etc/apt/preferences.d/sid-pin <<EOF
+Package: *
+Pin: release a=sid
+Pin-Priority: 100
+EOF
+
+apt update
 # Install build dependencies
 apt-get install -y \
   git cmake g++ make \
