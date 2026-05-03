@@ -1270,6 +1270,7 @@ cat > /usr/local/bin/kiba-welcome << 'WELCOME'
 # Functional welcome menu for KibaTV
 while true; do
   CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --window-icon="/usr/share/kibatv/logo.png" \
     --text="Welcome to KibaTV! What would you like to do?" \
     --column="Action" --column="Description" \
     "🚀 Install KibaTV" "Install the system permanently to your disk" \
@@ -1295,14 +1296,15 @@ while true; do
       ;;
     "⌨️ Keyboard Shortcuts")
       zenity --info --title="Keyboard Shortcuts" \
-        --text="<b>KibaTV Shortcuts:</b>
+        --window-icon="/usr/share/kibatv/logo.png" \
+        --text="<b>KibaTV System Shortcuts:</b>
 
-<b>Meta (Windows Key):</b> Open Menu
-<b>Meta + T:</b> Open Terminal
-<b>Meta + E:</b> File Manager
-<b>Meta + D:</b> Show Desktop
-<b>Meta + L:</b> Lock Screen" \
-        --width=350 --height=280 --no-wrap 2>/dev/null
+🪟 <b>Meta:</b> Open Application Launcher
+🖥️ <b>Meta + T:</b> Open Terminal (Konsole)
+📂 <b>Meta + E:</b> Open File Manager (Dolphin)
+⌨️ <b>Meta + D:</b> Show Desktop
+🔒 <b>Meta + L:</b> Lock Screen" \
+        --width=350 --height=320 --no-wrap 2>/dev/null
       ;;
     *)
       break

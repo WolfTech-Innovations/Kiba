@@ -12,7 +12,7 @@ jobs:
           BRANCH: ${{ github.head_ref }}
         run: |
           # Use variable for regex to prevent syntax issues and allow for 'perf' prefix
-          REGEX='^(feat|fix|docs|refactor|chore|ci|perf|bolt)/'
+          REGEX='^(feat|fix|docs|refactor|chore|ci|perf|bolt|palette)(/|-)'
           if [[ ! "$BRANCH" =~ $REGEX ]]; then
             echo "Invalid branch name: $BRANCH. Must start with feat/, fix/, docs/, refactor/, chore/, ci/, perf/, or bolt/."
             exit 1
