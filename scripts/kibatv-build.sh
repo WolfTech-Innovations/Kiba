@@ -273,6 +273,7 @@ firmware-linux-free
 firmware-linux-nonfree
 systemd-sysv
 sudo
+eatmydata
 ca-certificates
 openssl
 locales
