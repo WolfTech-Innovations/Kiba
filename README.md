@@ -1,7 +1,8 @@
 # KibaTV
 
 <p align="center">
-<img width="1330" height="519" alt="image" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8" />
+<img width="1983" height="793" alt="image" src="https://github.com/user-attachments/assets/1006d5ea-1e3c-4191-90de-72a79f4cb323" />
+
 </p>
 
 <p align="center">
