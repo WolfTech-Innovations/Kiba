@@ -10,7 +10,7 @@ apt-get update && apt-get install -y \
   meson ninja-build pkg-config \
   libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
   libjson-glib-dev libostree-dev \
-  gcc g++ gettext curl
+  gcc g++ gettext curl jq
 
 cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
@@ -96,9 +96,9 @@ echo "=== Installing CachyOS Kernel ==="
 # For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
 
-if [ -z "$LATEST_TAG" ]; then
+if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
   # Fallback to a known version or exit
   exit 0
@@ -108,21 +108,25 @@ mkdir -p /tmp/cachyos
 cd /tmp/cachyos
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
 
-if [ -n "$IMAGE_URL" ]; then
+if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then
   curl -LO "$IMAGE_URL"
 else
   echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-  curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
+  for i in {5..1}; do
+    curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+  done
 fi
 
-if [ -n "$HEADERS_URL" ]; then
+if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then
   curl -LO "$HEADERS_URL"
 else
    echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-   curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
+   for i in {5..1}; do
+     curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${i}_amd64.deb" && break
+   done
 fi
 
 # Install
@@ -290,7 +294,7 @@ plasma-discover
 plasma-discover-backend-flatpak
 
 sddm
-sddm-theme-debian-breeze
+sddm-theme-breeze
 plasma-nm
 plasma-pa
 dolphin
@@ -363,6 +367,7 @@ chromium
 nano
 micro
 python3
+jq
 fastfetch
 eza
 bat
@@ -572,7 +577,16 @@ setopt HIST_IGNORE_SPACE
 setopt INC_APPEND_HISTORY
 
 # ── Completion ─────────────────────────────────────────
-autoload -Uz compinit && compinit -u
+# KibaTV: optimized compinit with caching using native glob qualifiers
+zmodload zsh/datetime
+() {
+  local dump="${ZDOTDIR:-$HOME}/.zcompdump"
+  if [[ ! -f "$dump" || "$dump" -nt "${ZDOTDIR:-$HOME}/.zshrc" || "$dump"(mh+24) ]]; then
+    autoload -Uz compinit && compinit -u
+  else
+    autoload -Uz compinit && compinit -C
+  fi
+}
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
@@ -623,7 +637,7 @@ fi
 alias edit='${EDITOR:-micro}'
 alias please='sudo'
 alias cls='clear'
-alias path='echo -e "${PATH//:/\\n}"'
+alias path='print -l $path'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
@@ -749,12 +763,23 @@ WATCHMETA
 cat > /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
 import QtQuick 2.15
 Rectangle {
-    color: "#000000"
+    color: "#282a36"
     anchors.fill: parent
+
     Text {
+        id: welcomeText
         anchors.centerIn: parent
         text: "KibaTV | Switch to simple"
         font.pixelSize: 48; font.bold: true; color: "#bd93f9"
+        opacity: 0
+
+        OpacityAnimator {
+            target: welcomeText
+            from: 0
+            to: 1
+            duration: 1000
+            running: true
+        }
     }
 }
 WATCHSPLASH
@@ -1222,25 +1247,31 @@ mkdir -p /usr/local/bin
 cat > /usr/local/bin/kiba-welcome << 'WELCOME'
 #!/bin/bash
 # Functional welcome menu for KibaTV
-CHOICE=$(zenity --list --title="Welcome to KibaTV" \
-  --text="Welcome to KibaTV! What would you like to do?" \
-  --column="Action" --column="Description" \
-  "Install KibaTV" "Install the system permanently to your disk" \
-  "Web Browser" "Browse the internet" \
-  "Software Center" "Discover and install new applications" \
-  --width=450 --height=300 2>/dev/null)
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --text="Welcome to KibaTV! What would you like to do?" \
+    --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install the system permanently to your disk" \
+    "🌐 Web Browser" "Browse the internet" \
+    "🛍️ Software Center" "Discover and install new applications" \
+    --width=450 --height=300 2>/dev/null)
 
-case "$CHOICE" in
-  "Install KibaTV")
-    sudo calamares &
-    ;;
-  "Web Browser")
-    chromium &
-    ;;
-  "Software Center")
-    plasma-discover &
-    ;;
-esac
+  case "$CHOICE" in
+    "🚀 Install KibaTV")
+      sudo calamares &
+      break
+      ;;
+    "🌐 Web Browser")
+      chromium &
+      ;;
+    "🛍️ Software Center")
+      plasma-discover &
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 WELCOME
 chmod +x /usr/local/bin/kiba-welcome
 
@@ -1291,6 +1322,8 @@ style:
   SidebarText:              "#f8f8f2"
   SidebarTextCurrent:       "#282a36"
   SidebarBackgroundCurrent: "#bd93f9"
+  WindowBackground:         "#282a36"
+  WindowForeground:         "#f8f8f2"
 slideshow: "show.qml"
 BRANDING
 
