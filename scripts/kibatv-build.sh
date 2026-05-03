@@ -33,7 +33,7 @@ apt update && apt install -y \
   libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
   libjson-glib-dev libostree-dev \
   gcc g++ gettext curl
-
+  
 cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
 
@@ -275,7 +275,45 @@ apt update || true
 
 
 echo "=== Adding packages ==="
+# ── Build plasma-bigscreen from source ────────────────────────────────
+mkdir -p config/hooks/live
+cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
+#!/bin/bash
+set -e
+echo "=== Installing plasma-bigscreen from source ==="
 
+# Install build dependencies
+apt-get install -y \
+  git cmake g++ make \
+  extra-cmake-modules \
+  libkf6config-dev libkf6coreaddons-dev \
+  libkf6service-dev libkf6i18n-dev \
+  libplasma-dev libkf6kcmutils-dev \
+  qt6-base-dev libqt6core6 libqt6gui6 \
+  libkf6globalshortcuts-dev libkf6notifications-dev \
+  libtag1-dev libmpv-dev
+
+# Clone and build plasma-bigscreen
+cd /tmp
+git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
+  git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
+
+cd plasma-bigscreen
+mkdir build && cd build
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=OFF
+
+make -j$(nproc)
+make install
+
+# Cleanup
+cd / && rm -rf /tmp/plasma-bigscreen
+
+echo "=== plasma-bigscreen built and installed ==="
+BIGSCREEN_HOOK
+chmod +x config/hooks/live/0050-plasma-bigscreen.hook.chroot
 mkdir -p config/package-lists
 cat > config/package-lists/kibatv.list.chroot << 'PACKAGES'
 # ── Base system ───────────────────────────────────────────────────────
@@ -305,7 +343,6 @@ git
 apt-transport-https
 
 # ── KDE Plasma Bigscreen ─────────────────────────────────────────────
-plasma-bigscreen
 plasma-workspace
 plasma-workspace-wallpapers
 plasma-discover
