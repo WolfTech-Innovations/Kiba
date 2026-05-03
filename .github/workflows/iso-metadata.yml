@@ -16,7 +16,7 @@ jobs:
         run: |
           echo "ISO Build completed at $(date)" > build-info.txt
           echo "Run ID: ${{ github.event.workflow_run.id }}" >> build-info.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: build-metadata
           path: build-info.txt
