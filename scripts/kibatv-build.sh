@@ -113,6 +113,7 @@ apt purge -y linux-image-amd64 linux-headers-amd64
 apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
+CACHY_HOOK
 chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
 # ── Extreme Minimization hook ─────────────────────────────────────────
