@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml`">
+  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
@@ -139,7 +139,7 @@ KibaTV uses a highly automated CI/CD pipeline.
 To reproduce the build environment on your own machine:
 
 ````bash
-git clone https://github.com/WolfTech-Innovations/Kiba`
+git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \

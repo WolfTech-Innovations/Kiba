@@ -1,11 +1,11 @@
 # KibaTV
 
 <p align="center">
-<img width="1330" height="519" alt="image" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8`" />
+<img width="1330" height="519" alt="image" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml`">
+  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
@@ -23,7 +23,7 @@
 KibaTV is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
-  <a href="https://sourceforge.net/projects/kibaos/files/latest/download`">
+  <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaTV">
   </a>
 </p>
@@ -143,10 +143,10 @@ KibaTV ships the **Dracula** color scheme system-wide using the official palette
 
 | Color      | Hex       | Role         |
 | ---------- | --------- | ------------ |
-| Background | `#282a36` | Primary BG   |
-| Purple     | `#bd93f9` | Accent Color |
-| Pink       | `#ff79c6` | Selection    |
-| Green      | `#50fa7b` | Success      |
+| Background | `hex #282a36` | Primary BG   |
+| Purple     | `hex #bd93f9` | Accent Color |
+| Pink       | `hex #ff79c6` | Selection    |
+| Green      | `hex #50fa7b` | Success      |
 
 The scheme is applied to **Plasma Bigscreen**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
 
@@ -180,7 +180,7 @@ KibaTV is built using **live-build** inside a **Debian Trixie** **Docker** conta
 Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
 ```bash
-git clone https://github.com/WolfTech-Innovations/Kiba`
+git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \

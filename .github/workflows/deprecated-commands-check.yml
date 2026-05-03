@@ -15,13 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
       - name: Scan for deprecated commands
         run: |
           # Use grep to find deprecated commands, excluding the workflow file itself
           # and the software-management.md documentation which mentions it legitimately.
-          if grep -rnE "apt|ifconfig|netstat" . | grep -vE "\.github/workflows/deprecated-commands-check\.yml|docs/software-management\.md"; then
+          if grep -rnE "apt-get|ifconfig|netstat" . | grep -vE "\.github/workflows/deprecated-commands-check\.yml|docs/software-management\.md"; then
             echo "Error: Use apt, ip, or ss instead of deprecated commands"
             exit 1
           fi

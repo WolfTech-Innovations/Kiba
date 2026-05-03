@@ -1,12 +1,11 @@
+# bug_report.md
 ---
 name: Bug report
 description: Create a report to help us improve
 about: Create a report to help us improve
 title: ""
 labels: ""
-assignees: ""
----
-# Bug Report
+## assignees: ""
 
 **Describe the bug**
 A clear and concise description of what the bug is.
