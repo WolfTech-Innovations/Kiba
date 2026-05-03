@@ -232,8 +232,12 @@ cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
 set -e
 echo "=== Installing plasma-bigscreen from source ==="
 cd ~
-curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
-bash initial_setup.sh
+# Example for Debian/Ubuntu-based CI
+sudo apt-get install -y git cmake python3-pip
+cd ~
+curl 'https://kde.org' > initial_setup.sh
+# Run with yes to accept package installations
+yes | bash initial_setup.sh
 kde-builder --generate-config
 
 # Add sid to sources temporarily
