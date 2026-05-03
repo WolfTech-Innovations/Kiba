@@ -5,7 +5,6 @@ on:
       - '.github/workflows/*'
 jobs:
   check-extension:
-    timeout-minutes: 60
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
