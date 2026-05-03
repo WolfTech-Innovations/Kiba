@@ -235,17 +235,21 @@ fi
 echo "=== GRUB boot menu branding complete ==="
 BOOT_HOOK
 chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
+# Update your script around lines 238-248 to use a compatible Neon repository
 wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
-# User (stable) repo
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user noble main" | tee /etc/apt/sources.list.d/neon.list
 
-# Unstable repo (has plasma-bigscreen)
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable noble main" | tee /etc/apt/sources.list.d/neon-dev.list
+# Use 'jammy' (Ubuntu 22.04 LTS) which is closest to Debian Trixie compatibility
+# or use 'focal' as fallback - both have plasma-bigscreen available
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user jammy main" | tee /etc/apt/sources.list.d/neon.list
 
-# Key
-wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
-echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 1" | tee /etc/apt/preferences.d/neon-pin
-apt update
+# Unstable repo (has plasma-bigscreen) - use jammy instead of noble
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
+
+# Set low priority to prefer Debian packages
+echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 100" | tee /etc/apt/preferences.d/neon-pin
+
+# Update package cache inside the container BEFORE live-build uses it
+apt-get update || true
 
 
 echo "=== Adding packages ==="
