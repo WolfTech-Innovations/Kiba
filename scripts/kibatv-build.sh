@@ -249,7 +249,7 @@ apt-get install -y \
   libkf6service-dev libkf6i18n-dev \
   libplasma-dev libkf6kcmutils-dev \
   qt6-base-dev libqt6core6 libqt6gui6 \
-  libkf6globalshortcuts-dev libkf6notifications-dev \
+  libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
 
 # Clone and build plasma-bigscreen
