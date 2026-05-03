@@ -1,8 +1,7 @@
-
 # Security & Compliance
 
 <p align="center">
-  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
 </p>
 
 <p align="center">
@@ -13,13 +12,13 @@
 
 ---
 
-KibaOS is built with a "Privacy by Design" philosophy. We go beyond standard security practices to ensure compliance with modern digital safety laws and to minimize the system's attack surface.
+KibaTV is built with a "Privacy by Design" philosophy. We go beyond standard security practices to ensure compliance with modern digital safety laws and to minimize the system's attack surface.
 
 ---
 
 \n## California Age-Appropriate Design Code (AB 2273)
 
-To comply with the California Age-Appropriate Design Code Act, KibaOS features a custom **Age Verification** module within the **Calamares** installer.
+To comply with the California Age-Appropriate Design Code Act, KibaTV features a custom **Age Verification** module within the **Calamares** installer.
 
 #\n## Implementation
 
@@ -29,9 +28,9 @@ To comply with the California Age-Appropriate Design Code Act, KibaOS features a
 
 #\n## Privacy and Data Storage
 
-In accordance with KibaOS's privacy-first philosophy:
+In accordance with KibaTV's privacy-first philosophy:
 
-- **Local Storage Only:** The selected age group is stored exclusively on the user's local machine at `/etc/kibaos/age-verify`.
+- **Local Storage Only:** The selected age group is stored exclusively on the user's local machine at `/etc/kibatv/age-verify`.
 - **No Transmission:** This data is **never** transmitted to WolfTech Innovations or any other external servers.
 - **Purpose:** This local record ensures the system can provide an age-appropriate experience as mandated by law without compromising user anonymity.
 
@@ -44,14 +43,14 @@ In accordance with KibaOS's privacy-first philosophy:
 In strict adherence to our privacy goals:
 
 - **No Transmission:** Your age selection is **never** sent to WolfTech Innovations or any third party.
-- **Local Record:** Data is stored exclusively at **`/etc/kibaos/age-verify`**.
+- **Local Record:** Data is stored exclusively at **`/etc/kibatv/age-verify`**.
 - **User Control:** You can delete or modify this file at any time after installation.
 
 ---
 
 \n## System Hardening
 
-KibaOS implements several strategies to keep your data safe and your system resilient.
+KibaTV implements several strategies to keep your data safe and your system resilient.
 
 #\n## Minimal Attack Surface
 
@@ -74,7 +73,7 @@ The **CachyOS Kernel** isn't just for performance; it includes modern security p
 
 We believe your operating system should be a tool, not a tracker.
 
-- **No Telemetry:** KibaOS does not include any built-in telemetry or data collection services.
+- **No Telemetry:** KibaTV does not include any built-in telemetry or data collection services.
 - **Ungoogled Chromium:** Our default browser is stripped of Google-specific tracking and background services.
 - **Flatpak Sandboxing:** We encourage the use of Flatpaks via **KibaStore**, which provides an additional layer of isolation between your applications and your private data.
 

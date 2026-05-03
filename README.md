@@ -1,5 +1,4 @@
-
-# KibaOS
+# KibaTV
 
 <p align="center">
 <img width="1330" height="519" alt="image" src="`https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8`" />
@@ -21,29 +20,29 @@
   <img src="`https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square`" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **KDE Plasma 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaTV is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="`https://sourceforge.net/projects/kibaos/files/latest/download`">
-    <img src="`https://a.fsdn.com/con/app/sf-download-button`" alt="Download KibaOS">
+    <img src="`https://a.fsdn.com/con/app/sf-download-button`" alt="Download KibaTV">
   </a>
 </p>
 
 ---
 
-The goal of KibaOS is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
+The goal of KibaTV is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
 
 ---
 
 \n## Documentation
 
-For a more in-depth look at KibaOS, check out our detailed documentation:
+For a more in-depth look at KibaTV, check out our detailed documentation:
 
 - [**Architecture**](./docs/architecture.md): Base system, kernel, and minimization strategies.
 - [**UX & Design**](./docs/ux-design.md): The Dracula aesthetic and terminal experience.
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
-- [**Build System**](./docs/build-system.md): How we build and release KibaOS.
+- [**Build System**](./docs/build-system.md): How we build and release KibaTV.
 - [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
@@ -52,11 +51,11 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 \n## Features
 
 - **Debian Base:** Built on **Debian 13 Trixie** (supported until 2030).
-- **Modern Desktop:** **KDE Plasma 6.3** with **Wayland** as the default session.
+- **Modern Desktop:** **Plasma Bigscreen** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
 - **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
-- **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
+- **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaTV branding.
 - **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
 - **Performance:** No bloat — only what you need is installed.
 
@@ -69,7 +68,7 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 <img src="`https://img.shields.io/sourceforge/dt/kibaos?style=flat-square`" alt="SourceForge Downloads">
 
 ISO images are available on **SourceForge**:
-[Download KibaOS on SourceForge](https://sourceforge.net/projects/kibaos/files/)
+[Download KibaTV on SourceForge](https://sourceforge.net/projects/kibaos/files/)
 
 SHA256 checksums are provided alongside each release. Always verify your download.
 
@@ -77,8 +76,8 @@ SHA256 checksums are provided alongside each release. Always verify your downloa
 
 On Linux:
 
-```bash
-sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
+````bash
+sudo dd if=kibatv-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```bash
 
 > [!IMPORTANT]
@@ -89,7 +88,7 @@ sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 Boot from the USB drive to enter the live environment. The session logs in automatically.
 
 > [!NOTE]
-> No changes made in the live session are saved after reboot. To install KibaOS permanently, launch the **Calamares** installer from the desktop.
+> No changes made in the live session are saved after reboot. To install KibaTV permanently, launch the **Calamares** installer from the desktop.
 
 ##\n## Default Credentials (Live Session Only)
 
@@ -123,7 +122,7 @@ sudo apt update && sudo apt upgrade -y
 <img src="`https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square`&logo=zsh&logoColor=white" alt="Shell: Zsh">
 <img src="`https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square`" alt="Kernel: CachyOS">
 
-KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
+KibaTV uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
 
 - Shared history across sessions.
 - Tab completion with menu select.
@@ -140,7 +139,7 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 <img src="`https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square`&logo=dracula&logoColor=white" alt="Theme: Dracula">
 
-KibaOS ships the **Dracula** color scheme system-wide using the official palette
+KibaTV ships the **Dracula** color scheme system-wide using the official palette
 
 | Color      | Hex       | Role         |
 | ---------- | --------- | ------------ |
@@ -149,7 +148,7 @@ KibaOS ships the **Dracula** color scheme system-wide using the official palette
 | Pink       | `#ff79c6` | Selection    |
 | Green      | `#50fa7b` | Success      |
 
-The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The scheme is applied to **Plasma Bigscreen**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
 
 #\n## System Requirements
 
@@ -170,7 +169,7 @@ The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Br
   <img src="`https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square`&logo=docker&logoColor=white" alt="Infrastructure: Docker">
 </p>
 
-KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
+KibaTV is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
 
 - **Orchestration:** `.github/workflows/kiba.yml`
 - **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
@@ -187,11 +186,11 @@ docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
   debian:trixie \
-  /w/build.sh
+  /w/scripts/kibatv-build.sh
 ```bash
 
 > [!NOTE]
-> The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
+> The build process is encapsulated in the `scripts/kibatv-build.sh` script and can be executed locally using Docker.
 
 ---
 
@@ -203,7 +202,7 @@ Kiba/
 │   └── workflows/
 │       └── kiba.yml           # Main build and release workflow
 ├── branding/
-│   └── kibaos_banner.png      # KibaOS brand assets
+│   └── kibatv_banner.png      # KibaTV brand assets
 ├── docs/                      # In-depth documentation
 ├── Notes/                     # Automatic release notes
 └── README.md                  # Project documentation
@@ -219,11 +218,12 @@ Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://
 
 \n## License
 
-KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
+KibaTV is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
 \n## About
 
-KibaOS is a **WolfTech Innovations** project.
+KibaTV is a **WolfTech Innovations** project.
 [Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)
+````

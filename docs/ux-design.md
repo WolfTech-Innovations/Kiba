@@ -1,41 +1,40 @@
-
 # UX & Visual Design
 
 <p align="center">
-  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
 </p>
 
 <p align="center">
   <img src="`https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge`&logo=dracula" alt="Theme">
-  <img src="`https://img.shields.io/badge/Desktop-KDE`%20Plasma%206-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
+  <img src="`https://img.shields.io/badge/Desktop-Plasma`%20Bigscreen-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
   <img src="`https://img.shields.io/badge/Font-Inter-white?style=for-the-badge`" alt="Font">
 </p>
 
 ---
 
-KibaOS is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
+KibaTV is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
 
 ---
 
 \n## Visual Identity
 
-The KibaOS aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
+The KibaTV aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
 
 #\n## Color Palette
 
-| Color            | Hex       | Role                                                     |
-| :--------------- | :-------- | :------------------------------------------------------- |
-| **Background**   | `#282a36` | Primary window and desktop background                    |
-| **Current Line** | `#44475a` | Highlight and secondary background                       |
-| **Foreground**   | `#f8f8f2` | Primary text color                                       |
-| **Comment**      | `#6272a4` | Secondary text and disabled elements                     |
-| **Purple**       | `#bd93f9` | Accent color, selection background, and primary branding |
-| **Pink**         | `#ff79c6` | Selection foreground and highlights                      |
-| **Green**        | `#50fa7b` | Success states and active terminal elements              |
+| Color            | Hex           | Role                                                     |
+| :--------------- | :------------ | :------------------------------------------------------- |
+| **Background**   | `&num;282A36` | Primary window and desktop background                    |
+| **Current Line** | `&num;44475A` | Highlight and secondary background                       |
+| **Foreground**   | `&num;F8F8F2` | Primary text color                                       |
+| **Comment**      | `&num;6272A4` | Secondary text and disabled elements                     |
+| **Purple**       | `&num;BD93F9` | Accent color, selection background, and primary branding |
+| **Pink**         | `&num;FF79C6` | Selection foreground and highlights                      |
+| **Green**        | `&num;50FA7B` | Success states and active terminal elements              |
 
 #\n## Look and Feel
 
-- **Desktop Environment:** KDE Plasma 6.3.
+- **Desktop Environment:** Plasma Bigscreen.
 - **Global Theme:** A customized version of **Ant-Dark**.
 - **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
 - **Icons:** **Kora** icon theme for a colorful and modern look.
@@ -50,7 +49,7 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 \n## Shell Experience
 
-KibaOS provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
+KibaTV provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
 
 #\n## Starship Prompt
 
@@ -87,7 +86,7 @@ Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
 
 The branding experience starts from the moment the system boots:
 
-- **Plymouth:** A custom "kibaos-spinner" theme with a Dracula-themed progress bar.
+- **Plymouth:** A custom "kibatv-spinner" theme with a Dracula-themed progress bar.
 - **Grub**
 
 #\n## Interface Components
@@ -101,9 +100,9 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-\n## Desktop Experience (Plasma 6)
+\n## Desktop Experience (Plasma Bigscreen)
 
-KibaOS leverages the power of **KDE Plasma 6.3** but configures it for a streamlined "out-of-the-box" experience.
+KibaTV leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
 
 #\n## Window Management Polish
 
@@ -120,7 +119,7 @@ KibaOS leverages the power of **KDE Plasma 6.3** but configures it for a streaml
 
 \n## The Modern Terminal
 
-KibaOS provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
+KibaTV provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
 
 #\n## Modern Alternative Comparison
 

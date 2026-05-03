@@ -14,8 +14,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Calamares branding strings
         run: |
-          # Verify productName is KibaOS
-          grep "productName:" .github/workflows/kiba.yml | grep -v "KibaOS" && { echo "Error: Calamares branding name mismatch."; exit 1; }
+          # Verify productName is KibaTV
+          grep "productName:" .github/workflows/kiba.yml | grep -v "KibaTV" && { echo "Error: Calamares branding name mismatch."; exit 1; }
           # Verify sidebar colors (Dracula)
           grep "SidebarBackground:" .github/workflows/kiba.yml | grep -v "#282a36" && { echo "Warning: Sidebar background color mismatch."; }
           echo "Calamares branding looks good."

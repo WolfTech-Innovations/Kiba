@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Image Existence
         run: |
-          ls branding/kibaos_banner.png || exit 1
+          ls branding/kibatv_banner.png || exit 1
       - name: Verify Image Formats
         run: |
           find branding -type f -name "*.png" -exec file {} + | grep "PNG image data"

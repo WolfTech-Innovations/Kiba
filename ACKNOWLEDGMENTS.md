@@ -1,13 +1,12 @@
-
 # Acknowledgments
 
-KibaOS is made possible by the incredible work of the global open-source community. We would like to extend our deepest gratitude to the following:
+KibaTV is made possible by the incredible work of the global open-source community. We would like to extend our deepest gratitude to the following:
 
 ---
 
 \n## Linus Torvalds
 
-For creating **Linux** and **Git**, providing the foundation upon which KibaOS and modern software development are built.
+For creating **Linux** and **Git**, providing the foundation upon which KibaTV and modern software development are built.
 
 \n## The Open Source Community
 
@@ -15,7 +14,7 @@ To the thousands of developers, designers, and contributors worldwide who dedica
 
 \n## Free and Open Source Software (FOSS)
 
-We acknowledge the many FOSS projects that KibaOS integrates and builds upon, including but not limited to:
+We acknowledge the many FOSS projects that KibaTV integrates and builds upon, including but not limited to:
 
 - **Debian Project**: For the robust and stable base system.
 - **KDE Community**: For the powerful and beautiful Plasma desktop environment.
@@ -25,4 +24,4 @@ We acknowledge the many FOSS projects that KibaOS integrates and builds upon, in
 
 ---
 
-KibaOS is proud to be part of the open-source ecosystem.
+KibaTV is proud to be part of the open-source ecosystem.

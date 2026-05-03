@@ -42,8 +42,8 @@ jobs:
       - uses: actions/first-interaction@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: "Welcome to the KibaOS project! Thank you for opening your first issue. Our team will look into it as soon as possible."
-          pr-message: "Welcome to the KibaOS project! Thank you for your first pull request. We appreciate your contribution!"
+          issue-message: "Welcome to the KibaTV project! Thank you for opening your first issue. Our team will look into it as soon as possible."
+          pr-message: "Welcome to the KibaTV project! Thank you for your first pull request. We appreciate your contribution!"
 
   labeler:
     timeout-minutes: 60
