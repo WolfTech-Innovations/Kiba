@@ -231,7 +231,8 @@ cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
 #!/bin/bash
 set -e
 echo "=== Installing plasma-bigscreen from source ==="
-eval $(dbus-launch --system)
+mkdir -p /run/dbus
+dbus-daemon --system --fork
 export CMAKE_PREFIX_PATH=/usr
 export Qt6_DIR=/usr/lib/x86_64-linux-gnu/cmake/Qt6
 export XDG_RUNTIME_DIR=/tmp/runtime-root
@@ -240,7 +241,6 @@ chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-# Example for Debian/Ubuntu-based CI
 sudo apt-get install -y git cmake python3-pip
 cd ~
 curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
@@ -280,8 +280,7 @@ apt-get install -y \
   libtag1-dev libmpv-dev
 apt-get update
 apt-get install -y --no-install-recommends \
-  'qt6-base-dev-tools=6.10.2+dfsg-12' \
-  'qt6-wayland-dev-tools'
+  'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
 kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
 source ~/kde/usr/bin/prefix.sh 
