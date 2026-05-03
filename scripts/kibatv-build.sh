@@ -1,4 +1,26 @@
 #!/bin/bash
+set -euo pipefail
+#
+# Copyright (c) 2025 WolfTech Innovations
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 set -ex
 export DEBIAN_FRONTEND=noninteractive
 
@@ -12,7 +34,7 @@ eatmydata apt-get install -y \
   libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
   libjson-glib-dev libostree-dev \
   gcc g++ gettext curl
-
+  
 cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
 
@@ -97,7 +119,7 @@ echo "=== Installing CachyOS Kernel ==="
 # For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | grep -E '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -z "$LATEST_TAG" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
@@ -105,12 +127,12 @@ if [ -z "$LATEST_TAG" ]; then
   exit 0
 fi
 
-mkdir -p /tmp/cachyos
-cd /tmp/cachyos
+mkdir -p $(mktemp -d)/cachyos
+cd $(mktemp -d)/cachyos
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-image-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+HEADERS_URL=$(echo "$RELEASE_INFO" | grep -E '"browser_download_url":' | grep -E "linux-headers-psycachy" | grep -E "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
@@ -127,19 +149,19 @@ else
 fi
 
 # Install
-apt-get install -y ./*.deb || {
+apt install -y ./*.deb || {
   echo "WARNING: CachyOS Kernel install failed, falling back to stock"
-  cd / && rm -rf /tmp/cachyos
+  cd / && rm -rf $(mktemp -d)/cachyos
   exit 0
 }
 
 # Cleanup
-cd / && rm -rf /tmp/cachyos
+cd / && rm -rf $(mktemp -d)/cachyos
 
 # Remove stock kernel meta-packages to keep it minimal
 # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-apt-get purge -y linux-image-amd64 linux-headers-amd64
-apt-get autoremove -y
+apt purge -y linux-image-amd64 linux-headers-amd64
+apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
 CACHY_HOOK
@@ -168,7 +190,7 @@ rm -rf /var/cache/apt/archives/*
 rm -rf /var/lib/apt/lists/*
 
 # 4. Remove temporary files
-rm -rf /tmp/* /var/tmp/*
+rm -rf $(mktemp -d)/* /var$(mktemp -d)/*
 
 echo "=== Aggressive Minimization complete ==="
 MIN_HOOK
@@ -247,14 +269,52 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
 
 # Set low priority to prefer Debian packages
-echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 100" | tee /etc/apt/preferences.d/neon-pin
+printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
 eatmydata apt-get update || true
 
 
 echo "=== Adding packages ==="
+# ── Build plasma-bigscreen from source ────────────────────────────────
+mkdir -p config/hooks/live
+cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
+#!/bin/bash
+set -e
+echo "=== Installing plasma-bigscreen from source ==="
 
+# Install build dependencies
+apt-get install -y \
+  git cmake g++ make \
+  extra-cmake-modules \
+  libkf6config-dev libkf6coreaddons-dev \
+  libkf6service-dev libkf6i18n-dev \
+  libplasma-dev libkf6kcmutils-dev \
+  qt6-base-dev libqt6core6 libqt6gui6 \
+  libkf6globalshortcuts-dev libkf6notifications-dev \
+  libtag1-dev libmpv-dev
+
+# Clone and build plasma-bigscreen
+cd /tmp
+git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
+  git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
+
+cd plasma-bigscreen
+mkdir build && cd build
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=OFF
+
+make -j$(nproc)
+make install
+
+# Cleanup
+cd / && rm -rf /tmp/plasma-bigscreen
+
+echo "=== plasma-bigscreen built and installed ==="
+BIGSCREEN_HOOK
+chmod +x config/hooks/live/0050-plasma-bigscreen.hook.chroot
 mkdir -p config/package-lists
 cat > config/package-lists/kibatv.list.chroot << 'PACKAGES'
 # ── Base system ───────────────────────────────────────────────────────
@@ -284,7 +344,6 @@ git
 apt-transport-https
 
 # ── KDE Plasma Bigscreen ─────────────────────────────────────────────
-plasma-bigscreen
 plasma-workspace
 plasma-workspace-wallpapers
 plasma-discover
@@ -412,11 +471,11 @@ mkdir -p /usr/share/plymouth/themes/kibatv-spinner
 
 # Decode embedded fallback logo
 if [ ! -f /usr/share/kibatv/logo.png ]; then
-  cat > /tmp/logo_b64.txt << 'LOGO_B64'
+  cat > $(mktemp -d)/logo_b64.txt << 'LOGO_B64'
 iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
 LOGO_B64
-  base64 -d /tmp/logo_b64.txt > /usr/share/kibatv/logo.png
-  rm /tmp/logo_b64.txt
+  base64 -d $(mktemp -d)/logo_b64.txt > /usr/share/kibatv/logo.png
+  rm $(mktemp -d)/logo_b64.txt
 fi
 cp /usr/share/kibatv/logo.png /usr/share/kibatv/logo-plymouth.png
 
@@ -532,13 +591,13 @@ Session=plasma-bigscreen
 SDDM_CONF
 
 # ── Nala: replace apt alias system-wide ───────────────────────────────
-# Nala wraps apt; we alias apt→nala in the system zshrc and bashrc
+# Nala wraps apt; we alias apt_get→nala in the system zshrc and bashrc
 # so users interacting with the terminal get the nicer interface.
 cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
-  alias apt='nala'
-  alias apt-get='nala'
+  alias apt_get='nala'
+  alias apt_get='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-alias.sh
@@ -610,15 +669,15 @@ if command -v fastfetch >/dev/null 2>&1; then
 fi
 
 # ── Plugins ────────────────────────────────────────────
-[[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
+[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
+[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
-  alias apt='nala'
-  alias apt-get='nala'
+  alias apt_get='nala'
+  alias apt_get='nala'
   alias install='sudo nala install'
   alias remove='sudo nala remove'
   alias update='sudo nala update && sudo nala upgrade -y'
@@ -733,20 +792,20 @@ POWERRC
 # ── Ant-Dark plasma theme ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/desktoptheme/ant-dark
 git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
-  /tmp/ant-themes 2>/dev/null || true
-if [ -d /tmp/ant-themes/Plasma/Ant-Dark ]; then
-  cp -r /tmp/ant-themes/Plasma/Ant-Dark/. /usr/share/plasma/desktoptheme/ant-dark/
+  $(mktemp -d)/ant-themes 2>/dev/null || true
+if [ -d $(mktemp -d)/ant-themes/Plasma/Ant-Dark ]; then
+  cp -r $(mktemp -d)/ant-themes/Plasma/Ant-Dark/. /usr/share/plasma/desktoptheme/ant-dark/
 fi
 if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
   cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
 {"KPlugin":{"Id":"ant-dark","Name":"Ant Dark","License":"GPL","Version":"1.0"}}
 ANTMETA
 fi
-if [ -f /tmp/ant-themes/colors/Ant-Dark.colors ]; then
+if [ -f $(mktemp -d)/ant-themes/colors/Ant-Dark.colors ]; then
   mkdir -p /usr/share/color-schemes
-  cp /tmp/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
+  cp $(mktemp -d)/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
 fi
-rm -rf /tmp/ant-themes
+rm -rf $(mktemp -d)/ant-themes
 
 # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/images
@@ -768,20 +827,20 @@ WATCHSPLASH
 
 # ── Kora icon theme ───────────────────────────────────────────────────
 mkdir -p /usr/share/icons
-git clone --depth=1 https://github.com/bikass/kora.git /tmp/kora 2>/dev/null || true
-if [ -d /tmp/kora/kora ]; then
-  cp -r /tmp/kora/kora /usr/share/icons/kora
+git clone --depth=1 https://github.com/bikass/kora.git $(mktemp -d) 2>/dev/null || true
+if [ -d $(mktemp -d)/kora ]; then
+  cp -r $(mktemp -d)/kora /usr/share/icons/kora
   gtk-update-icon-cache -f /usr/share/icons/kora 2>/dev/null || true
 fi
-rm -rf /tmp/kora
+rm -rf $(mktemp -d)
 
 # ── Vimix cursors ─────────────────────────────────────────────────────
 git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
-  /tmp/vimix-cursors 2>/dev/null || true
-if [ -d /tmp/vimix-cursors/dist/Vimix-cursors ]; then
-  cp -r /tmp/vimix-cursors/dist/Vimix-cursors /usr/share/icons/Vimix-cursors
+  $(mktemp -d)/vimix-cursors 2>/dev/null || true
+if [ -d $(mktemp -d)/vimix-cursors/dist/Vimix-cursors ]; then
+  cp -r $(mktemp -d)/vimix-cursors/dist/Vimix-cursors /usr/share/icons/Vimix-cursors
 fi
-rm -rf /tmp/vimix-cursors
+rm -rf $(mktemp -d)/vimix-cursors
 
 # ── Dracula KDE colour scheme ─────────────────────────────────────────
 mkdir -p /usr/share/color-schemes
@@ -1216,7 +1275,7 @@ cat > /etc/motd << 'EOF'
 
  _  ___ _             ___  ____
 | |/ (_) |__   __ _ / _ \/ ___|
-| ' /| | '_ \ / _` | | | \___ \
+| ' /| | '_ \ / _\" | | | \___ \
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
@@ -1611,8 +1670,8 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
     cat >> "$RCFILE" << 'NALABASH'
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
-  alias apt='nala'
-  alias apt-get='nala'
+  alias apt_get='nala'
+  alias apt_get='nala'
 }
 NALABASH
   fi
@@ -1632,7 +1691,7 @@ eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
-if grep -qiE "cachyos|psycachy" build.log; then
+if grep -qiEE "cachyos|psycachy" build.log; then
   echo "VERIFIED: CachyOS kernel (psycachy) mentioned in build log"
 else
   echo "WARNING: CachyOS kernel not found in build log"
@@ -1640,7 +1699,7 @@ fi
 
 # Check for critical modern tools (mapping binary names to package names where needed)
 for tool in micro fastfetch eza bat btop ripgrep fd-find tealdeer starship fzf yt-dlp; do
-  if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qi "$tool installed" build.log; then
+  if grep -q "Installing $tool" build.log || grep -q "Setting up $tool" build.log || grep -qiE "$tool installed" build.log; then
      echo "VERIFIED: $tool installed"
   else
      # Some might be installed as dependencies or already present
@@ -1665,20 +1724,20 @@ if [ -f live-image-amd64.hybrid.iso ]; then
     > boot_test.log 2>&1 || true
 
   echo "=== Analyzing Boot Logs ==="
-  if grep -qi "Kernel panic" boot_test.log; then
+  if grep -qiE "Kernel panic" boot_test.log; then
     echo "ERROR: Kernel panic detected during boot test!"
     cat boot_test.log
     exit 1
   fi
 
-  if grep -qi "Call Trace:" boot_test.log; then
+  if grep -qiE "Call Trace:" boot_test.log; then
      echo "ERROR: Potential crash/trace detected in logs!"
      cat boot_test.log
      exit 1
   fi
 
   # Check if we at least reached the initramfs or live-boot stage
-  if ! grep -qiE "init|live-boot|Loading|Linux version" boot_test.log; then
+  if ! grep -qiEE "init|live-boot|Loading|Linux version" boot_test.log; then
      echo "WARNING: Boot log seems empty or didn't start properly"
      # This might be due to lack of kvm, but we'll still fail if it's definitely broken
   fi

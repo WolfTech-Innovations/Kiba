@@ -5,18 +5,18 @@
 </p>
 
 <p align="center">
-  <a href="`https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml`">
-    <img src="`https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
+  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
   </a>
-  <img src="`https://img.shields.io/badge/License-MIT-purple?style=for-the-badge`" alt="License">
-  <img src="`https://img.shields.io/badge/Status-Stable-success?style=for-the-badge`" alt="Status">
+  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Status-Stable-success?style=for-the-badge" alt="Status">
 </p>
 
 Welcome to the official **KibaTV Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaTV.
 
 ---
 
-\n## 📖 Extended Documentation
+## 📖 Extended Documentation
 
 For more specific details on the various components of KibaTV, please refer to the following documents:
 
@@ -30,9 +30,9 @@ For more specific details on the various components of KibaTV, please refer to t
 
 ---
 
-\n## 🏗️ Architecture & Core Components
+## 🏗️ Architecture & Core Components
 
-#\n## Base System
+### Base System
 
 KibaTV is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
 
@@ -41,7 +41,7 @@ KibaTV is built upon the **Debian 13 (Trixie)** testing branch, providing a mode
 - **Display Server:** **Wayland** (default) with **X11** fallback.
 - **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems).
 
-#\n## Extreme Minimization
+### Extreme Minimization
 
 The system undergoes aggressive footprint reduction during the build process:
 
@@ -52,9 +52,9 @@ The system undergoes aggressive footprint reduction during the build process:
 
 ---
 
-\n## 🎨 User Experience (UX) & Design
+## 🎨 User Experience (UX) & Design
 
-#\n## Visual Identity
+### Visual Identity
 
 KibaTV follows the **Dracula** color palette for system-wide visual consistency.
 
@@ -68,7 +68,7 @@ KibaTV follows the **Dracula** color palette for system-wide visual consistency.
 | **System Font**         | **Inter**            |
 | **Monospace Font**      | **JetBrains Mono**   |
 
-#\n## Shell Experience
+### Shell Experience
 
 **Zsh** is the default shell for all users, including `root`.
 
@@ -84,20 +84,20 @@ KibaTV follows the **Dracula** color palette for system-wide visual consistency.
   - `fd-find` (Fast file finder)
   - `tealdeer` (`tldr` implementation)
 
-#\n## Boot & Branding
+### Boot & Branding
 
 - **Plymouth:** Custom "kibatv-spinner" theme with a Dracula-themed progress bar and logo.
 - **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
 
 ---
 
-\n## 📦 Software Management
+## 📦 Software Management
 
-#\n## KibaStore
+### KibaStore
 
 KibaTV features **KibaStore**, which is a native build of **Bazaar**. It serves as a user-friendly frontend for managing **Flatpaks** without the overhead of heavy software centers.
 
-#\n## Repositories & Packages
+### Repositories & Packages
 
 - **Ungoogled Chromium:** Provided via OBS (Open Build Service) repository.
 - **Flatpak:** Integrated by default with the **Flathub** remote.
@@ -105,9 +105,9 @@ KibaTV features **KibaStore**, which is a native build of **Bazaar**. It serves 
 
 ---
 
-\n## 🛡️ Security & Compliance
+## 🛡️ Security & Compliance
 
-#\n## California AADC (AB 2273)
+### California AADC (AB 2273)
 
 KibaTV includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
 
@@ -116,30 +116,30 @@ KibaTV includes a custom **Age Verification** module within the **Calamares** in
 
 ---
 
-\n## 🚀 Build Infrastructure
+## 🚀 Build Infrastructure
 
 KibaTV uses a highly automated CI/CD pipeline.
 
-#\n## Build Pipeline
+### Build Pipeline
 
 1. **Tooling:** Built using **live-build** (lb).
 2. **Environment:** **Docker** container running **Debian Trixie**.
 3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
 4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
 
-#\n## Image Optimization
+### Image Optimization
 
 - **Compression:** The SquashFS filesystem is repacked with **Zstd** (compression level 19) for maximum space efficiency and decompression speed.
 - **Initramfs:** Configured with `zstd -19` for faster boot times.
 
 ---
 
-\n## 🛠️ Build Locally
+## 🛠️ Build Locally
 
 To reproduce the build environment on your own machine:
 
 ````bash
-git clone `https://github.com/WolfTech-Innovations/Kiba`
+git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
@@ -153,7 +153,7 @@ docker run --rm --privileged \
 
 ---
 
-\n## 🤝 Community & Support
+## 🤝 Community & Support
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
@@ -162,7 +162,7 @@ docker run --rm --privileged \
 
 ---
 
-\n## ⚖️ License
+## ⚖️ License
 
 KibaTV is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
 
