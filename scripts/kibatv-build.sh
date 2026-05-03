@@ -1,16 +1,18 @@
 #!/bin/bash
+# License: MIT
 set -ex
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt-get update && apt-get install -y \
+apt update && apt install -y eatmydata
+eatmydata apt update && eatmydata apt install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
   meson ninja-build pkg-config \
   libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
   libjson-glib-dev libostree-dev \
-  gcc g++ gettext curl
+  gcc g++ gettext curl jq eatmydata
 
 cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
@@ -93,52 +95,62 @@ set -e
 echo "=== Installing CachyOS Kernel ==="
 
 # Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
-# For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
 
-if [ -z "$LATEST_TAG" ]; then
+if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
-  # Fallback to a known version or exit
   exit 0
 fi
 
-mkdir -p /tmp/cachyos
-cd /tmp/cachyos
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
 
-# Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+# Download image and headers using jq for robust parsing
+IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
 
-if [ -n "$IMAGE_URL" ]; then
+if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then
   curl -LO "$IMAGE_URL"
 else
-  echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-  curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
+  echo "WARNING: Could not find CachyOS image URL, using looping fallback"
+  for v in {5..1}; do
+    URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-${v}_amd64.deb"
+    if curl -Is "$URL" | grep -q "200 OK"; then
+      curl -LO "$URL"
+      break
+    fi
+  done
 fi
 
-if [ -n "$HEADERS_URL" ]; then
+if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then
   curl -LO "$HEADERS_URL"
 else
-   echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-   curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
+  echo "WARNING: Could not find CachyOS headers URL, using looping fallback"
+  for v in {5..1}; do
+    URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-${v}_amd64.deb"
+    if curl -Is "$URL" | grep -q "200 OK"; then
+      curl -LO "$URL"
+      break
+    fi
+  done
 fi
 
 # Install
-apt-get install -y ./*.deb || {
+eatmydata apt install -y ./*.deb || {
   echo "WARNING: CachyOS Kernel install failed, falling back to stock"
-  cd / && rm -rf /tmp/cachyos
+  cd / && rm -rf "$TMP_DIR"
   exit 0
 }
 
 # Cleanup
-cd / && rm -rf /tmp/cachyos
+cd / && rm -rf "$TMP_DIR"
 
 # Remove stock kernel meta-packages to keep it minimal
 # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-apt-get purge -y linux-image-amd64 linux-headers-amd64
-apt-get autoremove -y
+eatmydata apt purge -y linux-image-amd64 linux-headers-amd64
+eatmydata apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
 CACHY_HOOK
@@ -249,7 +261,7 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 100" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
-apt-get update || true
+eatmydata apt update || true
 
 
 echo "=== Adding packages ==="
@@ -279,6 +291,8 @@ wpasupplicant
 iwd
 wget
 curl
+jq
+eatmydata
 git
 apt-transport-https
 
@@ -290,7 +304,7 @@ plasma-discover
 plasma-discover-backend-flatpak
 
 sddm
-sddm-theme-debian-breeze
+sddm-theme-breeze
 plasma-nm
 plasma-pa
 dolphin
@@ -572,22 +586,30 @@ setopt HIST_IGNORE_SPACE
 setopt INC_APPEND_HISTORY
 
 # ── Completion ─────────────────────────────────────────
-autoload -Uz compinit && compinit -u
+# Fast completion init with caching
+setopt extendedglob
+() {
+  local dump
+  dump="${ZDOTDIR:-$HOME}/.zcompdump"
+  if [[ -f "$dump"(#qN.m-24) ]]; then
+    autoload -Uz compinit && compinit -C
+  else
+    autoload -Uz compinit && compinit
+  fi
+}
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 
-# ── VCS info (git branch in prompt) ────────────────────
-autoload -Uz vcs_info
-precmd() { vcs_info }
-zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
-setopt PROMPT_SUBST
-
-# ── Prompt — Starship (Modern) ──────────────────────────
+# ── Prompt ─────────────────────────────────────────────
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 else
-  # Fallback to Dracula palette
+  # Fallback to Dracula palette with vcs_info
+  autoload -Uz vcs_info
+  precmd() { vcs_info }
+  zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
+  setopt PROMPT_SUBST
   PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
 fi
 
@@ -603,9 +625,9 @@ if command -v fastfetch >/dev/null 2>&1; then
 fi
 
 # ── Plugins ────────────────────────────────────────────
-[[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
+[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
+[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # ── Nala/apt aliases ────────────────────────────────────
@@ -748,13 +770,27 @@ cat > /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/metadata.json
 WATCHMETA
 cat > /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
 import QtQuick 2.15
+
 Rectangle {
-    color: "#000000"
+    id: root
+    color: "#282a36"
     anchors.fill: parent
+
     Text {
+        id: welcomeText
         anchors.centerIn: parent
         text: "KibaTV | Switch to simple"
-        font.pixelSize: 48; font.bold: true; color: "#bd93f9"
+        font.pixelSize: 48
+        font.bold: true
+        color: "#bd93f9"
+        opacity: 0
+
+        NumberAnimation on opacity {
+            from: 0
+            to: 1
+            duration: 1000
+            easing.type: Easing.InOutQuad
+        }
     }
 }
 WATCHSPLASH
@@ -1222,25 +1258,36 @@ mkdir -p /usr/local/bin
 cat > /usr/local/bin/kiba-welcome << 'WELCOME'
 #!/bin/bash
 # Functional welcome menu for KibaTV
-CHOICE=$(zenity --list --title="Welcome to KibaTV" \
-  --text="Welcome to KibaTV! What would you like to do?" \
-  --column="Action" --column="Description" \
-  "Install KibaTV" "Install the system permanently to your disk" \
-  "Web Browser" "Browse the internet" \
-  "Software Center" "Discover and install new applications" \
-  --width=450 --height=300 2>/dev/null)
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --text="Welcome to KibaTV! What would you like to do?" \
+    --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install the system permanently to your disk" \
+    "🌐 Web Browser" "Browse the internet" \
+    "🛍️ Software Center" "Discover and install new applications" \
+    "⌨️ Keyboard Shortcuts" "View system keyboard shortcuts" \
+    --width=500 --height=400 2>/dev/null)
 
-case "$CHOICE" in
-  "Install KibaTV")
-    sudo calamares &
-    ;;
-  "Web Browser")
-    chromium &
-    ;;
-  "Software Center")
-    plasma-discover &
-    ;;
-esac
+  [ -z "$CHOICE" ] && break
+
+  case "$CHOICE" in
+    *"Install KibaTV")
+      sudo calamares &
+      break
+      ;;
+    *"Web Browser")
+      chromium &
+      ;;
+    *"Software Center")
+      plasma-discover &
+      ;;
+    *"Keyboard Shortcuts")
+      zenity --info --title="Keyboard Shortcuts" \
+        --text="Meta (Windows Key): Open Launcher\nMeta+T: Open Terminal\nMeta+E: Open File Manager\nMeta+L: Lock Screen\nAlt+F2: Run Command" \
+        --width=400 2>/dev/null
+      ;;
+  esac
+done
 WELCOME
 chmod +x /usr/local/bin/kiba-welcome
 
@@ -1291,6 +1338,8 @@ style:
   SidebarText:              "#f8f8f2"
   SidebarTextCurrent:       "#282a36"
   SidebarBackgroundCurrent: "#bd93f9"
+  WindowBackground:         "#282a36"
+  WindowForeground:         "#f8f8f2"
 slideshow: "show.qml"
 BRANDING
 
@@ -1621,7 +1670,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-lb build 2>&1 | tee build.log
+eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
