@@ -1,0 +1,21 @@
+name: Check dconf Defaults
+on:
+  push:
+    paths:
+      - '**/dconf/db/*/config/*'
+  pull_request:
+    paths:
+      - '**/dconf/db/*/config/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate dconf default files
+        run: |
+          set -euo pipefail
+          find . -path "*/dconf/db/*/config/*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            grep -q "\[.*\]" "$file" || { echo "Error: Missing group header in $file"; exit 1; }
+          done

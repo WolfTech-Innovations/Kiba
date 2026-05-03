@@ -1,0 +1,24 @@
+name: Check Audio Configs
+on:
+  push:
+    paths:
+      - '**/pipewire/*.conf'
+      - '**/pulse/*.pa'
+  pull_request:
+    paths:
+      - '**/pipewire/*.conf'
+      - '**/pulse/*.pa'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate Pipewire configs
+        run: |
+          set -euo pipefail
+          find . -name "*.conf" -path "*/pipewire/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Pipewire uses SPA JSON format
+            FILE="$file" python3 -c "import os, json; json.load(open(os.environ['FILE']))" || echo "Warning: $file is not strict JSON, skipping deep validation"
+          done

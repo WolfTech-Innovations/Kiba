@@ -1,0 +1,23 @@
+name: Check modprobe Snippets
+on:
+  push:
+    paths:
+      - '**/modprobe.d/*.conf'
+  pull_request:
+    paths:
+      - '**/modprobe.d/*.conf'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate modprobe config
+        run: |
+          set -euo pipefail
+          find . -name "*.conf" -path "*/modprobe.d/*" | while read -r file; do
+            echo "Auditing $file..."
+            grep -v "^#" "$file" | grep -v "^$" | grep -vE "^(options|alias|blacklist|install|remove)" && {
+              echo "Error: Invalid command in $file"; exit 1;
+            } || true
+          done

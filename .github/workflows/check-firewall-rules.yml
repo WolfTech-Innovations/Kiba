@@ -1,0 +1,24 @@
+name: Check Firewall Rules
+on:
+  push:
+    paths:
+      - '**.nft'
+      - '**/iptables.rules'
+  pull_request:
+    paths:
+      - '**.nft'
+      - '**/iptables.rules'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate nftables rules
+        run: |
+          set -euo pipefail
+          sudo apt-get update && sudo apt-get install -y nftables
+          find . -name "*.nft" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            nft -c -f "$file" || { echo "Error: nftables validation failed for $file"; exit 1; }
+          done

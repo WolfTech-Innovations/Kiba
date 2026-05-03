@@ -1,0 +1,22 @@
+name: Check initramfs Hooks
+on:
+  push:
+    paths:
+      - '**/initramfs-tools/hooks/*'
+  pull_request:
+    paths:
+      - '**/initramfs-tools/hooks/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate initramfs hooks
+        run: |
+          set -euo pipefail
+          find . -path "*/initramfs-tools/hooks/*" -type f | while read -r file; do
+            echo "Auditing $file..."
+            grep -q "PREREQ" "$file" || echo "Warning: No PREREQ function in initramfs hook $file"
+            grep -q "case" "$file" || echo "Warning: No case statement in initramfs hook $file"
+          done

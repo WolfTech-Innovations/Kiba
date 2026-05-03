@@ -1,0 +1,21 @@
+name: Check MIME Definitions
+on:
+  push:
+    paths:
+      - '**/mime/packages/*.xml'
+  pull_request:
+    paths:
+      - '**/mime/packages/*.xml'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate MIME XML
+        run: |
+          set -euo pipefail
+          find . -name "*.xml" -path "*/mime/packages/*" | while read -r file; do
+            echo "Auditing $file..."
+            FILE="$file" python3 -c "import os, xml.dom.minidom; xml.dom.minidom.parse(os.environ['FILE'])" || { echo "Error: Invalid XML in $file"; exit 1; }
+          done

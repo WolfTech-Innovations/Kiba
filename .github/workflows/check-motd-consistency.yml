@@ -1,0 +1,23 @@
+name: Check motd Consistency
+on:
+  push:
+    paths:
+      - '**/etc/motd'
+      - '**/update-motd.d/*'
+  pull_request:
+    paths:
+      - '**/etc/motd'
+      - '**/update-motd.d/*'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Audit motd
+        run: |
+          set -euo pipefail
+          find . -name "motd" | while read -r file; do
+            echo "Auditing $file..."
+            grep -qi "KibaOS" "$file" || echo "Warning: KibaOS not mentioned in MOTD"
+          done

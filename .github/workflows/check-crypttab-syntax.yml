@@ -1,0 +1,22 @@
+name: Check crypttab Syntax
+on:
+  push:
+    paths:
+      - '**/crypttab'
+  pull_request:
+    paths:
+      - '**/crypttab'
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate crypttab format
+        run: |
+          set -euo pipefail
+          find . -name "crypttab" -not -path "./node_modules/*" | while read -r file; do
+            echo "Auditing $file..."
+            # Check for at least 2 columns (name and device)
+            grep -v "^#" "$file" | grep -v "^$" | awk 'NF < 2 {print "Error: Invalid line in crypttab: " $0; exit 1}'
+          done

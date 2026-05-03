@@ -30,7 +30,7 @@ jobs:
             echo "SourceForge credentials not configured. Skipping upload."
             exit 0
           fi
-          sudo apt-get update && sudo apt-get install -y sshpass rsync
+          sudo apt update && sudo apt install -y sshpass rsync
           for iso_file in *.iso; do
             [ -f "$iso_file" ] || continue
             echo "Uploading $iso_file to SourceForge..."
