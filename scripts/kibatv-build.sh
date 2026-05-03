@@ -242,12 +242,12 @@ EOF
 
 apt update
 # Install KDE Frameworks 6 development dependencies
-apt install -y \
-  kf6-dev \
-  libkf6bluezqt-dev \
+sudo apt install \
   libkf6kio-dev \
   libkf6dbusaddons-dev \
-  libkf6iconthemes-dev
+  libkf6iconthemes-dev \
+  libkf6bluezqt-dev \
+  extra-cmake-modules
 # Install build dependencies
 apt-get install -y \
   git cmake g++ make \
@@ -270,6 +270,7 @@ cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF
+  -DCMAKE_PREFIX_PATH=/usr
 
 make -j$(nproc)
 make install
