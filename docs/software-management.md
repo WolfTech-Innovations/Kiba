@@ -83,11 +83,11 @@ While KibaStore is the preferred way to browse, you can manage Flatpaks directly
 
 ```bash
 
-# Search for an app
+## Search for an app
 
 flatpak search <name>
 
-# Install an app
+## Install an app
 
 flatpak install flathub <app-id>
 ```bash

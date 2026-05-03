@@ -289,7 +289,7 @@ jobs:
           plasma-workspace-wallpapers
           plasma-discover
           plasma-discover-backend-flatpak
-          
+
           sddm
           sddm-theme-debian-breeze
           plasma-nm
@@ -538,7 +538,6 @@ jobs:
           # KibaOS: use nala as the default package manager frontend
           if command -v nala >/dev/null 2>&1; then
             alias apt='nala'
-            alias apt-get='nala'
           fi
           NALA_ALIAS
           chmod +x /etc/profile.d/nala-alias.sh
@@ -612,7 +611,6 @@ jobs:
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
             alias apt='nala'
-            alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
             alias update='sudo nala update && sudo nala upgrade -y'
@@ -1228,44 +1226,33 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Functional welcome menu for KibaOS
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaOS! What would you like to do?" \
               --column="Action" --column="Description" \
-              "Install KibaOS" "Install the system permanently to your disk" \
-              "Web Browser" "Browse the internet" \
-              "Software Center" "Discover and install new applications" \
-              "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "Online Wiki" "Read the technical documentation" \
-              --width=500 --height=400 2>/dev/null)
-
+              "🚀 Install KibaOS" "Install the system permanently to your disk" \
+              "🌐 Web Browser" "Browse the internet" \
+              "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "📖 Online Wiki" "Read the technical documentation" \
+              "💬 Get Support" "Open the community support page" \
+              --width=550 --height=400 2>/dev/null)
             [ -z "$CHOICE" ] && break
-
             case "$CHOICE" in
-              "Install KibaOS")
+              "🚀 Install KibaOS")
                 sudo calamares &
-                break
-                ;;
-              "Web Browser")
-                chromium &
-                break
-                ;;
-              "Software Center")
-                plasma-discover &
-                break
-                ;;
-              "Keyboard Shortcuts")
+                break ;;
+              "🌐 Web Browser")
+                chromium & ;;
+              "⌨️ Keyboard Shortcuts")
                 zenity --info --title="Keyboard Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
-                  --width=400 2>/dev/null
-                ;;
-              "Online Wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
-                break
-                ;;
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: Quick Launch\n  • <b>Ctrl + Alt + T</b>: Terminal\n  • <b>Meta + E</b>: File Manager\n  • <b>Alt + Tab</b>: Switch Windows" \
+                  --width=400 2>/dev/null ;;
+              "📖 Online Wiki")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & ;;
+              "💬 Get Support")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/issues" & ;;
             esac
           done
           WELCOME
@@ -1634,7 +1621,6 @@ jobs:
           # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
             alias apt='nala'
-            alias apt-get='nala'
           }
           NALABASH
             fi
