@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Validate Issue Template
-        uses: stefanbuck/github-issue-parser@v3
+        uses: stefanbuck/github-issue-parser@cb6e97157cbf851e3a393ff8d57c93a484cc323f
         id: issue-parser
         with:
           template-path: .github/ISSUE_TEMPLATE/bug_report.yml # Adjust if needed
