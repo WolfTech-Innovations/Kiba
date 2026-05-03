@@ -283,7 +283,23 @@ apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
 kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
-source ~/kde/usr/bin/prefix.sh 
+source ~/kde/usr/bin/prefix.sh
+curl https://repo.waydro.id | sudo bash
+git clone https://github.com/WolfTech-Innovations/KStore
+cd KStore
+apt update && apt install -y \
+  build-essential \
+  cmake \
+  extra-cmake-modules \
+  gettext \
+  qt6-base-dev \
+  qt6-declarative-dev \
+  qml6-module-org-kde-kirigami \
+  libkirigami-dev \
+  libkf6i18n-dev \
+  libkf6coreaddons-dev
+cmake --build .
+cd ~
 echo "=== plasma-bigscreen built and installed ==="
 BIGSCREEN_HOOK
 chmod +x config/hooks/live/0050-plasma-bigscreen.hook.chroot
