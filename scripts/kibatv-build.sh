@@ -236,10 +236,18 @@ echo "=== GRUB boot menu branding complete ==="
 BOOT_HOOK
 chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
 wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
+# User (stable) repo
 echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user noble main" | tee /etc/apt/sources.list.d/neon.list
+
+# Unstable repo (has plasma-bigscreen)
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable noble main" | tee /etc/apt/sources.list.d/neon-dev.list
+
+# Key
+wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
 echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 1" | tee /etc/apt/preferences.d/neon-pin
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/dev/unstable noble main" | tee /etc/apt/sources.list.d/neon-dev.list
 apt update
+
+
 echo "=== Adding packages ==="
 
 mkdir -p config/package-lists
