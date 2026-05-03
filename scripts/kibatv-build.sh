@@ -252,7 +252,7 @@ EOF
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
 apt update
-kde-builder --install-distro-packages
+kde-builder --install-distro-packages --prompt-answer=y
 # Install KDE Frameworks 6 development dependencies
 apt install -y \
   libkf6kio-dev \
@@ -271,6 +271,7 @@ apt-get install -y \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
 
+kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
 source ~/kde/usr/bin/prefix.sh 
 echo "=== plasma-bigscreen built and installed ==="
