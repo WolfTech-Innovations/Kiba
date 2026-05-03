@@ -104,8 +104,8 @@ CACHY_TMP=$(mktemp -d)
 trap 'rm -rf "$CACHY_TMP"' EXIT
 cd "$CACHY_TMP"
 
-curl -LO "$BASE/linux-image-psycachy_${VERSION}-1_amd64.deb"
-curl -LO "$BASE/linux-headers-psycachy_${VERSION}-1_amd64.deb"
+curl -LO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
+curl -LO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
 
 dpkg -i ./*.deb || apt install -f -y
 echo "=== CachyOS Kernel installed ==="
