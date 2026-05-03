@@ -1,9 +1,11 @@
 #!/bin/bash
-set -ex
+# License: MIT
+set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt-get update && apt-get install -y \
+apt update && apt install -y eatmydata
+eatmydata apt install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -96,20 +98,20 @@ echo "=== Installing CachyOS Kernel ==="
 # For trixie, we'll try to find the latest version from their GitHub
 REPO="psygreg/linux-psycachy"
 RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+LATEST_TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name' || echo "")
 
-if [ -z "$LATEST_TAG" ]; then
+if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
   echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
   # Fallback to a known version or exit
   exit 0
 fi
 
-mkdir -p /tmp/cachyos
-cd /tmp/cachyos
+CACHY_DIR=$(mktemp -d)
+cd "$CACHY_DIR"
 
 # Download image and headers
-IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+IMAGE_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -1)
+HEADERS_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -1)
 
 if [ -n "$IMAGE_URL" ]; then
   curl -LO "$IMAGE_URL"
@@ -126,19 +128,19 @@ else
 fi
 
 # Install
-apt-get install -y ./*.deb || {
+apt install -y ./*.deb || {
   echo "WARNING: CachyOS Kernel install failed, falling back to stock"
-  cd / && rm -rf /tmp/cachyos
+  cd / && rm -rf "$CACHY_DIR"
   exit 0
 }
 
 # Cleanup
-cd / && rm -rf /tmp/cachyos
+cd / && rm -rf "$CACHY_DIR"
 
 # Remove stock kernel meta-packages to keep it minimal
 # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-apt-get purge -y linux-image-amd64 linux-headers-amd64
-apt-get autoremove -y
+apt purge -y linux-image-amd64 linux-headers-amd64
+apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
 CACHY_HOOK
@@ -246,10 +248,10 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
 
 # Set low priority to prefer Debian packages
-echo -e "Package: *\nPin: release o=Neon\nPin-Priority: 100" | tee /etc/apt/preferences.d/neon-pin
+printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
-apt-get update || true
+eatmydata apt update || true
 
 
 echo "=== Adding packages ==="
@@ -411,11 +413,12 @@ mkdir -p /usr/share/plymouth/themes/kibatv-spinner
 
 # Decode embedded fallback logo
 if [ ! -f /usr/share/kibatv/logo.png ]; then
-  cat > /tmp/logo_b64.txt << 'LOGO_B64'
+  LOGO_TMP=$(mktemp)
+  cat > "$LOGO_TMP" << 'LOGO_B64'
 iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
 LOGO_B64
-  base64 -d /tmp/logo_b64.txt > /usr/share/kibatv/logo.png
-  rm /tmp/logo_b64.txt
+  base64 -d "$LOGO_TMP" > /usr/share/kibatv/logo.png
+  rm "$LOGO_TMP"
 fi
 cp /usr/share/kibatv/logo.png /usr/share/kibatv/logo-plymouth.png
 
@@ -537,7 +540,7 @@ cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
   alias apt='nala'
-  alias apt-get='nala'
+  alias apt='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-alias.sh
@@ -572,21 +575,27 @@ setopt HIST_IGNORE_SPACE
 setopt INC_APPEND_HISTORY
 
 # ── Completion ─────────────────────────────────────────
-autoload -Uz compinit && compinit -u
+setopt extendedglob
+autoload -Uz compinit
+if [ -n "${ZDOTDIR:-$HOME}/.zcompdump(#qN.m-24)" ] && [ "${ZDOTDIR:-$HOME}/.zcompdump" -nt /etc/zsh/zshrc ]; then
+  compinit -C -u
+else
+  compinit -u
+fi
 zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
-
-# ── VCS info (git branch in prompt) ────────────────────
-autoload -Uz vcs_info
-precmd() { vcs_info }
-zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
-setopt PROMPT_SUBST
 
 # ── Prompt — Starship (Modern) ──────────────────────────
 if command -v starship >/dev/null 2>&1; then
   eval "$(starship init zsh)"
 else
+  # ── VCS info (git branch in prompt) ────────────────────
+  autoload -Uz vcs_info
+  precmd() { vcs_info }
+  zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
+  setopt PROMPT_SUBST
+
   # Fallback to Dracula palette
   PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
 fi
@@ -603,15 +612,15 @@ if command -v fastfetch >/dev/null 2>&1; then
 fi
 
 # ── Plugins ────────────────────────────────────────────
-[[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ]] && \
+[ -f /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
   source /usr/share/zsh-autosuggestions/zsh-autosuggestions.zsh
-[[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ]] && \
+[ -f /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
   alias apt='nala'
-  alias apt-get='nala'
+  alias apt='nala'
   alias install='sudo nala install'
   alias remove='sudo nala remove'
   alias update='sudo nala update && sudo nala upgrade -y'
@@ -623,7 +632,7 @@ fi
 alias edit='${EDITOR:-micro}'
 alias please='sudo'
 alias cls='clear'
-alias path='echo -e "${PATH//:/\\n}"'
+alias path='print -l $path'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
@@ -725,21 +734,22 @@ POWERRC
 
 # ── Ant-Dark plasma theme ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/desktoptheme/ant-dark
+ANT_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
-  /tmp/ant-themes 2>/dev/null || true
-if [ -d /tmp/ant-themes/Plasma/Ant-Dark ]; then
-  cp -r /tmp/ant-themes/Plasma/Ant-Dark/. /usr/share/plasma/desktoptheme/ant-dark/
+  "$ANT_TMP" 2>/dev/null || true
+if [ -d "$ANT_TMP/Plasma/Ant-Dark" ]; then
+  cp -r "$ANT_TMP/Plasma/Ant-Dark/." /usr/share/plasma/desktoptheme/ant-dark/
 fi
 if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
   cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
 {"KPlugin":{"Id":"ant-dark","Name":"Ant Dark","License":"GPL","Version":"1.0"}}
 ANTMETA
 fi
-if [ -f /tmp/ant-themes/colors/Ant-Dark.colors ]; then
+if [ -f "$ANT_TMP/colors/Ant-Dark.colors" ]; then
   mkdir -p /usr/share/color-schemes
-  cp /tmp/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
+  cp "$ANT_TMP/colors/Ant-Dark.colors" /usr/share/color-schemes/AntDark.colors
 fi
-rm -rf /tmp/ant-themes
+rm -rf "$ANT_TMP"
 
 # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/images
@@ -761,20 +771,22 @@ WATCHSPLASH
 
 # ── Kora icon theme ───────────────────────────────────────────────────
 mkdir -p /usr/share/icons
-git clone --depth=1 https://github.com/bikass/kora.git /tmp/kora 2>/dev/null || true
-if [ -d /tmp/kora/kora ]; then
-  cp -r /tmp/kora/kora /usr/share/icons/kora
+KORA_TMP=$(mktemp -d)
+git clone --depth=1 https://github.com/bikass/kora.git "$KORA_TMP" 2>/dev/null || true
+if [ -d "$KORA_TMP/kora" ]; then
+  cp -r "$KORA_TMP/kora" /usr/share/icons/kora
   gtk-update-icon-cache -f /usr/share/icons/kora 2>/dev/null || true
 fi
-rm -rf /tmp/kora
+rm -rf "$KORA_TMP"
 
 # ── Vimix cursors ─────────────────────────────────────────────────────
+VIMIX_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
-  /tmp/vimix-cursors 2>/dev/null || true
-if [ -d /tmp/vimix-cursors/dist/Vimix-cursors ]; then
-  cp -r /tmp/vimix-cursors/dist/Vimix-cursors /usr/share/icons/Vimix-cursors
+  "$VIMIX_TMP" 2>/dev/null || true
+if [ -d "$VIMIX_TMP/dist/Vimix-cursors" ]; then
+  cp -r "$VIMIX_TMP/dist/Vimix-cursors" /usr/share/icons/Vimix-cursors
 fi
-rm -rf /tmp/vimix-cursors
+rm -rf "$VIMIX_TMP"
 
 # ── Dracula KDE colour scheme ─────────────────────────────────────────
 mkdir -p /usr/share/color-schemes
@@ -1209,7 +1221,7 @@ cat > /etc/motd << 'EOF'
 
  _  ___ _             ___  ____
 | |/ (_) |__   __ _ / _ \/ ___|
-| ' /| | '_ \ / _` | | | \___ \
+| ' /| | '_ \ / _' | | | \___ \
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
@@ -1605,7 +1617,7 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
   alias apt='nala'
-  alias apt-get='nala'
+  alias apt='nala'
 }
 NALABASH
   fi
@@ -1621,7 +1633,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-lb build 2>&1 | tee build.log
+eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment

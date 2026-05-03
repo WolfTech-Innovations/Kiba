@@ -26,21 +26,24 @@ set -euo pipefail
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  local release_id="${RELEASE_ID:-}"
-  local github_token="${GH_TOKEN:-}"
-  local repo="${GITHUB_REPOSITORY:-}"
+  local release_id
+  release_id="${RELEASE_ID:-}"
+  local github_token
+  github_token="${GH_TOKEN:-}"
+  local repo
+  repo="${GITHUB_REPOSITORY:-}"
 
-  if [[ -z "$release_id" ]]; then
+  if [ -z "$release_id" ]; then
     printf "Error: RELEASE_ID environment variable is required.\n" >&2
     exit 1
   fi
 
-  if [[ -z "$github_token" ]]; then
+  if [ -z "$github_token" ]; then
     printf "Error: GH_TOKEN environment variable is required.\n" >&2
     exit 1
   fi
 
-  if [[ -z "$repo" ]]; then
+  if [ -z "$repo" ]; then
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
     exit 1
   fi
@@ -56,7 +59,8 @@ save_release_notes() {
 
   local h_val
   h_val=$(date +%-H)
-  local hours="0123456789ABCDEFGHIJKLMN"
+  local hours
+  hours="0123456789ABCDEFGHIJKLMN"
   local h
   h=$(printf "%s" "$hours" | cut -c $((h_val + 1)))
 
@@ -65,28 +69,31 @@ save_release_notes() {
 
   local m_val
   m_val=$(date +%-m)
-  local months="123456789ABC"
+  local months
+  months="123456789ABC"
   local m
   m=$(printf "%s" "$months" | cut -c "$m_val")
 
-  local filename="Notes/NTE-${dd}${h}${y}${m}.md"
+  local filename
+  filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [[ ! -f Notes/.gitkeep ]]; then
+  if [ ! -f Notes/.gitkeep ]; then
     touch Notes/.gitkeep
   fi
 
   # 3. Fetch release body using curl and jq
   # Uses GH_TOKEN from environment
-  local api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
+  local api_url
+  api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
   local body
   body=$(curl -s -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 
   # 4. Handle empty release notes
-  if [[ -z "$body" || "$body" == "null" ]]; then
+  if [ -z "$body" ] || [ "$body" = "null" ]; then
     printf "No release notes provided for this release.\n" > "$filename"
   else
     printf "%s\n" "$body" > "$filename"
