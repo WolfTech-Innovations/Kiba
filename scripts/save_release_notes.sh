@@ -25,52 +25,80 @@ set -euo pipefail
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
 
-RELEASE_ID="$1"
+save_release_notes() {
+  local release_id="${RELEASE_ID:-}"
+  local github_token="${GH_TOKEN:-}"
+  local repo="${GITHUB_REPOSITORY:-}"
 
-if [ -z "$RELEASE_ID" ]; then
-  echo "Error: Release ID is required as the first argument."
-  exit 1
-fi
+  if [[ -z "$release_id" ]]; then
+    printf "Error: RELEASE_ID environment variable is required.\n" >&2
+    exit 1
+  fi
 
-# 1. Generate filename: NTE-DDHYM
-# DD: Day of month (01-31)
-# H: Hour of day (0-N for 0-23)
-# Y: Last digit of year
-# M: Month (1-C for 1-12)
+  if [[ -z "$github_token" ]]; then
+    printf "Error: GH_TOKEN environment variable is required.\n" >&2
+    exit 1
+  fi
 
-DD=$(date +%d)
+  if [[ -z "$repo" ]]; then
+    printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
+    exit 1
+  fi
 
-H_VAL=$(date +%-H)
-HOURS="0123456789ABCDEFGHIJKLMN"
-H=$(echo "$HOURS" | cut -c $((H_VAL + 1)))
+  # 1. Generate filename: NTE-DDHYM
+  # DD: Day of month (01-31)
+  # H: Hour of day (0-N for 0-23)
+  # Y: Last digit of year
+  # M: Month (1-C for 1-12)
 
-Y=$(date +%y | cut -c 2)
+  local dd
+  dd=$(date +%d)
 
-M_VAL=$(date +%-m)
-MONTHS="123456789ABC"
-M=$(echo "$MONTHS" | cut -c "$M_VAL")
+  local h_val
+  h_val=$(date +%-H)
+  local hours="0123456789ABCDEFGHIJKLMN"
+  local h
+  h=$(printf "%s" "$hours" | cut -c $((h_val + 1)))
 
-FILENAME="Notes/NTE-${DD}${H}${Y}${M}.md"
+  local y
+  y=$(date +%y | cut -c 2)
 
-# 2. Ensure Notes directory and .gitkeep exist
-mkdir -p Notes
-if [ ! -f Notes/.gitkeep ]; then
-  touch Notes/.gitkeep
-fi
+  local m_val
+  m_val=$(date +%-m)
+  local months="123456789ABC"
+  local m
+  m=$(printf "%s" "$months" | cut -c "$m_val")
 
-# 3. Fetch release body using GitHub CLI
-# Uses GH_TOKEN from environment
-gh release view "$RELEASE_ID" --template '{{.body}}' > "$FILENAME"
+  local filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
-# 4. Handle empty release notes
-if [ ! -s "$FILENAME" ]; then
-  echo "No release notes provided for this release." > "$FILENAME"
-fi
+  # 2. Ensure Notes directory and .gitkeep exist
+  mkdir -p Notes
+  if [[ ! -f Notes/.gitkeep ]]; then
+    touch Notes/.gitkeep
+  fi
 
-# 5. Git operations
-git config user.name "github-actions[bot]"
-git config user.email "github-actions[bot]@users.noreply.github.com"
-git add "$FILENAME" Notes/.gitkeep
-git commit -m "docs: add release notes $FILENAME [skip ci]" || echo "No changes to commit"
-git pull --rebase origin main
-git push origin main
+  # 3. Fetch release body using curl and jq
+  # Uses GH_TOKEN from environment
+  local api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
+  local body
+  body=$(curl -s -H "Authorization: token ${github_token}" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "$api_url" | jq -r '.body')
+
+  # 4. Handle empty release notes
+  if [[ -z "$body" || "$body" == "null" ]]; then
+    printf "No release notes provided for this release.\n" > "$filename"
+  else
+    printf "%s\n" "$body" > "$filename"
+  fi
+
+  # 5. Git operations
+  git config user.name "github-actions[bot]"
+  git config user.email "github-actions[bot]@users.noreply.github.com"
+  git add "$filename" Notes/.gitkeep
+  git commit -m "docs: add release notes $filename [skip ci]" || printf "No changes to commit\n"
+  git pull --rebase origin main
+  git push origin main
+}
+
+save_release_notes
