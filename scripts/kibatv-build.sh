@@ -236,6 +236,7 @@ cd ~
 sudo apt-get install -y git cmake python3-pip
 cd ~
 curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
+export PATH="$HOME/.local/bin:$PATH"
 # Run with yes to accept package installations
 yes | bash initial_setup.sh
 kde-builder --generate-config
