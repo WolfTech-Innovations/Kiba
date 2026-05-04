@@ -244,7 +244,6 @@ apt install -y \
 # Install build dependencies
 apt-get install -y \
   git cmake g++ make \
-  extra-cmake-modules \
   libkf6config-dev libkf6coreaddons-dev \
   libkf6service-dev libkf6i18n-dev \
   libplasma-dev libkf6kcmutils-dev \
@@ -253,6 +252,11 @@ apt-get install -y \
   libtag1-dev libmpv-dev
 apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
+git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
+cd extra-cmake-modules
+git checkout v6.14.0
+cmake -B build
+cmake --install build
 # Clone and build plasma-bigscreen
 cd /tmp
 git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
