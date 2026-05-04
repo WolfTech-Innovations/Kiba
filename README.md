@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Ubuntu`%20Noble-D70A53?style=for-the-badge&logo=ubuntu&logoColor=white" alt="Ubuntu Version">
+  <img src="https://img.shields.io/badge/postmarketOS%20-D70A53?style=for-the-badge&logo=postmarketos&logoColor=green" alt="postmarketOS Version">
   <img src="https://img.shields.io/badge/KDE-Plasma`%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
 </p>
 
@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaTV is a lightweight Linux distribution built on **Ubuntu Noble** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaTV is a lightweight Linux distribution built on **postmarketOS** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -41,7 +41,7 @@ For a more in-depth look at KibaTV, check out our detailed documentation:
 
 - [**Architecture**](./docs/architecture.md): Base system, kernel, and minimization strategies.
 - [**UX & Design**](./docs/ux-design.md): The Dracula aesthetic and terminal experience.
-- [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
+- [**Software Management**](./docs/software-management.md): KStore.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaTV.
 - [**FAQ**](./docs/faq.md): Frequently asked questions.
@@ -51,7 +51,7 @@ For a more in-depth look at KibaTV, check out our detailed documentation:
 
 ## Features
 
-- **Debian Base:** Built on **Debian 13 Trixie** (supported until 2030).
+- **Debian Base:** Built on **postmarketOS**.
 - **Modern Desktop:** **Plasma Bigscreen** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
