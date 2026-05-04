@@ -3,7 +3,10 @@
 set -euo pipefail
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
-
+# Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
+sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.us.leaseweb.net/ubuntu|g' /etc/apt/sources.list
+# OR use Ubuntu's official US CDN-backed mirror:
+# http://us.archive.ubuntu.com/ubuntu
 # ── Install live-build and build deps ─────────────────────────────────
 apt update && apt install -y \
   eatmydata \
@@ -234,6 +237,10 @@ chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
+# Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
+sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirror.us.leaseweb.net/ubuntu|g' /etc/apt/sources.list
+# OR use Ubuntu's official US CDN-backed mirror:
+# http://us.archive.ubuntu.com/ubuntu
 apt install -y git cmake python3-pip
 cd ~
 
