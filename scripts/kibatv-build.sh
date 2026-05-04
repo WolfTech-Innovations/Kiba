@@ -23,7 +23,12 @@ apt update && apt install -y \
 
 cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
+# Remove Ubuntu's ancient live-build
+apt-get remove -y live-build
 
+# Install from Debian trixie instead
+wget https://mirrors.kernel.org/debian/pool/main/l/live-build/live-build_20250114_all.deb
+dpkg -i live-build_20250114_all.deb || apt-get install -f -y
 echo "=== Configuring live-build ==="
 
 lb config \
