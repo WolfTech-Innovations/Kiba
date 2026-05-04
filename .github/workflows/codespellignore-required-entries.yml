@@ -1,0 +1,21 @@
+name: Codespellignore Required Entries
+
+on:
+  push:
+    paths:
+      - ".codespellignore"
+  pull_request:
+    paths:
+      - ".codespellignore"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Codespellignore Required Entries
+        run: |
+          ERR=0; for w in teh recieve occured; do grep -q "$w" .codespellignore || { echo "Error: missing $w"; ERR=1; }; done; [ $ERR -eq 0 ]

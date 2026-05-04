@@ -1,0 +1,21 @@
+name: Zshrc Prompt Optimization
+
+on:
+  push:
+    paths:
+      - "scripts/kibatv-build.sh"
+  pull_request:
+    paths:
+      - "scripts/kibatv-build.sh"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Zshrc Prompt Optimization
+        run: |
+          grep -q "vcs_info" scripts/kibatv-build.sh && ! grep -q "if command -v starship" scripts/kibatv-build.sh && { echo "Warning: missing skip"; } || true

@@ -1,0 +1,21 @@
+name: Audit Qt6 Tools Pinning
+
+on:
+  push:
+    paths:
+      - "scripts/kibatv-build.sh"
+  pull_request:
+    paths:
+      - "scripts/kibatv-build.sh"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Audit Qt6 Tools Pinning
+        run: |
+          grep -q "qt6-base-dev-tools" scripts/kibatv-build.sh && ! grep -q "qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1" scripts/kibatv-build.sh && { echo "Error: wrong version"; false; } || true

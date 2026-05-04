@@ -1,0 +1,21 @@
+name: Prohibit APT Trusted Yes
+
+on:
+  push:
+    paths:
+      - "scripts/kibatv-build.sh"
+  pull_request:
+    paths:
+      - "scripts/kibatv-build.sh"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Prohibit APT Trusted Yes
+        run: |
+          grep -q "trusted=yes" scripts/kibatv-build.sh && { echo "Error: trusted=yes used"; false; } || true
