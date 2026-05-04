@@ -256,11 +256,56 @@ git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
 cd extra-cmake-modules
 apt update
 apt install -y \
-  qml6-module-org-kde-kirigami \
-  libkf6svg-dev \
+  # Build tools
+  cmake \
+  extra-cmake-modules \
+  pkg-config \
+  gettext \
+  \
+  # KF6 components
+  libkf6bluezqt-dev \
   libkf6i18n-dev \
+  libkf6kcmutils-dev \
+  libkf6globalaccel-dev \
+  libkf6notifications-dev \
   libkf6kio-dev \
+  libkf6windowsystem-dev \
+  libkf6svg-dev \
+  libkf6dbusaddons-dev \
+  libkf6iconthemes-dev \
   libkirigami-dev \
+  \
+  # Kirigami QML runtime
+  qml6-module-org-kde-kirigami \
+  \
+  # KScreen
+  libkscreen-dev \
+  \
+  # Plasma
+  libplasma-dev \
+  libplasmaactivities-dev \
+  libplasmaactivitiesstats-dev \
+  plasma-workspace-dev \
+  plasma-wayland-protocols \
+  \
+  # Qt6 components
+  qt6-base-dev \
+  qt6-declarative-dev \
+  qt6-multimedia-dev \
+  qt6-webengine-dev \
+  qt6-wayland-dev \
+  \
+  # QCoro (C++20 coroutines for Qt6)
+  qcoro-qt6-dev \
+  \
+  # Wayland
+  libwayland-dev \
+  \
+  # SDL3 (game controller support)
+  libsdl3-dev \
+  \
+  # libcec (optional - TV remote/CEC support)
+  libcec-dev
   
   
 sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
