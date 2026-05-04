@@ -244,11 +244,6 @@ export LANG=C.UTF-8
 cd ~
 apt-get install -y git cmake python3-pip
 cd ~
-curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
-export PATH="$HOME/.local/bin:$PATH"
-# Run with yes to accept package installations
-yes | bash initial_setup.sh
-kde-builder --generate-config
 
 # Add sid to sources temporarily
 echo "deb http://deb.debian.org/debian sid main" > /etc/apt/sources.list.d/sid.list
@@ -261,7 +256,6 @@ EOF
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
 apt update
-kde-builder --install-distro-packages --prompt-answer=y
 # Install KDE Frameworks 6 development dependencies
 apt install -y \
   libkf6kio-dev \
@@ -282,9 +276,24 @@ apt-get install -y \
 apt-get update
 apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
-kde-builder --initial-setup --prompt-answer=y
-kde-builder plasma-bigscreen
-source ~/kde/usr/bin/prefix.sh
+# Clone and build plasma-bigscreen
+cd /tmp
+git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
+  git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
+
+cd plasma-bigscreen
+mkdir build && cd build
+cmake .. \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_TESTING=OFF
+  -DCMAKE_PREFIX_PATH=/usr
+
+make -j$(nproc)
+make install
+
+# Cleanup
+cd / && rm -rf /tmp/plasma-bigscreen
 curl https://repo.waydro.id | bash
 waydroid init -s GAPPS
 systemctl enable --now waydroid-container.service
