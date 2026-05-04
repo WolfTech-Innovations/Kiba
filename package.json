@@ -1,7 +1,14 @@
 {
   "name": "kibatv-automation",
   "version": "1.0.0",
+  "description": "Automation scripts and workflows for the KibaTV Linux distribution",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WolfTech-Innovations/Kiba.git"
+  },
   "private": true,
+  "scripts": {},
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
