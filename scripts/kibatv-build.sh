@@ -1,6 +1,7 @@
 #!/bin/bash
 # License: GPL-3.0-or-later
 set -euo pipefail
+set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
