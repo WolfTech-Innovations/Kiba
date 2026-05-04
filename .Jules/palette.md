@@ -7,3 +7,7 @@
 
 **Learning:** For informational items in a selection menu (like "Keyboard Shortcuts"), omitting the `break` command ensures the user remains in the menu after dismissing the info dialog, encouraging further exploration.
 **Action:** Only use `break` for primary actions that launch a full application or process (like the installer) in looping welcome tools.
+
+## 2025-05-15 - [Discoverable Shortcuts in Menu Labels]
+**Learning:** Incorporating keyboard shortcut hints (e.g., "Terminal (Meta+T)") directly into Zenity menu labels in the `kiba-welcome` tool improves functional discoverability and teaches users efficient interaction methods within the live environment.
+**Action:** Include shortcut hints in labels for primary system tools to enhance user onboarding and system proficiency.
