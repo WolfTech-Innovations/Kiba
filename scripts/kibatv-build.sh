@@ -284,7 +284,9 @@ apt-get install -y --no-install-recommends \
 kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
 source ~/kde/usr/bin/prefix.sh
-curl https://repo.waydro.id | sudo bash
+curl https://repo.waydro.id | bash
+waydroid init
+systemctl enable --now waydroid-container.service
 git clone https://github.com/WolfTech-Innovations/KStore
 cd KStore
 apt update && apt install -y \
