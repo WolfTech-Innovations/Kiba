@@ -3,12 +3,13 @@
 set -euo pipefail
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
+apt install curl
 # Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
 # Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
 curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
 -o /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
-fast-apt-mirror.sh find --apply
+bash ./fast-apt-mirror.sh find --apply
 # OR use Ubuntu's official US CDN-backed mirror:
 # http://us.archive.ubuntu.com/ubuntu
 # ── Install live-build and build deps ─────────────────────────────────
@@ -88,7 +89,7 @@ mkdir -p config/hooks/live
 curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
 -o /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
-fast-apt-mirror.sh find --apply
+bash ./fast-apt-mirror.sh find --apply
 cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
 #!/bin/bash
 set -e
