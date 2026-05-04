@@ -212,10 +212,10 @@ wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/sha
 
 # Use 'jammy' (Ubuntu 22.04 LTS) which is closest to Debian Trixie compatibility
 # or use 'focal' as fallback - both have plasma-bigscreen available
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user jammy main" | tee /etc/apt/sources.list.d/neon.list
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg] https://archive.neon.kde.org/user jammy main" | tee /etc/apt/sources.list.d/neon.list
 
 # Unstable repo (has plasma-bigscreen) - use jammy instead of noble
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
 
 # Set low priority to prefer Debian packages
 printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
