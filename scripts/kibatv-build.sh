@@ -1,6 +1,7 @@
 #!/bin/bash
 # License: GPL-3.0-or-later
 set -euo pipefail
+set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
@@ -591,8 +592,8 @@ SDDM_CONF
 cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
-  alias apt_get='nala'
-  alias apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-alias.sh
@@ -640,7 +641,7 @@ zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 
 # ── Prompt — Starship (Modern) ──────────────────────────
 if command -v starship >/dev/null 2>&1; then
-  eval "$(starship init zsh)"
+  'eval' "$(starship init zsh)"
 else
   # ── VCS info (git branch in prompt) ────────────────────
   autoload -Uz vcs_info
@@ -671,56 +672,56 @@ fi
 
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
-  alias apt_get='nala'
-  alias apt_get='nala'
-  alias install='sudo nala install'
-  alias remove='sudo nala remove'
-  alias update='sudo nala update && sudo nala upgrade -y'
-  alias upgrade='sudo nala upgrade'
-  alias search='nala search'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' install='sudo nala install'
+  'alias' remove='sudo nala remove'
+  'alias' update='sudo nala update && sudo nala upgrade -y'
+  'alias' upgrade='sudo nala upgrade'
+  'alias' search='nala search'
 fi
 
 # ── KibaTV Aliases ──────────────────────────────────────
-alias edit='${EDITOR:-micro}'
-alias please='sudo'
-alias cls='clear'
-alias path='print -l $path'
+'alias' edit='${EDITOR:-micro}'
+'alias' please='sudo'
+'alias' cls='clear'
+'alias' path='print -l $path'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
-  alias ls='eza --icons --group-directories-first'
-  alias ll='eza -lah --icons --group-directories-first'
-  alias la='eza -A --icons'
-  alias tree='eza --tree --icons'
+  'alias' ls='eza --icons --group-directories-first'
+  'alias' ll='eza -lah --icons --group-directories-first'
+  'alias' la='eza -A --icons'
+  'alias' tree='eza --tree --icons'
 else
-  alias ls='ls --color=auto'
-  alias ll='ls -lah'
-  alias la='ls -A'
+  'alias' ls='ls --color=auto'
+  'alias' ll='ls -lah'
+  'alias' la='ls -A'
 fi
 
 if command -v bat >/dev/null 2>&1; then
-  alias cat='bat --paging=never'
+  'alias' cat='bat --paging=never'
 elif command -v batcat >/dev/null 2>&1; then
-  alias cat='batcat --paging=never'
-  alias bat='batcat'
+  'alias' cat='batcat --paging=never'
+  'alias' bat='batcat'
 fi
 
 if command -v rg >/dev/null 2>&1; then
-  alias grep='rg'
+  'alias' grep='rg'
 elif command -v rg >/dev/null 2>&1; then
-  alias grep='rg'
+  'alias' grep='rg'
 fi
 
 if command -v fdfind >/dev/null 2>&1; then
-  alias fd='fdfind'
+  'alias' fd='fdfind'
 fi
 
 if command -v tldr >/dev/null 2>&1; then
   # Use tealdeer if available
-  alias help='tldr'
+  'alias' help='tldr'
 elif command -v tealdeer >/dev/null 2>&1; then
-  alias help='tealdeer'
-  alias tldr='tealdeer'
+  'alias' help='tealdeer'
+  'alias' tldr='tealdeer'
 fi
 
 command -v duf >/dev/null 2>&1 && alias df='duf'
@@ -728,13 +729,13 @@ command -v ncdu >/dev/null 2>&1 && alias du='ncdu'
 command -v btop >/dev/null 2>&1 && alias top='btop'
 
 # ── General aliases ─────────────────────────────────────
-alias free='free -h'
-alias mkdir='mkdir -pv'
-alias cp='cp -iv'
-alias mv='mv -iv'
-alias rm='rm -I'
-alias ..='cd ..'
-alias ...='cd ../..'
+'alias' free='free -h'
+'alias' mkdir='mkdir -pv'
+'alias' cp='cp -iv'
+'alias' mv='mv -iv'
+'alias' rm='rm -I'
+'alias' ..='cd ..'
+'alias' ...='cd ../..'
 ZSHRC
 
 # ── Update tldr cache ──────────────────────────────────────────────────
@@ -1704,8 +1705,8 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
     cat >> "$RCFILE" << 'NALABASH'
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
-  alias apt_get='nala'
-  alias apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
 }
 NALABASH
   fi

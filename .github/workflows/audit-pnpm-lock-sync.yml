@@ -16,7 +16,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install pnpm
-        uses: pnpm/action-setup@a3487db36f1315224a0ff41d22ac0c2b1239857d
+        uses: pnpm/action-setup@v4
         with:
           version: 9
       - name: Check lockfile sync

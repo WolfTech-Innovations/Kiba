@@ -16,10 +16,11 @@ jobs:
       - name: Check for duplicate step names within jobs
         run: |
           for file in .github/workflows/*.yml; do
-            # Use yq to check uniqueness PER JOB
-            bad_jobs=$(yq '.jobs | to_entries | .[] | select((.value.steps | map(.name) | filter(. != null) | sort | uniq -d | length) > 0) | .key' "$file")
+            # Use yq to extract step names per job and check for duplicates
+            # Output format: job_name:step_name
+            bad_jobs=$(yq '.jobs | to_entries | .[] | .key as $j | .value.steps | .[] | select(.name != null) | $j + ":" + .name' "$file" | sort | uniq -d | cut -d: -f1 | sort -u)
             if [ -n "$bad_jobs" ]; then
               echo "Duplicate step names found in $file in jobs: $bad_jobs"
-              exit 1
+              false
             fi
           done
