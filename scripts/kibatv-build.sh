@@ -256,6 +256,7 @@ git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
 cd extra-cmake-modules
 sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
 sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
+sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
 git checkout v6.14.0
 cmake -B build
 cmake --install build
@@ -267,6 +268,7 @@ git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/nu
 cd plasma-bigscreen
 sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
 sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
+sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
 mkdir build && cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
