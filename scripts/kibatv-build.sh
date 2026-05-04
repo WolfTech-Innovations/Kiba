@@ -1,10 +1,12 @@
 #!/bin/bash
 # License: GPL-3.0-or-later
 set -euo pipefail
+set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
 apt update && apt install -y \
+  eatmydata \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -93,26 +95,32 @@ cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
 set -e
 echo "=== Installing CachyOS Kernel ==="
 
-set -e
-echo "=== Installing CachyOS Kernel ==="
+# Dynamically fetch the latest release version and asset URLs
+API_URL="https://api.github.com/repos/psygreg/linux-psycachy/releases/latest"
+RELEASE_INFO=$(curl -s "$API_URL")
+TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+IMG_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy")) | .browser_download_url')
+HDR_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy")) | .browser_download_url')
 
-VERSION="6.17.13"
-TAG="6.17.13"
-BASE="https://github.com/psygreg/linux-psycachy/releases/download/$TAG"
+if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+  echo "ERROR: Failed to fetch latest CachyOS kernel version"
+  exit 1
+fi
+
+echo "Installing CachyOS Kernel $TAG..."
 
 CACHY_TMP=$(mktemp -d)
 trap 'rm -rf "$CACHY_TMP"' EXIT
 cd "$CACHY_TMP"
 
-curl -LO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
-curl -LO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
+curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
+curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
 
 dpkg -i ./*.deb || apt install -f -y
-echo "=== CachyOS Kernel installed ==="
 apt purge -y linux-image-amd64 linux-headers-amd64
 apt autoremove -y
 
-echo "=== CachyOS Kernel installed ==="
+echo "=== CachyOS Kernel installed ($TAG) ==="
 CACHY_HOOK
 chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
@@ -207,22 +215,6 @@ fi
 echo "=== GRUB boot menu branding complete ==="
 BOOT_HOOK
 chmod +x config/hooks/binary/0020-bootloader-branding.hook.binary
-# Update your script around lines 238-248 to use a compatible Neon repository
-wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/share/keyrings/neon-archive-keyring.gpg > /dev/null
-
-# Use 'jammy' (Ubuntu 22.04 LTS) which is closest to Debian Trixie compatibility
-# or use 'focal' as fallback - both have plasma-bigscreen available
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user jammy main" | tee /etc/apt/sources.list.d/neon.list
-
-# Unstable repo (has plasma-bigscreen) - use jammy instead of noble
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
-
-# Set low priority to prefer Debian packages
-printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
-
-# Update package cache inside the container BEFORE live-build uses it
- apt-get update || true
-
 
 echo "=== Adding packages ==="
 # ── Build plasma-bigscreen from source ────────────────────────────────
@@ -242,17 +234,9 @@ chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-apt-get install -y git cmake python3-pip
+apt install -y git cmake python3-pip
 cd ~
 
-# Add sid to sources temporarily
-echo "deb http://deb.debian.org/debian sid main" > /etc/apt/sources.list.d/sid.list
-
-cat > /etc/apt/preferences.d/sid-pin <<EOF
-Package: *
-Pin: release a=sid
-Pin-Priority: 100
-EOF
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
 apt update
@@ -264,37 +248,104 @@ apt install -y \
   libkf6bluezqt-dev \
   extra-cmake-modules
 # Install build dependencies
-apt-get install -y \
+apt install -y \
   git cmake g++ make \
-  extra-cmake-modules \
   libkf6config-dev libkf6coreaddons-dev \
   libkf6service-dev libkf6i18n-dev \
   libplasma-dev libkf6kcmutils-dev \
   qt6-base-dev libqt6core6 libqt6gui6 \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
-apt-get update
-apt-get install -y --no-install-recommends \
+apt install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
+git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
+cd extra-cmake-modules
+apt update
+apt install -y \
+  # Build tools
+  cmake \
+  extra-cmake-modules \
+  pkg-config \
+  gettext \
+  \
+  # KF6 components
+  libkf6bluezqt-dev \
+  libkf6i18n-dev \
+  libkf6kcmutils-dev \
+  libkf6globalaccel-dev \
+  libkf6notifications-dev \
+  libkf6kio-dev \
+  libkf6windowsystem-dev \
+  libkf6svg-dev \
+  libkf6dbusaddons-dev \
+  libkf6iconthemes-dev \
+  libkirigami-dev \
+  \
+  # Kirigami QML runtime
+  qml6-module-org-kde-kirigami \
+  \
+  # KScreen
+  libkscreen-dev \
+  \
+  # Plasma
+  libplasma-dev \
+  libplasmaactivities-dev \
+  libplasmaactivitiesstats-dev \
+  plasma-workspace-dev \
+  plasma-wayland-protocols \
+  \
+  # Qt6 components
+  qt6-base-dev \
+  qt6-declarative-dev \
+  qt6-multimedia-dev \
+  qt6-webengine-dev \
+  qt6-wayland-dev \
+  \
+  # QCoro (C++20 coroutines for Qt6)
+  qcoro-qt6-dev \
+  \
+  # Wayland
+  libwayland-dev \
+  \
+  # SDL3 (game controller support)
+  libsdl3-dev \
+  \
+  # libcec (optional - TV remote/CEC support)
+  libcec-dev
+  
+  
+sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
+sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
+sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
+git checkout v6.14.0
+cmake -B build
+cmake --install build
 # Clone and build plasma-bigscreen
 cd /tmp
 git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
   git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
 
 cd plasma-bigscreen
+sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
+sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
+sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
 mkdir build && cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF
+  -DBUILD_TESTING=OFF \
   -DCMAKE_PREFIX_PATH=/usr
-
-make -j$(nproc)
+make -j"$(nproc)"
 make install
 
 # Cleanup
 cd / && rm -rf /tmp/plasma-bigscreen
-curl https://repo.waydro.id | bash
+
+# Securely install Waydroid repository
+curl --proto '=https' --tlsv1.2 -Sf https://repo.waydro.id/waydroid.gpg --output /usr/share/keyrings/waydroid.gpg
+echo "deb [signed-by=/usr/share/keyrings/waydroid.gpg] https://repo.waydro.id/ trixie main" > /etc/apt/sources.list.d/waydroid.list
+apt update
+
 waydroid init -s GAPPS
 systemctl enable --now waydroid-container.service
 git clone https://github.com/WolfTech-Innovations/KStore
@@ -310,7 +361,9 @@ apt update && apt install -y \
   libkirigami-dev \
   libkf6i18n-dev \
   libkf6coreaddons-dev
-cmake --build .
+cmake .
+cmake --build . -j"$(nproc)"
+make install || true
 cd ~
 echo "=== plasma-bigscreen built and installed ==="
 BIGSCREEN_HOOK
@@ -348,6 +401,9 @@ plasma-workspace
 plasma-workspace-wallpapers
 plasma-discover
 plasma-discover-backend-flatpak
+konsole
+dolphin
+systemsettings
 
 sddm
 sddm-theme-breeze
@@ -466,11 +522,12 @@ mkdir -p /usr/share/plymouth/themes/kibatv-spinner
 
 # Decode embedded fallback logo
 if [ ! -f /usr/share/kibatv/logo.png ]; then
-  cat > $(mktemp -d)/logo_b64.txt << 'LOGO_B64'
+  LOGO_TMP=$(mktemp -d)
+  cat > "$LOGO_TMP/logo_b64.txt" << 'LOGO_B64'
 iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
 LOGO_B64
-  base64 -d $(mktemp -d)/logo_b64.txt > /usr/share/kibatv/logo.png
-  rm $(mktemp -d)/logo_b64.txt
+  base64 -d "$LOGO_TMP/logo_b64.txt" > /usr/share/kibatv/logo.png
+  rm -rf "$LOGO_TMP"
 fi
 cp /usr/share/kibatv/logo.png /usr/share/kibatv/logo-plymouth.png
 
@@ -585,17 +642,16 @@ User=user
 Session=plasma-bigscreen
 SDDM_CONF
 
-# ── Nala: replace apt alias system-wide ───────────────────────────────
-# Nala wraps apt; we alias apt_get→nala in the system zshrc and bashrc
+# ── Nala: replace apt 'alias' system-wide ───────────────────────────────
+# Nala wraps apt; we 'alias' apt_get→nala in the system zshrc and bashrc
 # so users interacting with the terminal get the nicer interface.
-cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
+cat > /etc/profile.d/nala-'alias'.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
   'alias' apt_get='nala'
-  'alias' apt_get='nala'
 fi
 NALA_ALIAS
-chmod +x /etc/profile.d/nala-alias.sh
+chmod +x /etc/profile.d/nala-'alias'.sh
 
 # ── Zsh config (auto-generated) ───────────────────────────────────────
 # The zshrc is written by this hook and placed in /etc/zsh/zshrc
@@ -672,7 +728,6 @@ fi
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
   'alias' apt_get='nala'
-  'alias' apt_get='nala'
   'alias' install='sudo nala install'
   'alias' remove='sudo nala remove'
   'alias' update='sudo nala update && sudo nala upgrade -y'
@@ -707,8 +762,6 @@ fi
 
 if command -v rg >/dev/null 2>&1; then
   'alias' grep='rg'
-elif command -v rg >/dev/null 2>&1; then
-  'alias' grep='rg'
 fi
 
 if command -v fdfind >/dev/null 2>&1; then
@@ -723,9 +776,9 @@ elif command -v tealdeer >/dev/null 2>&1; then
   'alias' tldr='tealdeer'
 fi
 
-command -v duf >/dev/null 2>&1 && alias df='duf'
-command -v ncdu >/dev/null 2>&1 && alias du='ncdu'
-command -v btop >/dev/null 2>&1 && alias top='btop'
+command -v duf >/dev/null 2>&1 && 'alias' df='duf'
+command -v ncdu >/dev/null 2>&1 && 'alias' du='ncdu'
+command -v btop >/dev/null 2>&1 && 'alias' top='btop'
 
 # ── General aliases ─────────────────────────────────────
 'alias' free='free -h'
@@ -788,20 +841,20 @@ POWERRC
 mkdir -p /usr/share/plasma/desktoptheme/ant-dark
 ANT_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
-  $(mktemp -d)/ant-themes 2>/dev/null || true
-if [ -d $(mktemp -d)/ant-themes/Plasma/Ant-Dark ]; then
-  cp -r $(mktemp -d)/ant-themes/Plasma/Ant-Dark/. /usr/share/plasma/desktoptheme/ant-dark/
+  "$ANT_TMP/ant-themes" 2>/dev/null || true
+if [ -d "$ANT_TMP/ant-themes/Plasma/Ant-Dark" ]; then
+  cp -r "$ANT_TMP/ant-themes/Plasma/Ant-Dark/." /usr/share/plasma/desktoptheme/ant-dark/
 fi
 if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
   cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
 {"KPlugin":{"Id":"ant-dark","Name":"Ant Dark","License":"GPL","Version":"1.0"}}
 ANTMETA
 fi
-if [ -f $(mktemp -d)/ant-themes/colors/Ant-Dark.colors ]; then
+if [ -f "$ANT_TMP/ant-themes/colors/Ant-Dark.colors" ]; then
   mkdir -p /usr/share/color-schemes
-  cp $(mktemp -d)/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
+  cp "$ANT_TMP/ant-themes/colors/Ant-Dark.colors" /usr/share/color-schemes/AntDark.colors
 fi
-rm -rf $(mktemp -d)/ant-themes
+rm -rf "$ANT_TMP"
 
 # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/images
@@ -834,21 +887,22 @@ WATCHSPLASH
 
 # ── Kora icon theme ───────────────────────────────────────────────────
 mkdir -p /usr/share/icons
-git clone --depth=1 https://github.com/bikass/kora.git $(mktemp -d) 2>/dev/null || true
-if [ -d $(mktemp -d)/kora ]; then
-  cp -r $(mktemp -d)/kora /usr/share/icons/kora
+KORA_TMP=$(mktemp -d)
+git clone --depth=1 https://github.com/bikass/kora.git "$KORA_TMP/kora" 2>/dev/null || true
+if [ -d "$KORA_TMP/kora" ]; then
+  cp -r "$KORA_TMP/kora" /usr/share/icons/kora
   gtk-update-icon-cache -f /usr/share/icons/kora 2>/dev/null || true
 fi
-rm -rf $(mktemp -d)
+rm -rf "$KORA_TMP"
 
 # ── Vimix cursors ─────────────────────────────────────────────────────
 VIMIX_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
-  $(mktemp -d)/vimix-cursors 2>/dev/null || true
-if [ -d $(mktemp -d)/vimix-cursors/dist/Vimix-cursors ]; then
-  cp -r $(mktemp -d)/vimix-cursors/dist/Vimix-cursors /usr/share/icons/Vimix-cursors
+  "$VIMIX_TMP/vimix-cursors" 2>/dev/null || true
+if [ -d "$VIMIX_TMP/vimix-cursors/dist/Vimix-cursors" ]; then
+  cp -r "$VIMIX_TMP/vimix-cursors/dist/Vimix-cursors" /usr/share/icons/Vimix-cursors
 fi
-rm -rf $(mktemp -d)/vimix-cursors
+rm -rf "$VIMIX_TMP"
 
 # ── Dracula KDE colour scheme ─────────────────────────────────────────
 mkdir -p /usr/share/color-schemes
@@ -1304,7 +1358,8 @@ while true; do
     "🚀 Install KibaTV" "Install the system permanently to your disk" \
     "🌐 Web Browser" "Browse the internet" \
     "🛍️ Software Center" "Discover and install new applications" \
-    "🖥️ Terminal" "Open a command line terminal" \
+    "📂 File Manager (Meta+E)" "Manage your files and folders" \
+    "🖥️ Terminal (Meta+T)" "Open a command line terminal" \
     "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
     --width=450 --height=400 2>/dev/null)
 
@@ -1319,7 +1374,10 @@ while true; do
     "🛍️ Software Center")
       plasma-discover &
       ;;
-    "🖥️ Terminal")
+    "📂 File Manager (Meta+E)")
+      dolphin &
+      ;;
+    "🖥️ Terminal (Meta+T)")
       konsole &
       ;;
     "⌨️ Keyboard Shortcuts")
@@ -1698,13 +1756,12 @@ systemctl disable live-boot      2>/dev/null || true
 # 14. Remove installer from autostart
 rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
 
-# 15. Nala alias in bashrc (belt-and-suspenders alongside profile.d)
+# 15. Nala 'alias' in bashrc (belt-and-suspenders alongside profile.d)
 for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
   if [ -f "$RCFILE" ] && ! grep -q "nala" "$RCFILE"; then
     cat >> "$RCFILE" << 'NALABASH'
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
-  'alias' apt_get='nala'
   'alias' apt_get='nala'
 }
 NALABASH
@@ -1721,7 +1778,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-lb build 2>&1 | tee build.log
+eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
