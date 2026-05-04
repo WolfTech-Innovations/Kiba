@@ -1384,54 +1384,53 @@ mkdir -p /usr/local/bin
 cat > /usr/local/bin/kiba-welcome << 'WELCOME'
 #!/bin/bash
 # Functional welcome menu for KibaTV
+
+# Labels
+L_INSTALL="🚀 Install KibaTV"
+L_BROWSER="🌐 Web Browser"
+L_STORE="🛍️ KStore"
+L_TERM="🖥️ Terminal (Meta+T)"
+L_FILES="📂 File Manager (Meta+E)"
+L_SETTINGS="⚙️ System Settings (Meta+I)"
+L_SHORTCUTS="⌨️ Keyboard Shortcuts"
+L_ABOUT="✨ About KibaTV"
+
 while true; do
   CHOICE=$(zenity --list --title="Welcome to KibaTV" \
     --window-icon="/usr/share/kibatv/logo.png" \
     --text="Welcome to KibaTV! What would you like to do?" \
     --column="Action" --column="Description" \
-<<<<<<< palette-welcome-ux-polish-4409227695125798102
-    "🚀 Install KibaTV" "Install the system permanently to your disk" \
-    "🌐 Web Browser" "Browse the internet" \
-    "🛍️ Software Center" "Discover and install new applications" \
-    "🖥️ Terminal" "Open a command line terminal" \
-    "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
-    "✨ About KibaTV" "Learn more about the system" \
-    --width=450 --height=440 2>/dev/null)
-=======
-    "Install KibaTV" "Install the system permanently to your disk" \
-    "Web Browser" "Browse the internet" \
-    "KStore" "Discover and install new applications" \
-    "Terminal (Meta+T)" "Open a command line terminal" \
-    "File Manager (Meta+E)" "Manage your files and folders" \
-    "System Settings" "Configure your system appearance and behavior" \
-    "Keyboard Shortcuts" "View common system shortcuts" \
-    --width=450 --height=480 2>/dev/null)
->>>>>>> main
+    "$L_INSTALL" "Install the system permanently to your disk" \
+    "$L_BROWSER" "Browse the internet" \
+    "$L_STORE" "Discover and install new applications" \
+    "$L_TERM" "Open a command line terminal" \
+    "$L_FILES" "Manage your files and folders" \
+    "$L_SETTINGS" "Configure your system appearance and behavior" \
+    "$L_SHORTCUTS" "View common system shortcuts" \
+    "$L_ABOUT" "Learn more about the system" \
+    --width=450 --height=500 2>/dev/null)
 
   case "$CHOICE" in
-    "Install KibaTV")
+    "$L_INSTALL")
       sudo calamares &
       break
       ;;
-    "Web Browser")
+    "$L_BROWSER")
       chromium &
       ;;
-    "KStore")
+    "$L_STORE")
       kstore &
       ;;
-    "📂 File Manager (Meta+E)")
-      dolphin &
-      ;;
-    "🖥️ Terminal (Meta+T)")
+    "$L_TERM")
       konsole &
       ;;
-    "📂 File Manager (Meta+E)")
+    "$L_FILES")
       dolphin &
       ;;
-    "⚙️ System Settings")
+    "$L_SETTINGS")
       systemsettings &
       ;;
-    "⌨️ Keyboard Shortcuts")
+    "$L_SHORTCUTS")
       zenity --info --title="Keyboard Shortcuts" \
         --window-icon="/usr/share/kibatv/logo.png" \
         --text="<b>KibaTV System Shortcuts</b>
@@ -1439,11 +1438,12 @@ while true; do
 🪟 <b>Meta</b> — Open Application Launcher
 🖥️ <b>Meta + T</b> — Open Terminal (Konsole)
 📂 <b>Meta + E</b> — Open File Manager (Dolphin)
+⚙️ <b>Meta + I</b> — Open System Settings
 ⌨️ <b>Meta + D</b> — Show Desktop
 🔒 <b>Meta + L</b> — Lock Screen" \
         --width=380 --height=320 --no-wrap 2>/dev/null
       ;;
-    "✨ About KibaTV")
+    "$L_ABOUT")
       zenity --info --title="About KibaTV" \
         --window-icon="/usr/share/kibatv/logo.png" \
         --text="<b>KibaTV</b>
