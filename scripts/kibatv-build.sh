@@ -254,6 +254,11 @@ apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
 git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
 cd extra-cmake-modules
+apt update
+apt install -y \
+  libkf6kirigami-dev \
+  qml6-module-org-kde-kirigami \
+  libkf6svg-dev
 sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
 sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
 sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
