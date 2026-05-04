@@ -25,7 +25,7 @@ cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
 # Remove Ubuntu's ancient live-build
 apt-get remove -y live-build
-curl -fsSL https://ftp.debian.org/debian/pool/main/d/debian-archive-keyring/debian-archive-keyring_2023.4_all.deb \
+curl -fsSL https://ftp.debian.org/debian/pool/main/d/debian-archive-keyring/debian-archive-keyring_2025.1_all.deb \
   -o /tmp/debian-archive-keyring.deb
 
 dpkg-deb -x /tmp/debian-archive-keyring.deb /tmp/debian-keyring
@@ -42,6 +42,8 @@ apt-get update -o Dir::Etc::sourcelist="sources.list.d/debian-trixie.list" \
                -o APT::Get::List-Cleanup="0"
 
 apt-get install -y -t trixie live-build
+
+
 echo "=== Configuring live-build ==="
 
 lb config \
