@@ -11,3 +11,7 @@
 ## 2025-05-15 - [Discoverable Shortcuts in Menu Labels]
 **Learning:** Incorporating keyboard shortcut hints (e.g., "Terminal (Meta+T)") directly into Zenity menu labels in the `kiba-welcome` tool improves functional discoverability and teaches users efficient interaction methods within the live environment.
 **Action:** Include shortcut hints in labels for primary system tools to enhance user onboarding and system proficiency.
+
+## 2025-05-15 - [Toolkit Compatibility in TV Interfaces]
+**Learning:** Using GTK-based tools like Zenity for welcome dialogs in TV-focused environments (like Plasma Bigscreen) can lead to poor accessibility as they often lack proper focus handling and D-pad/remote navigation support compared to native Qt/QML components.
+**Action:** Prioritize native toolkit components (Qt/Kirigami for KDE) for interactive system tools in TV-centric distros to ensure full input device compatibility.

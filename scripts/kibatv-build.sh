@@ -455,10 +455,10 @@ Presentation {
         interval: 5000; running: presentation.activatedInCalamares
         repeat: true; onTriggered: presentation.goToNextSlide()
     }
-    Slide { centeredText: "Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
-    Slide { centeredText: "KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
-    Slide { centeredText: "Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
-    Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
+    Slide { centeredText: "🚀 Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
+    Slide { centeredText: "📺 KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
+    Slide { centeredText: "🛍️ Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
+    Slide { centeredText: "✨ Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
     function onActivate() { presentation.currentSlide = 0; }
     function onLeave() {}
 }
