@@ -1355,30 +1355,37 @@ while true; do
     --window-icon="/usr/share/kibatv/logo.png" \
     --text="Welcome to KibaTV! What would you like to do?" \
     --column="Action" --column="Description" \
-    "🚀 Install KibaTV" "Install the system permanently to your disk" \
-    "🌐 Web Browser" "Browse the internet" \
-    "🛍️ Software Center" "Discover and install new applications" \
-    "📂 File Manager (Meta+E)" "Manage your files and folders" \
-    "🖥️ Terminal (Meta+T)" "Open a command line terminal" \
-    "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
-    --width=450 --height=400 2>/dev/null)
+    "Install KibaTV" "Install the system permanently to your disk" \
+    "Web Browser" "Browse the internet" \
+    "KStore" "Discover and install new applications" \
+    "Terminal (Meta+T)" "Open a command line terminal" \
+    "File Manager (Meta+E)" "Manage your files and folders" \
+    "System Settings" "Configure your system appearance and behavior" \
+    "Keyboard Shortcuts" "View common system shortcuts" \
+    --width=450 --height=480 2>/dev/null)
 
   case "$CHOICE" in
-    "🚀 Install KibaTV")
+    "Install KibaTV")
       sudo calamares &
       break
       ;;
-    "🌐 Web Browser")
+    "Web Browser")
       chromium &
       ;;
-    "🛍️ Software Center")
-      plasma-discover &
+    "KStore")
+      kstore &
       ;;
     "📂 File Manager (Meta+E)")
       dolphin &
       ;;
     "🖥️ Terminal (Meta+T)")
       konsole &
+      ;;
+    "📂 File Manager (Meta+E)")
+      dolphin &
+      ;;
+    "⚙️ System Settings")
+      systemsettings &
       ;;
     "⌨️ Keyboard Shortcuts")
       zenity --info --title="Keyboard Shortcuts" \
