@@ -231,6 +231,7 @@ cat > config/hooks/live/0050-plasma-bigscreen.hook.chroot << 'BIGSCREEN_HOOK'
 #!/bin/bash
 set -e
 echo "=== Installing plasma-bigscreen from source ==="
+bash -c 'echo "APT::Get::AutomaticRemove \"false\";" > /etc/apt/apt.conf.d/99noautoremove'
 mkdir -p /run/dbus
 dbus-daemon --system --fork
 export CMAKE_PREFIX_PATH=/usr
@@ -241,7 +242,7 @@ chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-sudo apt-get install -y git cmake python3-pip
+apt-get install -y git cmake python3-pip
 cd ~
 curl 'https://invent.kde.org/sdk/kde-builder/-/raw/master/scripts/initial_setup.sh' > initial_setup.sh
 export PATH="$HOME/.local/bin:$PATH"
