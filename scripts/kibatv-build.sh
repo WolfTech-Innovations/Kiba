@@ -5,9 +5,10 @@ set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 # Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
 # Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
-sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.xtom.com/ubuntu|g' /etc/apt/sources.list 
-sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.xtom.com/ubuntu|g' /etc/apt/sources.list 
-apt-get update
+curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
+-o /usr/local/bin/fast-apt-mirror.sh
+chmod +x /usr/local/bin/fast-apt-mirror.sh
+fast-apt-mirror.sh find --apply
 # OR use Ubuntu's official US CDN-backed mirror:
 # http://us.archive.ubuntu.com/ubuntu
 # ── Install live-build and build deps ─────────────────────────────────
@@ -84,6 +85,10 @@ lb config \
 
 # ── Starship prompt hook ────────────────────────────────────────────
 mkdir -p config/hooks/live
+curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
+-o /usr/local/bin/fast-apt-mirror.sh
+chmod +x /usr/local/bin/fast-apt-mirror.sh
+fast-apt-mirror.sh find --apply
 cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
 #!/bin/bash
 set -e
