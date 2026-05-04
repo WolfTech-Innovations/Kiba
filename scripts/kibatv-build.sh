@@ -1355,6 +1355,15 @@ while true; do
     --window-icon="/usr/share/kibatv/logo.png" \
     --text="Welcome to KibaTV! What would you like to do?" \
     --column="Action" --column="Description" \
+<<<<<<< palette-welcome-ux-polish-4409227695125798102
+    "🚀 Install KibaTV" "Install the system permanently to your disk" \
+    "🌐 Web Browser" "Browse the internet" \
+    "🛍️ Software Center" "Discover and install new applications" \
+    "🖥️ Terminal" "Open a command line terminal" \
+    "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
+    "✨ About KibaTV" "Learn more about the system" \
+    --width=450 --height=440 2>/dev/null)
+=======
     "Install KibaTV" "Install the system permanently to your disk" \
     "Web Browser" "Browse the internet" \
     "KStore" "Discover and install new applications" \
@@ -1363,6 +1372,7 @@ while true; do
     "System Settings" "Configure your system appearance and behavior" \
     "Keyboard Shortcuts" "View common system shortcuts" \
     --width=450 --height=480 2>/dev/null)
+>>>>>>> main
 
   case "$CHOICE" in
     "Install KibaTV")
@@ -1390,14 +1400,29 @@ while true; do
     "⌨️ Keyboard Shortcuts")
       zenity --info --title="Keyboard Shortcuts" \
         --window-icon="/usr/share/kibatv/logo.png" \
-        --text="<b>KibaTV System Shortcuts:</b>
+        --text="<b>KibaTV System Shortcuts</b>
 
-🪟 <b>Meta:</b> Open Application Launcher
-🖥️ <b>Meta + T:</b> Open Terminal (Konsole)
-📂 <b>Meta + E:</b> Open File Manager (Dolphin)
-⌨️ <b>Meta + D:</b> Show Desktop
-🔒 <b>Meta + L:</b> Lock Screen" \
-        --width=350 --height=320 --no-wrap 2>/dev/null
+🪟 <b>Meta</b> — Open Application Launcher
+🖥️ <b>Meta + T</b> — Open Terminal (Konsole)
+📂 <b>Meta + E</b> — Open File Manager (Dolphin)
+⌨️ <b>Meta + D</b> — Show Desktop
+🔒 <b>Meta + L</b> — Lock Screen" \
+        --width=380 --height=320 --no-wrap 2>/dev/null
+      ;;
+    "✨ About KibaTV")
+      zenity --info --title="About KibaTV" \
+        --window-icon="/usr/share/kibatv/logo.png" \
+        --text="<b>KibaTV</b>
+
+A modern, Dracula-themed Linux experience.
+
+🚀 <b>Base</b> — Debian 13 (Trixie)
+🎨 <b>Desktop</b> — Plasma 6 (Bigscreen)
+⚙️ <b>Kernel</b> — CachyOS (Optimized)
+💜 <b>Theme</b> — Dracula (System-wide)
+
+Created with care by WolfTech Innovations." \
+        --width=380 --height=340 --no-wrap 2>/dev/null
       ;;
     *)
       break
