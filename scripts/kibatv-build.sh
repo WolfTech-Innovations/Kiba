@@ -348,6 +348,9 @@ plasma-workspace
 plasma-workspace-wallpapers
 plasma-discover
 plasma-discover-backend-flatpak
+konsole
+dolphin
+systemsettings
 
 sddm
 sddm-theme-breeze
@@ -1304,9 +1307,11 @@ while true; do
     "🚀 Install KibaTV" "Install the system permanently to your disk" \
     "🌐 Web Browser" "Browse the internet" \
     "🛍️ Software Center" "Discover and install new applications" \
-    "🖥️ Terminal" "Open a command line terminal" \
+    "🖥️ Terminal (Meta+T)" "Open a command line terminal" \
+    "📂 File Manager (Meta+E)" "Manage your files and folders" \
+    "⚙️ System Settings" "Configure your system appearance and behavior" \
     "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
-    --width=450 --height=400 2>/dev/null)
+    --width=450 --height=480 2>/dev/null)
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
@@ -1319,8 +1324,14 @@ while true; do
     "🛍️ Software Center")
       plasma-discover &
       ;;
-    "🖥️ Terminal")
+    "🖥️ Terminal (Meta+T)")
       konsole &
+      ;;
+    "📂 File Manager (Meta+E)")
+      dolphin &
+      ;;
+    "⚙️ System Settings")
+      systemsettings &
       ;;
     "⌨️ Keyboard Shortcuts")
       zenity --info --title="Keyboard Shortcuts" \
