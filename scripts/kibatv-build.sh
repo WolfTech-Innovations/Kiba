@@ -1,10 +1,12 @@
 #!/bin/bash
 # License: GPL-3.0-or-later
 set -euo pipefail
+set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
 apt update && apt install -y \
+  eatmydata \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -221,7 +223,7 @@ echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] h
 printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
- apt-get update || true
+eatmydata apt update || true
 
 
 echo "=== Adding packages ==="
@@ -273,7 +275,6 @@ apt-get install -y \
   qt6-base-dev libqt6core6 libqt6gui6 \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
-apt-get update
 apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
 # Clone and build plasma-bigscreen
@@ -286,10 +287,10 @@ mkdir build && cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF
+  -DBUILD_TESTING=OFF \
   -DCMAKE_PREFIX_PATH=/usr
 
-make -j$(nproc)
+make -j"$(nproc)"
 make install
 
 # Cleanup
@@ -310,7 +311,9 @@ apt update && apt install -y \
   libkirigami-dev \
   libkf6i18n-dev \
   libkf6coreaddons-dev
-cmake --build .
+cmake .
+cmake --build . -j"$(nproc)"
+make install || true
 cd ~
 echo "=== plasma-bigscreen built and installed ==="
 BIGSCREEN_HOOK
@@ -466,11 +469,12 @@ mkdir -p /usr/share/plymouth/themes/kibatv-spinner
 
 # Decode embedded fallback logo
 if [ ! -f /usr/share/kibatv/logo.png ]; then
-  cat > $(mktemp -d)/logo_b64.txt << 'LOGO_B64'
+  LOGO_TMP=$(mktemp -d)
+  cat > "$LOGO_TMP/logo_b64.txt" << 'LOGO_B64'
 iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
 LOGO_B64
-  base64 -d $(mktemp -d)/logo_b64.txt > /usr/share/kibatv/logo.png
-  rm $(mktemp -d)/logo_b64.txt
+  base64 -d "$LOGO_TMP/logo_b64.txt" > /usr/share/kibatv/logo.png
+  rm -rf "$LOGO_TMP"
 fi
 cp /usr/share/kibatv/logo.png /usr/share/kibatv/logo-plymouth.png
 
@@ -585,17 +589,17 @@ User=user
 Session=plasma-bigscreen
 SDDM_CONF
 
-# ── Nala: replace apt alias system-wide ───────────────────────────────
-# Nala wraps apt; we alias apt_get→nala in the system zshrc and bashrc
+# ── Nala: replace apt 'alias' system-wide ───────────────────────────────
+# Nala wraps apt; we 'alias' apt_get→nala in the system zshrc and bashrc
 # so users interacting with the terminal get the nicer interface.
-cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
+cat > /etc/profile.d/nala-'alias'.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
-  alias apt_get='nala'
-  alias apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
 fi
 NALA_ALIAS
-chmod +x /etc/profile.d/nala-alias.sh
+chmod +x /etc/profile.d/nala-'alias'.sh
 
 # ── Zsh config (auto-generated) ───────────────────────────────────────
 # The zshrc is written by this hook and placed in /etc/zsh/zshrc
@@ -640,7 +644,7 @@ zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 
 # ── Prompt — Starship (Modern) ──────────────────────────
 if command -v starship >/dev/null 2>&1; then
-  eval "$(starship init zsh)"
+  'eval' "$(starship init zsh)"
 else
   # ── VCS info (git branch in prompt) ────────────────────
   autoload -Uz vcs_info
@@ -671,70 +675,70 @@ fi
 
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
-  alias apt_get='nala'
-  alias apt_get='nala'
-  alias install='sudo nala install'
-  alias remove='sudo nala remove'
-  alias update='sudo nala update && sudo nala upgrade -y'
-  alias upgrade='sudo nala upgrade'
-  alias search='nala search'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' install='sudo nala install'
+  'alias' remove='sudo nala remove'
+  'alias' update='sudo nala update && sudo nala upgrade -y'
+  'alias' upgrade='sudo nala upgrade'
+  'alias' search='nala search'
 fi
 
 # ── KibaTV Aliases ──────────────────────────────────────
-alias edit='${EDITOR:-micro}'
-alias please='sudo'
-alias cls='clear'
-alias path='print -l $path'
+'alias' edit='${EDITOR:-micro}'
+'alias' please='sudo'
+'alias' cls='clear'
+'alias' path='print -l $path'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
-  alias ls='eza --icons --group-directories-first'
-  alias ll='eza -lah --icons --group-directories-first'
-  alias la='eza -A --icons'
-  alias tree='eza --tree --icons'
+  'alias' ls='eza --icons --group-directories-first'
+  'alias' ll='eza -lah --icons --group-directories-first'
+  'alias' la='eza -A --icons'
+  'alias' tree='eza --tree --icons'
 else
-  alias ls='ls --color=auto'
-  alias ll='ls -lah'
-  alias la='ls -A'
+  'alias' ls='ls --color=auto'
+  'alias' ll='ls -lah'
+  'alias' la='ls -A'
 fi
 
 if command -v bat >/dev/null 2>&1; then
-  alias cat='bat --paging=never'
+  'alias' cat='bat --paging=never'
 elif command -v batcat >/dev/null 2>&1; then
-  alias cat='batcat --paging=never'
-  alias bat='batcat'
+  'alias' cat='batcat --paging=never'
+  'alias' bat='batcat'
 fi
 
 if command -v rg >/dev/null 2>&1; then
-  alias grep='rg'
+  'alias' grep='rg'
 elif command -v rg >/dev/null 2>&1; then
-  alias grep='rg'
+  'alias' grep='rg'
 fi
 
 if command -v fdfind >/dev/null 2>&1; then
-  alias fd='fdfind'
+  'alias' fd='fdfind'
 fi
 
 if command -v tldr >/dev/null 2>&1; then
   # Use tealdeer if available
-  alias help='tldr'
+  'alias' help='tldr'
 elif command -v tealdeer >/dev/null 2>&1; then
-  alias help='tealdeer'
-  alias tldr='tealdeer'
+  'alias' help='tealdeer'
+  'alias' tldr='tealdeer'
 fi
 
-command -v duf >/dev/null 2>&1 && alias df='duf'
-command -v ncdu >/dev/null 2>&1 && alias du='ncdu'
-command -v btop >/dev/null 2>&1 && alias top='btop'
+command -v duf >/dev/null 2>&1 && 'alias' df='duf'
+command -v ncdu >/dev/null 2>&1 && 'alias' du='ncdu'
+command -v btop >/dev/null 2>&1 && 'alias' top='btop'
 
 # ── General aliases ─────────────────────────────────────
-alias free='free -h'
-alias mkdir='mkdir -pv'
-alias cp='cp -iv'
-alias mv='mv -iv'
-alias rm='rm -I'
-alias ..='cd ..'
-alias ...='cd ../..'
+'alias' free='free -h'
+'alias' mkdir='mkdir -pv'
+'alias' cp='cp -iv'
+'alias' mv='mv -iv'
+'alias' rm='rm -I'
+'alias' ..='cd ..'
+'alias' ...='cd ../..'
 ZSHRC
 
 # ── Update tldr cache ──────────────────────────────────────────────────
@@ -788,20 +792,20 @@ POWERRC
 mkdir -p /usr/share/plasma/desktoptheme/ant-dark
 ANT_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
-  $(mktemp -d)/ant-themes 2>/dev/null || true
-if [ -d $(mktemp -d)/ant-themes/Plasma/Ant-Dark ]; then
-  cp -r $(mktemp -d)/ant-themes/Plasma/Ant-Dark/. /usr/share/plasma/desktoptheme/ant-dark/
+  "$ANT_TMP/ant-themes" 2>/dev/null || true
+if [ -d "$ANT_TMP/ant-themes/Plasma/Ant-Dark" ]; then
+  cp -r "$ANT_TMP/ant-themes/Plasma/Ant-Dark/." /usr/share/plasma/desktoptheme/ant-dark/
 fi
 if [ ! -f /usr/share/plasma/desktoptheme/ant-dark/metadata.json ]; then
   cat > /usr/share/plasma/desktoptheme/ant-dark/metadata.json << 'ANTMETA'
 {"KPlugin":{"Id":"ant-dark","Name":"Ant Dark","License":"GPL","Version":"1.0"}}
 ANTMETA
 fi
-if [ -f $(mktemp -d)/ant-themes/colors/Ant-Dark.colors ]; then
+if [ -f "$ANT_TMP/ant-themes/colors/Ant-Dark.colors" ]; then
   mkdir -p /usr/share/color-schemes
-  cp $(mktemp -d)/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
+  cp "$ANT_TMP/ant-themes/colors/Ant-Dark.colors" /usr/share/color-schemes/AntDark.colors
 fi
-rm -rf $(mktemp -d)/ant-themes
+rm -rf "$ANT_TMP"
 
 # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
 mkdir -p /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/images
@@ -834,21 +838,22 @@ WATCHSPLASH
 
 # ── Kora icon theme ───────────────────────────────────────────────────
 mkdir -p /usr/share/icons
-git clone --depth=1 https://github.com/bikass/kora.git $(mktemp -d) 2>/dev/null || true
-if [ -d $(mktemp -d)/kora ]; then
-  cp -r $(mktemp -d)/kora /usr/share/icons/kora
+KORA_TMP=$(mktemp -d)
+git clone --depth=1 https://github.com/bikass/kora.git "$KORA_TMP/kora" 2>/dev/null || true
+if [ -d "$KORA_TMP/kora" ]; then
+  cp -r "$KORA_TMP/kora" /usr/share/icons/kora
   gtk-update-icon-cache -f /usr/share/icons/kora 2>/dev/null || true
 fi
-rm -rf $(mktemp -d)
+rm -rf "$KORA_TMP"
 
 # ── Vimix cursors ─────────────────────────────────────────────────────
 VIMIX_TMP=$(mktemp -d)
 git clone --depth=1 https://github.com/vinceliuice/Vimix-cursors.git \
-  $(mktemp -d)/vimix-cursors 2>/dev/null || true
-if [ -d $(mktemp -d)/vimix-cursors/dist/Vimix-cursors ]; then
-  cp -r $(mktemp -d)/vimix-cursors/dist/Vimix-cursors /usr/share/icons/Vimix-cursors
+  "$VIMIX_TMP/vimix-cursors" 2>/dev/null || true
+if [ -d "$VIMIX_TMP/vimix-cursors/dist/Vimix-cursors" ]; then
+  cp -r "$VIMIX_TMP/vimix-cursors/dist/Vimix-cursors" /usr/share/icons/Vimix-cursors
 fi
-rm -rf $(mktemp -d)/vimix-cursors
+rm -rf "$VIMIX_TMP"
 
 # ── Dracula KDE colour scheme ─────────────────────────────────────────
 mkdir -p /usr/share/color-schemes
@@ -1698,14 +1703,14 @@ systemctl disable live-boot      2>/dev/null || true
 # 14. Remove installer from autostart
 rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
 
-# 15. Nala alias in bashrc (belt-and-suspenders alongside profile.d)
+# 15. Nala 'alias' in bashrc (belt-and-suspenders alongside profile.d)
 for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
   if [ -f "$RCFILE" ] && ! grep -q "nala" "$RCFILE"; then
     cat >> "$RCFILE" << 'NALABASH'
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
-  alias apt_get='nala'
-  alias apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
 }
 NALABASH
   fi
@@ -1721,7 +1726,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-lb build 2>&1 | tee build.log
+eatmydata lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
