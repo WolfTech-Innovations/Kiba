@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 set -euo pipefail
+set -o pipefail
 
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
