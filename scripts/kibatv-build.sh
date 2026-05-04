@@ -5,9 +5,9 @@ set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 # Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
 # Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
-apt update && apt install -y wget
-wget -q https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
-  -O /usr/local/bin/fast-apt-mirror.sh
+apt update && apt install -y curl
+curl --proto '=https' --tlsv1.2 -SfL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
+  -o /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
 bash /usr/local/bin/fast-apt-mirror.sh find --apply
 # OR use Ubuntu's official US CDN-backed mirror:
@@ -86,10 +86,10 @@ lb config \
 
 # ── Starship prompt hook ────────────────────────────────────────────
 mkdir -p config/hooks/live
-curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
--o /usr/local/bin/fast-apt-mirror.sh
+curl --proto '=https' --tlsv1.2 -SfL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
+  -o /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
-bash ./fast-apt-mirror.sh find --apply
+bash /usr/local/bin/fast-apt-mirror.sh find --apply
 cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
 #!/bin/bash
 set -e
@@ -152,8 +152,8 @@ CACHY_TMP=$(mktemp -d)
 trap 'rm -rf "$CACHY_TMP"' EXIT
 cd "$CACHY_TMP"
 
-curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
-curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
+curl --proto '=https' --tlsv1.2 -SfLO "$IMG_URL"
+curl --proto '=https' --tlsv1.2 -SfLO "$HDR_URL"
 
 dpkg -i ./*.deb || apt install -f -y
 apt purge -y linux-image-amd64 linux-headers-amd64
@@ -268,13 +268,13 @@ dbus-daemon --system --fork
 export CMAKE_PREFIX_PATH=/usr
 export Qt6_DIR=/usr/lib/x86_64-linux-gnu/cmake/Qt6
 export XDG_RUNTIME_DIR=/tmp/runtime-root
-mkdir -p $XDG_RUNTIME_DIR
-chmod 700 $XDG_RUNTIME_DIR
+mkdir -p "$XDG_RUNTIME_DIR"
+chmod 700 "$XDG_RUNTIME_DIR"
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-wget -q https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
-  -O /usr/local/bin/fast-apt-mirror.sh
+curl --proto '=https' --tlsv1.2 -SfL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
+  -o /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
 bash /usr/local/bin/fast-apt-mirror.sh find --apply
 # OR use Ubuntu's official US CDN-backed mirror:
@@ -1389,44 +1389,31 @@ while true; do
     --window-icon="/usr/share/kibatv/logo.png" \
     --text="Welcome to KibaTV! What would you like to do?" \
     --column="Action" --column="Description" \
-<<<<<<< palette-welcome-ux-polish-4409227695125798102
     "🚀 Install KibaTV" "Install the system permanently to your disk" \
+    "🛍️ KStore" "Discover and install new applications" \
     "🌐 Web Browser" "Browse the internet" \
-    "🛍️ Software Center" "Discover and install new applications" \
-    "🖥️ Terminal" "Open a command line terminal" \
+    "🖥️ Terminal (Meta+T)" "Open a command line terminal" \
+    "📂 File Manager (Meta+E)" "Manage your files and folders" \
+    "⚙️ System Settings" "Configure your system appearance and behavior" \
     "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
     "✨ About KibaTV" "Learn more about the system" \
-    --width=450 --height=440 2>/dev/null)
-=======
-    "Install KibaTV" "Install the system permanently to your disk" \
-    "Web Browser" "Browse the internet" \
-    "KStore" "Discover and install new applications" \
-    "Terminal (Meta+T)" "Open a command line terminal" \
-    "File Manager (Meta+E)" "Manage your files and folders" \
-    "System Settings" "Configure your system appearance and behavior" \
-    "Keyboard Shortcuts" "View common system shortcuts" \
-    --width=450 --height=480 2>/dev/null)
->>>>>>> main
-
+    --width=450 --height=520 2>/dev/null)
   case "$CHOICE" in
-    "Install KibaTV")
+    "🚀 Install KibaTV")
       sudo calamares &
       break
       ;;
-    "Web Browser")
+    "🌐 Web Browser")
       chromium &
-      ;;
-    "KStore")
-      kstore &
       ;;
     "📂 File Manager (Meta+E)")
       dolphin &
+      ;;
+    "🛍️ KStore")
+      kstore &
       ;;
     "🖥️ Terminal (Meta+T)")
       konsole &
-      ;;
-    "📂 File Manager (Meta+E)")
-      dolphin &
       ;;
     "⚙️ System Settings")
       systemsettings &
