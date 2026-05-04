@@ -25,11 +25,22 @@ cd /w
 ISO="kibatv-v${RUN_NUM:-local}"
 # Remove Ubuntu's ancient live-build
 apt-get remove -y live-build
-# Add Debian trixie repo and install live-build from it
-# Import Debian archive signing keys
-apt-get install -y debian-archive-keyring
-echo "deb http://deb.debian.org/debian trixie main" > /etc/apt/sources.list.d/debian-trixie.list
-apt-get update -o Dir::Etc::sourcelist="sources.list.d/debian-trixie.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+curl -fsSL https://ftp.debian.org/debian/pool/main/d/debian-archive-keyring/debian-archive-keyring_2023.4_all.deb \
+  -o /tmp/debian-archive-keyring.deb
+
+dpkg-deb -x /tmp/debian-archive-keyring.deb /tmp/debian-keyring
+
+cp /tmp/debian-keyring/usr/share/keyrings/debian-archive-keyring.gpg \
+  /usr/share/keyrings/debian-archive-keyring.gpg
+
+echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] \
+  http://deb.debian.org/debian trixie main" \
+  > /etc/apt/sources.list.d/debian-trixie.list
+
+apt-get update -o Dir::Etc::sourcelist="sources.list.d/debian-trixie.list" \
+               -o Dir::Etc::sourceparts="-" \
+               -o APT::Get::List-Cleanup="0"
+
 apt-get install -y -t trixie live-build
 echo "=== Configuring live-build ==="
 
