@@ -1,4 +1,5 @@
 #!/bin/bash
+# License: MIT
 #
 # Copyright (c) 2025 WolfTech Innovations
 #
@@ -21,6 +22,7 @@
 # SOFTWARE.
 
 set -euo pipefail
+set -o pipefail
 
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md

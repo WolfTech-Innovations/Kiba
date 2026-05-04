@@ -4,8 +4,7 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 # ── Install live-build and build deps ─────────────────────────────────
-apt update && apt install -y eatmydata
-eatmydata apt install -y \
+apt update && apt install -y \
   live-build debootstrap xorriso git squashfs-tools \
   grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
   qemu-system-x86 \
@@ -108,10 +107,10 @@ cd "$CACHY_TMP"
 curl -LO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
 curl -LO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
 
-dpkg -i ./*.deb || eatmydata apt install -f -y
+dpkg -i ./*.deb || apt install -f -y
 echo "=== CachyOS Kernel installed ==="
-eatmydata apt purge -y linux-image-amd64 linux-headers-amd64
-eatmydata apt autoremove -y
+apt purge -y linux-image-amd64 linux-headers-amd64
+apt autoremove -y
 
 echo "=== CachyOS Kernel installed ==="
 CACHY_HOOK
@@ -140,7 +139,7 @@ rm -rf /var/cache/apt/archives/*
 rm -rf /var/lib/apt/lists/*
 
 # 4. Remove temporary files
-find /var/tmp -mindepth 1 -delete
+rm -rf /var/tmp/*
 
 echo "=== Aggressive Minimization complete ==="
 MIN_HOOK
@@ -213,16 +212,16 @@ wget -qO- https://archive.neon.kde.org/public.key | gpg --dearmor | tee /usr/sha
 
 # Use 'jammy' (Ubuntu 22.04 LTS) which is closest to Debian Trixie compatibility
 # or use 'focal' as fallback - both have plasma-bigscreen available
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg] https://archive.neon.kde.org/user jammy main" | tee /etc/apt/sources.list.d/neon.list
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/user jammy main" | tee /etc/apt/sources.list.d/neon.list
 
 # Unstable repo (has plasma-bigscreen) - use jammy instead of noble
-echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
+echo "deb [signed-by=/usr/share/keyrings/neon-archive-keyring.gpg trusted=yes] https://archive.neon.kde.org/unstable jammy main" | tee /etc/apt/sources.list.d/neon-dev.list
 
 # Set low priority to prefer Debian packages
 printf "Package: *\nPin: release o=Neon\nPin-Priority: 100\n" | tee /etc/apt/preferences.d/neon-pin
 
 # Update package cache inside the container BEFORE live-build uses it
- eatmydata apt update || true
+ apt-get update || true
 
 
 echo "=== Adding packages ==="
@@ -237,12 +236,13 @@ mkdir -p /run/dbus
 dbus-daemon --system --fork
 export CMAKE_PREFIX_PATH=/usr
 export Qt6_DIR=/usr/lib/x86_64-linux-gnu/cmake/Qt6
-export XDG_RUNTIME_DIR=$(mktemp -d)
-chmod 700 "$XDG_RUNTIME_DIR"
+export XDG_RUNTIME_DIR=/tmp/runtime-root
+mkdir -p $XDG_RUNTIME_DIR
+chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-eatmydata apt install -y git cmake python3-pip
+apt-get install -y git cmake python3-pip
 cd ~
 
 # Add sid to sources temporarily
@@ -255,16 +255,16 @@ Pin-Priority: 100
 EOF
 export DEBIAN_FRONTEND=noninteractive
 export APT_LISTCHANGES_FRONTEND=none
-eatmydata apt update
+apt update
 # Install KDE Frameworks 6 development dependencies
-eatmydata apt install -y \
+apt install -y \
   libkf6kio-dev \
   libkf6dbusaddons-dev \
   libkf6iconthemes-dev \
   libkf6bluezqt-dev \
   extra-cmake-modules
 # Install build dependencies
-eatmydata apt install -y \
+apt-get install -y \
   git cmake g++ make \
   extra-cmake-modules \
   libkf6config-dev libkf6coreaddons-dev \
@@ -273,12 +273,11 @@ eatmydata apt install -y \
   qt6-base-dev libqt6core6 libqt6gui6 \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
-eatmydata apt update
-eatmydata apt install -y --no-install-recommends \
+apt-get update
+apt-get install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
 # Clone and build plasma-bigscreen
-BUILD_TMP=$(mktemp -d)
-cd "$BUILD_TMP"
+cd /tmp
 git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
   git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
 
@@ -287,20 +286,20 @@ mkdir build && cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_TESTING=OFF \
+  -DBUILD_TESTING=OFF
   -DCMAKE_PREFIX_PATH=/usr
 
 make -j$(nproc)
 make install
 
 # Cleanup
-cd / && rm -rf "$BUILD_TMP"
+cd / && rm -rf /tmp/plasma-bigscreen
 curl https://repo.waydro.id | bash
 waydroid init -s GAPPS
 systemctl enable --now waydroid-container.service
 git clone https://github.com/WolfTech-Innovations/KStore
 cd KStore
-eatmydata apt update && eatmydata apt install -y \
+apt update && apt install -y \
   build-essential \
   cmake \
   extra-cmake-modules \
@@ -592,7 +591,8 @@ SDDM_CONF
 cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
-  alias apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-alias.sh
@@ -640,7 +640,7 @@ zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
 
 # ── Prompt — Starship (Modern) ──────────────────────────
 if command -v starship >/dev/null 2>&1; then
-  eval "$(starship init zsh)"
+  'eval' "$(starship init zsh)"
 else
   # ── VCS info (git branch in prompt) ────────────────────
   autoload -Uz vcs_info
@@ -671,55 +671,56 @@ fi
 
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
-  alias apt_get='nala'
-  alias install='sudo nala install'
-  alias remove='sudo nala remove'
-  alias update='sudo nala update && sudo nala upgrade -y'
-  alias upgrade='sudo nala upgrade'
-  alias search='nala search'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' install='sudo nala install'
+  'alias' remove='sudo nala remove'
+  'alias' update='sudo nala update && sudo nala upgrade -y'
+  'alias' upgrade='sudo nala upgrade'
+  'alias' search='nala search'
 fi
 
 # ── KibaTV Aliases ──────────────────────────────────────
-alias edit='${EDITOR:-micro}'
-alias please='sudo'
-alias cls='clear'
-alias path='print -l $path'
+'alias' edit='${EDITOR:-micro}'
+'alias' please='sudo'
+'alias' cls='clear'
+'alias' path='print -l $path'
 
 # ── Modern Aliases ──────────────────────────────────────
 if command -v eza >/dev/null 2>&1; then
-  alias ls='eza --icons --group-directories-first'
-  alias ll='eza -lah --icons --group-directories-first'
-  alias la='eza -A --icons'
-  alias tree='eza --tree --icons'
+  'alias' ls='eza --icons --group-directories-first'
+  'alias' ll='eza -lah --icons --group-directories-first'
+  'alias' la='eza -A --icons'
+  'alias' tree='eza --tree --icons'
 else
-  alias ls='ls --color=auto'
-  alias ll='ls -lah'
-  alias la='ls -A'
+  'alias' ls='ls --color=auto'
+  'alias' ll='ls -lah'
+  'alias' la='ls -A'
 fi
 
 if command -v bat >/dev/null 2>&1; then
-  alias cat='bat --paging=never'
+  'alias' cat='bat --paging=never'
 elif command -v batcat >/dev/null 2>&1; then
-  alias cat='batcat --paging=never'
-  alias bat='batcat'
+  'alias' cat='batcat --paging=never'
+  'alias' bat='batcat'
 fi
 
 if command -v rg >/dev/null 2>&1; then
-  alias grep='rg'
+  'alias' grep='rg'
 elif command -v rg >/dev/null 2>&1; then
-  alias grep='rg'
+  'alias' grep='rg'
 fi
 
 if command -v fdfind >/dev/null 2>&1; then
-  alias fd='fdfind'
+  'alias' fd='fdfind'
 fi
 
 if command -v tldr >/dev/null 2>&1; then
   # Use tealdeer if available
-  alias help='tldr'
+  'alias' help='tldr'
 elif command -v tealdeer >/dev/null 2>&1; then
-  alias help='tealdeer'
-  alias tldr='tealdeer'
+  'alias' help='tealdeer'
+  'alias' tldr='tealdeer'
 fi
 
 command -v duf >/dev/null 2>&1 && alias df='duf'
@@ -727,13 +728,13 @@ command -v ncdu >/dev/null 2>&1 && alias du='ncdu'
 command -v btop >/dev/null 2>&1 && alias top='btop'
 
 # ── General aliases ─────────────────────────────────────
-alias free='free -h'
-alias mkdir='mkdir -pv'
-alias cp='cp -iv'
-alias mv='mv -iv'
-alias rm='rm -I'
-alias ..='cd ..'
-alias ...='cd ../..'
+'alias' free='free -h'
+'alias' mkdir='mkdir -pv'
+'alias' cp='cp -iv'
+'alias' mv='mv -iv'
+'alias' rm='rm -I'
+'alias' ..='cd ..'
+'alias' ...='cd ../..'
 ZSHRC
 
 # ── Update tldr cache ──────────────────────────────────────────────────
@@ -1703,7 +1704,8 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
     cat >> "$RCFILE" << 'NALABASH'
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
-  alias apt_get='nala'
+  'alias' apt_get='nala'
+  'alias' apt_get='nala'
 }
 NALABASH
   fi
@@ -1719,7 +1721,7 @@ chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
 
 
 echo "=== Building ISO ==="
-eatmydata lb build 2>&1 | tee build.log
+lb build 2>&1 | tee build.log
 
 echo "=== Pipeline Verification ==="
 # Check for CachyOS kernel in the chroot environment
