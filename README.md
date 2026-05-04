@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Ubuntu`%20Resolute Racoon-D70A53?style=for-the-badge&logo=ubuntu&logoColor=white" alt="Ubuntu Version">
+  <img src="https://img.shields.io/badge/Ubuntu`%20Noble-D70A53?style=for-the-badge&logo=ubuntu&logoColor=white" alt="Ubuntu Version">
   <img src="https://img.shields.io/badge/KDE-Plasma`%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
 </p>
 
@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaTV is a lightweight Linux distribution built on **Ubuntu Resolute Racoon** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaTV is a lightweight Linux distribution built on **Ubuntu Noble** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
