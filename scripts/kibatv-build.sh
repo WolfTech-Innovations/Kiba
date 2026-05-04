@@ -5,6 +5,7 @@ set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 # Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
 # Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
+apt update && apt install -y wget
 wget -q https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
   -O /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
