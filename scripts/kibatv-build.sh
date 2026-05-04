@@ -553,6 +553,7 @@ APKBUILD
 apt install -y kpartx
 # ── Init pmbootstrap non-interactively ────────────────────────────────
 useradd -m -s /bin/bash builder
+su -c "pmbootstrap init" builder
 su -c "pmbootstrap config device qemu-amd64" builder
 su -c "pmbootstrap --details-to-stdout config ui plasma-bigscreen" builder
 su -c "pmbootstrap --details-to-stdout config channel edge" builder
