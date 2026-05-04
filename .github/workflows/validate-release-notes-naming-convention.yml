@@ -1,0 +1,21 @@
+name: Validate Release Notes Naming
+
+on:
+  push:
+    paths:
+      - "Notes/**"
+  pull_request:
+    paths:
+      - "Notes/**"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Validate Release Notes Naming
+        run: |
+          ERR=0; REGEX="^NTE-[0-9]{2}[0-9A-N][0-9][1-9A-C]\.md$"; for f in Notes/*.md; do [ "$f" = "Notes/*.md" ] || [ "$f" = "Notes/.gitkeep" ] || [[ "$(basename "$f")" =~ $REGEX ]] || { echo "Error: $f"; ERR=1; }; done; [ $ERR -eq 0 ]

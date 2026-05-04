@@ -1,0 +1,21 @@
+name: Shell License Header Auditor
+
+on:
+  push:
+    paths:
+      - "**/*.sh"
+  pull_request:
+    paths:
+      - "**/*.sh"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Shell License Header Auditor
+        run: |
+          ERR=0; for f in $(find . -name "*.sh"); do head -n 15 "$f" | grep -qi "License" || { echo "Error: $f"; ERR=1; }; done; [ $ERR -eq 0 ]

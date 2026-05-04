@@ -1,0 +1,21 @@
+name: Secure APT Keyring Paths
+
+on:
+  push:
+    paths:
+      - "scripts/kibatv-build.sh"
+  pull_request:
+    paths:
+      - "scripts/kibatv-build.sh"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Secure APT Keyring Paths
+        run: |
+          grep -E "curl|wget" scripts/kibatv-build.sh | grep -E "\.gpg|\.asc" | grep -v "/usr/share/keyrings/" && { echo "Error: insecure path"; false; } || true

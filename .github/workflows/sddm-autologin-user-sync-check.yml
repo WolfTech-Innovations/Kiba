@@ -1,0 +1,21 @@
+name: SDDM Autologin User Sync
+
+on:
+  push:
+    paths:
+      - "scripts/kibatv-build.sh"
+  pull_request:
+    paths:
+      - "scripts/kibatv-build.sh"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: SDDM Autologin User Sync
+        run: |
+          U=$(grep "User=" scripts/kibatv-build.sh | cut -d= -f2); [ -n "$U" ] && ! grep -q "useradd.*$U" scripts/kibatv-build.sh && { echo "Error: user $U not created"; false; } || true
