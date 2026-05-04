@@ -3,7 +3,7 @@
 set -euo pipefail
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
-apt install curl
+apt install wget
 # Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
 # Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
 wget -q https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
