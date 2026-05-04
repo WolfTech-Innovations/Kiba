@@ -21,7 +21,7 @@ ISO="kibatv-v${RUN_NUM:-local}"
 echo "=== Configuring live-build ==="
 
 lb config \
-  --distribution resolute \
+  --distribution noble \
   --architectures amd64 \
   --archive-areas "main contrib non-free non-free-firmware" \
   --debian-installer live \
