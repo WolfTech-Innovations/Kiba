@@ -1306,7 +1306,8 @@ while true; do
     "🛍️ Software Center" "Discover and install new applications" \
     "🖥️ Terminal" "Open a command line terminal" \
     "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
-    --width=450 --height=400 2>/dev/null)
+    "✨ About KibaTV" "Learn more about the system" \
+    --width=450 --height=440 2>/dev/null)
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
@@ -1325,14 +1326,29 @@ while true; do
     "⌨️ Keyboard Shortcuts")
       zenity --info --title="Keyboard Shortcuts" \
         --window-icon="/usr/share/kibatv/logo.png" \
-        --text="<b>KibaTV System Shortcuts:</b>
+        --text="<b>KibaTV System Shortcuts</b>
 
-🪟 <b>Meta:</b> Open Application Launcher
-🖥️ <b>Meta + T:</b> Open Terminal (Konsole)
-📂 <b>Meta + E:</b> Open File Manager (Dolphin)
-⌨️ <b>Meta + D:</b> Show Desktop
-🔒 <b>Meta + L:</b> Lock Screen" \
-        --width=350 --height=320 --no-wrap 2>/dev/null
+🪟 <b>Meta</b> — Open Application Launcher
+🖥️ <b>Meta + T</b> — Open Terminal (Konsole)
+📂 <b>Meta + E</b> — Open File Manager (Dolphin)
+⌨️ <b>Meta + D</b> — Show Desktop
+🔒 <b>Meta + L</b> — Lock Screen" \
+        --width=380 --height=320 --no-wrap 2>/dev/null
+      ;;
+    "✨ About KibaTV")
+      zenity --info --title="About KibaTV" \
+        --window-icon="/usr/share/kibatv/logo.png" \
+        --text="<b>KibaTV</b>
+
+A modern, Dracula-themed Linux experience.
+
+🚀 <b>Base</b> — Debian 13 (Trixie)
+🎨 <b>Desktop</b> — Plasma 6 (Bigscreen)
+⚙️ <b>Kernel</b> — CachyOS (Optimized)
+💜 <b>Theme</b> — Dracula (System-wide)
+
+Created with care by WolfTech Innovations." \
+        --width=380 --height=340 --no-wrap 2>/dev/null
       ;;
     *)
       break
