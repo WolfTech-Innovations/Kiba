@@ -40,7 +40,9 @@ echo "deb [signed-by=/usr/share/keyrings/debian-archive-keyring.gpg] \
 apt-get update -o Dir::Etc::sourcelist="sources.list.d/debian-trixie.list" \
                -o Dir::Etc::sourceparts="-" \
                -o APT::Get::List-Cleanup="0"
-
+for dir in /lib32 /lib64 /libx32 /sbin /bin /lib; do
+  dpkg-divert --remove "$dir" 2>/dev/null || true
+done
 apt-get install -y -t trixie live-build
 
 
