@@ -21,13 +21,13 @@ ISO="kibatv-v${RUN_NUM:-local}"
 echo "=== Configuring live-build ==="
 
 lb config \
-  --distribution trixie \
+  --distribution jammy \
   --architectures amd64 \
   --archive-areas "main contrib non-free non-free-firmware" \
   --debian-installer live \
   --debian-installer-gui false \
   --binary-images iso-hybrid \
-  --mode debian \
+  --mode ubuntu \
   --system live \
   --linux-flavours amd64 \
   --linux-packages "linux-image linux-headers" \
@@ -312,23 +312,12 @@ apt install -y \
   \
   # libcec (optional - TV remote/CEC support)
   libcec-dev
-  
-  
-sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
-sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
-sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
-git checkout v6.14.0
-cmake -B build
-cmake --install build
 # Clone and build plasma-bigscreen
 cd /tmp
 git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
   git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
 
 cd plasma-bigscreen
-sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
-sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
-sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
 mkdir build && cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
