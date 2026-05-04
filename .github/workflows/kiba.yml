@@ -12,13 +12,13 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
+        
       - name: Run build in Docker
         run: |
           docker run --rm --privileged \
             -v "$PWD:/w" \
             -e RUN_NUM="${{ github.run_number }}" \
-            debian:trixie \
+            ubuntu:jammy \
             /w/scripts/kibatv-build.sh
 
       - name: Upload to SourceForge
