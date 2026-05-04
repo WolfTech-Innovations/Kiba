@@ -550,7 +550,7 @@ package() {
   install -Dm755 "$srcdir/kstore" "$pkgdir/usr/bin/kstore"
 }
 APKBUILD
-apt install kpartx
+apt install -y kpartx
 # ── Init pmbootstrap non-interactively ────────────────────────────────
 useradd -m -s /bin/bash builder
 su -c "pmbootstrap config device qemu-amd64" builder
