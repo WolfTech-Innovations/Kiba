@@ -86,10 +86,6 @@ lb config \
 
 # ── Starship prompt hook ────────────────────────────────────────────
 mkdir -p config/hooks/live
-curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
--o /usr/local/bin/fast-apt-mirror.sh
-chmod +x /usr/local/bin/fast-apt-mirror.sh
-bash ./fast-apt-mirror.sh find --apply
 cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
 #!/bin/bash
 set -e
