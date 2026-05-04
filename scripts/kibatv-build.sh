@@ -113,8 +113,8 @@ CACHY_TMP=$(mktemp -d)
 trap 'rm -rf "$CACHY_TMP"' EXIT
 cd "$CACHY_TMP"
 
-curl -LO "$IMG_URL"
-curl -LO "$HDR_URL"
+curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
+curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
 
 dpkg -i ./*.deb || apt install -f -y
 apt purge -y linux-image-amd64 linux-headers-amd64
@@ -258,26 +258,94 @@ apt install -y \
   libtag1-dev libmpv-dev
 apt install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
-
+git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
+cd extra-cmake-modules
+apt update
+apt install -y \
+  # Build tools
+  cmake \
+  extra-cmake-modules \
+  pkg-config \
+  gettext \
+  \
+  # KF6 components
+  libkf6bluezqt-dev \
+  libkf6i18n-dev \
+  libkf6kcmutils-dev \
+  libkf6globalaccel-dev \
+  libkf6notifications-dev \
+  libkf6kio-dev \
+  libkf6windowsystem-dev \
+  libkf6svg-dev \
+  libkf6dbusaddons-dev \
+  libkf6iconthemes-dev \
+  libkirigami-dev \
+  \
+  # Kirigami QML runtime
+  qml6-module-org-kde-kirigami \
+  \
+  # KScreen
+  libkscreen-dev \
+  \
+  # Plasma
+  libplasma-dev \
+  libplasmaactivities-dev \
+  libplasmaactivitiesstats-dev \
+  plasma-workspace-dev \
+  plasma-wayland-protocols \
+  \
+  # Qt6 components
+  qt6-base-dev \
+  qt6-declarative-dev \
+  qt6-multimedia-dev \
+  qt6-webengine-dev \
+  qt6-wayland-dev \
+  \
+  # QCoro (C++20 coroutines for Qt6)
+  qcoro-qt6-dev \
+  \
+  # Wayland
+  libwayland-dev \
+  \
+  # SDL3 (game controller support)
+  libsdl3-dev \
+  \
+  # libcec (optional - TV remote/CEC support)
+  libcec-dev
+  
+  
+sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
+sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
+sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
+git checkout v6.14.0
+cmake -B build
+cmake --install build
 # Clone and build plasma-bigscreen
 cd /tmp
 git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/null || \
   git clone --depth=1 https://github.com/KDE/plasma-bigscreen.git
 
 cd plasma-bigscreen
+sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
+sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
+sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
 mkdir build && cd build
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF \
   -DCMAKE_PREFIX_PATH=/usr
-
 make -j"$(nproc)"
 make install
 
 # Cleanup
 cd / && rm -rf /tmp/plasma-bigscreen
-curl https://repo.waydro.id | bash
+
+# Securely install Waydroid repository
+curl --proto '=https' --tlsv1.2 -Sf https://repo.waydro.id/waydroid.gpg --output /usr/share/keyrings/waydroid.gpg
+echo "deb [signed-by=/usr/share/keyrings/waydroid.gpg] https://repo.waydro.id/ trixie main" > /etc/apt/sources.list.d/waydroid.list
+apt update
+
 waydroid init -s GAPPS
 systemctl enable --now waydroid-container.service
 git clone https://github.com/WolfTech-Innovations/KStore
