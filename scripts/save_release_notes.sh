@@ -1,4 +1,5 @@
 #!/bin/bash
+# License: MIT
 #
 # Copyright (c) 2025 WolfTech Innovations
 #
