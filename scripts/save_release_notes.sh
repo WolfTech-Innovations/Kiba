@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 #
 # Copyright (c) 2025 WolfTech Innovations
 #
