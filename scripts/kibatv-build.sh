@@ -6,10 +6,10 @@ export DEBIAN_FRONTEND=noninteractive
 apt install curl
 # Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
 # Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
-curl -fsSL https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \ 
--o /usr/local/bin/fast-apt-mirror.sh
+wget -q https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
+  -O /usr/local/bin/fast-apt-mirror.sh
 chmod +x /usr/local/bin/fast-apt-mirror.sh
-bash ./fast-apt-mirror.sh find --apply
+bash /usr/local/bin/fast-apt-mirror.sh find --apply
 # OR use Ubuntu's official US CDN-backed mirror:
 # http://us.archive.ubuntu.com/ubuntu
 # ── Install live-build and build deps ─────────────────────────────────
@@ -273,11 +273,10 @@ chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-# Force a specific regional mirror instead of the load-balanced archive.ubuntu.com
-# Nuke archive.ubuntu.com and security.ubuntu.com, replace with xtom 
-sed -i 's|http://archive.ubuntu.com/ubuntu|http://mirrors.xtom.com/ubuntu|g' /etc/apt/sources.list
-sed -i 's|http://security.ubuntu.com/ubuntu|http://mirrors.xtom.com/ubuntu|g' /etc/apt/sources.list 
-apt-get update
+wget -q https://raw.githubusercontent.com/vegardit/fast-apt-mirror.sh/v1/fast-apt-mirror.sh \
+  -O /usr/local/bin/fast-apt-mirror.sh
+chmod +x /usr/local/bin/fast-apt-mirror.sh
+bash /usr/local/bin/fast-apt-mirror.sh find --apply
 # OR use Ubuntu's official US CDN-backed mirror:
 # http://us.archive.ubuntu.com/ubuntu
 apt install -y git cmake python3-pip
