@@ -285,7 +285,7 @@ kde-builder --initial-setup --prompt-answer=y
 kde-builder plasma-bigscreen
 source ~/kde/usr/bin/prefix.sh
 curl https://repo.waydro.id | bash
-waydroid init
+waydroid init -s GAPPS
 systemctl enable --now waydroid-container.service
 git clone https://github.com/WolfTech-Innovations/KStore
 cd KStore
