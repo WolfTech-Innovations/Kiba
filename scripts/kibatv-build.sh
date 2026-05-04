@@ -259,7 +259,12 @@ apt install -y \
   qml6-module-org-kde-kirigami \
   libkf6svg-dev \
   libkf6i18n-dev \
-  libkf6kio-dev
+  libkf6kio-dev \
+  kirigami2 \
+  kirigami2-dev \
+  qml-module-org-kde-kirigami2
+  
+  
 sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
 sed -i -E 's/([0-9]+)\.14(\.[0-9]+)?/\113\2/g' CMakeLists.txt
 sed -i -E 's/613\.0/6.13.0/g' CMakeLists.txt
