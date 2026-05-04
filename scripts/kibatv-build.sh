@@ -106,8 +106,8 @@ CACHY_TMP=$(mktemp -d)
 trap 'rm -rf "$CACHY_TMP"' EXIT
 cd "$CACHY_TMP"
 
-curl -LO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
-curl -LO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
+curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-image-psycachy_${VERSION}-3_amd64.deb"
+curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
 
 dpkg -i ./*.deb || apt install -f -y
 echo "=== CachyOS Kernel installed ==="
@@ -334,7 +334,12 @@ make install
 
 # Cleanup
 cd / && rm -rf /tmp/plasma-bigscreen
-curl https://repo.waydro.id | bash
+
+# Securely install Waydroid repository
+curl --proto '=https' --tlsv1.2 -Sf https://repo.waydro.id/waydroid.gpg --output /usr/share/keyrings/waydroid.gpg
+echo "deb [signed-by=/usr/share/keyrings/waydroid.gpg] https://repo.waydro.id/ trixie main" > /etc/apt/sources.list.d/waydroid.list
+apt update
+
 waydroid init -s GAPPS
 systemctl enable --now waydroid-container.service
 git clone https://github.com/WolfTech-Innovations/KStore
