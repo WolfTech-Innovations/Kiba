@@ -23,7 +23,7 @@ jobs:
           docker run --rm --privileged \
             -v "$PWD:/w" \
             -e RUN_NUM="${{ github.run_number }}" \
-            ubuntu:noble \
+            debian:trixie \
             /w/scripts/kibatv-build.sh
 
       - name: Upload to SourceForge
