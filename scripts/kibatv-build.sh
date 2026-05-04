@@ -256,7 +256,7 @@ git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
 cd extra-cmake-modules
 apt update
 apt install -y \
-  libkf6kirigami-dev \
+  kirigami-dev \
   qml6-module-org-kde-kirigami \
   libkf6svg-dev
 sed -i 's/find_package(KF6 6.14.0 REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
