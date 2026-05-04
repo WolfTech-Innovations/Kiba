@@ -255,7 +255,6 @@ apt-get install -y --no-install-recommends \
 git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
 cd extra-cmake-modules
 sed -i 's/find_package(KF6 [0-9.]* REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
-sed -i 's/find_package(ECM [0-9.]* REQUIRED/find_package(ECM REQUIRED/g' CMakeLists.txt
 git checkout v6.14.0
 cmake -B build
 cmake --install build
@@ -266,17 +265,12 @@ git clone --depth=1 https://invent.kde.org/plasma/plasma-bigscreen.git 2>/dev/nu
 
 cd plasma-bigscreen
 sed -i 's/find_package(KF6 [0-9.]* REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
-sed -i 's/find_package(ECM [0-9.]* REQUIRED/find_package(ECM REQUIRED/g' CMakeLists.txt
 mkdir build && cd build
-sed -i 's/find_package(KF6 [0-9.]* REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
-sed -i 's/find_package(ECM [0-9.]* REQUIRED/find_package(ECM REQUIRED/g' CMakeLists.txt
 cmake .. \
   -DCMAKE_INSTALL_PREFIX=/usr \
   -DCMAKE_BUILD_TYPE=Release \
   -DBUILD_TESTING=OFF \
   -DCMAKE_PREFIX_PATH=/usr
-sed -i 's/find_package(KF6 [0-9.]* REQUIRED/find_package(KF6 REQUIRED/g' CMakeLists.txt
-sed -i 's/find_package(ECM [0-9.]* REQUIRED/find_package(ECM REQUIRED/g' CMakeLists.txt
 make -j"$(nproc)"
 make install
 
