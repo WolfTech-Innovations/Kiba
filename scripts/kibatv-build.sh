@@ -95,12 +95,19 @@ cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
 set -e
 echo "=== Installing CachyOS Kernel ==="
 
-set -e
-echo "=== Installing CachyOS Kernel ==="
+# Dynamically fetch the latest release version and asset URLs
+API_URL="https://api.github.com/repos/psygreg/linux-psycachy/releases/latest"
+RELEASE_INFO=$(curl -s "$API_URL")
+TAG=$(echo "$RELEASE_INFO" | jq -r '.tag_name')
+IMG_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy")) | .browser_download_url')
+HDR_URL=$(echo "$RELEASE_INFO" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy")) | .browser_download_url')
 
-VERSION="6.17.13"
-TAG="6.17.13"
-BASE="https://github.com/psygreg/linux-psycachy/releases/download/$TAG"
+if [ -z "$TAG" ] || [ "$TAG" = "null" ]; then
+  echo "ERROR: Failed to fetch latest CachyOS kernel version"
+  exit 1
+fi
+
+echo "Installing CachyOS Kernel $TAG..."
 
 CACHY_TMP=$(mktemp -d)
 trap 'rm -rf "$CACHY_TMP"' EXIT
@@ -110,11 +117,10 @@ curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-image-psycachy_${VERSION}-3_a
 curl --proto '=https' --tlsv1.2 -SfLO "$BASE/linux-headers-psycachy_${VERSION}-3_amd64.deb"
 
 dpkg -i ./*.deb || apt install -f -y
-echo "=== CachyOS Kernel installed ==="
 apt purge -y linux-image-amd64 linux-headers-amd64
 apt autoremove -y
 
-echo "=== CachyOS Kernel installed ==="
+echo "=== CachyOS Kernel installed ($TAG) ==="
 CACHY_HOOK
 chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
@@ -228,7 +234,7 @@ chmod 700 $XDG_RUNTIME_DIR
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 cd ~
-apt-get install -y git cmake python3-pip
+apt install -y git cmake python3-pip
 cd ~
 
 export DEBIAN_FRONTEND=noninteractive
@@ -242,7 +248,7 @@ apt install -y \
   libkf6bluezqt-dev \
   extra-cmake-modules
 # Install build dependencies
-apt-get install -y \
+apt install -y \
   git cmake g++ make \
   libkf6config-dev libkf6coreaddons-dev \
   libkf6service-dev libkf6i18n-dev \
@@ -250,7 +256,7 @@ apt-get install -y \
   qt6-base-dev libqt6core6 libqt6gui6 \
   libkf6globalaccel-dev libkf6notifications-dev \
   libtag1-dev libmpv-dev
-apt-get install -y --no-install-recommends \
+apt install -y --no-install-recommends \
   'qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1'
 git clone https://invent.kde.org/frameworks/extra-cmake-modules.git
 cd extra-cmake-modules
@@ -395,6 +401,9 @@ plasma-workspace
 plasma-workspace-wallpapers
 plasma-discover
 plasma-discover-backend-flatpak
+konsole
+dolphin
+systemsettings
 
 sddm
 sddm-theme-breeze
@@ -640,7 +649,6 @@ cat > /etc/profile.d/nala-'alias'.sh << 'NALA_ALIAS'
 # KibaTV: use nala as the default package manager frontend
 if command -v nala >/dev/null 2>&1; then
   'alias' apt_get='nala'
-  'alias' apt_get='nala'
 fi
 NALA_ALIAS
 chmod +x /etc/profile.d/nala-'alias'.sh
@@ -720,7 +728,6 @@ fi
 # ── Nala/apt aliases ────────────────────────────────────
 if command -v nala >/dev/null 2>&1; then
   'alias' apt_get='nala'
-  'alias' apt_get='nala'
   'alias' install='sudo nala install'
   'alias' remove='sudo nala remove'
   'alias' update='sudo nala update && sudo nala upgrade -y'
@@ -754,8 +761,6 @@ elif command -v batcat >/dev/null 2>&1; then
 fi
 
 if command -v rg >/dev/null 2>&1; then
-  'alias' grep='rg'
-elif command -v rg >/dev/null 2>&1; then
   'alias' grep='rg'
 fi
 
@@ -1353,7 +1358,8 @@ while true; do
     "🚀 Install KibaTV" "Install the system permanently to your disk" \
     "🌐 Web Browser" "Browse the internet" \
     "🛍️ Software Center" "Discover and install new applications" \
-    "🖥️ Terminal" "Open a command line terminal" \
+    "📂 File Manager (Meta+E)" "Manage your files and folders" \
+    "🖥️ Terminal (Meta+T)" "Open a command line terminal" \
     "⌨️ Keyboard Shortcuts" "View common system shortcuts" \
     --width=450 --height=400 2>/dev/null)
 
@@ -1368,7 +1374,10 @@ while true; do
     "🛍️ Software Center")
       plasma-discover &
       ;;
-    "🖥️ Terminal")
+    "📂 File Manager (Meta+E)")
+      dolphin &
+      ;;
+    "🖥️ Terminal (Meta+T)")
       konsole &
       ;;
     "⌨️ Keyboard Shortcuts")
@@ -1753,7 +1762,6 @@ for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
     cat >> "$RCFILE" << 'NALABASH'
 # KibaTV: nala as package manager frontend
 command -v nala >/dev/null 2>&1 && {
-  'alias' apt_get='nala'
   'alias' apt_get='nala'
 }
 NALABASH
