@@ -26,6 +26,8 @@ ISO="kibatv-v${RUN_NUM:-local}"
 # Remove Ubuntu's ancient live-build
 apt-get remove -y live-build
 # Add Debian trixie repo and install live-build from it
+# Import Debian archive signing keys
+apt-get install -y debian-archive-keyring
 echo "deb http://deb.debian.org/debian trixie main" > /etc/apt/sources.list.d/debian-trixie.list
 apt-get update -o Dir::Etc::sourcelist="sources.list.d/debian-trixie.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
 apt-get install -y -t trixie live-build
