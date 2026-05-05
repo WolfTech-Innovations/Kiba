@@ -612,8 +612,21 @@ systemd = default
 providers = {}
 extra_packages = none
 EOF
-printf 'edge\nqemu\namd64\nstable\nuser\ndefault\ndefault\ndefault\ndefault\nconsole\ndefault\nn\n\n' \
-  | pmbootstrap --as-root --assume-yes init
+pmbootstrap --as-root config work $WORKDIR
+pmbootstrap --as-root config device qemu-amd64
+pmbootstrap --as-root config kernel stable
+pmbootstrap --as-root config ui plasma-bigscreen
+pmbootstrap --as-root config channel edge
+pmbootstrap --as-root config username user
+pmbootstrap --as-root config timezone UTC
+pmbootstrap --as-root config locale en_US
+pmbootstrap --as-root config hostname kibatv
+pmbootstrap --as-root config extra_space 0
+pmbootstrap --as-root config boot_size 512
+pmbootstrap --as-root config jobs 4
+pmbootstrap --as-root config ccache_size 5G
+pmbootstrap --as-root config sudo_timer False
+pmbootstrap --as-root config extra_packages none
 pmbootstrap --as-root build kibatv-config
 pmbootstrap --as-root build kstore
 pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
