@@ -33,13 +33,18 @@ timezone = UTC
 locale = en_US.UTF-8
 EOF
 chown -R builder:builder /home/builder/.config
+# Run init alone, fully isolated
+set +o pipefail
+printf '\n\n\n\n\n\n\nplasma-bigscreen\n\n\n\n\n\n\n\n\n\n\n\n\n' \
+  | pmbootstrap --as-root --assume-yes init
+EXIT=$?
+set -o pipefail
 
-echo "Initializing pmbootstrap..."
-# The 'yes' command returns exit 2 (SIGPIPE) when pmbootstrap closes stdin after finishing
-# Use '|| true' to ignore that, OR check if config was actually written
-yes "" | pmbootstrap --as-root --assume-yes init || true
+echo "Init exit: $EXIT"
 
-echo "pmbootstrap init completed successfully"
+# Completely separate — set aports path
+pmbootstrap --as-root config aports /work/pmaports
+echo "Aports now: $(pmbootstrap --as-root config aports)"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -593,13 +598,6 @@ package() {
   echo "kibatv-live" > "$pkgdir/etc/hostname"
 }
 APKBUILD
-apt install -y kpartx
-mkdir -p "$PMAPORTS_CACHE/temp/kstore"
-# Let init write a valid config
-set +o pipefail
-yes "" | pmbootstrap --as-root --assume-yes init
-set -o pipefail
-pmbootstrap --as-root config aports /work/pmaports
 # Then build and install
 pmbootstrap --as-root build kibatv-config
 pmbootstrap --as-root build kstore
