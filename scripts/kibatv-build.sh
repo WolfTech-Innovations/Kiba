@@ -9,7 +9,7 @@ chown -R builder:builder /home/builder "$WORKDIR"
 apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
 # Install latest pmbootstrap from git into builder's home
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
-ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmboostrap
+ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmbootstrap
 chmod +x /home/builder/pmbootstrap/pmbootstrap.py
 # Write config
 mkdir -p /home/builder/.config
