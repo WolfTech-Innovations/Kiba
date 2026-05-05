@@ -459,7 +459,6 @@ pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
 pmbootstrap --as-root config ui plasma-bigscreen
 pmbootstrap --as-root config user user
-pmbootstrap --as-root config install_password "kibatv"
 pmbootstrap --as-root config timezone UTC
 pmbootstrap --as-root config locale en_US
 pmbootstrap --as-root config hostname kibatv
@@ -469,7 +468,7 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
+echo "kibatv" | pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log
 pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log
@@ -478,7 +477,7 @@ cat install.log
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
 find $WORKDIR/chroot_native -name "*.log" | xargs grep -l "kibatv" 2>/dev/null | xargs cat
-RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
+RAW_IMG=$(find $WORKDIR -name "*.img*" 2>/dev/null || echo "no image")
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
 modprobe nbd max_part=16
