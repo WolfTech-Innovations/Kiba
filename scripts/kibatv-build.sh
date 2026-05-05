@@ -35,7 +35,16 @@ EOF
 chown -R builder:builder /home/builder/.config
 
 echo "Initializing pmbootstrap..."
-su -c 'yes "" | /home/builder/.local/bin/pmbootstrap --assume-yes init' builder
+# The 'yes' command returns exit 2 (SIGPIPE) when pmbootstrap closes stdin after finishing
+# Use '|| true' to ignore that, OR check if config was actually written
+su -c 'yes "" | /home/builder/.local/bin/pmbootstrap --assume-yes init || true' builder
+
+# Verify init actually succeeded by checking the config was written
+su -c 'test -f /home/builder/.config/pmbootstrap_v3.cfg' builder
+echo "pmbootstrap init completed successfully"
+
+# Then continue with the actual build
+su -c '/home/builder/.local/bin/pmbootstrap --assume-yes install --no-sshd --no-firewall --password 1234' builder
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
