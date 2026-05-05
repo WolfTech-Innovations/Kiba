@@ -421,7 +421,7 @@ command -v fastfetch >/dev/null 2>&1 && fastfetch
 'alias' please='sudo' # satisfy audit: alias please='sudo'
 'alias' cls='clear'
 'alias' update='sudo apk update && sudo apk upgrade'
-  'alias' upgrade='sudo apk update && sudo apk upgrade'
+'alias' upgrade='sudo apk update && sudo apk upgrade'
 'alias' install='sudo apk add'
 'alias' remove='sudo apk del'
 'alias' search='apk search'
@@ -586,8 +586,8 @@ EOF
 Type=Application
 Name=Install KibaTV
 GenericName=System Installer
-      Comment=Install KibaTV permanently to your local storage
-      Keywords=install;system;kibatv;
+Comment=Install KibaTV permanently to your local storage
+Keywords=install;system;kibatv;
 Exec=calamares
 Icon=/usr/share/kibatv/logo.png
 Terminal=false
