@@ -595,7 +595,7 @@ package() {
 APKBUILD
 apt install -y kpartx
 mkdir -p "$PMAPORTS_CACHE/temp/kstore"
-pmbootstrap --as-root config set aports /work/pmaports
+pmbootstrap --as-root config aports /work/pmaports
 # Then build and install
 pmbootstrap --as-root build kibatv-config
 pmbootstrap --as-root build kstore
