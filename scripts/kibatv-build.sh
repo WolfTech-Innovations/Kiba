@@ -593,13 +593,6 @@ package() {
 }
 APKBUILD
 apt install -y kpartx
-# ── Init pmbootstrap non-interactively ────────────────────────────────
-su -c "pmbootstrap config device qemu-amd64" builder
-su -c "pmbootstrap --details-to-stdout config ui plasma-bigscreen" builder
-su -c "pmbootstrap --details-to-stdout config channel edge" builder
-su -c 'pmbootstrap --details-to-stdout config extra_packages \
-  "plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup,kibatv-config,kstore"' builder
-
 # ── Build local packages ──────────────────────────────────────────────
 su -c "pmbootstrap build kibatv-config" builder
 su -c "pmbootstrap build kstore" builder
