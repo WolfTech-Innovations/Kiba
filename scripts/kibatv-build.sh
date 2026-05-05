@@ -1,25 +1,24 @@
 #!/bin/bash
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 WORKDIR="/wdir"
-CONFIG_DIR="$WORKDIR/config"
-CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
+# v3 uses pmbootstrap_v3.cfg, not pmbootstrap.cfg
+CONFIG_FILE="$HOME/.config/pmbootstrap_v3.cfg"
 
-# Create dirs as root first, then hand off ownership
-mkdir -p "$CONFIG_DIR"
+mkdir -p "$WORKDIR" "$(dirname "$CONFIG_FILE")"
 
 useradd -m -s /bin/bash builder || true
-chown -R builder:builder /home/builder
-chown -R builder:builder "$WORKDIR"
+chown -R builder:builder /home/builder "$WORKDIR"
 
-apt-get update -y && apt-get install -y pmbootstrap procps kpartx
+apt-get update -y && apt-get install -y pmbootstrap procps kpartx git python3
 
-echo "Writing pmbootstrap config..."
-# Use a heredoc written directly (as root), then chown
+# Write config to the correct v3 path under builder's home
+CONFIG_FILE="/home/builder/.config/pmbootstrap_v3.cfg"
+mkdir -p /home/builder/.config
 cat > "$CONFIG_FILE" <<EOF
 [pmbootstrap]
-aports = /work/pmaports
-work = /work/pmb
+work = $WORKDIR
 device = qemu-amd64
 ui = plasma-bigscreen
 channel = edge
@@ -27,13 +26,13 @@ username = user
 timezone = UTC
 locale = en_US.UTF-8
 EOF
+chown -R builder:builder /home/builder/.config
 
-chown builder:builder "$CONFIG_FILE"
-chmod 644 "$CONFIG_FILE"
+echo "Initializing pmbootstrap (non-interactive via yes pipe)..."
+# This is the method the upstream project itself uses in CI
+su -c 'yes "" | pmbootstrap --assume-yes init' builder
 
-echo "Initializing pmbootstrap..."
-# Pass variables explicitly via env, or use double quotes with su -c
-su -c "pmbootstrap -c '$CONFIG_FILE' -w '$WORKDIR' --assume-yes init" builder
+echo "Done."
 
 export DEBIAN_FRONTEND=noninteractive
 
