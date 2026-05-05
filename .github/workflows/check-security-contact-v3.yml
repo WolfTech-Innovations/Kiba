@@ -1,0 +1,20 @@
+name: Check Security Contact
+on:
+  push:
+paths:
+- SECURITY.md
+  pull_request:
+paths:
+- SECURITY.md
+jobs:
+  audit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Method
+      run: grep -Ei "contact|email|report" SECURITY.md
+    timeout-minutes: 5

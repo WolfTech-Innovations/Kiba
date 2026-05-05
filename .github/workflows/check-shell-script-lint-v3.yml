@@ -1,0 +1,22 @@
+name: Check Shell Script Lint
+on:
+  push:
+paths:
+- '**/*.sh'
+  pull_request:
+paths:
+- '**/*.sh'
+jobs:
+  lint:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Run ShellCheck
+      run: 'sudo apt-get update && sudo apt-get install -y shellcheck
+
+        shellcheck scripts/*.sh'
+    timeout-minutes: 5

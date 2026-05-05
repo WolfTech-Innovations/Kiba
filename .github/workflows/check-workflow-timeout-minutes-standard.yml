@@ -1,0 +1,20 @@
+name: Check Workflow Timeout Minutes Standard
+true:
+  push:
+    paths:
+    - .github/workflows/*.yml
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Timeouts
+      run: '# Audit jobs should have a 5-minute timeout for resource efficiency
+
+        grep -rn "jobs:" .github/workflows/ -A 20 | grep -v "timeout-minutes: 5" |
+        grep "audit" && exit 1 || exit 0
+
+        '
+    timeout-minutes: 5

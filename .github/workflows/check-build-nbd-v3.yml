@@ -1,0 +1,21 @@
+name: Check Build NBD
+on:
+  push:
+paths:
+- scripts/kibatv-build.sh
+  pull_request:
+paths:
+- scripts/kibatv-build.sh
+jobs:
+  audit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Verify Disconnect
+      run: grep -q "qemu-nbd --connect" scripts/kibatv-build.sh && grep -q "qemu-nbd
+        --disconnect" scripts/kibatv-build.sh
+    timeout-minutes: 5

@@ -1,0 +1,21 @@
+name: Audit Shell Variable Quoting Strict
+true:
+  push:
+    paths:
+    - scripts/*.sh
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Quoting
+      run: '# Memory requirement: shell script variables must be double-quoted
+
+        # Simple check for unquoted variables in command arguments
+
+        grep -rnE "[a-z0-9_]+=.* \$\{[a-z0-9_]+\}" scripts/ && exit 1 || exit 0
+
+        '
+    timeout-minutes: 5

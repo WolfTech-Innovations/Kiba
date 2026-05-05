@@ -1,0 +1,21 @@
+name: Check Workflow Cancel In Progress
+on:
+  push:
+paths:
+- .github/workflows/*.yml
+  pull_request:
+paths:
+- .github/workflows/*.yml
+jobs:
+  audit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Concurrency
+      run: grep -r "concurrency:" .github/workflows/ -A 5 | grep "cancel-in-progress"
+        | grep -v "true" && exit 1 || exit 0
+    timeout-minutes: 5

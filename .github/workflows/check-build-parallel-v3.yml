@@ -1,0 +1,21 @@
+name: Check Build Parallel
+on:
+  push:
+paths:
+- scripts/kibatv-build.sh
+  pull_request:
+paths:
+- scripts/kibatv-build.sh
+jobs:
+  audit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Flags
+      run: grep -E "make|cmake --build" scripts/kibatv-build.sh | grep -v "-j" &&
+        exit 1 || exit 0
+    timeout-minutes: 5

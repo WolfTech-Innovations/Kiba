@@ -1,0 +1,20 @@
+name: Check Build Cleanup
+on:
+  push:
+paths:
+- scripts/kibatv-build.sh
+  pull_request:
+paths:
+- scripts/kibatv-build.sh
+jobs:
+  audit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Cleanup
+      run: tail -n 20 scripts/kibatv-build.sh | grep "rm -rf \$WORKDIR" || exit 1
+    timeout-minutes: 5
