@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKDIR="./wdir"
+WORKDIR="$GITHUB_WORKSPACE/wdir"
 CONFIG_DIR="$WORKDIR/config"
 CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
 useradd -m -s /bin/bash builder
