@@ -488,7 +488,7 @@ echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | te
 cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --add kibatv-config,kstore | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
