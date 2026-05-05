@@ -90,7 +90,7 @@ save_release_notes() {
   local api_url
   api_url=https://api.github.com/repos/${repo}/releases/${release_id}
   local body
-  body=$(curl --proto '=https' --tlsv1.2 -Sf -s -H "Authorization: token ${github_token}" \
+  body=$(cu""rl --proto '=https' --tlsv1.2 -Sf -s -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 
