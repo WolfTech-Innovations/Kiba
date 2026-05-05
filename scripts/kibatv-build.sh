@@ -72,7 +72,7 @@ device = qemu-amd64
 ui = plasma-bigscreen
 username = user
 channel = edge
-extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
+extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
 timezone = UTC
 locale = en_US.UTF-8
 PMCFG
@@ -86,7 +86,7 @@ pkgrel=0
 pkgdesc="KibaTV system configuration, theming, and branding"
 arch="noarch"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh calamares"
+depends="plasma-bigscreen chromium flatpak sddm zsh"
 source=""
 
 package() {
