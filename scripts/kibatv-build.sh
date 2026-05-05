@@ -1,12 +1,15 @@
 #!/bin/bash
 # License: GPL-3.0-or-later
 set -euo pipefail
+set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
 
 # ── Host deps ─────────────────────────────────────────────────────────
+# Install eatmydata to bypass fsync and accelerate disk-intensive build tasks
 apt-get update && apt-get install -y \
+  eatmydata kpartx \
   python3 python3-pip git openssl \
   qemu-utils parted e2fsprogs dosfstools \
   xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
@@ -342,27 +345,37 @@ EOF
   # ── zshrc ────────────────────────────────────────────────────────────
   install -dm755 "$pkgdir/etc/zsh"
   cat > "$pkgdir/etc/zsh/zshrc" << 'ZSHRC'
+setopt extendedglob
 export LANG=en_US.UTF-8
 export EDITOR=nano
 export PAGER=less
 HISTSIZE=10000; SAVEHIST=10000; HISTFILE=~/.zsh_history
 setopt SHARE_HISTORY HIST_IGNORE_DUPS INC_APPEND_HISTORY
-autoload -Uz compinit && compinit -u
+
+# Completion caching (Check for dump file less than 24h old)
+autoload -Uz compinit
+for dump in ~/.zcompdump(N.m-24); do
+  compinit -C -u
+done
+if [[ -z "$dump" ]]; then
+  compinit -u
+fi
+
 zstyle ':completion:*' menu select
 [ -f /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
   source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 [ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 command -v fastfetch >/dev/null 2>&1 && fastfetch
-alias ls='ls --color=auto'
-alias ll='ls -lah'
-alias la='ls -A'
-alias please='sudo'
-alias cls='clear'
-alias update='sudo apk update && sudo apk upgrade'
-alias install='sudo apk add'
-alias remove='sudo apk del'
-alias search='apk search'
+'alias' ls='ls --color=auto'
+'alias' ll='ls -lah'
+'alias' la='ls -A'
+'alias' please='sudo'
+'alias' cls='clear'
+'alias' update='sudo apk update && sudo apk upgrade'
+'alias' install='sudo apk add'
+'alias' remove='sudo apk del'
+'alias' search='apk search'
 free() { command free -h "$@"; }
 mkdir() { command mkdir -pv "$@"; }
 ZSHRC
@@ -550,22 +563,23 @@ package() {
   install -Dm755 "$srcdir/kstore" "$pkgdir/usr/bin/kstore"
 }
 APKBUILD
-apt install -y kpartx
+
 # ── Init pmbootstrap non-interactively ────────────────────────────────
 useradd -m -s /bin/bash builder
-su -c "pmbootstrap config device qemu-amd64" builder
-su -c "pmbootstrap --details-to-stdout config ui plasma-bigscreen" builder
-su -c "pmbootstrap --details-to-stdout config channel edge" builder
-su -c 'pmbootstrap --details-to-stdout config extra_packages \
-  "plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup,kibatv-config,kstore"' builder
+su -c "eatmydata pmbootstrap config device qemu-amd64 && \
+      eatmydata pmbootstrap --details-to-stdout config ui plasma-bigscreen && \
+      eatmydata pmbootstrap --details-to-stdout config channel edge && \
+      eatmydata pmbootstrap --details-to-stdout config extra_packages \
+        \"plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup,kibatv-config,kstore\"" builder
 
 # ── Build local packages ──────────────────────────────────────────────
-su -c "pmbootstrap build kibatv-config" builder
-su -c "pmbootstrap build kstore" builder
+su -c "eatmydata pmbootstrap build kibatv-config && \
+      eatmydata pmbootstrap build kstore" builder
 
 # ── Build image ───────────────────────────────────────────────────────
-su -c "pmbootstrap install --no-fde" builder
-su -c "pmbootstrap export --odin 2>/dev/null || pmbootstrap export" builder
+su -c "eatmydata pmbootstrap install --no-fde && \
+      (eatmydata pmbootstrap export --odin 2>/dev/null || \
+       eatmydata pmbootstrap export)" builder
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
@@ -582,9 +596,10 @@ mount "/dev/${ROOT_PART}" /mnt/pmroot
 # ── Build ISO structure ───────────────────────────────────────────────
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
 
-# Squashfs rootfs with zstd max compression
-mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
-  -comp zstd -Xcompression-level 19 \
+# Squashfs rootfs with zstd compression
+# Level 15 provides a good balance between compression speed and image size
+eatmydata mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
+  -comp zstd -Xcompression-level 15 \
   -b 1M -no-progress -noappend
 
 printf $(du -sx --block-size=1 /mnt/pmroot | cut -f1) \
@@ -624,7 +639,7 @@ menuentry "Install KibaTV to this TV" {
 GRUBCFG
 
 # ── EFI bootloader ────────────────────────────────────────────────────
-grub-mkstandalone \
+eatmydata grub-mkstandalone \
   --format=x86_64-efi \
   --output=/isobuild/EFI/boot/bootx64.efi \
   --locales="" --fonts="" \
@@ -637,7 +652,7 @@ LC_CTYPE=C mcopy -i /isobuild/EFI/boot/efiboot.img \
   /isobuild/EFI/boot/bootx64.efi ::efi/boot/
 
 # ── BIOS bootloader ───────────────────────────────────────────────────
-grub-mkstandalone \
+eatmydata grub-mkstandalone \
   --format=i386-pc \
   --output=/isobuild/boot/grub/bios.img \
   --install-modules="linux normal iso9660 biosdisk memdisk search tar ls" \
@@ -649,7 +664,7 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
 # ── Build hybrid ISO ──────────────────────────────────────────────────
-xorriso \
+eatmydata xorriso \
   -as mkisofs \
   -iso-level 3 \
   -full-iso9660-filenames \
