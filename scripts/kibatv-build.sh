@@ -130,7 +130,7 @@ EOF
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
-Welcome to KibaTV -- Switch to Simple
+Welcome to 🚀 KibaTV -- Switch to Simple
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
@@ -294,7 +294,7 @@ EOF
   cat > "$pkgdir/etc/xdg/ksplashrc" << 'EOF'
 [KSplash]
 Engine=KSplashQML
-Theme=org.kde.breezedark.desktop
+Theme=com.kibatv.watchdogs.desktop
 EOF
 
   # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
@@ -310,7 +310,7 @@ Rectangle {
     Text {
         id: welcomeText
         anchors.centerIn: parent
-        text: "KibaTV | Switch to simple"
+        text: "🚀 KibaTV | Switch to simple"
         font.pixelSize: 48; font.bold: true; color: "#bd93f9"
         opacity: 0
         OpacityAnimator { target: welcomeText; from: 0; to: 1; duration: 1000; running: true }
@@ -407,6 +407,7 @@ alias la='ls -A'
 alias please='sudo'
 alias cls='clear'
 alias update='sudo apk update && sudo apk upgrade'
+alias upgrade='sudo apk update && sudo apk upgrade'
 alias install='sudo apk add'
 alias remove='sudo apk del'
 alias search='apk search'
@@ -502,10 +503,10 @@ Presentation {
         interval: 5000; running: presentation.activatedInCalamares
         repeat: true; onTriggered: presentation.goToNextSlide()
     }
-    Slide { centeredText: "Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
-    Slide { centeredText: "KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
-    Slide { centeredText: "Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
-    Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
+    Slide { centeredText: "🚀 Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
+    Slide { centeredText: "📺 KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
+    Slide { centeredText: "🛍️ Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
+    Slide { centeredText: "✨ Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
     function onActivate() { presentation.currentSlide = 0; }
     function onLeave() {}
 }
@@ -570,11 +571,13 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=Install KibaTV
-Comment=Install KibaTV on your TV
+GenericName=System Installer
+Comment=Install KibaTV permanently to your local storage
 Exec=calamares
-Icon=calamares
+Icon=/usr/share/kibatv/logo.png
 Terminal=false
 Categories=System;
+Keywords=install;system;kibatv;
 EOF
 }
 APKBUILD
