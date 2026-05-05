@@ -613,7 +613,6 @@ pmbootstrap --as-root config work $WORKDIR
 pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
 pmbootstrap --as-root config ui plasma-bigscreen
-pmbootstrap --as-root config channel edge
 pmbootstrap --as-root config username user
 pmbootstrap --as-root config timezone UTC
 pmbootstrap --as-root config locale en_US
