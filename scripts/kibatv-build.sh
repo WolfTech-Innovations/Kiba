@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-apt update -y && apt install -y pmbootstrap yes
+apt update -y && apt install -y pmbootstrap
 # Initialize pmbootstrap if not already done
 echo "Initializing pmbootstrap..."
 yes | pmbootstrap init
