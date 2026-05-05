@@ -1,9 +1,9 @@
 #!/bin/bash
 set -euo pipefail
-apt update -y && apt install -y pmbootstrap
+apt update -y && apt install -y pmbootstrap yes
 # Initialize pmbootstrap if not already done
 echo "Initializing pmbootstrap..."
-pmbootstrap init -y
+yes | pmbootstrap init
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
@@ -556,7 +556,7 @@ APKBUILD
 apt install -y kpartx
 # ── Init pmbootstrap non-interactively ────────────────────────────────
 useradd -m -s /bin/bash builder
-su -c "pmbootstrap -y init" builder
+su -c "yes | pmbootstrap init" builder
 su -c "pmbootstrap config device qemu-amd64" builder
 su -c "pmbootstrap --details-to-stdout config ui plasma-bigscreen" builder
 su -c "pmbootstrap --details-to-stdout config channel edge" builder
