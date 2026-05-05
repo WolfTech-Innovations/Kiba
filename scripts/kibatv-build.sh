@@ -72,7 +72,7 @@ device = qemu-amd64
 ui = plasma-bigscreen
 username = user
 channel = edge
-extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
+extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
 timezone = UTC
 locale = en_US.UTF-8
 PMCFG
@@ -86,7 +86,7 @@ pkgrel=0
 pkgdesc="KibaTV system configuration, theming, and branding"
 arch="noarch"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh calamares"
+depends="plasma-bigscreen chromium flatpak sddm zsh"
 source=""
 
 package() {
@@ -404,161 +404,6 @@ command -v flatpak >/dev/null 2>&1 && \
     https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
 EOF
   chmod +x "$pkgdir/etc/profile.d/kibatv-flathub.sh"
-
-  # ── Calamares settings ────────────────────────────────────────────────
-  install -dm755 "$pkgdir/etc/calamares/branding/kibatv"
-  cat > "$pkgdir/etc/calamares/settings.conf" << 'EOF'
----
-modules-search: [ local, /usr/lib/calamares/modules ]
-sequence:
-  - show:
-    - welcome
-    - locale
-    - keyboard
-    - partition
-    - users
-    - summary
-  - exec:
-    - partition
-    - mount
-    - unpackfs
-    - machineid
-    - fstab
-    - locale
-    - keyboard
-    - localecfg
-    - users
-    - displaymanager
-    - networkcfg
-    - hwclock
-    - services-systemd
-    - initramfs
-    - umount
-  - show:
-    - finished
-branding: kibatv
-prompt-install: false
-dont-chroot: false
-disable-cancel: false
-hide-back-and-next-during-exec: true
-quit-at-end: false
-EOF
-
-  cat > "$pkgdir/etc/calamares/branding/kibatv/branding.desc" << 'EOF'
-componentName: kibatv
-welcomeStyleCalamares: true
-welcomeExpandingLogo: true
-slideshowAPI: 2
-strings:
-  productName: "KibaTV"
-  shortProductName: "KibaTV"
-  version: "1.0"
-  shortVersion: "1.0"
-  versionedName: "KibaTV 1.0"
-  bootloaderEntryName: "KibaTV"
-  productUrl: "https://github.com/WolfTech-Innovations/kiba"
-  supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
-images:
-  productLogo: "logo.png"
-  productIcon: "logo.png"
-  productWelcome: "logo.png"
-style:
-  SidebarBackground:        "#282a36"
-  SidebarText:              "#f8f8f2"
-  SidebarTextCurrent:       "#282a36"
-  SidebarBackgroundCurrent: "#bd93f9"
-  WindowBackground:         "#282a36"
-  WindowForeground:         "#f8f8f2"
-slideshow: "show.qml"
-EOF
-
-  cp "$pkgdir/usr/share/kibatv/logo.png" \
-     "$pkgdir/etc/calamares/branding/kibatv/logo.png"
-
-  cat > "$pkgdir/etc/calamares/branding/kibatv/show.qml" << 'EOF'
-import calamares.slideshow 1.0;
-Presentation {
-    id: presentation
-    Timer {
-        interval: 5000; running: presentation.activatedInCalamares
-        repeat: true; onTriggered: presentation.goToNextSlide()
-    }
-    Slide { centeredText: "Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
-    Slide { centeredText: "KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
-    Slide { centeredText: "Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
-    Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
-    function onActivate() { presentation.currentSlide = 0; }
-    function onLeave() {}
-}
-EOF
-
-  install -dm755 "$pkgdir/etc/calamares/modules"
-  cat > "$pkgdir/etc/calamares/modules/welcome.conf" << 'EOF'
----
-requirements:
-  check: [ storage, ram, power ]
-  requiredStorageGiB: 20.0
-  requiredRam: 1.0
-sidebar: "Welcome"
-EOF
-  cat > "$pkgdir/etc/calamares/modules/users.conf" << 'EOF'
----
-sidebar: "Your Account"
-userShell: /bin/zsh
-sudoersGroup: wheel
-setRootPassword: false
-doAutoLogin: true
-passwordRequirements:
-  minLength: 6
-EOF
-  cat > "$pkgdir/etc/calamares/modules/partition.conf" << 'EOF'
----
-efiSystemPartition: "/boot/efi"
-efiSystemPartitionSize: "300MiB"
-sidebar: "Storage"
-EOF
-  cat > "$pkgdir/etc/calamares/modules/finished.conf" << 'EOF'
----
-sidebar: "All Done!"
-restartNowEnabled: true
-restartNowChecked: true
-restartNowCommand: "shutdown -r now"
-EOF
-  cat > "$pkgdir/etc/calamares/modules/displaymanager.conf" << 'EOF'
----
-displaymanagers: [ sddm ]
-basicSetup: false
-defaultDesktopEnvironment:
-  executable: "plasma-bigscreen"
-  desktopFile: "plasma-bigscreen"
-EOF
-
-  # ── Calamares autostart ───────────────────────────────────────────────
-  install -dm755 "$pkgdir/etc/xdg/autostart"
-  cat > "$pkgdir/etc/xdg/autostart/kibatv-installer.desktop" << 'EOF'
-[Desktop Entry]
-Type=Application
-Name=Install KibaTV
-Exec=bash -c 'sleep 4 && calamares'
-Icon=calamares
-Terminal=false
-OnlyShowIn=KDE;
-EOF
-
-  # ── Calamares .desktop ────────────────────────────────────────────────
-  install -dm755 "$pkgdir/usr/share/applications"
-  cat > "$pkgdir/usr/share/applications/calamares.desktop" << 'EOF'
-[Desktop Entry]
-Type=Application
-Name=Install KibaTV
-Comment=Install KibaTV on your TV
-Exec=calamares
-Icon=calamares
-Terminal=false
-Categories=System;
-EOF
-}
-APKBUILD
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
