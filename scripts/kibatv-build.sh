@@ -1,25 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
-
 WORKDIR="/wdir"
-
 mkdir -p "$WORKDIR"
-
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
-
 # Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
 apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
-
 # Install latest pmbootstrap from git into builder's home
-su -c '
-  git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
-  mkdir -p /home/builder/.local/bin
-  ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmboostrap
-  chmod +x /home/builder/pmbootstrap/pmbootstrap.py
-' builder
-
+git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
+ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmboostrap
+chmod +x /home/builder/pmbootstrap/pmbootstrap.py
 # Write config
 mkdir -p /home/builder/.config
 cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
