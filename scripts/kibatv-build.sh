@@ -85,6 +85,7 @@ pkgver=1.0
 pkgrel=0
 pkgdesc="KibaTV system configuration, theming, and branding"
 arch="noarch"
+options="!check"
 license="GPL-3.0-or-later"
 depends="plasma-bigscreen chromium flatpak sddm zsh"
 source=""
