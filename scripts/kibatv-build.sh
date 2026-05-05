@@ -90,10 +90,10 @@ extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-s
 timezone = UTC
 locale = en_US.UTF-8
 PMCFG
-
+mkdir -p /work/pmaports/device/testing/kibatv-config
 # ── Write kibatv-config APKBUILD ──────────────────────────────────────
-mkdir -p /work/pmaports/local/kibatv-config
-cat > /work/pmaports/local/kibatv-config/APKBUILD << 'APKBUILD'
+
+cat > /work/pmaports/device/testing/kibatv-config/APKBUILD << 'APKBUILD'
 pkgname=kibatv-config
 pkgver=1.0
 pkgrel=0
@@ -598,7 +598,7 @@ su -c "pmbootstrap build kibatv-config" builder
 su -c "pmbootstrap build kstore" builder
 
 # ── Build image ───────────────────────────────────────────────────────
-su -c "pmbootstrap install --no-fde" builder
+pmbootstrap --as-root install --no-fde --add kibatv-config
 su -c "pmbootstrap export --odin 2>/dev/null || pmbootstrap export" builder
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
