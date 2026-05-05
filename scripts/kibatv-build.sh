@@ -13,7 +13,7 @@ chown -R builder:builder /home/builder
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
 
 echo "Writing pmbootstrap config..."
-su -c 'cat > "$CONFIG_FILE" <<EOF
+su -c "cat > '$CONFIG_FILE'" builder <<EOF
 [pmbootstrap]
 aports = /work/pmaports
 work = /work/pmb
@@ -23,7 +23,7 @@ channel = edge
 username = user
 timezone = UTC
 locale = en_US.UTF-8
-EOF' builder
+EOF
 
 chown builder:builder "$CONFIG_FILE"
 su -c 'chmod 644 "$CONFIG_FILE"'
