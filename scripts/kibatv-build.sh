@@ -1,4 +1,5 @@
 #!/bin/bash
+set -o pipefail
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 WORKDIR="/wdir"
@@ -276,7 +277,7 @@ EOF
   cat > "$pkgdir/etc/xdg/ksplashrc" << 'EOF'
 [KSplash]
 Engine=KSplashQML
-Theme=org.kde.breezedark.desktop
+Theme=com.kibatv.watchdogs.desktop
 EOF
 
   # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
