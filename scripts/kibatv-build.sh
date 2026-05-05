@@ -469,11 +469,11 @@ pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
 echo "kibatv" | pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
-cat buildconfig.log
+cat buildconfig.log || true
 pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
-cat buildkstore.log
+cat buildkstore.log || true
 pmbootstrap --as-root -v --details-to-stdout install --add kibatv-config,kstore | tee install.log || true
-cat install.log
+cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
 find $WORKDIR/chroot_native -name "*.log" | xargs grep -l "kibatv" 2>/dev/null | xargs cat
