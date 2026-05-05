@@ -7,7 +7,7 @@ CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
 useradd -m -s /bin/bash builder
 chown -R builder:builder /home/builder
 chown -R builder:builder /wdir
-su -c 'mkdir -p ./wdir && mkdir -p "$CONFIG_DIR"' builder
+chown -R builder:builder /wdir/config
 
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
 su -c 'mkdir -p "$CONFIG_DIR"' builder
