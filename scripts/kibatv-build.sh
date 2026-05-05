@@ -1,17 +1,36 @@
 #!/bin/bash
 set -euo pipefail
+
+WORKDIR="/work"
+CONFIG_DIR="$WORKDIR/config"
+CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
+
 useradd -m -s /bin/bash builder
-mkdir -p /work/pmb
-mkdir ./config/
-chown -R builder:builder /work
-chmod -R u+rwX /work
-chown -R builder:builder /home/builder
-apt update -y && apt install -y pmbootstrap procps kpartx
-# Initialize pmbootstrap if not already done
+mkdir -p "$CONFIG_DIR" /work/pmb
+
+chown -R builder:builder /work /home/builder
+
+apt-get update -y && apt-get install -y pmbootstrap procps kpartx
+
+echo "Writing pmbootstrap config..."
+cat > "$CONFIG_FILE" <<EOF
+[pmbootstrap]
+aports = /work/pmaports
+work = /work/pmb
+device = qemu-amd64
+ui = plasma-bigscreen
+channel = edge
+username = user
+timezone = UTC
+locale = en_US.UTF-8
+EOF
+
+chown builder:builder "$CONFIG_FILE"
+chmod 644 "$CONFIG_FILE"
+
 echo "Initializing pmbootstrap..."
-su -c 'echo -e "[pmbootstrap]\naports = /work/pmaports\nwork = /work/pmb\ndevice = qemu-amd64\nui = plasma-bigscreen\nchannel = edge\nusername = user\ntimezone = UTC\nlocale = en_US.UTF-8" > ./config/pmbootstrap.cfg' builder
-su -c "chmod 777 ./config/*"
-su -c "pmbootstrap init -c ./config/pmbootstrap.cfg" builder
+su -c "pmbootstrap -c $CONFIG_FILE --no-interactive work_migrate" builder
+
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
