@@ -86,6 +86,7 @@ pkgver=1.0
 pkgrel=0
 pkgdesc="KibaTV system configuration, theming, and branding"
 arch="noarch"
+url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
 depends="plasma-bigscreen chromium flatpak sddm zsh"
@@ -417,7 +418,8 @@ command -v flatpak >/dev/null 2>&1 && \
     https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
 EOF
   chmod +x "$pkgdir/etc/profile.d/kibatv-flathub.sh"
-APKBUILD
+
+  APKBUILD
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
@@ -432,6 +434,7 @@ arch="x86_64"
 license="GPL-3.0-or-later"
 depends="flatpak qt6-qtbase"
 source="kstore"
+url="https://github.com/WolfTech-Innovations/KStore"
 options="!check"
 
 package() {
