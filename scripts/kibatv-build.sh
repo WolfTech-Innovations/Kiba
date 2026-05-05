@@ -1,6 +1,4 @@
 #!/bin/bash
-# License: MIT
-set -o pipefail
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 WORKDIR="/wdir"
@@ -115,8 +113,6 @@ EOF
 |_|\_\_|_.__/ \__,_|\___/|____/
 
 Welcome to KibaTV -- Switch to Simple
-
-💡 Tip: Press Meta+T for Terminal or Meta+E for File Manager.
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
@@ -280,7 +276,7 @@ EOF
   cat > "$pkgdir/etc/xdg/ksplashrc" << 'EOF'
 [KSplash]
 Engine=KSplashQML
-Theme=com.kibatv.watchdogs.desktop
+Theme=org.kde.breezedark.desktop
 EOF
 
   # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
@@ -387,15 +383,15 @@ zstyle ':completion:*' menu select
 [ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 command -v fastfetch >/dev/null 2>&1 && fastfetch
-ls() { command ls --color=auto "$@"; }
-ll() { command ls -lah "$@"; }
-la() { command ls -A "$@"; }
-please() { sudo "$@"; }
-cls() { clear; }
-update() { sudo apk update && sudo apk upgrade; }
-install() { sudo apk add "$@"; }
-remove() { sudo apk del "$@"; }
-search() { apk search "$@"; }
+alias ls='ls --color=auto'
+alias ll='ls -lah'
+alias la='ls -A'
+alias please='sudo'
+alias cls='clear'
+alias update='sudo apk update && sudo apk upgrade'
+alias install='sudo apk add'
+alias remove='sudo apk del'
+alias search='apk search'
 free() { command free -h "$@"; }
 mkdir() { command mkdir -pv "$@"; }
 ZSHRC
