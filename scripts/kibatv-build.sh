@@ -92,7 +92,7 @@ locale = en_US.UTF-8
 PMCFG
 mkdir -p /work/pmaports/device/testing/kibatv-config
 # ── Write kibatv-config APKBUILD ──────────────────────────────────────
-PMAPORTS_CACHE="/root/.local/var/pmbootstrap/cache_git/pmaports"
+PMAPORTS_CACHE="/wdir/cache_git/pmaports"
 
 mkdir -p "$PMAPORTS_CACHE/temp/kibatv-config"
 cat > "$PMAPORTS_CACHE/temp/kibatv-config/APKBUILD" << 'APKBUILD'
