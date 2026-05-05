@@ -34,11 +34,11 @@ KSTORE_BIN=$(find /tmp/kstore-out -type f -executable | head -1)
 cd /
 
 # ── Clone pmaports ────────────────────────────────────────────────────
-mkdir -p /work
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git /work/pmaports
+mkdir -p "/work"
+git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git "/work/pmaports"
 
 # ── Write pmbootstrap config ──────────────────────────────────────────
-mkdir -p ~/.config
+mkdir -p "$HOME/.config"
 cat > ~/.config/pmbootstrap.cfg << 'PMCFG'
 [pmbootstrap]
 aports = /work/pmaports
@@ -53,8 +53,8 @@ locale = en_US.UTF-8
 PMCFG
 
 # ── Write kibatv-config APKBUILD ──────────────────────────────────────
-mkdir -p /work/pmaports/local/kibatv-config
-cat > /work/pmaports/local/kibatv-config/APKBUILD << 'APKBUILD'
+mkdir -p "/work/pmaports/local/kibatv-config"
+cat > "/work/pmaports/local/kibatv-config/APKBUILD" << 'APKBUILD'
 pkgname=kibatv-config
 pkgver=1.0
 pkgrel=0
@@ -330,6 +330,7 @@ LOGO_B64
 
   # ── Chromium policy ──────────────────────────────────────────────────
   install -dm755 "$pkgdir/etc/chromium/policies/managed"
+  # CPOLICY START
   cat > "$pkgdir/etc/chromium/policies/managed/kibatv.json" << 'EOF'
 {
   "HomepageLocation": "https://alphasearch.pages.dev",
@@ -341,6 +342,7 @@ LOGO_B64
   "BookmarkBarEnabled": true
 }
 EOF
+  # CPOLICY END
 
   # ── zshrc ────────────────────────────────────────────────────────────
   install -dm755 "$pkgdir/etc/zsh"
@@ -354,7 +356,7 @@ setopt SHARE_HISTORY HIST_IGNORE_DUPS INC_APPEND_HISTORY
 
 # Completion caching (Check for dump file less than 24h old)
 autoload -Uz compinit
-for dump in ~/.zcompdump(N.m-24); do
+for dump in ~/.zcompdump(#qN.m-24); do
   compinit -C -u
 done
 if [[ -z "$dump" ]]; then
@@ -546,9 +548,9 @@ EOF
 APKBUILD
 
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
-mkdir -p /work/pmaports/local/kstore
-cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
-cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
+mkdir -p "/work/pmaports/local/kstore"
+cp "$KSTORE_BIN" "/work/pmaports/local/kstore/kstore"
+cat > "/work/pmaports/local/kstore/APKBUILD" << 'APKBUILD'
 pkgname=kstore
 pkgver=1.0
 pkgrel=0
@@ -566,11 +568,11 @@ APKBUILD
 
 # ── Init pmbootstrap non-interactively ────────────────────────────────
 useradd -m -s /bin/bash builder
+PMB_PACKAGES="plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup,kibatv-config,kstore"
 su -c "eatmydata pmbootstrap config device qemu-amd64 && \
       eatmydata pmbootstrap --details-to-stdout config ui plasma-bigscreen && \
       eatmydata pmbootstrap --details-to-stdout config channel edge && \
-      eatmydata pmbootstrap --details-to-stdout config extra_packages \
-        \"plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup,kibatv-config,kstore\"" builder
+      eatmydata pmbootstrap --details-to-stdout config extra_packages $PMB_PACKAGES" builder
 
 # ── Build local packages ──────────────────────────────────────────────
 su -c "eatmydata pmbootstrap build kibatv-config && \
@@ -588,13 +590,13 @@ modprobe nbd max_part=16
 qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
 sleep 2
 
-mkdir -p /mnt/pmroot
+mkdir -p "/mnt/pmroot"
 # Find the root partition (usually p2 on pmOS)
 ROOT_PART=$(lsblk /dev/nbd0 -o NAME,FSTYPE | grep ext4 | awk '{print $1}' | head -1)
-mount "/dev/${ROOT_PART}" /mnt/pmroot
+mount "/dev/${ROOT_PART}" "/mnt/pmroot"
 
 # ── Build ISO structure ───────────────────────────────────────────────
-mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
+mkdir -p "/isobuild/live" "/isobuild/boot/grub" "/isobuild/EFI/boot"
 
 # Squashfs rootfs with zstd compression
 # Level 15 provides a good balance between compression speed and image size
