@@ -1,5 +1,5 @@
 name: Check Shell Script Lint
-on:
+"on":
   push:
 paths:
 - '**/*.sh'

@@ -1,5 +1,5 @@
 name: Check Security Contact
-on:
+"on":
   push:
 paths:
 - SECURITY.md

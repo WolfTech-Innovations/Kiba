@@ -1,5 +1,5 @@
 name: Check Repo Hygiene
-on:
+"on":
   push:
   pull_request:
 jobs:

@@ -1,5 +1,5 @@
 name: Check JSON Syntax
-on:
+"on":
   push:
 paths:
 - '**/*.json'

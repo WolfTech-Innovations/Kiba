@@ -1,5 +1,5 @@
 name: Check Contributing Links
-on:
+"on":
   push:
 paths:
 - CONTRIBUTING.md

@@ -1,5 +1,5 @@
 name: Check Shell Strict Mode
-on:
+"on":
   push:
 paths:
 - scripts/*.sh

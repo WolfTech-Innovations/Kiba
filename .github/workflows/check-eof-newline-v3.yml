@@ -1,5 +1,5 @@
 name: Check EOF Newline
-on:
+"on":
   push:
   pull_request:
 jobs:

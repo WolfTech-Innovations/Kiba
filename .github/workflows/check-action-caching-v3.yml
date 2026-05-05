@@ -1,5 +1,5 @@
 name: Check Action Caching
-on:
+"on":
   push:
 paths:
 - .github/workflows/*.yml

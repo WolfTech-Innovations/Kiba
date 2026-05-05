@@ -1,5 +1,5 @@
 name: Check Workflow Security
-on:
+"on":
   push:
 paths:
 - .github/workflows/*.yml

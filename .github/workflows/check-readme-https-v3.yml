@@ -1,5 +1,5 @@
 name: Check README HTTPS
-on:
+"on":
   push:
 paths:
 - README.md

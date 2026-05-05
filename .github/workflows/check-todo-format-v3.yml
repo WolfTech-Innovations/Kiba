@@ -1,5 +1,5 @@
 name: Check TODO Format
-on:
+"on":
   push:
   pull_request:
 jobs:

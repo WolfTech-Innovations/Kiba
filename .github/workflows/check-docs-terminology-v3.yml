@@ -1,5 +1,5 @@
 name: Check Docs Terminology
-on:
+"on":
   push:
 paths:
 - docs/*.md

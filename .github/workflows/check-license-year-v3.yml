@@ -1,5 +1,5 @@
 name: Check License Year
-on:
+"on":
   push:
 paths:
 - LICENSE

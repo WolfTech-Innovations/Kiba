@@ -1,5 +1,5 @@
 name: Check Workflow Strategy Fail Fast
-on:
+"on":
   push:
 paths:
 - .github/workflows/*.yml

@@ -1,5 +1,5 @@
 name: Check Build Parallel
-on:
+"on":
   push:
 paths:
 - scripts/kibatv-build.sh

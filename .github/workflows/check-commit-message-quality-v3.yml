@@ -1,5 +1,5 @@
 name: Check Commit Message Quality
-on:
+"on":
   pull_request:
 jobs:
   check:

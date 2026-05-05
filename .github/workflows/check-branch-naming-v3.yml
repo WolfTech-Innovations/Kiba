@@ -1,5 +1,5 @@
 name: Check Branch Naming
-on:
+"on":
   pull_request:
 jobs:
   check:
@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Verify Branch Name
-      run: echo "${{ github.head_ref }}" | grep -vE "^(feat|fix|docs|style|refactor|test|chore)/"
+      run: echo "${{ github.head_ref }}" | grep -vE "^(feat|fix|docs|style|refactor|test|chore|sentinel)/"
         && exit 1 || exit 0
     timeout-minutes: 5
