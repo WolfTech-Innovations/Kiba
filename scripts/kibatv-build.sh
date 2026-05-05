@@ -471,8 +471,9 @@ pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log
 pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log
-pmbootstrap --as-root -v --details-to-stdout --no-sshd --no-firewall --no-fde install --add kibatv-config,kstore | tee install.log || true
+pmbootstrap --as-root -v --details-to-stdout install --add kibatv-config,kstore | tee install.log || true
 cat install.log
+cat /wdir/log.txt || pmbootstrap --as-root log || true
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
