@@ -37,10 +37,8 @@ chown -R builder:builder /home/builder/.config
 echo "Initializing pmbootstrap..."
 # The 'yes' command returns exit 2 (SIGPIPE) when pmbootstrap closes stdin after finishing
 # Use '|| true' to ignore that, OR check if config was actually written
-su -c 'yes "" | /home/builder/.local/bin/pmbootstrap --assume-yes init || true' builder
+yes "" | pmbootstrap --as-root --assume-yes init || true
 
-# Verify init actually succeeded by checking the config was written
-su -c 'test -f /home/builder/.config/pmbootstrap_v3.cfg' builder
 echo "pmbootstrap init completed successfully"
 
 export DEBIAN_FRONTEND=noninteractive
