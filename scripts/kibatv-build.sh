@@ -92,8 +92,10 @@ locale = en_US.UTF-8
 PMCFG
 mkdir -p /work/pmaports/device/testing/kibatv-config
 # ── Write kibatv-config APKBUILD ──────────────────────────────────────
+PMAPORTS_CACHE="/root/.local/var/pmbootstrap/cache_git/pmaports"
 
-cat > /work/pmaports/device/testing/kibatv-config/APKBUILD << 'APKBUILD'
+mkdir -p "$PMAPORTS_CACHE/temp/kibatv-config"
+cat > "$PMAPORTS_CACHE/temp/kibatv-config/APKBUILD" << 'APKBUILD'
 pkgname=kibatv-config
 pkgver=1.0
 pkgrel=0
@@ -589,17 +591,17 @@ source="kstore"
 options="!check"
 
 package() {
-  install -Dm755 "$srcdir/kstore" "$pkgdir/usr/bin/kstore"
+  install -dm755 "$pkgdir/etc"
+  echo "kibatv-live" > "$pkgdir/etc/hostname"
 }
 APKBUILD
 apt install -y kpartx
-# ── Build local packages ──────────────────────────────────────────────
-su -c "pmbootstrap build kibatv-config" builder
-su -c "pmbootstrap build kstore" builder
+mkdir -p "$PMAPORTS_CACHE/temp/kstore"
 
-# ── Build image ───────────────────────────────────────────────────────
-pmbootstrap --as-root install --no-fde --add kibatv-config
-su -c "pmbootstrap export --odin 2>/dev/null || pmbootstrap export" builder
+# Then build and install
+pmbootstrap --as-root build kibatv-config
+pmbootstrap --as-root build kstore
+pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
