@@ -595,6 +595,10 @@ package() {
 APKBUILD
 apt install -y kpartx
 mkdir -p "$PMAPORTS_CACHE/temp/kstore"
+# Let init write a valid config
+set +o pipefail
+yes "" | pmbootstrap --as-root --assume-yes init
+set -o pipefail
 pmbootstrap --as-root config aports /work/pmaports
 # Then build and install
 pmbootstrap --as-root build kibatv-config
