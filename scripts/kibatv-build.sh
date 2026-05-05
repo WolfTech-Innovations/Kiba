@@ -11,7 +11,9 @@ mkdir -p "$WORKDIR" "$(dirname "$CONFIG_FILE")"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 
-apt-get update -y && apt-get install -y pmbootstrap procps kpartx git python3
+# Remove the apt version, install latest from pip
+apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
+pip3 install --break-system-packages pmbootstrap
 
 # Write config to the correct v3 path under builder's home
 CONFIG_FILE="/home/builder/.config/pmbootstrap_v3.cfg"
