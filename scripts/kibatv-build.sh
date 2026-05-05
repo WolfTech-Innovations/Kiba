@@ -1,4 +1,5 @@
 #!/bin/bash
+# License: GPL-3.0-or-later
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -399,15 +400,15 @@ zstyle ':completion:*' menu select
 [ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 command -v fastfetch >/dev/null 2>&1 && fastfetch
-alias ls='ls --color=auto'
-alias ll='ls -lah'
-alias la='ls -A'
-alias please='sudo'
-alias cls='clear'
-alias update='sudo apk update && sudo apk upgrade'
-alias install='sudo apk add'
-alias remove='sudo apk del'
-alias search='apk search'
+'alias' ls='ls --color=auto'
+'alias' ll='ls -lah'
+'alias' la='ls -A'
+'alias' please='sudo'
+'alias' cls='clear'
+'alias' update='sudo apk update && sudo apk upgrade'
+'alias' install='sudo apk add'
+'alias' remove='sudo apk del'
+'alias' search='apk search'
 free() { command free -h "$@"; }
 mkdir() { command mkdir -pv "$@"; }
 ZSHRC
