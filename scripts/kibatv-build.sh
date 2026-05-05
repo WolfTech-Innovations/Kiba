@@ -1,11 +1,12 @@
 #!/bin/bash
 set -euo pipefail
-
-WORKDIR="$GITHUB_WORKSPACE/wdir"
+mkdir -p /wdir/config
+WORKDIR="/wdir"
 CONFIG_DIR="$WORKDIR/config"
 CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
 useradd -m -s /bin/bash builder
 chown -R builder:builder /home/builder
+chown -R builder:builder /wdir
 su -c "mkdir ./wdir && mkdir -p "$CONFIG_DIR" ./config/" builder
 
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
