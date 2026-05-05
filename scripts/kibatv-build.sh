@@ -1,4 +1,6 @@
 #!/bin/bash
+# License: MIT
+set -o pipefail
 set -euo pipefail
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -275,7 +277,16 @@ EOF
   cat > "$pkgdir/etc/xdg/ksplashrc" << 'EOF'
 [KSplash]
 Engine=KSplashQML
-Theme=org.kde.breezedark.desktop
+Theme=com.kibatv.watchdogs.desktop
+EOF
+
+  # ── Calamares branding ───────────────────────────────────────────────
+  install -dm755 "$pkgdir/usr/share/calamares/branding/kibatv"
+  cat > "$pkgdir/usr/share/calamares/branding/kibatv/branding.desc" << 'EOF'
+---
+componentName:  kibatv
+style:
+   SidebarBackground:        "#282a36"
 EOF
 
   # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
@@ -383,15 +394,16 @@ zstyle ':completion:*' menu select
 [ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 command -v fastfetch >/dev/null 2>&1 && fastfetch
-alias ls='ls --color=auto'
-alias ll='ls -lah'
-alias la='ls -A'
-alias please='sudo'
-alias cls='clear'
-alias update='sudo apk update && sudo apk upgrade'
-alias install='sudo apk add'
-alias remove='sudo apk del'
-alias search='apk search'
+# alias please='sudo'
+ls() { command ls --color=auto "$@"; }
+ll() { ls -lah "$@"; }
+la() { ls -A "$@"; }
+please() { sudo "$@"; }
+cls() { clear; }
+update() { sudo apk update && sudo apk upgrade "$@"; }
+install() { sudo apk add "$@"; }
+remove() { sudo apk del "$@"; }
+search() { apk search "$@"; }
 free() { command free -h "$@"; }
 mkdir() { command mkdir -pv "$@"; }
 ZSHRC

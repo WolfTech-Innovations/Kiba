@@ -1,7 +1,7 @@
 # KibaTV
 
 <p align="center">
-<img width="1983" height="793" alt="image" src="https://github.com/user-attachments/assets/1006d5ea-1e3c-4191-90de-72a79f4cb323" />
+<img width="1983" height="793" alt="KibaTV Banner showing the Dracula-themed Plasma Bigscreen desktop environment" src="https://github.com/user-attachments/assets/1006d5ea-1e3c-4191-90de-72a79f4cb323" />
 
 </p>
 
