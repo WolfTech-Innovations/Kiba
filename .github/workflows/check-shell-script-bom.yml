@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for Byte Order Mark
         run: |
           find . -name "*.sh" -exec grep -l $'\xef\xbb\xbf' {} + && { echo "BOM found in shell scripts; remove BOM for compatibility"; exit 1; } || echo "No BOM found"

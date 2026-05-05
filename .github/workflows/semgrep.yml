@@ -12,7 +12,7 @@ jobs:
     container:
       image: returntocorp/semgrep
     steps:
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: semgrep scan --config auto --sarif --output semgrep.sarif
       - name: Upload SARIF
         uses: github/codeql-action/upload-sarif@0daab03d71ff584ef619d027a3fd9146679c5d84
