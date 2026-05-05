@@ -1,6 +1,11 @@
 #!/bin/bash
-# License: GPL-3.0-or-later
 set -euo pipefail
+
+# Initialize pmbootstrap if not already done
+if [ ! -d "/home/builder/.local/var/pmbootstrap" ]; then
+    echo "Initializing pmbootstrap..."
+    pmbootstrap init --non-interactive
+fi
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
