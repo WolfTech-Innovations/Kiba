@@ -4,8 +4,8 @@ set -euo pipefail
 WORKDIR="./wdir"
 CONFIG_DIR="$WORKDIR/config"
 CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
-chown -R builder:builder /home/builder
 useradd -m -s /bin/bash builder
+chown -R builder:builder /home/builder
 su -c "mkdir ./wdir && mkdir -p "$CONFIG_DIR" ./config/" builder
 
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
