@@ -1,0 +1,16 @@
+name: Check Docs MD Links
+
+on:
+  push:
+    paths:
+      - "docs/**/*.md"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify Links
+        run: |
+          grep "\.md)" docs/**/*.md

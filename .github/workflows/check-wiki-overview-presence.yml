@@ -1,0 +1,16 @@
+name: Check Wiki Overview Presence
+
+on:
+  push:
+    paths:
+      - "WIKI.md"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify Header
+        run: |
+          grep "^# Overview" WIKI.md

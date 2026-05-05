@@ -1,0 +1,16 @@
+name: Audit WF Perms Sec
+
+on:
+  push:
+    paths:
+      - ".github/workflows/*.yml"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check Permissions
+        run: |
+          ! grep 'permissions: write-all' .github/workflows/*.yml

@@ -1,0 +1,16 @@
+name: Check README Badge Links
+
+on:
+  push:
+    paths:
+      - "README.md"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify Badges
+        run: |
+          grep "https://img.shields.io" README.md

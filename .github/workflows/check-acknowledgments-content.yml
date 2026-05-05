@@ -1,0 +1,16 @@
+name: Check Acknowledgments Content
+
+on:
+  push:
+    paths:
+      - "ACKNOWLEDGMENTS.md"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify Content
+        run: |
+          test -s ACKNOWLEDGMENTS.md
