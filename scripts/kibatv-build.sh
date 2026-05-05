@@ -91,7 +91,6 @@ options="!check"
 license="GPL-3.0-or-later"
 depends="plasma-bigscreen chromium flatpak sddm zsh"
 source=""
-sha512sums="SKIP"
 
 package() {
   # ── System identity ──────────────────────────────────────────────────
@@ -426,22 +425,22 @@ mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
 mkdir -p /work/pmaports/local/kstore
 cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
+KSTORE_SHA512=$(sha512sum /work/pmaports/local/kstore/kstore | awk '{print $1}')
 cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
 pkgname=kstore
 pkgver=1.0
-sha512sums="SKIP"
 pkgrel=0
 pkgdesc="KibaTV app store"
 arch="x86_64"
 license="GPL-3.0-or-later"
 depends="flatpak qt6-qtbase"
 source="kstore"
+sha512sums="$KSTORE_SHA512  kstore"
 url="https://github.com/WolfTech-Innovations/KStore"
 options="!check"
 
 package() {
-  install -dm755 "$pkgdir/etc"
-  echo "kibatv-live" > "$pkgdir/etc/hostname"
+  install -Dm755 "\$srcdir/kstore" "\$pkgdir/usr/bin/kstore"
 }
 APKBUILD
 # Then build and install
