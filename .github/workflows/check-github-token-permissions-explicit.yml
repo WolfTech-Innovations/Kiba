@@ -1,0 +1,17 @@
+name: Check GitHub Token Permissions Explicit
+true:
+  push:
+    paths:
+    - .github/workflows/*.yml
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check permissions block
+      run: "# GITHUB_TOKEN permissions should be explicitly defined at top or job\
+        \ level\nfor f in .github/workflows/*.yml; do\n  grep -q \"permissions:\"\
+        \ \"$f\" || (echo \"Missing permissions in $f\" && exit 1)\ndone\n"
+    timeout-minutes: 5

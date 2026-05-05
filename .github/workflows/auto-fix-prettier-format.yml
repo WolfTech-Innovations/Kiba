@@ -1,0 +1,29 @@
+name: Auto Fix Prettier Format
+true:
+  pull_request:
+    paths:
+    - '**/*.js'
+    - '**/*.json'
+    - '**/*.md'
+    - '**/*.yml'
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: true
+        ref: ${{ github.head_ref }}
+    - name: Run Prettier
+      run: 'npm install -g prettier
+
+        prettier --write .
+
+        '
+    - name: Commit changes
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "\U0001F3A8 Palette: fix formatting with Prettier"
+    timeout-minutes: 5

@@ -1,0 +1,20 @@
+name: Check Shell Strict Mode
+on:
+  push:
+paths:
+- scripts/*.sh
+  pull_request:
+paths:
+- scripts/*.sh
+jobs:
+  audit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check set -e
+      run: for f in scripts/*.sh; do grep -q "set -e" "$f" || exit 1; done
+    timeout-minutes: 5

@@ -1,0 +1,20 @@
+name: Audit Build Parallel Jobs Enforcement
+true:
+  push:
+    paths:
+    - scripts/kibatv-build.sh
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      with:
+        persist-credentials: false
+    - name: Check Parallel Flags
+      run: '# Ensure -j$(nproc) is used for make/cmake
+
+        grep -E "make|cmake --build" scripts/kibatv-build.sh | grep -v "\-j" && exit
+        1 || exit 0
+
+        '
+    timeout-minutes: 5
