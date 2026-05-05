@@ -419,7 +419,7 @@ command -v flatpak >/dev/null 2>&1 && \
 EOF
   chmod +x "$pkgdir/etc/profile.d/kibatv-flathub.sh"
 
-  APKBUILD
+APKBUILD
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
