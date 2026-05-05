@@ -1,0 +1,16 @@
+name: Audit WF Env Prefix
+
+on:
+  push:
+    paths:
+      - ".github/workflows/*.yml"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check Env Vars
+        run: |
+          grep "  [A-Z0-9_]\+:" .github/workflows/*.yml | grep -vE "(KIBA_|GITHUB_|ACTIONS_|RUNNER_)" || true

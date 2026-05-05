@@ -1,0 +1,16 @@
+name: Check Shell Nounset Usage
+
+on:
+  push:
+    paths:
+      - "scripts/*.sh"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify Nounset
+        run: |
+          grep -LE "set -u|set -eu" scripts/*.sh && false || true

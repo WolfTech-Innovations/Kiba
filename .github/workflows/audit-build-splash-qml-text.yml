@@ -1,0 +1,16 @@
+name: Audit Build Splash QML Text
+
+on:
+  push:
+    paths:
+      - "scripts/kibatv-build.sh"
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Check Text
+        run: |
+          grep "text: \"KibaTV | Switch to simple\"" scripts/kibatv-build.sh
