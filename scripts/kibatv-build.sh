@@ -43,8 +43,6 @@ su -c 'yes "" | /home/builder/.local/bin/pmbootstrap --assume-yes init || true' 
 su -c 'test -f /home/builder/.config/pmbootstrap_v3.cfg' builder
 echo "pmbootstrap init completed successfully"
 
-# Then continue with the actual build
-su -c '/home/builder/.local/bin/pmbootstrap --assume-yes install --no-sshd --no-firewall --password 1234' builder
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
