@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 useradd -m -s /bin/bash builder
-apt update -y && apt install -y pmbootstrap
+apt update -y && apt install -y pmbootstrap ps kpartx
 # Initialize pmbootstrap if not already done
 echo "Initializing pmbootstrap..."
 su -c "yes | pmbootstrap init" builder
