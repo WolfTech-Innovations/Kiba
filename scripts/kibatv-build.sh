@@ -607,7 +607,8 @@ extra_packages = none
 EOF
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
-yes '' | pmbootstrap --as-root --assume-yes init || true
+rm -rf /root/.local/var/pmbootstrap
+yes '' | pmbootstrap --as-root --assume-yes -w $WORKDIR init || true
 pmbootstrap --as-root config work $WORKDIR
 pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
