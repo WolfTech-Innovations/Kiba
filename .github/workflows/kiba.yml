@@ -30,7 +30,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
              name: pmbootstrap-log
-             path: /wdir/log.txt
+             path: ~/.local/var/pmbootstrap/log.txt
              
       - name: Upload to SourceForge
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
