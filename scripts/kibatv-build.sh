@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 useradd -m -s /bin/bash builder
+mkdir -p /work/pmb
+chown -R builder:builder /work
+chmod -R u+rwX /work
+chown -R builder:builder /home/builder
 apt update -y && apt install -y pmbootstrap procps kpartx
 # Initialize pmbootstrap if not already done
 echo "Initializing pmbootstrap..."
