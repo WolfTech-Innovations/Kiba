@@ -469,7 +469,7 @@ pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
 pmbootstrap --as-root build kibatv-config
 pmbootstrap --as-root build kstore
-pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
+pmbootstrap --as-root --details-to-stdout --no-sshd --no-firewall --no-fde install --add kibatv-config,kstore
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
