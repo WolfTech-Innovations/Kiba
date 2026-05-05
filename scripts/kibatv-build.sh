@@ -1,5 +1,6 @@
 #!/bin/bash
 set -euo pipefail
+set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
 WORKDIR="/wdir"
 mkdir -p "$WORKDIR"
@@ -286,6 +287,7 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
+    # SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
