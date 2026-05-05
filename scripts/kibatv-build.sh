@@ -3,22 +3,26 @@ set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 WORKDIR="/wdir"
-# v3 uses pmbootstrap_v3.cfg, not pmbootstrap.cfg
-CONFIG_FILE="$HOME/.config/pmbootstrap_v3.cfg"
 
-mkdir -p "$WORKDIR" "$(dirname "$CONFIG_FILE")"
+mkdir -p "$WORKDIR"
 
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 
-# Remove the apt version, install latest from pip
+# Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
 apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
-pip3 install --break-system-packages pmbootstrap
 
-# Write config to the correct v3 path under builder's home
-CONFIG_FILE="/home/builder/.config/pmbootstrap_v3.cfg"
+# Install latest pmbootstrap from git into builder's home
+su -c '
+  git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
+  mkdir -p /home/builder/.local/bin
+  ln -sf /home/builder/pmbootstrap/pmbootstrap.py /home/builder/.local/bin/pmbootstrap
+  chmod +x /home/builder/pmbootstrap/pmbootstrap.py
+' builder
+
+# Write config
 mkdir -p /home/builder/.config
-cat > "$CONFIG_FILE" <<EOF
+cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
 [pmbootstrap]
 work = $WORKDIR
 device = qemu-amd64
@@ -30,12 +34,8 @@ locale = en_US.UTF-8
 EOF
 chown -R builder:builder /home/builder/.config
 
-echo "Initializing pmbootstrap (non-interactive via yes pipe)..."
-# This is the method the upstream project itself uses in CI
-su -c 'yes "" | pmbootstrap --assume-yes init' builder
-
-echo "Done."
-
+echo "Initializing pmbootstrap..."
+su -c 'yes "" | /home/builder/.local/bin/pmbootstrap --assume-yes init' builder
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
