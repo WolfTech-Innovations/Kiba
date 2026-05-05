@@ -1,6 +1,6 @@
 #!/bin/bash
 set -euo pipefail
-
+apt install pmbootstrap
 # Initialize pmbootstrap if not already done
 if [ ! -d "/home/builder/.local/var/pmbootstrap" ]; then
     echo "Initializing pmbootstrap..."
