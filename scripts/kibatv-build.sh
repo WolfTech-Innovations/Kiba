@@ -91,6 +91,7 @@ options="!check"
 license="GPL-3.0-or-later"
 depends="plasma-bigscreen chromium flatpak sddm zsh"
 source=""
+sha512sums="SKIP"
 
 package() {
   # ── System identity ──────────────────────────────────────────────────
@@ -428,6 +429,7 @@ cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
 cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
 pkgname=kstore
 pkgver=1.0
+sha512sums="SKIP"
 pkgrel=0
 pkgdesc="KibaTV app store"
 arch="x86_64"
