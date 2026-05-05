@@ -435,7 +435,7 @@ arch="x86_64"
 license="GPL-3.0-or-later"
 depends="flatpak qt6-qtbase"
 source="kstore"
-sha512sums="$KSTORE_SHA512  kstore"
+sha512sums="$(sha512sum /work/pmaports/local/kstore/kstore)"
 url="https://github.com/WolfTech-Innovations/KStore"
 options="!check"
 
