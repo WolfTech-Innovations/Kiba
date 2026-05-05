@@ -6,7 +6,15 @@ mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 # Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
-apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
+apt-get update -y && apt-get install -y \
+  procps kpartx git python3 python3-pip openssl \
+  qemu-utils parted e2fsprogs dosfstools \
+  xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
+  cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev \
+  libkf6i18n-dev libkf6coreaddons-dev qml6-module-org-kde-kirigami \
+  libkirigami-dev gettext build-essential \
+  jq curl wget eatmydata
+
 # Install latest pmbootstrap from git into builder's home
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
 ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmbootstrap
@@ -32,16 +40,6 @@ echo "Aports now: $(pmbootstrap --as-root config aports)"
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
-
-# ── Host deps ─────────────────────────────────────────────────────────
-apt-get update && apt-get install -y \
-  python3 python3-pip git openssl \
-  qemu-utils parted e2fsprogs dosfstools \
-  xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
-  cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev \
-  libkf6i18n-dev libkf6coreaddons-dev qml6-module-org-kde-kirigami \
-  libkirigami-dev gettext build-essential \
-  jq curl wget
 
 # ── Install pmbootstrap from git (need 3.5.1+) ───────────────────────
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
@@ -468,11 +466,11 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-echo "kibatv" | pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
+echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
-pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
+eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log || true
-pmbootstrap --as-root -v --details-to-stdout install --add kibatv-config,kstore | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
@@ -492,9 +490,9 @@ mount "/dev/${ROOT_PART}" /mnt/pmroot
 # ── Build ISO structure ───────────────────────────────────────────────
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
 
-# Squashfs rootfs with zstd max compression
-mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
-  -comp zstd -Xcompression-level 19 \
+# Squashfs rootfs with zstd optimized compression
+eatmydata mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
+  -comp zstd -Xcompression-level 15 \
   -b 1M -no-progress -noappend
 
 printf $(du -sx --block-size=1 /mnt/pmroot | cut -f1) \
@@ -534,7 +532,7 @@ menuentry "Install KibaTV to this TV" {
 GRUBCFG
 
 # ── EFI bootloader ────────────────────────────────────────────────────
-grub-mkstandalone \
+eatmydata grub-mkstandalone \
   --format=x86_64-efi \
   --output=/isobuild/EFI/boot/bootx64.efi \
   --locales="" --fonts="" \
@@ -547,7 +545,7 @@ LC_CTYPE=C mcopy -i /isobuild/EFI/boot/efiboot.img \
   /isobuild/EFI/boot/bootx64.efi ::efi/boot/
 
 # ── BIOS bootloader ───────────────────────────────────────────────────
-grub-mkstandalone \
+eatmydata grub-mkstandalone \
   --format=i386-pc \
   --output=/isobuild/boot/grub/bios.img \
   --install-modules="linux normal iso9660 biosdisk memdisk search tar ls" \
@@ -559,7 +557,7 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
 # ── Build hybrid ISO ──────────────────────────────────────────────────
-xorriso \
+eatmydata xorriso \
   -as mkisofs \
   -iso-level 3 \
   -full-iso9660-filenames \
