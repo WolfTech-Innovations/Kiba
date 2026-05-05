@@ -604,6 +604,8 @@ systemd = default
 providers = {}
 extra_packages = none
 EOF
+rm -rf $WORKDIR
+mkdir -p $WORKDIR
 pmbootstrap --as-root config work $WORKDIR
 pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
