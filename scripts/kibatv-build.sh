@@ -9,12 +9,20 @@ mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 
-# Install deps - get /home/builder/.local/bin/pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
-apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
+# Install all dependencies early and include eatmydata for performance
+apt-get update && apt-get install -y \
+  eatmydata \
+  procps kpartx git python3 python3-pip openssl \
+  qemu-utils parted e2fsprogs dosfstools \
+  xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
+  cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev \
+  libkf6i18n-dev libkf6coreaddons-dev qml6-module-org-kde-kirigami \
+  libkirigami-dev gettext build-essential \
+  jq curl wget
 
 # Install latest /home/builder/.local/bin/pmbootstrap from git into builder's home
 su -c '
-  git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS//home/builder/.local/bin/pmbootstrap.git /home/builder//home/builder/.local/bin/pmbootstrap
+  eatmydata git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS//home/builder/.local/bin/pmbootstrap.git /home/builder//home/builder/.local/bin/pmbootstrap
   mkdir -p /home/builder/.local/bin
   ln -sf /home/builder//home/builder/.local/bin/pmbootstrap//home/builder/.local/bin/pmbootstrap.py /home/builder/.local/bin//home/builder/.local/bin/pmbootstrap
   chmod +x /home/builder//home/builder/.local/bin/pmbootstrap//home/builder/.local/bin/pmbootstrap.py
@@ -43,41 +51,31 @@ set -o pipefail
 echo "Init exit: $EXIT"
 
 # Completely separate — set aports path
-/home/builder/.local/bin/pmbootstrap --as-root config aports /work/pmaports
+eatmydata /home/builder/.local/bin/pmbootstrap --as-root config aports /work/pmaports
 echo "Aports now: $(/home/builder/.local/bin/pmbootstrap --as-root config aports)"
 
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
 
-# ── Host deps ─────────────────────────────────────────────────────────
-apt-get update && apt-get install -y \
-  python3 python3-pip git openssl \
-  qemu-utils parted e2fsprogs dosfstools \
-  xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
-  cmake extra-cmake-modules qt6-base-dev qt6-declarative-dev \
-  libkf6i18n-dev libkf6coreaddons-dev qml6-module-org-kde-kirigami \
-  libkirigami-dev gettext build-essential \
-  jq curl wget
-
 # ── Install /home/builder/.local/bin/pmbootstrap from git (need 3.5.1+) ───────────────────────
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS//home/builder/.local/bin/pmbootstrap.git /opt//home/builder/.local/bin/pmbootstrap
+eatmydata git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS//home/builder/.local/bin/pmbootstrap.git /opt//home/builder/.local/bin/pmbootstrap
 ln -sf /opt//home/builder/.local/bin/pmbootstrap//home/builder/.local/bin/pmbootstrap.py /usr/local/bin//home/builder/.local/bin/pmbootstrap
 
 # ── Build KStore binary ───────────────────────────────────────────────
-git clone --depth=1 https://github.com/WolfTech-Innovations/KStore /tmp/KStore
+eatmydata git clone --depth=1 https://github.com/WolfTech-Innovations/KStore /tmp/KStore
 cd /tmp/KStore
-cmake -DCMAKE_INSTALL_PREFIX=/tmp/kstore-out \
+eatmydata cmake -DCMAKE_INSTALL_PREFIX=/tmp/kstore-out \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTING=OFF .
-cmake --build . -j"$(nproc)"
-cmake --install .
+eatmydata cmake --build . -j"$(nproc)"
+eatmydata cmake --install .
 KSTORE_BIN=$(find /tmp/kstore-out -type f -executable | head -1)
 cd /
 
 # ── Clone pmaports ────────────────────────────────────────────────────
 mkdir -p /work
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git /work/pmaports
+eatmydata git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git /work/pmaports
 
 # ── Write /home/builder/.local/bin/pmbootstrap config ──────────────────────────────────────────
 mkdir -p ~/.config
@@ -599,9 +597,9 @@ package() {
 }
 APKBUILD
 # Then build and install
-/home/builder/.local/bin/pmbootstrap --as-root build kibatv-config
-/home/builder/.local/bin/pmbootstrap --as-root build kstore
-/home/builder/.local/bin/pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
+eatmydata /home/builder/.local/bin/pmbootstrap --as-root build kibatv-config
+eatmydata /home/builder/.local/bin/pmbootstrap --as-root build kstore
+eatmydata /home/builder/.local/bin/pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
@@ -618,9 +616,9 @@ mount "/dev/${ROOT_PART}" /mnt/pmroot
 # ── Build ISO structure ───────────────────────────────────────────────
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
 
-# Squashfs rootfs with zstd max compression
-mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
-  -comp zstd -Xcompression-level 19 \
+# Squashfs rootfs with optimized zstd compression level (15) for faster builds
+eatmydata mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
+  -comp zstd -Xcompression-level 15 \
   -b 1M -no-progress -noappend
 
 printf $(du -sx --block-size=1 /mnt/pmroot | cut -f1) \
@@ -660,20 +658,20 @@ menuentry "Install KibaTV to this TV" {
 GRUBCFG
 
 # ── EFI bootloader ────────────────────────────────────────────────────
-grub-mkstandalone \
+eatmydata grub-mkstandalone \
   --format=x86_64-efi \
   --output=/isobuild/EFI/boot/bootx64.efi \
   --locales="" --fonts="" \
   "boot/grub/grub.cfg=/isobuild/boot/grub/grub.cfg"
 
-dd if=/dev/zero of=/isobuild/EFI/boot/efiboot.img bs=1M count=10
-mkfs.vfat /isobuild/EFI/boot/efiboot.img
-LC_CTYPE=C mmd -i /isobuild/EFI/boot/efiboot.img efi efi/boot
-LC_CTYPE=C mcopy -i /isobuild/EFI/boot/efiboot.img \
+eatmydata dd if=/dev/zero of=/isobuild/EFI/boot/efiboot.img bs=1M count=10
+eatmydata mkfs.vfat /isobuild/EFI/boot/efiboot.img
+LC_CTYPE=C eatmydata mmd -i /isobuild/EFI/boot/efiboot.img efi efi/boot
+LC_CTYPE=C eatmydata mcopy -i /isobuild/EFI/boot/efiboot.img \
   /isobuild/EFI/boot/bootx64.efi ::efi/boot/
 
 # ── BIOS bootloader ───────────────────────────────────────────────────
-grub-mkstandalone \
+eatmydata grub-mkstandalone \
   --format=i386-pc \
   --output=/isobuild/boot/grub/bios.img \
   --install-modules="linux normal iso9660 biosdisk memdisk search tar ls" \
@@ -685,7 +683,7 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
 # ── Build hybrid ISO ──────────────────────────────────────────────────
-xorriso \
+eatmydata xorriso \
   -as mkisofs \
   -iso-level 3 \
   -full-iso9660-filenames \
