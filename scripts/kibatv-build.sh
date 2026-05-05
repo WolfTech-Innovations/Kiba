@@ -417,7 +417,7 @@ pkgrel=0
 pkgdesc="KibaTV app store"
 arch="x86_64"
 license="GPL-3.0-or-later"
-depends="flatpak qt6-base"
+depends="flatpak qt6-qtbase"
 source="kstore"
 options="!check"
 
