@@ -459,6 +459,7 @@ pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
 pmbootstrap --as-root config ui plasma-bigscreen
 pmbootstrap --as-root config user user
+pmbootstrap --as-root config install_password "kibatv"
 pmbootstrap --as-root config timezone UTC
 pmbootstrap --as-root config locale en_US
 pmbootstrap --as-root config hostname kibatv
@@ -475,6 +476,8 @@ cat buildkstore.log
 pmbootstrap --as-root -v --details-to-stdout install --add kibatv-config,kstore | tee install.log || true
 cat install.log
 cat /wdir/log.txt || pmbootstrap --as-root log || true
+cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
+find $WORKDIR/chroot_native -name "*.log" | xargs grep -l "kibatv" 2>/dev/null | xargs cat
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
