@@ -1,19 +1,22 @@
 #!/bin/bash
 set -euo pipefail
-mkdir -p /wdir/config
+
 WORKDIR="/wdir"
 CONFIG_DIR="$WORKDIR/config"
 CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
-useradd -m -s /bin/bash builder
+
+# Create dirs as root first, then hand off ownership
+mkdir -p "$CONFIG_DIR"
+
+useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder
-chown -R builder:builder /wdir
-chown -R builder:builder /wdir/config
+chown -R builder:builder "$WORKDIR"
 
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
-su -c 'mkdir -p "$CONFIG_DIR"' builder
-su -c 'chown -R builder:builder "$CONFIG_DIR"' builder
+
 echo "Writing pmbootstrap config..."
-su -c "cat > '$CONFIG_FILE'" builder <<EOF
+# Use a heredoc written directly (as root), then chown
+cat > "$CONFIG_FILE" <<EOF
 [pmbootstrap]
 aports = /work/pmaports
 work = /work/pmb
@@ -26,10 +29,11 @@ locale = en_US.UTF-8
 EOF
 
 chown builder:builder "$CONFIG_FILE"
-su -c 'chmod 644 "$CONFIG_FILE"'
+chmod 644 "$CONFIG_FILE"
 
 echo "Initializing pmbootstrap..."
-su -c "pmbootstrap -c $CONFIG_FILE -w ./wdir --assume-yes init" builder
+# Pass variables explicitly via env, or use double quotes with su -c
+su -c "pmbootstrap -c '$CONFIG_FILE' -w '$WORKDIR' --assume-yes init" builder
 
 export DEBIAN_FRONTEND=noninteractive
 
