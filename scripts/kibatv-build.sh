@@ -24,14 +24,6 @@ timezone = UTC
 locale = en_US.UTF-8
 EOF
 chown -R builder:builder /home/builder/.config
-# Run init alone, fully isolated
-set +o pipefail
-printf '\n\n\n\n\n\n\nplasma-bigscreen\n\n\n\n\n\n\n\n\n\n\n\n\n' \
-  | pmbootstrap --as-root --assume-yes init
-EXIT=$?
-set -o pipefail
-
-echo "Init exit: $EXIT"
 
 # Completely separate — set aports path
 pmbootstrap --as-root config aports /work/pmaports
