@@ -2,14 +2,15 @@
 set -euo pipefail
 useradd -m -s /bin/bash builder
 mkdir -p /work/pmb
+mkdir ./config/
 chown -R builder:builder /work
 chmod -R u+rwX /work
 chown -R builder:builder /home/builder
 apt update -y && apt install -y pmbootstrap procps kpartx
 # Initialize pmbootstrap if not already done
 echo "Initializing pmbootstrap..."
-su -c 'echo -e "[pmbootstrap]\naports = /work/pmaports\nwork = /work/pmb\ndevice = qemu-amd64\nui = plasma-bigscreen\nchannel = edge\nusername = user\ntimezone = UTC\nlocale = en_US.UTF-8" > ~/.config/pmbootstrap.cfg' builder
-su -c "pmbootstrap init -c ~/.config/pmbootstrap.cfg" builder
+su -c 'echo -e "[pmbootstrap]\naports = /work/pmaports\nwork = /work/pmb\ndevice = qemu-amd64\nui = plasma-bigscreen\nchannel = edge\nusername = user\ntimezone = UTC\nlocale = en_US.UTF-8" > ./config/pmbootstrap.cfg' builder
+su -c "pmbootstrap init -c ./config/pmbootstrap.cfg" builder
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
