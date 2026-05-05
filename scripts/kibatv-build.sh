@@ -24,7 +24,7 @@ timezone = UTC
 locale = en_US.UTF-8
 EOF
 chown -R builder:builder /home/builder/.config
-yes '' | pmbootstrap --as-root --assume-yes --fast init || true
+yes '' | pmbootstrap --as-root --assume-yes init || true
 # Completely separate — set aports path
 pmbootstrap --as-root config aports /work/pmaports
 echo "Aports now: $(pmbootstrap --as-root config aports)"
