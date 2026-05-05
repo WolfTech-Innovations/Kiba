@@ -16,7 +16,7 @@ apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip op
 su -c '
   git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
   mkdir -p /home/builder/.local/bin
-  ln -sf /home/builder/pmbootstrap/pmbootstrap.py /home/builder/.local/bin/pmbootstrap
+  ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmboostrap
   chmod +x /home/builder/pmbootstrap/pmbootstrap.py
 ' builder
 
