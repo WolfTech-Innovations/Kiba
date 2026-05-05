@@ -561,7 +561,8 @@ Categories=System;
 EOF
 }
 APKBUILD
-
+rm -rf $WORKDIR
+mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
 mkdir -p /work/pmaports/local/kstore
 cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
@@ -606,6 +607,7 @@ extra_packages = none
 EOF
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
+yes '' | pmbootstrap --as-root --assume-yes init || true
 pmbootstrap --as-root config work $WORKDIR
 pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
