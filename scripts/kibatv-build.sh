@@ -1,19 +1,19 @@
 #!/bin/bash
 set -euo pipefail
 
-WORKDIR="/work"
+WORKDIR="./wdir"
 CONFIG_DIR="$WORKDIR/config"
 CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
 
 useradd -m -s /bin/bash builder
-mkdir -p "$CONFIG_DIR" /work/pmb
+su -c "mkdir ./wdir && mkdir -p "$CONFIG_DIR" ./config/"
 
 chown -R builder:builder /work /home/builder
 
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
 
 echo "Writing pmbootstrap config..."
-cat > "$CONFIG_FILE" <<EOF
+su -c 'cat > "$CONFIG_FILE" <<EOF
 [pmbootstrap]
 aports = /work/pmaports
 work = /work/pmb
@@ -23,13 +23,13 @@ channel = edge
 username = user
 timezone = UTC
 locale = en_US.UTF-8
-EOF
+EOF' builder
 
 chown builder:builder "$CONFIG_FILE"
-chmod 644 "$CONFIG_FILE"
+su -c 'chmod 644 "$CONFIG_FILE"'
 
 echo "Initializing pmbootstrap..."
-su -c "pmbootstrap config -c $CONFIG_FILE" builder
+su -c "pmbootstrap -c $CONFIG_FILE -w ./wdir --assume-yes init" builder
 
 export DEBIAN_FRONTEND=noninteractive
 
