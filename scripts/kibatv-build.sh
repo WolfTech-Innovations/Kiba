@@ -2,10 +2,8 @@
 set -euo pipefail
 apt update -y && apt install -y pmbootstrap
 # Initialize pmbootstrap if not already done
-if [ ! -d "/home/builder/.local/var/pmbootstrap" ]; then
-    echo "Initializing pmbootstrap..."
-    pmbootstrap init --non-interactive
-fi
+echo "Initializing pmbootstrap..."
+pmbootstrap init -y
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
