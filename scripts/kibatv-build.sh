@@ -29,7 +29,7 @@ chown builder:builder "$CONFIG_FILE"
 chmod 644 "$CONFIG_FILE"
 
 echo "Initializing pmbootstrap..."
-su -c "pmbootstrap -c $CONFIG_FILE --no-interactive work_migrate" builder
+su -c "pmbootstrap config -c $CONFIG_FILE" builder
 
 export DEBIAN_FRONTEND=noninteractive
 
