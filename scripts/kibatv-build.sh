@@ -72,7 +72,7 @@ device = qemu-amd64
 ui = plasma-bigscreen
 username = user
 channel = edge
-extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
+extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,calamares,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
 timezone = UTC
 locale = en_US.UTF-8
 PMCFG
@@ -86,7 +86,7 @@ pkgrel=0
 pkgdesc="KibaTV system configuration, theming, and branding"
 arch="noarch"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh"
+depends="plasma-bigscreen chromium flatpak sddm zsh calamares"
 source=""
 
 package() {
@@ -404,6 +404,7 @@ command -v flatpak >/dev/null 2>&1 && \
     https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
 EOF
   chmod +x "$pkgdir/etc/profile.d/kibatv-flathub.sh"
+APKBUILD
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
