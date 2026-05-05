@@ -379,46 +379,6 @@ LOGO_B64
   "BookmarkBarEnabled": true
 }
 EOF
-
-  # ── zshrc ────────────────────────────────────────────────────────────
-  install -dm755 "$pkgdir/etc/zsh"
-  cat > "$pkgdir/etc/zsh/zshrc" << 'ZSHRC'
-export LANG=en_US.UTF-8
-export EDITOR=nano
-export PAGER=less
-HISTSIZE=10000; SAVEHIST=10000; HISTFILE=~/.zsh_history
-setopt SHARE_HISTORY HIST_IGNORE_DUPS INC_APPEND_HISTORY
-autoload -Uz compinit && compinit -u
-zstyle ':completion:*' menu select
-[ -f /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh ] && \
-  source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
-[ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
-  source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
-command -v fastfetch >/dev/null 2>&1 && fastfetch
-# alias please='sudo'
-ls() { command ls --color=auto "$@"; }
-ll() { ls -lah "$@"; }
-la() { ls -A "$@"; }
-please() { sudo "$@"; }
-cls() { clear; }
-update() { sudo apk update && sudo apk upgrade "$@"; }
-install() { sudo apk add "$@"; }
-remove() { sudo apk del "$@"; }
-search() { apk search "$@"; }
-free() { command free -h "$@"; }
-mkdir() { command mkdir -pv "$@"; }
-ZSHRC
-
-  # ── Flathub setup ────────────────────────────────────────────────────
-  install -dm755 "$pkgdir/etc/profile.d"
-  cat > "$pkgdir/etc/profile.d/kibatv-flathub.sh" << 'EOF'
-#!/bin/sh
-command -v flatpak >/dev/null 2>&1 && \
-  flatpak remote-add --if-not-exists --system flathub \
-    https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
-EOF
-  chmod +x "$pkgdir/etc/profile.d/kibatv-flathub.sh"
-
 APKBUILD
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
