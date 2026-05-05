@@ -8,7 +8,8 @@ chown -R builder:builder /home/builder
 apt update -y && apt install -y pmbootstrap procps kpartx
 # Initialize pmbootstrap if not already done
 echo "Initializing pmbootstrap..."
-su -c "pmbootstrap config --config" builder
+su -c 'echo -e "[pmbootstrap]\naports = /work/pmaports\nwork = /work/pmb\ndevice = qemu-amd64\nui = plasma-bigscreen\nchannel = edge\nusername = user\ntimezone = UTC\nlocale = en_US.UTF-8" > ~/.config/pmbootstrap.cfg' builder
+su -c "pmbootstrap init -c ~/.config/pmbootstrap.cfg" builder
 export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
@@ -560,7 +561,6 @@ package() {
 APKBUILD
 apt install -y kpartx
 # ── Init pmbootstrap non-interactively ────────────────────────────────
-su -c "pmbootstrap config --config" builder
 su -c "pmbootstrap config device qemu-amd64" builder
 su -c "pmbootstrap --details-to-stdout config ui plasma-bigscreen" builder
 su -c "pmbootstrap --details-to-stdout config channel edge" builder
