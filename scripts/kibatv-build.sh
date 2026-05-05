@@ -590,6 +590,30 @@ package() {
 }
 APKBUILD
 # Then build and install
+cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
+[pmbootstrap]
+work = $WORKDIR
+device = qemu-amd64
+kernel = stable
+ui = plasma-bigscreen
+ui_extras = False
+channel = edge
+username = user
+timezone = UTC
+locale = en_US
+hostname = qemu-amd64
+extra_space = 0
+boot_size = 512
+jobs = 4
+ccache_size = 5G
+sudo_timer = False
+mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
+systemd = default
+providers = {}
+extra_packages = none
+EOF
+printf 'edge\nqemu\namd64\nstable\nuser\ndefault\ndefault\ndefault\ndefault\nconsole\ndefault\nn\n\n' \
+  | pmbootstrap --as-root --assume-yes init
 pmbootstrap --as-root build kibatv-config
 pmbootstrap --as-root build kstore
 pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
