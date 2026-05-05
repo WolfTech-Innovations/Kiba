@@ -9,20 +9,20 @@ mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 
-# Install deps - get /home/builder/.local/bin/pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
+# Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
 apt-get update -y && apt-get install -y procps kpartx git python3 python3-pip openssl
 
-# Install latest /home/builder/.local/bin/pmbootstrap from git into builder's home
+# Install latest pmbootstrap from git into builder's home
 su -c '
-  git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS//home/builder/.local/bin/pmbootstrap.git /home/builder//home/builder/.local/bin/pmbootstrap
+  git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
   mkdir -p /home/builder/.local/bin
-  ln -sf /home/builder//home/builder/.local/bin/pmbootstrap//home/builder/.local/bin/pmbootstrap.py /home/builder/.local/bin//home/builder/.local/bin/pmbootstrap
-  chmod +x /home/builder//home/builder/.local/bin/pmbootstrap//home/builder/.local/bin/pmbootstrap.py
+  ln -sf /home/builder/pmbootstrap/pmbootstrap.py /home/builder/.local/bin/pmbootstrap
+  chmod +x /home/builder/pmbootstrap/pmbootstrap.py
 ' builder
 
 # Write config
 mkdir -p /home/builder/.config
-cat > /home/builder/.config//home/builder/.local/bin/pmbootstrap_v3.cfg <<EOF
+cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
 [pmbootstrap]
 work = $WORKDIR
 device = qemu-amd64
@@ -36,15 +36,15 @@ chown -R builder:builder /home/builder/.config
 # Run init alone, fully isolated
 set +o pipefail
 printf '\n\n\n\n\n\n\nplasma-bigscreen\n\n\n\n\n\n\n\n\n\n\n\n\n' \
-  | /home/builder/.local/bin//home/builder/.local/bin/pmbootstrap --as-root --assume-yes init
+  | pmbootstrap --as-root --assume-yes init
 EXIT=$?
 set -o pipefail
 
 echo "Init exit: $EXIT"
 
 # Completely separate — set aports path
-/home/builder/.local/bin/pmbootstrap --as-root config aports /work/pmaports
-echo "Aports now: $(/home/builder/.local/bin/pmbootstrap --as-root config aports)"
+pmbootstrap --as-root config aports /work/pmaports
+echo "Aports now: $(pmbootstrap --as-root config aports)"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -60,9 +60,9 @@ apt-get update && apt-get install -y \
   libkirigami-dev gettext build-essential \
   jq curl wget
 
-# ── Install /home/builder/.local/bin/pmbootstrap from git (need 3.5.1+) ───────────────────────
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS//home/builder/.local/bin/pmbootstrap.git /opt//home/builder/.local/bin/pmbootstrap
-ln -sf /opt//home/builder/.local/bin/pmbootstrap//home/builder/.local/bin/pmbootstrap.py /usr/local/bin//home/builder/.local/bin/pmbootstrap
+# ── Install pmbootstrap from git (need 3.5.1+) ───────────────────────
+git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
+ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
 # ── Build KStore binary ───────────────────────────────────────────────
 git clone --depth=1 https://github.com/WolfTech-Innovations/KStore /tmp/KStore
@@ -79,10 +79,10 @@ cd /
 mkdir -p /work
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git /work/pmaports
 
-# ── Write /home/builder/.local/bin/pmbootstrap config ──────────────────────────────────────────
+# ── Write pmbootstrap config ──────────────────────────────────────────
 mkdir -p ~/.config
-cat > ~/.config//home/builder/.local/bin/pmbootstrap.cfg << 'PMCFG'
-[/home/builder/.local/bin/pmbootstrap]
+cat > ~/.config/pmbootstrap.cfg << 'PMCFG'
+[pmbootstrap]
 aports = /work/pmaports
 work = /work/pmb
 device = qemu-amd64
@@ -599,9 +599,9 @@ package() {
 }
 APKBUILD
 # Then build and install
-/home/builder/.local/bin/pmbootstrap --as-root build kibatv-config
-/home/builder/.local/bin/pmbootstrap --as-root build kstore
-/home/builder/.local/bin/pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
+pmbootstrap --as-root build kibatv-config
+pmbootstrap --as-root build kstore
+pmbootstrap --as-root install --no-fde --add kibatv-config,kstore
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
