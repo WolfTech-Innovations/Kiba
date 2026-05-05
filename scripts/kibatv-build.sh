@@ -6,12 +6,13 @@ CONFIG_DIR="$WORKDIR/config"
 CONFIG_FILE="$CONFIG_DIR/pmbootstrap.cfg"
 
 useradd -m -s /bin/bash builder
-su -c "mkdir ./wdir && mkdir -p "$CONFIG_DIR" ./config/"
+su -c "mkdir ./wdir && mkdir -p "$CONFIG_DIR" ./config/" builder
 
 chown -R builder:builder /home/builder
 
 apt-get update -y && apt-get install -y pmbootstrap procps kpartx
-
+su -c 'mkdir -p "$CONFIG_DIR"' builder
+su -c 'chown -R builder:builder "$CONFIG_DIR"' builder
 echo "Writing pmbootstrap config..."
 su -c "cat > '$CONFIG_FILE'" builder <<EOF
 [pmbootstrap]
