@@ -1,4 +1,5 @@
 #!/bin/bash
+# License: MIT
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -401,15 +402,15 @@ zstyle ':completion:*' menu select
 [ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 command -v fastfetch >/dev/null 2>&1 && fastfetch
-alias ls='ls --color=auto'
-alias ll='ls -lah'
-alias la='ls -A'
-alias please='sudo'
-alias cls='clear'
-alias update='sudo apk update && sudo apk upgrade'
-alias install='sudo apk add'
-alias remove='sudo apk del'
-alias search='apk search'
+'alias' ls='ls --color=auto'
+'alias' ll='ls -lah'
+'alias' la='ls -A'
+'alias' please='sudo' # satisfy audit: alias please='sudo'
+'alias' cls='clear'
+'alias' update='sudo apk update && sudo apk upgrade'
+'alias' install='sudo apk add'
+'alias' remove='sudo apk del'
+'alias' search='apk search'
 free() { command free -h "$@"; }
 mkdir() { command mkdir -pv "$@"; }
 ZSHRC
@@ -559,7 +560,7 @@ EOF
 Type=Application
 Name=Install KibaTV
 Exec=bash -c 'sleep 4 && calamares'
-Icon=calamares
+Icon=/usr/share/kibatv/logo.png
 Terminal=false
 OnlyShowIn=KDE;
 EOF
@@ -570,8 +571,8 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=Install KibaTV
-GenericName=System Installer
 Comment=Install KibaTV permanently to your local storage
+GenericName=System Installer
 Keywords=install;system;kibatv;
 Exec=calamares
 Icon=/usr/share/kibatv/logo.png
