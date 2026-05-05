@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Job IDs
         run: |
-          ! grep -E '^  [a-z0-9]+_[a-z0-9]+' .github/workflows/*.yml
+          ! grep -E '^  [a-z0-9]+_[a-z0-9]+:' .github/workflows/*.yml | grep -vE '  (workflow_dispatch|workflow_run|pull_request_target|branch_protection_rule|issue_comment|discussion_comment|pull_request_review|pull_request_review_comment|registry_package|repository_dispatch|update_release_draft|pull_request|push):'

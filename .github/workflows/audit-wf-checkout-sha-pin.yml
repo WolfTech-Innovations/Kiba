@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Pinning
         run: |
-          grep "uses: actions/checkout@" .github/workflows/*.yml | grep -vE "@[a-f0-9]{40}" && false || true
+          grep "uses: actions/checkout@[a-zA-Z0-9]" .github/workflows/*.yml | grep -vE "@[a-f0-9]{40}" && false || true

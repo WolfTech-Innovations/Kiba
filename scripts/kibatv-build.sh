@@ -1,18 +1,4 @@
 #!/bin/bash
-# License: MIT
-#
-# Copyright (c) 2025 WolfTech Innovations
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all
-# copies or substantial portions of the Software.
-#
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -144,7 +130,7 @@ EOF
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
-Welcome to 🚀 KibaTV -- Switch to Simple
+Welcome to KibaTV -- Switch to Simple
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
@@ -308,7 +294,7 @@ EOF
   cat > "$pkgdir/etc/xdg/ksplashrc" << 'EOF'
 [KSplash]
 Engine=KSplashQML
-Theme=com.kibatv.watchdogs.desktop
+Theme=org.kde.breezedark.desktop
 EOF
 
   # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
@@ -324,7 +310,7 @@ Rectangle {
     Text {
         id: welcomeText
         anchors.centerIn: parent
-        text: "KibaTV | Switch to simple" + " 🚀"
+        text: "KibaTV | Switch to simple"
         font.pixelSize: 48; font.bold: true; color: "#bd93f9"
         opacity: 0
         OpacityAnimator { target: welcomeText; from: 0; to: 1; duration: 1000; running: true }
@@ -415,16 +401,15 @@ zstyle ':completion:*' menu select
 [ -f /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh ] && \
   source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
 command -v fastfetch >/dev/null 2>&1 && fastfetch
-'alias' ls='ls --color=auto'
-'alias' ll='ls -lah'
-'alias' la='ls -A'
-'alias' please='sudo' # satisfy audit: alias please='sudo'
-'alias' cls='clear'
-'alias' update='sudo apk update && sudo apk upgrade'
-'alias' upgrade='sudo apk update && sudo apk upgrade'
-'alias' install='sudo apk add'
-'alias' remove='sudo apk del'
-'alias' search='apk search'
+alias ls='ls --color=auto'
+alias ll='ls -lah'
+alias la='ls -A'
+alias please='sudo'
+alias cls='clear'
+alias update='sudo apk update && sudo apk upgrade'
+alias install='sudo apk add'
+alias remove='sudo apk del'
+alias search='apk search'
 free() { command free -h "$@"; }
 mkdir() { command mkdir -pv "$@"; }
 ZSHRC
@@ -517,10 +502,10 @@ Presentation {
         interval: 5000; running: presentation.activatedInCalamares
         repeat: true; onTriggered: presentation.goToNextSlide()
     }
-    Slide { centeredText: "🚀 Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
-    Slide { centeredText: "📺 KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
-    Slide { centeredText: "🛍️ Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
-    Slide { centeredText: "✨ Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
+    Slide { centeredText: "Welcome to KibaTV!\n\nYour TV is getting set up.\nThis usually takes about 10 minutes." }
+    Slide { centeredText: "KibaTV is built to stay out of your way.\n\nEverything you need is already here." }
+    Slide { centeredText: "Your files, your apps, your way.\n\nHead to KStore after setup to install anything you like." }
+    Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour TV will restart when ready." }
     function onActivate() { presentation.currentSlide = 0; }
     function onLeave() {}
 }
@@ -574,7 +559,7 @@ EOF
 Type=Application
 Name=Install KibaTV
 Exec=bash -c 'sleep 4 && calamares'
-Icon=/usr/share/kibatv/logo.png
+Icon=calamares
 Terminal=false
 OnlyShowIn=KDE;
 EOF
