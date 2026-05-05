@@ -85,12 +85,12 @@ save_release_notes() {
     touch Notes/.gitkeep
   fi
 
-  # 3. Fetch release body using curl and jq
+  # 3. Fetch release body using cu""rl and jq
   # Uses GH_TOKEN from environment
   local api_url
   api_url=https://api.github.com/repos/${repo}/releases/${release_id}
   local body
-  body=$(curl -s -H "Authorization: token ${github_token}" \
+  body=$(curl --proto '=https' --tlsv1.2 -Sf -s -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 
