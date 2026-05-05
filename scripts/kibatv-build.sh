@@ -467,9 +467,10 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-pmbootstrap --as-root -v build kibatv-config 2>&1 | tee build.log
+pmbootstrap --as-root -v build kibatv-config 2>&1 | tee build.log || true
+cat build.log
 pmbootstrap --as-root build kstore
-pmbootstrap --as-root -v --details-to-stdout --no-sshd --no-firewall --no-fde install --add kibatv-config,kstore | tee build.log
+pmbootstrap --as-root -v --details-to-stdout --no-sshd --no-firewall --no-fde install --add kibatv-config,kstore | tee install.log
 
 RAW_IMG=$(find /work/pmb/export -name "*.img" | head -1)
 
