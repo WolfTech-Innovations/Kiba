@@ -416,6 +416,7 @@ EOF
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 EOF
+}
 APKBUILD
 rm -rf $WORKDIR
 mkdir -p $WORKDIR
