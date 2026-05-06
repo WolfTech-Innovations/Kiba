@@ -1,0 +1,24 @@
+name: Audit Build Clean Tmp
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for /tmp cleanup
+        run: |
+          # Check if scripts use /tmp and have a cleanup mechanism
+          grep -rnE "^[^#]*/tmp/" scripts/ && (grep -qE "rm -rf /tmp/|trap .* /tmp/" scripts/ || (echo "Ensure temporary files in /tmp are cleaned up using rm or trap" && exit 1)) || exit 0

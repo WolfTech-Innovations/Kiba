@@ -1,0 +1,24 @@
+name: Audit Shell No Eval Strict
+
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for eval usage
+        run: |
+          # Robust check for eval, ignoring comments
+          grep -rnE "^[^#]*eval " . --include="*.sh" && (echo "Avoid using 'eval' in shell scripts as it is a security risk" && exit 1) || exit 0

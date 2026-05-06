@@ -1,0 +1,24 @@
+name: Audit Build No Read Interactive
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for interactive read
+        run: |
+          # Robust check for 'read' without heredoc or pipe (likely interactive)
+          grep -rnE "^[^#]*read " scripts/ | grep -vE "(<<|<|\|)" && (echo "Avoid interactive 'read' in non-interactive build scripts" && exit 1) || exit 0

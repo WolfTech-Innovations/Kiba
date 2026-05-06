@@ -1,0 +1,24 @@
+name: Audit Build Umount Lazy
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for umount lazy
+        run: |
+          # Robust check for umount without -l or --lazy
+          grep -rnE "^[^#]*umount " scripts/ | grep -vE "(\-l|\-\-lazy)" && (echo "Consider 'umount -l' in build scripts to handle busy mount points gracefully" && exit 1) || exit 0

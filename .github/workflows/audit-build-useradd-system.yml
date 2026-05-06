@@ -1,0 +1,24 @@
+name: Audit Build Useradd System
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for useradd system
+        run: |
+          # Robust check for useradd without --system or -r
+          grep -rnE "^[^#]*useradd" scripts/ | grep -vE "(\-\-system|\-r)" && (echo "Use --system or -r with useradd for system accounts" && exit 1) || exit 0
