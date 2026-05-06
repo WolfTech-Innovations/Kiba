@@ -11,6 +11,8 @@ jobs:
         with:
           fetch-depth: 0
       - name: Scan for revert commits
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           set -euo pipefail
-          git log origin/${{ github.base_ref }}..HEAD --pretty=format:"%s" | grep -i "^Revert" && { echo "Warning: PR contains revert commits. Please squash them if appropriate."; } || echo "No revert commits found."
+          git log "origin/$BASE_REF..HEAD" --pretty=format:"%s" | grep -i "^Revert" && { echo "Warning: PR contains revert commits. Please squash them if appropriate."; } || echo "No revert commits found."

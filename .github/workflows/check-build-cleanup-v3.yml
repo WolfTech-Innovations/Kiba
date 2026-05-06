@@ -1,11 +1,11 @@
 name: Check Build Cleanup
 on:
   push:
-paths:
-- scripts/kibatv-build.sh
+    paths:
+      - scripts/kibatv-build.sh
   pull_request:
-paths:
-- scripts/kibatv-build.sh
+    paths:
+      - scripts/kibatv-build.sh
 jobs:
   audit:
     permissions:

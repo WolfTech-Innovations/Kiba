@@ -1,11 +1,11 @@
 name: Check Zshrc Performance
 on:
   push:
-paths:
-- scripts/kibatv-build.sh
+    paths:
+      - scripts/kibatv-build.sh
   pull_request:
-paths:
-- scripts/kibatv-build.sh
+    paths:
+      - scripts/kibatv-build.sh
 jobs:
   audit:
     permissions:
@@ -16,6 +16,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Compinit
-      run: grep "compinit" scripts/kibatv-build.sh | grep -v "compinit -u" && exit
-        1 || exit 0
+      run: grep "compinit" scripts/kibatv-build.sh | grep -v "compinit -u" && exit 1 || exit 0
     timeout-minutes: 5
