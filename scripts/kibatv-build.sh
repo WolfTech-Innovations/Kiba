@@ -480,7 +480,7 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-cd /work/pmaports/local/kstore/ && abuild checksum
+cd /work/pmaports/local/kstore/ && pmbootstrap chroot -- abuild checksum
 eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log || true
 echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
