@@ -1,0 +1,23 @@
+name: Audit Zsh compinit Age Check
+
+on:
+  push:
+    paths:
+      - '**.sh'
+      - '.zshrc'
+  pull_request:
+    paths:
+      - '**.sh'
+      - '.zshrc'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check compinit age
+        run: |
+          grep -r "~/.zcompdump(N.m-24)" . || (echo "Missing 24h age check for compinit" && exit 1)

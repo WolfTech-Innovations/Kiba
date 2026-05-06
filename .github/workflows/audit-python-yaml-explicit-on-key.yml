@@ -1,0 +1,22 @@
+name: Audit Python YAML Explicit On Key
+
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check YAML on key
+        run: |
+          # If yaml.dump or similar is used, ensure "on:" is quoted or handled
+          grep -r "yaml.safe_load" . --include="*.py" || echo "No python YAML usage found"

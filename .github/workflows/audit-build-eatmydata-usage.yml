@@ -1,0 +1,21 @@
+name: Audit Build Eatmydata Usage
+
+on:
+  push:
+    paths:
+      - 'scripts/kibatv-build.sh'
+  pull_request:
+    paths:
+      - 'scripts/kibatv-build.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check eatmydata
+        run: |
+          grep -q "eatmydata" scripts/kibatv-build.sh || (echo "eatmydata missing" && exit 1)

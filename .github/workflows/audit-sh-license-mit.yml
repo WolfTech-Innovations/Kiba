@@ -1,0 +1,28 @@
+name: Audit Shell License MIT
+
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check MIT License
+        run: |
+          failed=0
+          while IFS= read -r f; do
+            if ! head -n 15 "$f" | grep -q "# License: MIT"; then
+              echo "$f is missing MIT license header"
+              failed=1
+            fi
+          done < <(find . -name "*.sh")
+          exit "$failed"
