@@ -422,7 +422,6 @@ mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
 mkdir -p /work/pmaports/local/kstore
 cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
-KSTORE_SHA512=$(sha512sum /work/pmaports/local/kstore/kstore | awk '{print $1}')
 cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
 pkgname=kstore
 pkgver=1.0
@@ -434,7 +433,7 @@ license="GPL-3.0-or-later"
 options="!check !strip"
 depends="flatpak qt6-qtbase"
 source="kstore"
-sha512sums="$KSTORE_SHA512, kstore"
+sha512sums="kstore"
 
 package() {
   install -Dm755 "\$srcdir/kstore" "\$pkgdir/usr/bin/kstore"
@@ -481,10 +480,11 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
-cat buildconfig.log || true
+cd /work/pmaports/local/kstore/ && abuild checksum
 eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log || true
+echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
+cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
