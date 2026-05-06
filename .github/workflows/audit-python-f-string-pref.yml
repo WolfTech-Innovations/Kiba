@@ -1,0 +1,21 @@
+name: Audit Python F-String Preference
+
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check formatting
+        run: |
+          grep -rE "\.format\(|% [\(\s]*['"]" . --include="*.py" && (echo "F-strings preferred over .format() or % formatting" && exit 1) || exit 0

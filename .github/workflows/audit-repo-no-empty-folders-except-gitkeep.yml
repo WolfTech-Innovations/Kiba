@@ -1,0 +1,18 @@
+name: Audit Repo No Empty Folders
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check empty folders
+        run: |
+          find . -type d -empty -not -path "./.git*" | grep . && exit 1 || exit 0
