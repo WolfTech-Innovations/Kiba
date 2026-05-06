@@ -1,0 +1,24 @@
+name: Audit Build Find Delete Name
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for find delete name
+        run: |
+          # Robust check for find -delete without filters
+          grep -rnE "^[^#]*find .* -delete" scripts/ | grep -vE "(\-name|\-iname|\-path|\-regex)" && (echo "Always use filtering (e.g., -name) with 'find -delete' for safety" && exit 1) || exit 0

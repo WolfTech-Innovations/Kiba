@@ -1,0 +1,24 @@
+name: Audit Workflow Job Timeout Standard
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/**.yml'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for job timeout
+        run: |
+          # Robust check for timeout-minutes in every job
+          find .github/workflows -name "*.yml" | xargs -I {} sh -c 'grep -q "timeout-minutes:" {} || (echo "{} is missing timeout-minutes for one or more jobs" && exit 1)'

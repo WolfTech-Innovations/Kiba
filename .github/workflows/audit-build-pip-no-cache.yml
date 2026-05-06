@@ -1,0 +1,24 @@
+name: Audit Build Pip No Cache
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for pip no-cache-dir
+        run: |
+          # Robust check for pip install without cache disabled
+          grep -rnE "^[^#]*pip install" scripts/ | grep -vE "\-\-no\-cache\-dir" && (echo "Use --no-cache-dir with pip install to reduce image size" && exit 1) || exit 0
