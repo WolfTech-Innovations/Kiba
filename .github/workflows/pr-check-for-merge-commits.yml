@@ -11,7 +11,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Verify no merge commits
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           # Use HEAD instead of origin/main to avoid dependency on origin branch naming
           # We check commits between base and head of PR
-          git rev-list --merges "origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}" | grep . && { echo "Error: Merge commits are not allowed. Please rebase."; exit 1; } || echo "No merge commits found."
+          git rev-list --merges "origin/$BASE_REF..$HEAD_SHA" | grep . && { echo "Error: Merge commits are not allowed. Please rebase."; exit 1; } || echo "No merge commits found."

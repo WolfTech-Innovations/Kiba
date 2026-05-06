@@ -9,7 +9,8 @@ mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 # Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
-apt-get update -y && apt-get install -y \
+apt-get update -y && apt-get install -y eatmydata && \
+  eatmydata apt-get install -y \
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
   xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
@@ -17,30 +18,6 @@ apt-get update -y && apt-get install -y \
   libkf6i18n-dev libkf6coreaddons-dev qml6-module-org-kde-kirigami \
   libkirigami-dev gettext build-essential \
   jq curl wget eatmydata
-
-# Install latest pmbootstrap from git into builder's home
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
-ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmbootstrap
-chmod +x /home/builder/pmbootstrap/pmbootstrap.py
-# Write config
-mkdir -p /home/builder/.config
-cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
-[pmbootstrap]
-work = $WORKDIR
-device = qemu-amd64
-ui = plasma-bigscreen
-channel = edge
-username = user
-timezone = UTC
-locale = en_US.UTF-8
-EOF
-chown -R builder:builder /home/builder/.config
-yes '' | pmbootstrap --as-root --assume-yes init || true
-# Completely separate — set aports path
-pmbootstrap --as-root config aports /work/pmaports
-echo "Aports now: $(pmbootstrap --as-root config aports)"
-
-export DEBIAN_FRONTEND=noninteractive
 
 ISO="kibatv-v${RUN_NUM:-local}"
 
@@ -114,7 +91,60 @@ EOF
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
-Welcome to KibaTV -- Switch to Simple
+Welcome to KibaTV -- Switch to Simple 🚀📺✨
+
+Quick Start:
+  💻 Terminal: Meta+T
+  🚀 Installer: Launch from menu
+EOF
+
+  # ── Welcome Tool ─────────────────────────────────────────────────────
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --window-icon="/usr/share/kibatv/logo.png" \
+    --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install the system to your drive" \
+    "💻 Terminal (Meta+T)" "Open the command line" \
+    "🌐 Web Browser" "Browse the internet" \
+    "✨ Shortcuts" "View system keyboard shortcuts")
+
+  case "$CHOICE" in
+    "🚀 Install KibaTV")
+      pkexec calamares
+      break
+      ;;
+    "💻 Terminal (Meta+T)")
+      konsole &
+      ;;
+    "🌐 Web Browser")
+      chromium &
+      ;;
+    "✨ Shortcuts")
+      zenity --info --title="Shortcuts" --text="Terminal: Meta+T
+Launcher: Meta
+Quick Settings: Meta+A"
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+EOF
+  chmod +x "$pkgdir/usr/bin/kiba-welcome"
+
+  # ── Autostart Welcome ────────────────────────────────────────────────
+  install -dm755 "$pkgdir/etc/xdg/autostart"
+  cat > "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop" << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=KibaTV Welcome
+Exec=kiba-welcome
+Icon=kiba-logo
+Terminal=false
+Categories=System;
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
@@ -429,11 +459,11 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
+echo "kibatv-default-password" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
 cat buildkstore.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv-default-password" --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
