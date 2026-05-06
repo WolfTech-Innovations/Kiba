@@ -10,7 +10,7 @@
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/postmarketOS%20-D70A53?style=for-the-badge&logo=postmarketos&logoColor=green" alt="postmarketOS Version">
+  <img src="https://img.shields.io/badge/Debian-D70A53?style=for-the-badge&logo=debian&logoColor=green" alt="Debian Version">
   <img src="https://img.shields.io/badge/KDE-Plasma`%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
 </p>
 
@@ -21,7 +21,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaTV is a lightweight Linux distribution built on **postmarketOS** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaTV is a lightweight Linux distribution built on **Debian 13 (Trixie)**  with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -51,7 +51,7 @@ For a more in-depth look at KibaTV, check out our detailed documentation:
 
 ## Features
 
-- **Debian Base:** Built on **postmarketOS**.
+- **Debian Base:** Built on **Debian 13 (Trixie)** .
 - **Modern Desktop:** **Plasma Bigscreen** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
@@ -165,12 +165,12 @@ The scheme is applied to **Plasma Bigscreen**, **Konsole**, **KWin** decorations
 ## Build System
 
 <p align="left">
-  <img src="https://img.shields.io/badge/Build-live--build-blue?style=flat-square" alt="Build: live-build">
+  <img src="https://img.shields.io/badge/Build-debootstrap-blue?style=flat-square" alt="Build: debootstrap">
   <img src="https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
   <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square`&logo=docker&logoColor=white" alt="Infrastructure: Docker">
 </p>
 
-KibaTV is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
+KibaTV is built using **debootstrap**  inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
 
 - **Orchestration:** `.github/workflows/kiba.yml`
 - **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
