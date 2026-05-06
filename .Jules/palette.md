@@ -11,3 +11,7 @@
 ## 2025-05-15 - [Discoverable Shortcuts in Menu Labels]
 **Learning:** Incorporating keyboard shortcut hints (e.g., "Terminal (Meta+T)") directly into Zenity menu labels in the `kiba-welcome` tool improves functional discoverability and teaches users efficient interaction methods within the live environment.
 **Action:** Include shortcut hints in labels for primary system tools to enhance user onboarding and system proficiency.
+
+## 2025-05-15 - [Explicit Exit Affordance in Selection Menus]
+**Learning:** Including an explicit "Close" or "Exit" option in Zenity selection menus (especially when looped) provides a clear and confident exit path for users, improving usability over relying on window 'X' buttons or the Escape key.
+**Action:** Always provide a dedicated exit option in interactive shell-based selection tools.

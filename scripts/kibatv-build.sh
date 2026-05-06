@@ -117,6 +117,7 @@ Welcome to KibaTV -- Switch to Simple 🚀📺✨
 
 Quick Start:
   💻 Terminal: Meta+T
+  🛍️ App Store: Launch from menu
   🚀 Installer: Launch from menu
 EOF
 
@@ -129,14 +130,19 @@ while true; do
     --window-icon="/usr/share/kibatv/logo.png" \
     --column="Action" --column="Description" \
     "🚀 Install KibaTV" "Install the system to your drive" \
+    "🛍️ App Store" "Browse and install applications" \
     "💻 Terminal (Meta+T)" "Open the command line" \
     "🌐 Web Browser" "Browse the internet" \
-    "✨ Shortcuts" "View system keyboard shortcuts")
+    "✨ Shortcuts" "View system keyboard shortcuts" \
+    "👋 Close" "Exit this welcome tool")
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
       pkexec calamares
       break
+      ;;
+    "🛍️ App Store")
+      kstore &
       ;;
     "💻 Terminal (Meta+T)")
       konsole &
@@ -148,6 +154,9 @@ while true; do
       zenity --info --title="Shortcuts" --text="Terminal: Meta+T
 Launcher: Meta
 Quick Settings: Meta+A"
+      ;;
+    "👋 Close")
+      break
       ;;
     *)
       break
@@ -163,10 +172,13 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=KibaTV Welcome
+GenericName=System Welcome
+Comment=Introduction and quick links for KibaTV
 Exec=kiba-welcome
 Icon=kiba-logo
 Terminal=false
 Categories=System;
+Keywords=welcome;installer;shortcuts;kstore;
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
