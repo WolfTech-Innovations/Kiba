@@ -521,12 +521,12 @@ eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || tr
 cat buildkstore.log || true
 echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore || true | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
-cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
-find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat
-RAW_IMG=$(find "$WORKDIR" -name "*.img*" 2>/dev/null || echo "no image")
+cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
+find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
+RAW_IMG=$(find "$WORKDIR" -name "*.img*" 2>/dev/null || echo "no image") || true
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
 modprobe nbd max_part=16
