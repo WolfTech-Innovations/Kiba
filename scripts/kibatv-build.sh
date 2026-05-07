@@ -458,7 +458,7 @@ source="kstore"
 sha512sums="kstore"
 
 package() {
-  install -Dm755 "\$srcdir/kstore" "\$pkgdir/usr/bin/kstore"
+  install -Dm755 "/work/pmaports/local/kstore/kstore" "\$pkgdir/usr/bin/kstore"
 
   mkdir -p "\$pkgdir/usr/share/applications"
   cat > "\$pkgdir/usr/share/applications/kstore.desktop" << 'EOF'
