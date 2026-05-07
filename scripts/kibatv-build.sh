@@ -517,12 +517,9 @@ pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
 rm -rf "$KSTORE_BUILD_DIR"
-pmbootstrap --as-root checksum kstore
-eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || true
-cat buildkstore.log || true
 echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore || true | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config || true | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
