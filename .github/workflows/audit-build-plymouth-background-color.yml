@@ -1,0 +1,26 @@
+name: Audit Build Plymouth Background Color
+
+on:
+  push:
+    paths:
+      - 'scripts/kibatv-build.sh'
+  pull_request:
+    paths:
+      - 'scripts/kibatv-build.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Plymouth Background
+        run: |
+          if ! grep -q "0.157, 0.165, 0.212" scripts/kibatv-build.sh; then
+            echo "Error: Plymouth background color should be Dracula background (0.157, 0.165, 0.212)"
+            exit 1
+          fi

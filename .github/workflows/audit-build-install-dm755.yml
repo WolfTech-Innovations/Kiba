@@ -1,0 +1,27 @@
+name: Audit Build Install Dm755
+
+on:
+  push:
+    paths:
+      - 'scripts/kibatv-build.sh'
+  pull_request:
+    paths:
+      - 'scripts/kibatv-build.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Install Dm755
+        run: |
+          # Check that install for directories uses -dm755 as per pattern
+          if grep "install " scripts/kibatv-build.sh | grep -v "\-dm755" | grep -v "\-Dm755"; then
+            echo "Error: Directory creation with 'install' should use -dm755"
+            exit 1
+          fi

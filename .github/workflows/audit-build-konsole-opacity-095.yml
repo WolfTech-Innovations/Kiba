@@ -1,0 +1,26 @@
+name: Audit Build Konsole Opacity 095
+
+on:
+  push:
+    paths:
+      - 'scripts/kibatv-build.sh'
+  pull_request:
+    paths:
+      - 'scripts/kibatv-build.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Konsole Opacity
+        run: |
+          if ! grep -q "Opacity=0.95" scripts/kibatv-build.sh; then
+            echo "Error: Konsole opacity should be set to 0.95"
+            exit 1
+          fi

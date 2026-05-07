@@ -1,0 +1,26 @@
+name: Audit Build Plasma Theme Name
+
+on:
+  push:
+    paths:
+      - 'scripts/kibatv-build.sh'
+  pull_request:
+    paths:
+      - 'scripts/kibatv-build.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Plasma Theme Name
+        run: |
+          if ! grep -q "name=breeze-dark" scripts/kibatv-build.sh; then
+            echo "Error: Plasma theme name should be set to breeze-dark"
+            exit 1
+          fi
