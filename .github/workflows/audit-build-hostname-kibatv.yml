@@ -1,0 +1,31 @@
+name: Audit Build Hostname Kibatv
+
+on:
+  push:
+    paths:
+      - 'scripts/kibatv-build.sh'
+  pull_request:
+    paths:
+      - 'scripts/kibatv-build.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Hostname
+        run: |
+          # Check for hostname setting in multiple places
+          if ! grep -q "kibatv-live" scripts/kibatv-build.sh; then
+            echo "Error: Hostname kibatv-live should be defined in the build script"
+            exit 1
+          fi
+          if ! grep -q "hostname kibatv" scripts/kibatv-build.sh; then
+            echo "Error: pmbootstrap hostname should be set to kibatv"
+            exit 1
+          fi
