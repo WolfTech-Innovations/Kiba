@@ -11,3 +11,7 @@
 ## 2025-05-15 - [Discoverable Shortcuts in Menu Labels]
 **Learning:** Incorporating keyboard shortcut hints (e.g., "Terminal (Meta+T)") directly into Zenity menu labels in the `kiba-welcome` tool improves functional discoverability and teaches users efficient interaction methods within the live environment.
 **Action:** Include shortcut hints in labels for primary system tools to enhance user onboarding and system proficiency.
+
+## 2025-05-20 - [Enhanced Desktop Entry Discoverability]
+**Learning:** Including `GenericName` and `Keywords` in `.desktop` files significantly improves accessibility and discoverability in application launchers, allowing users to find tools through functional search terms (e.g., "setup") even if they don't know the app's formal name.
+**Action:** Always include descriptive `GenericName` and relevant `Keywords` for core system onboarding and setup utilities.

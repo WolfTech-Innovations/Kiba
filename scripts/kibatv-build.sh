@@ -129,7 +129,8 @@ while true; do
     --window-icon="/usr/share/kibatv/logo.png" \
     --column="Action" --column="Description" \
     "🚀 Install KibaTV" "Install the system to your drive" \
-    "💻 Terminal (Meta+T)" "Open the command line" \
+    "🖥️ Terminal (Meta+T)" "Open the command line" \
+    "🛍️ App Store" "Browse and install applications" \
     "🌐 Web Browser" "Browse the internet" \
     "✨ Shortcuts" "View system keyboard shortcuts")
 
@@ -138,8 +139,11 @@ while true; do
       pkexec calamares
       break
       ;;
-    "💻 Terminal (Meta+T)")
+    "🖥️ Terminal (Meta+T)")
       konsole &
+      ;;
+    "🛍️ App Store")
+      kstore &
       ;;
     "🌐 Web Browser")
       chromium &
@@ -163,10 +167,12 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=KibaTV Welcome
+GenericName=Welcome Wizard
 Exec=kiba-welcome
 Icon=kiba-logo
 Terminal=false
 Categories=System;
+Keywords=welcome;setup;start;kiba;
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
