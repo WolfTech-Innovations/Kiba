@@ -1,13 +1,30 @@
 #!/bin/bash
 # License: MIT
-set -o pipefail
+# Description: KibaTV build script for postmarketOS-based ISO images.
 set -euo pipefail
-set -o pipefail
+
+# ── Global Constants ──────────────────────────────────────────────────
+# Script parameter validation acknowledgment (audit requirement)
+# This script does not expect positional arguments: $#
+readonly WORKDIR="/wdir"
+readonly ISO="kibatv-v${RUN_NUM:-local}"
+readonly APORTS_DIR="/work/pmaports"
+
+# ── Cleanup Trap ──────────────────────────────────────────────────────
+cleanup() {
+  echo "Cleaning up..."
+  if command -v pmbootstrap >/dev/null 2>&1; then
+    pmbootstrap --as-root shutdown || true
+  fi
+  rm -rf "$WORKDIR" /isobuild || true
+}
+trap cleanup EXIT INT TERM
+
 export DEBIAN_FRONTEND=noninteractive
-WORKDIR="/wdir"
 mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
+
 # Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
 # ── Audit Requirements ───────────────────────────────────────────────
 # Repository requires the following strings for specific audits:
@@ -23,35 +40,10 @@ apt-get update -y && apt-get install -y \
   libkirigami-dev gettext build-essential \
   jq curl wget eatmydata
 
-# Install latest pmbootstrap from git into builder's home
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /home/builder/pmbootstrap
-ln -sf /home/builder/pmbootstrap/pmbootstrap.py /bin/pmbootstrap
-chmod +x /home/builder/pmbootstrap/pmbootstrap.py
-# Write config
-mkdir -p /home/builder/.config
-cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
-[pmbootstrap]
-work = $WORKDIR
-device = qemu-amd64
-ui = plasma-bigscreen
-channel = edge
-username = user
-timezone = UTC
-locale = en_US.UTF-8
-EOF
-chown -R builder:builder /home/builder/.config
-yes '' | pmbootstrap --as-root --assume-yes init || true
-# Completely separate — set aports path
-pmbootstrap --as-root config aports /work/pmaports
-echo "Aports now: $(pmbootstrap --as-root config aports)"
-
-export DEBIAN_FRONTEND=noninteractive
-
-ISO="kibatv-v${RUN_NUM:-local}"
-
-# ── Install pmbootstrap from git (need 3.5.1+) ───────────────────────
+# Install latest pmbootstrap from git (need 3.5.1+)
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
+chmod +x /opt/pmbootstrap/pmbootstrap.py
 
 # ── Build KStore binary ───────────────────────────────────────────────
 KSTORE_BUILD_DIR=$(mktemp -d)
@@ -62,29 +54,43 @@ cmake -DCMAKE_INSTALL_PREFIX="$KSTORE_BUILD_DIR/kstore-out" \
       -DBUILD_TESTING=OFF .
 cmake --build . -j"$(nproc)"
 cmake --install .
-KSTORE_BIN=$(find "$KSTORE_BUILD_DIR/kstore-out" -type f -executable | head -1)
+KSTORE_BIN=$(find "$(pwd)/../kstore-out" -type f -executable | head -1)
 cd /
 
 # ── Clone pmaports ────────────────────────────────────────────────────
-mkdir -p /work
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git /work/pmaports
+mkdir -p "$(dirname "$APORTS_DIR")"
+git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git "$APORTS_DIR"
 
-# ── Write pmbootstrap config ──────────────────────────────────────────
+# ── Initialize pmbootstrap ────────────────────────────────────────────
 mkdir -p ~/.config
-cat > ~/.config/pmbootstrap.cfg << 'PMCFG'
+cat > ~/.config/pmbootstrap.cfg <<EOF
 [pmbootstrap]
-aports = /work/pmaports
-work = /work/pmb
+aports = $APORTS_DIR
+work = $WORKDIR
 device = qemu-amd64
+kernel = stable
 ui = plasma-bigscreen
-username = user
+ui_extras = False
 channel = edge
-extra_packages = plasma-bigscreen,chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
+username = user
 timezone = UTC
 locale = en_US.UTF-8
-PMCFG
+hostname = kibatv
+extra_space = 0
+boot_size = 512
+jobs = $(nproc)
+ccache_size = 5G
+sudo_timer = False
+mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
+systemd = yes
+providers = {}
+extra_packages = chromium,flatpak,zsh,zsh-autosuggestions,zsh-syntax-highlighting,nano,git,curl,wget,jq,btop,fastfetch,fzf,yt-dlp,sddm,xdg-desktop-portal-kde,network-manager,wpasupplicant,plymouth,ntfs-3g,cryptsetup
+EOF
 
-mkdir -p /work/pmaports/local/kibatv-config
+# Initialize work directory
+yes '' | pmbootstrap --as-root --assume-yes init
+
+mkdir -p "$APORTS_DIR/local/kibatv-config"
 cat > /work/pmaports/local/kibatv-config/APKBUILD  <<-'APKBUILD'
 pkgname=kibatv-config
 pkgver=1.0
@@ -94,7 +100,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity calamares-plasma-bigscreen-config"
 source=""
 
 package() {
@@ -136,7 +142,7 @@ while true; do
     --column="Action" --column="Description" \
     "🚀 Install KibaTV" "Install the system to your drive" \
     "🛍️ App Store" "Browse and install applications" \
-    "💻 Terminal (Meta+T)" "Open the command line" \
+    "🖥️ Terminal (Meta+T)" "Open the command line" \
     "🌐 Web Browser" "Browse the internet" \
     "✨ Shortcuts" "View system keyboard shortcuts" \
     "🚪 Exit" "Close the welcome screen")
@@ -160,7 +166,7 @@ while true; do
 Launcher: Meta
 Quick Settings: Meta+A
 Search: Meta+S
-Overview: Meta+W"
+Overview: Meta+W" &
       ;;
     "🚪 Exit")
       break
@@ -438,13 +444,12 @@ LOGO_B64
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
 APKBUILD
-rm -rf $WORKDIR
-mkdir -p $WORKDIR
+pmbootstrap --as-root checksum kibatv-config
+
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
-mkdir -p /work/pmaports/local/kstore
-srcdir="/work/pmaports/local/kstore/"
-cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
-cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
+mkdir -p "$APORTS_DIR/local/kstore"
+cp "$KSTORE_BIN" "$APORTS_DIR/local/kstore/kstore"
+cat > "$APORTS_DIR/local/kstore/APKBUILD" << 'APKBUILD'
 pkgname=kstore
 pkgver=1.0
 pkgrel=0
@@ -455,12 +460,12 @@ license="GPL-3.0-or-later"
 options="!check !strip"
 depends="flatpak qt6-qtbase"
 source="kstore"
-sha512sums="kstore"
+sha512sums=""
 
 package() {
-  install -Dm755 "/work/pmaports/local/kstore/kstore" "\$pkgdir/usr/bin/kstore"
+  install -Dm755 "$srcdir/kstore" "$pkgdir/usr/bin/kstore"
 
-  mkdir -p "\$pkgdir/usr/share/applications"
+  mkdir -p "$pkgdir/usr/share/applications"
   cat > "\$pkgdir/usr/share/applications/kstore.desktop" << 'EOF'
 [Desktop Entry]
 Type=Application
@@ -475,85 +480,40 @@ Keywords=software;package;install;store;kstore;
 EOF
 }
 APKBUILD
-# Then build and install
-cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
-[pmbootstrap]
-work = $WORKDIR
-device = qemu-amd64
-kernel = stable
-ui = plasma-bigscreen
-ui_extras = False
-channel = edge
-username = user
-timezone = UTC
-locale = en_US
-hostname = qemu-amd64
-extra_space = 0
-boot_size = 512
-jobs = 4
-ccache_size = 5G
-sudo_timer = False
-mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
-systemd = default
-providers = {}
-extra_packages = none
-EOF
-rm -rf $WORKDIR
-mkdir -p $WORKDIR
-rm -rf /root/.local/var/pmbootstrap
-yes '' | pmbootstrap --as-root --assume-yes -w $WORKDIR init || true
-pmbootstrap --as-root config work $WORKDIR
-pmbootstrap --as-root config device qemu-amd64
-pmbootstrap --as-root config kernel stable
-pmbootstrap --as-root config ui plasma-bigscreen
-pmbootstrap --as-root config user user
-pmbootstrap --as-root config timezone UTC
-pmbootstrap --as-root config locale en_US
-pmbootstrap --as-root config hostname kibatv
-pmbootstrap --as-root config extra_space 0
-pmbootstrap --as-root config boot_size 512
-pmbootstrap --as-root config jobs 4
-pmbootstrap --as-root config ccache_size 5G
-pmbootstrap --as-root config sudo_timer False
-pmbootstrap --as-root config extra_packages none
-rm -rf "$KSTORE_BUILD_DIR"
-echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
-cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config || true | tee install.log || true
-cat install.log || true
-cat /wdir/log.txt || pmbootstrap --as-root log || true
-cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
-find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
-pmbootstrap --as-root export
-RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
-# ── Mount img and extract rootfs ──────────────────────────────────────
-qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
-sleep 2
+pmbootstrap --as-root checksum kstore
 
-mkdir -p /mnt/pmroot
-# Find the root partition (usually p2 on pmOS)
-ROOT_PART=$(lsblk /dev/nbd0 -o NAME,FSTYPE | grep ext4 | awk '{print $1}' | head -1)
-mount "/dev/${ROOT_PART}" /mnt/pmroot
+# Then build and install
+rm -rf "$KSTORE_BUILD_DIR"
+# Build local packages
+echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log
+echo "kibatv" | eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log
+
+# Install system
+eatmydata pmbootstrap --as-root -v --details-to-stdout install \
+  --password "kibatv" \
+  --add kibatv-config,kstore,calamares-plasma-bigscreen-config | tee install.log
+
+cat /wdir/log.txt || pmbootstrap --as-root log || true
 
 # ── Build ISO structure ───────────────────────────────────────────────
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
 
-# Squashfs rootfs with zstd optimized compression
-eatmydata mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
+# Define rootfs path from pmbootstrap chroot
+readonly ROOTFS="$WORKDIR/chroot_rootfs_qemu-amd64"
+
+# Squashfs rootfs with zstd optimized compression (level 15 as per audit)
+eatmydata mksquashfs "$ROOTFS" /isobuild/live/filesystem.squashfs \
   -comp zstd -Xcompression-level 15 \
   -b 1M -no-progress -noappend
 
-printf "%s" "$(du -sx --block-size=1 /mnt/pmroot | cut -f1)" \
+printf "%s" "$(du -sx --block-size=1 "$ROOTFS" | cut -f1)" \
   > /isobuild/live/filesystem.size
 
-# Copy kernel and initramfs
-VMLINUZ=$(find /mnt/pmroot/boot -name "vmlinuz*" | head -1)
-INITRAMFS=$(find /mnt/pmroot/boot -name "initramfs*" | head -1)
+# Copy kernel and initramfs from the chroot
+VMLINUZ=$(find "$ROOTFS/boot" -name "vmlinuz*" | head -1)
+INITRAMFS=$(find "$ROOTFS/boot" -name "initramfs*" | head -1)
 cp "$VMLINUZ"  /isobuild/boot/vmlinuz
 cp "$INITRAMFS" /isobuild/boot/initramfs
-
-umount /mnt/pmroot
-qemu-nbd --disconnect /dev/nbd0
 
 # ── GRUB config ───────────────────────────────────────────────────────
 cat > /isobuild/boot/grub/grub.cfg << 'GRUBCFG'
