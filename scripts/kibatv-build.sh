@@ -529,7 +529,6 @@ find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv"
 RAW_IMG=$(find "$WORKDIR" -name "*.img*" 2>/dev/null || echo "no image") || true
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
-modprobe nbd max_part=16
 qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
 sleep 2
 
