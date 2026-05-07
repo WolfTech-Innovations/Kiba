@@ -4,7 +4,13 @@ set -o pipefail
 set -euo pipefail
 set -o pipefail
 export DEBIAN_FRONTEND=noninteractive
-WORKDIR="/wdir"
+readonly WORKDIR="/wdir"
+
+cleanup() {
+  [[ -n "${TMPFILE:-}" ]] && rm -rf "$TMPFILE"
+}
+trap cleanup EXIT INT TERM
+
 mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
@@ -47,22 +53,22 @@ echo "Aports now: $(pmbootstrap --as-root config aports)"
 
 export DEBIAN_FRONTEND=noninteractive
 
-ISO="kibatv-v${RUN_NUM:-local}"
+readonly ISO="kibatv-v${RUN_NUM:-local}"
 
 # ── Install pmbootstrap from git (need 3.5.1+) ───────────────────────
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
 # ── Build KStore binary ───────────────────────────────────────────────
-KSTORE_BUILD_DIR=$(mktemp -d)
-git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$KSTORE_BUILD_DIR/KStore"
-cd "$KSTORE_BUILD_DIR/KStore"
-cmake -DCMAKE_INSTALL_PREFIX="$KSTORE_BUILD_DIR/kstore-out" \
+TMPFILE=$(mktemp -d)
+git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore"
+cd "$TMPFILE/KStore"
+cmake -DCMAKE_INSTALL_PREFIX="$TMPFILE/kstore-out" \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTING=OFF .
 cmake --build . -j"$(nproc)"
 cmake --install .
-KSTORE_BIN=$(find "$KSTORE_BUILD_DIR/kstore-out" -type f -executable | head -1)
+KSTORE_BIN=$(find "$TMPFILE/kstore-out" -type f -executable | head -1)
 cd /
 
 # ── Clone pmaports ────────────────────────────────────────────────────
@@ -516,7 +522,7 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-rm -rf "$KSTORE_BUILD_DIR"
+rm -rf "$TMPFILE"
 echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config || true | tee install.log || true
