@@ -442,6 +442,7 @@ rm -rf $WORKDIR
 mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
 mkdir -p /work/pmaports/local/kstore
+srcdir="/work/pmaports/local/kstore/"
 cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
 cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
 pkgname=kstore
