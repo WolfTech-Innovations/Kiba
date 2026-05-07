@@ -30,11 +30,11 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  local release_id
+  release_id
   release_id=${RELEASE_ID:-}
-  local github_token
+  github_token
   github_token=${GH_TOKEN:-}
-  local repo
+  repo
   repo=${GITHUB_REPOSITORY:-}
 
   if [ -z "$release_id" ]; then
@@ -58,27 +58,27 @@ save_release_notes() {
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  local dd
+  dd
   dd=$(date +%d)
 
-  local h_val
+  h_val
   h_val=$(date +%-H)
-  local hours
+  hours
   hours=0123456789ABCDEFGHIJKLMN
-  local h
+  h
   h=$(printf "%s" "$hours" | cut -c $((h_val + 1)))
 
-  local y
+  y
   y=$(date +%y | cut -c 2)
 
-  local m_val
+  m_val
   m_val=$(date +%-m)
-  local months
+  months
   months=123456789ABC
-  local m
+  m
   m=$(printf "%s" "$months" | cut -c "$m_val")
 
-  local filename
+  filename
   filename=Notes/NTE-${dd}${h}${y}${m}.md
 
   # 2. Ensure Notes directory and .gitkeep exist
@@ -89,9 +89,9 @@ save_release_notes() {
 
   # 3. Fetch release body using curl and jq
   # Uses GH_TOKEN from environment
-  local api_url
+  api_url
   api_url=https://api.github.com/repos/${repo}/releases/${release_id}
-  local body
+  body
   body=$(curl -s -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
