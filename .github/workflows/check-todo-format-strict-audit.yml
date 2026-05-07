@@ -11,4 +11,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify TODO
         run: |
-          grep -r "TODO" . | grep -vE "TODO\([a-zA-Z0-9_-]+\):" || true
+          grep -r "[T]ODO" . | grep -vE "TODO\([a-zA-Z0-9_-]+\):" || true

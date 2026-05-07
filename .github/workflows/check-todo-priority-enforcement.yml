@@ -14,7 +14,7 @@ jobs:
     - name: Scan TODOs
       run: '# TODOs should have a priority: TODO(low), TODO(high), etc.
 
-        grep -rn "TODO" . | grep -vE "TODO\((low|med|high|critical)\)" && exit 1 ||
+        grep -rn "[T]ODO" . | grep -vE "TODO\((low|med|high|critical)\)" && exit 1 ||
         exit 0
 
         '

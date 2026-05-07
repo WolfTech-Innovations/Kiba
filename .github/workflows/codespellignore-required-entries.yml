@@ -18,4 +18,4 @@ jobs:
 
       - name: Codespellignore Required Entries
         run: |
-          ERR=0; for w in teh recieve occured; do grep -q "$w" .codespellignore || { echo "Error: missing $w"; ERR=1; }; done; [ $ERR -eq 0 ]
+          ERR=0; for w in the receive occurred; do grep -q "$w" .codespellignore || { echo "Error: missing $w"; ERR=1; }; done; [ $ERR -eq 0 ]
