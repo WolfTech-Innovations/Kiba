@@ -524,6 +524,7 @@ cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
 find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
+pmbootstrap --as-root export
 RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
 # ── Mount img and extract rootfs ──────────────────────────────────────
 qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
