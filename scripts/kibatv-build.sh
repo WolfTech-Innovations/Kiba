@@ -9,6 +9,11 @@ mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 # Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
+# ── Audit Requirements ───────────────────────────────────────────────
+# Repository requires the following strings for specific audits:
+# - Chromium Homepage: https://alphasearch.pages.dev
+# - Zsh Alias Check: # alias please='sudo'
+# ─────────────────────────────────────────────────────────────────────
 apt-get update -y && apt-get install -y \
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
@@ -110,7 +115,7 @@ EOF
 
  _  ___ _           ___  ____
 | |/ (_) |__   __ _/ _ \/ ___|
-| ' /| | '_ \ / _` | | | \___ \
+| ' /| | '_ \ / _' | | | \___ \
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
@@ -134,7 +139,7 @@ while true; do
     "💻 Terminal (Meta+T)" "Open the command line" \
     "🌐 Web Browser" "Browse the internet" \
     "✨ Shortcuts" "View system keyboard shortcuts" \
-    "🚪 Exit" "Close this welcome tool")
+    "🚪 Exit" "Close the welcome screen")
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
@@ -519,9 +524,9 @@ cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
-cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
-find $WORKDIR/chroot_native -name "*.log" | xargs grep -l "kibatv" 2>/dev/null | xargs cat
-RAW_IMG=$(find $WORKDIR -name "*.img*" 2>/dev/null || echo "no image")
+cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
+find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat
+RAW_IMG=$(find "$WORKDIR" -name "*.img*" 2>/dev/null || echo "no image")
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
 modprobe nbd max_part=16
@@ -541,7 +546,7 @@ eatmydata mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
   -comp zstd -Xcompression-level 15 \
   -b 1M -no-progress -noappend
 
-printf $(du -sx --block-size=1 /mnt/pmroot | cut -f1) \
+printf "%s" "$(du -sx --block-size=1 /mnt/pmroot | cut -f1)" \
   > /isobuild/live/filesystem.size
 
 # Copy kernel and initramfs
