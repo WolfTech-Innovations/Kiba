@@ -1,5 +1,9 @@
 #!/bin/bash
 # License: MIT
+if [ "$#" -ne 0 ]; then
+  echo "Usage: $0"
+  exit 1
+fi
 set -o pipefail
 set -euo pipefail
 set -o pipefail
@@ -448,7 +452,6 @@ rm -rf $WORKDIR
 mkdir -p $WORKDIR
 # ── Write KStore APKBUILD ─────────────────────────────────────────────
 mkdir -p /work/pmaports/local/kstore
-srcdir="/work/pmaports/local/kstore/"
 cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
 cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
 pkgname=kstore
@@ -614,11 +617,10 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
 # ── Build hybrid ISO ──────────────────────────────────────────────────
-eatmydata xorriso \
+eatmydata xorriso -volid "KIBATV" \
   -as mkisofs \
   -iso-level 3 \
   -full-iso9660-filenames \
-  -volid "KIBATV" \
   -eltorito-boot boot/grub/bios_combined.img \
   -no-emul-boot -boot-load-size 4 -boot-info-table \
   --grub2-boot-info \
