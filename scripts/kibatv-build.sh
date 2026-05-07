@@ -133,11 +133,13 @@ EOF
 while true; do
   CHOICE=$(zenity --list --title="Welcome to KibaTV" \
     --window-icon="/usr/share/kibatv/logo.png" \
+    --width=450 --height=500 \
     --column="Action" --column="Description" \
     "🚀 Install KibaTV" "Install the system to your drive" \
     "🛍️ App Store" "Browse and install applications" \
-    "💻 Terminal (Meta+T)" "Open the command line" \
+    "🖥️ Terminal (Meta+T)" "Open the command line" \
     "🌐 Web Browser" "Browse the internet" \
+    "📖 Documentation" "Read the technical manual" \
     "✨ Shortcuts" "View system keyboard shortcuts" \
     "🚪 Exit" "Close the welcome screen")
 
@@ -149,18 +151,21 @@ while true; do
     "🛍️ App Store")
       kstore &
       ;;
-    "💻 Terminal (Meta+T)")
+    "🖥️ Terminal (Meta+T)")
       konsole &
       ;;
     "🌐 Web Browser")
       chromium &
+      ;;
+    "📖 Documentation")
+      chromium --app=https://github.com/WolfTech-Innovations/Kiba &
       ;;
     "✨ Shortcuts")
       zenity --info --title="Shortcuts" --text="Terminal: Meta+T
 Launcher: Meta
 Quick Settings: Meta+A
 Search: Meta+S
-Overview: Meta+W"
+Overview: Meta+W" &
       ;;
     "🚪 Exit")
       break
@@ -185,7 +190,7 @@ Exec=kiba-welcome
 Icon=kiba-logo
 Terminal=false
 Categories=System;
-Keywords=welcome;guide;help;kiba;
+Keywords=welcome;guide;help;kiba;setup;start;
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
@@ -434,6 +439,7 @@ EOF
 LOGO_B64
   base64 -d "$TMPFILE" > "$pkgdir/usr/share/kibatv/logo.png"
   rm "$TMPFILE"
+  install -Dm644 "$pkgdir/usr/share/kibatv/logo.png" "$pkgdir/usr/share/pixmaps/kiba-logo.png"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
