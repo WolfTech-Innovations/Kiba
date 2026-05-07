@@ -131,7 +131,8 @@ while true; do
     "🚀 Install KibaTV" "Install the system to your drive" \
     "💻 Terminal (Meta+T)" "Open the command line" \
     "🌐 Web Browser" "Browse the internet" \
-    "✨ Shortcuts" "View system keyboard shortcuts")
+    "✨ Shortcuts" "View system keyboard shortcuts" \
+    "🚪 Exit" "Close the welcome screen")
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
@@ -148,6 +149,9 @@ while true; do
       zenity --info --title="Shortcuts" --text="Terminal: Meta+T
 Launcher: Meta
 Quick Settings: Meta+A"
+      ;;
+    "🚪 Exit")
+      break
       ;;
     *)
       break
@@ -488,9 +492,9 @@ cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
-cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
-find $WORKDIR/chroot_native -name "*.log" | xargs grep -l "kibatv" 2>/dev/null | xargs cat
-RAW_IMG=$(find $WORKDIR -name "*.img*" 2>/dev/null || echo "no image")
+cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
+find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat
+RAW_IMG=$(find "$WORKDIR" -name "*.img*" 2>/dev/null || echo "no image")
 
 # ── Mount img and extract rootfs ──────────────────────────────────────
 modprobe nbd max_part=16
@@ -510,7 +514,7 @@ eatmydata mksquashfs /mnt/pmroot /isobuild/live/filesystem.squashfs \
   -comp zstd -Xcompression-level 15 \
   -b 1M -no-progress -noappend
 
-printf $(du -sx --block-size=1 /mnt/pmroot | cut -f1) \
+printf "%s" "$(du -sx --block-size=1 /mnt/pmroot | cut -f1)" \
   > /isobuild/live/filesystem.size
 
 # Copy kernel and initramfs
