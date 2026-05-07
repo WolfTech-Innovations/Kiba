@@ -530,13 +530,15 @@ cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
 find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
-RAW_IMG=$(find "$WORKDIR" -type f -name "*.img" -not -path "*/chroot_*" | head -n 1)
-if [[ ! -f "$RAW_IMG" ]]; then
-    echo "Error: No disk image found in $WORKDIR"
-    exit 1
-fi
-
-# ── Mount img and extract rootfs ──────────────────────────────────────
+pmbootstrap --as-root shutdown
+pmbootstrap --as-root zap -a
+cd ~/pmaports && git reset --hard && git clean -xfd && git pull
+pmbootstrap --as-root init
+pmbootstrap --as-root pull
+pmbootstrap --as-root update
+pmbootstrap --as-root build postmarketos-mkinitfs --force
+pmbootstrap --as-root export --image
+RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
 qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
 sleep 2
 
