@@ -24,6 +24,8 @@
 set -euo pipefail
 set -o pipefail
 
+trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
+
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
 

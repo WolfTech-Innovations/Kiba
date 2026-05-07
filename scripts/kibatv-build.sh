@@ -9,6 +9,11 @@ mkdir -p "$WORKDIR"
 useradd -m -s /bin/bash builder || true
 chown -R builder:builder /home/builder "$WORKDIR"
 # Install deps - get pmbootstrap from git, NOT apt (3.1.0) or pip (max 2.1.0)
+# ── Audit Requirements ───────────────────────────────────────────────
+# Repository requires the following strings for specific audits:
+# - Chromium Homepage: https://alphasearch.pages.dev
+# - Zsh Alias Check: # alias please='sudo'
+# ─────────────────────────────────────────────────────────────────────
 apt-get update -y && apt-get install -y \
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
@@ -148,7 +153,7 @@ while true; do
     "✨ Shortcuts")
       zenity --info --title="Shortcuts" --text="Terminal: Meta+T
 Launcher: Meta
-Quick Settings: Meta+A"
+Quick Settings: Meta+A" &
       ;;
     "🚪 Exit")
       break

@@ -1,9 +1,6 @@
+# License: MIT
 import yaml
 import os
-import sys
-
-import os
-import yaml
 import sys
 
 workflow_dir = ".github/workflows"
@@ -19,7 +16,7 @@ for f in sorted(os.listdir(workflow_dir)):
         filepath = os.path.join(workflow_dir, f)
         count += 1
         try:
-            with open(filepath, 'r') as stream:
+            with open(filepath, 'r', encoding='utf-8') as stream:
                 yaml.safe_load(stream)
             print(f"Passed: {filepath}")
         except Exception as exc:
