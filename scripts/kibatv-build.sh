@@ -129,14 +129,19 @@ while true; do
     --window-icon="/usr/share/kibatv/logo.png" \
     --column="Action" --column="Description" \
     "🚀 Install KibaTV" "Install the system to your drive" \
+    "🛍️ App Store" "Browse and install applications" \
     "💻 Terminal (Meta+T)" "Open the command line" \
     "🌐 Web Browser" "Browse the internet" \
-    "✨ Shortcuts" "View system keyboard shortcuts")
+    "✨ Shortcuts" "View system keyboard shortcuts" \
+    "🚪 Exit" "Close this welcome tool")
 
   case "$CHOICE" in
     "🚀 Install KibaTV")
       pkexec calamares
       break
+      ;;
+    "🛍️ App Store")
+      kstore &
       ;;
     "💻 Terminal (Meta+T)")
       konsole &
@@ -147,7 +152,12 @@ while true; do
     "✨ Shortcuts")
       zenity --info --title="Shortcuts" --text="Terminal: Meta+T
 Launcher: Meta
-Quick Settings: Meta+A"
+Quick Settings: Meta+A
+Search: Meta+S
+Overview: Meta+W"
+      ;;
+    "🚪 Exit")
+      break
       ;;
     *)
       break
@@ -163,10 +173,13 @@ EOF
 [Desktop Entry]
 Type=Application
 Name=KibaTV Welcome
+GenericName=Welcome Guide
+Comment=Get started with KibaTV
 Exec=kiba-welcome
 Icon=kiba-logo
 Terminal=false
 Categories=System;
+Keywords=welcome;guide;help;kiba;
 EOF
 
   # ── SDDM autologin ───────────────────────────────────────────────────
@@ -437,6 +450,20 @@ sha512sums="kstore"
 
 package() {
   install -Dm755 "\$srcdir/kstore" "\$pkgdir/usr/bin/kstore"
+
+  mkdir -p "\$pkgdir/usr/share/applications"
+  cat > "\$pkgdir/usr/share/applications/kstore.desktop" << 'EOF'
+[Desktop Entry]
+Type=Application
+Name=App Store
+GenericName=Package Manager
+Comment=Browse and install applications
+Exec=kstore
+Icon=system-software-install
+Terminal=false
+Categories=System;Settings;
+Keywords=software;package;install;store;kstore;
+EOF
 }
 APKBUILD
 # Then build and install
