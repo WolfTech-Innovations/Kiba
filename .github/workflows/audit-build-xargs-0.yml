@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+        with:
+          persist-credentials: false
       - name: Check for xargs null delimiter
         run: |
           # Robust check for xargs without -0 or --null when used with find

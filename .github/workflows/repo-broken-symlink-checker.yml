@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
       - name: Scan for broken symlinks
         run: |
           find . -xtype l -not -path "./node_modules/*" | grep . && { echo "Error: Broken symbolic links detected."; exit 1; } || echo "No broken symlinks found"

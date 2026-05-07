@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+        with:
+          persist-credentials: false
       - name: Check absolute paths
         run: |
           grep "/usr/local/bin" scripts/kibatv-build.sh || (echo "Absolute paths for utilities required in build scripts" && exit 1)

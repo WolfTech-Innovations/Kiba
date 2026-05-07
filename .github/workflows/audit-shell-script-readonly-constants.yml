@@ -16,6 +16,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+        with:
+          persist-credentials: false
       - name: Check readonly
         run: |
           grep -Er "^[A-Z_]+=" . --include="*.sh" | grep -v "readonly" && (echo "Global constants should be readonly" && exit 1) || exit 0

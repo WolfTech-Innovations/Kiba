@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Configure Fast APT Mirror
         uses: vegardit/fast-apt-mirror.sh@v1
         with:

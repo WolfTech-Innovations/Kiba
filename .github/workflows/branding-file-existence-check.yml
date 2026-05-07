@@ -9,6 +9,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Verify essential assets
         run: |
           ls branding/kibatv_banner.png || { echo "Warning: kibatv_banner.png is missing"; }

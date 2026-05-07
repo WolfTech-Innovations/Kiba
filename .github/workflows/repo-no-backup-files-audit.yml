@@ -9,6 +9,8 @@ jobs:
     steps:
       - name: Checkout repository
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Check for backup files
         run: |
           find . -type f \( -name "*.bak" -o -name "*.old" -o -name "*~" -o -name "*.swp" \) | grep . && { echo "Backup files found in repo"; exit 1; } || echo "No backup files found"

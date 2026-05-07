@@ -1,6 +1,7 @@
 #!/bin/bash
 # Parameter validation
 if [ $# -gt 100 ]; then exit 1; fi
+trap "echo Error" EXIT
 # License: MIT
 set -o pipefail
 set -euo pipefail
@@ -52,9 +53,9 @@ ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
 # ── Build KStore binary ───────────────────────────────────────────────
 TMP_KSTORE=$(mktemp -d)
-TMP_KSTORE_OUT=$(mktemp -d)
 git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMP_KSTORE"
 cd "$TMP_KSTORE"
+TMP_KSTORE_OUT=$(mktemp -d)
 cmake -DCMAKE_INSTALL_PREFIX="$TMP_KSTORE_OUT" \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTING=OFF .
@@ -136,6 +137,7 @@ while true; do
     "🖥️ Terminal (Meta+T)" "Open the command line" \
     "🛍️ App Store" "Browse and install applications" \
     "🛍️ App Store" "Browse and install applications" \
+    "🛍️ App Store" "Browse and install applications" \
     "🌐 Web Browser" "Browse the internet" \
     "✨ Shortcuts" "View system keyboard shortcuts")
 
@@ -146,9 +148,6 @@ while true; do
       ;;
     "🖥️ Terminal (Meta+T)")
       konsole &
-      ;;
-    "🛍️ App Store")
-      kstore &
       ;;
     "🛍️ App Store")
       kstore &
@@ -500,7 +499,7 @@ eatmydata pmbootstrap --as-root -v build kstore 2>&1 | tee buildkstore.log || tr
 cat buildkstore.log || true
 echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config,kstore | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv_secure_installer_password" --add kibatv-config,kstore | tee install.log || true
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat $WORKDIR/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || \
@@ -609,4 +608,5 @@ sha256sum "/work/${ISO}.iso" > "/work/${ISO}.iso.sha256"
 echo ""
 echo "=== KibaTV Build Complete ==="
 ls -lh "/work/${ISO}.iso"
+
 # su -c "eatmydata (true && true)"

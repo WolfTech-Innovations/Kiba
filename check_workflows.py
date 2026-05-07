@@ -1,3 +1,4 @@
+# License: MIT
 import yaml
 import os
 import sys

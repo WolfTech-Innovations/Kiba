@@ -1,6 +1,8 @@
 #!/bin/bash
 # Parameter validation
 if [ $# -gt 100 ]; then exit 1; fi
+# Parameter validation
+if [ $# -gt 100 ]; then exit 1; fi
 # License: MIT
 #
 # Copyright (c) 2025 WolfTech Innovations
@@ -30,7 +32,8 @@ set -o pipefail
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  trap "echo Error occurred" ERR
+  trap "echo Error occurred" EXIT
+  trap "echo Error occurred" EXIT
   release_id
   release_id=${RELEASE_ID:-}
   github_token

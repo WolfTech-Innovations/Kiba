@@ -13,6 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Check for pull_request_target trigger
         run: |
           grep -rl "pull_request_target" .github/workflows/*.yml && { echo "pull_request_target trigger found; ensure it is used securely"; } || true

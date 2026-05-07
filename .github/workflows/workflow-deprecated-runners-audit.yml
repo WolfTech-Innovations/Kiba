@@ -12,6 +12,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
+        with:
+          persist-credentials: false
       - name: Scan for ubuntu-18.04 or ubuntu-20.04
         run: |
           grep -rE "ubuntu-18.04|ubuntu-20.04" .github/workflows/*.yml && { echo "Warning: Use of deprecated or older runners detected."; } || echo "Modern runners in use"
