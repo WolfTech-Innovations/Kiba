@@ -467,16 +467,71 @@ Keywords=software;package;install;store;kstore;
 EOF
 }
 APKBUILD
+# Then build and install
+cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
+[pmbootstrap]
+work = $WORKDIR
+device = qemu-amd64
+kernel = stable
+ui = plasma-bigscreen
+ui_extras = False
+channel = edge
+username = user
+timezone = UTC
+locale = en_US
+hostname = qemu-amd64
+extra_space = 0
+boot_size = 512
+jobs = 4
+ccache_size = 5G
+sudo_timer = False
+mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
+systemd = default
+providers = {}
+extra_packages = none
+EOF
+rm -rf $WORKDIR
+mkdir -p $WORKDIR
+rm -rf /root/.local/var/pmbootstrap
+yes '' | pmbootstrap --as-root --assume-yes -w $WORKDIR init || true
+pmbootstrap --as-root config work $WORKDIR
+pmbootstrap --as-root config device qemu-amd64
+pmbootstrap --as-root config kernel stable
+pmbootstrap --as-root config ui plasma-bigscreen
+pmbootstrap --as-root config user user
+pmbootstrap --as-root config timezone UTC
+pmbootstrap --as-root config locale en_US
+pmbootstrap --as-root config hostname kibatv
+pmbootstrap --as-root config extra_space 0
+pmbootstrap --as-root config boot_size 512
+pmbootstrap --as-root config jobs 4
+pmbootstrap --as-root config ccache_size 5G
+pmbootstrap --as-root config sudo_timer False
+pmbootstrap --as-root config extra_packages none
+rm -rf "$KSTORE_BUILD_DIR"
+echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
+cat buildconfig.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config || true | tee install.log || true
+cat install.log || true
+cat /wdir/log.txt || pmbootstrap --as-root log || true
+cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
+find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
+pmbootstrap --as-root shutdown
+pmbootstrap --as-root zap -a
+cd ~/pmaports && git reset --hard && git clean -xfd && git pull
+pmbootstrap --as-root init
+pmbootstrap --as-root pull
+pmbootstrap --as-root update
+pmbootstrap --as-root build postmarketos-mkinitfs --force
+pmbootstrap --as-root export --image
+RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
+qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
+sleep 2
 
-# ── Build Packages ────────────────────────────────────────────────────
-pmbootstrap --as-root checksum kstore
-pmbootstrap --as-root checksum kibatv-config
-
-eatmydata pmbootstrap --as-root -v build kstore
-eatmydata pmbootstrap --as-root -v build kibatv-config
-
-# ── Install and Generate Image ────────────────────────────────────────
-echo "kibatv" | eatmydata pmbootstrap --as-root -v install --password "kibatv" --add kibatv-config,kstore
+mkdir -p /mnt/pmroot
+# Find the root partition (usually p2 on pmOS)
+ROOT_PART=$(lsblk /dev/nbd0 -o NAME,FSTYPE | grep ext4 | awk '{print $1}' | head -1)
+mount "/dev/${ROOT_PART}" /mnt/pmroot
 
 # ── Build ISO structure ───────────────────────────────────────────────
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
