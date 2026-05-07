@@ -12,6 +12,12 @@ trap cleanup EXIT INT TERM
 
 export DEBIAN_FRONTEND=noninteractive
 readonly WORKDIR="/wdir"
+
+cleanup() {
+  [[ -n "${TMPFILE:-}" ]] && rm -rf "$TMPFILE"
+}
+trap cleanup EXIT INT TERM
+
 mkdir -p "$WORKDIR"
 
 # ── Audit Requirements ───────────────────────────────────────────────
@@ -63,20 +69,22 @@ EOF
 # Initialize pmbootstrap
 yes '' | pmbootstrap --as-root --assume-yes init
 
-# ── Clone pmaports ────────────────────────────────────────────────────
-mkdir -p /work
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmaports.git /work/pmaports
+readonly ISO="kibatv-v${RUN_NUM:-local}"
+
+# ── Install pmbootstrap from git (need 3.5.1+) ───────────────────────
+git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
+ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
 # ── Build KStore binary ───────────────────────────────────────────────
-TMPDIR=$(mktemp -d)
-git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPDIR/KStore"
-cd "$TMPDIR/KStore"
-cmake -DCMAKE_INSTALL_PREFIX="$TMPDIR/kstore-out" \
+TMPFILE=$(mktemp -d)
+git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore"
+cd "$TMPFILE/KStore"
+cmake -DCMAKE_INSTALL_PREFIX="$TMPFILE/kstore-out" \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTING=OFF .
 cmake --build . -j"$(nproc)"
 cmake --install .
-KSTORE_BIN=$(find "$TMPDIR/kstore-out" -type f -executable | head -1)
+KSTORE_BIN=$(find "$TMPFILE/kstore-out" -type f -executable | head -1)
 cd /
 
 # ── Setup local packages ──────────────────────────────────────────────
@@ -508,7 +516,7 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-rm -rf "$KSTORE_BUILD_DIR"
+rm -rf "$TMPFILE"
 echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
 eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config || true | tee install.log || true
