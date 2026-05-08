@@ -68,7 +68,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares"
 source=""
 
 package() {
@@ -99,6 +99,28 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" --width=450 --height=500 \
+    --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install KibaTV permanently to your disk" \
+    "🖥️ Terminal (Meta+T)" "Open the Konsole terminal" \
+    "🛍️ App Store" "Browse and install applications" \
+    "⌨️ Keyboard Shortcuts" "View system keyboard shortcuts")
+
+  case "$CHOICE" in
+    "🚀 Install KibaTV") pkexec calamares; break ;;
+    "🖥️ Terminal (Meta+T)") konsole & ;;
+    "🛍️ App Store") kstore & ;;
+    "⌨️ Keyboard Shortcuts")
+      zenity --info --title="Shortcuts" --no-wrap --text="KibaTV Shortcuts:
+• Meta+T : Terminal
+• Meta+S : Search
+• Meta+W : Overview
+• Meta+A : Quick Settings" & ;;
+    *) break ;;
+  esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -368,6 +390,10 @@ LOGO_B64
   rm "$TMPFILE_APK"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
+
+  # -- Icon resolution fix ----------------------------------------------
+  install -Dm644 "$pkgdir/usr/share/kibatv/logo.png" \
+     "$pkgdir/usr/share/pixmaps/kiba-logo.png"
 }
 APKBUILD
 
