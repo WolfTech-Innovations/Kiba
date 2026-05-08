@@ -1,0 +1,30 @@
+name: Audit Shell Double Brackets
+
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run Shell Audit
+        shell: bash
+        run: |
+          bash_scripts=$(find . -name "*.sh" -exec grep -l "^#!/bin/bash" {} +)
+          if [ -n "$bash_scripts" ]; then
+            if echo "$bash_scripts" | xargs grep -rnE "^[^#]*\b\[ " | grep -v "\[\["; then
+              echo "Error: Use '[[ ... ]]' instead of '[ ... ]' in bash scripts"
+              exit 1
+            fi
+          fi

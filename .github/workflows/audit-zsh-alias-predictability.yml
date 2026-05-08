@@ -1,0 +1,29 @@
+name: Audit Zsh Alias Predictability
+
+on:
+  push:
+    paths:
+      - '**/zshrc'
+      - '**.zsh'
+  pull_request:
+    paths:
+      - '**/zshrc'
+      - '**.zsh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run Zsh Audit
+        shell: bash
+        run: |
+          if grep -rn "\balias -g\b" .; then
+            echo "Error: Global aliases are discouraged"
+            exit 1
+          fi
