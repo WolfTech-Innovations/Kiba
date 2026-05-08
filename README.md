@@ -7,11 +7,11 @@
 
 <p align="center">
   <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
+    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/postmarketOS%20-D70A53?style=for-the-badge&logo=postmarketos&logoColor=green" alt="postmarketOS Version">
-  <img src="https://img.shields.io/badge/KDE-Plasma`%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
+  <img src="https://img.shields.io/badge/KDE-Plasma%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
 </p>
 
 <p align="center">
@@ -51,7 +51,7 @@ For a more in-depth look at KibaTV, check out our detailed documentation:
 
 ## Features
 
-- **Debian Base:** Built on **postmarketOS**.
+- **Alpine Base:** Built on **postmarketOS**.
 - **Modern Desktop:** **Plasma Bigscreen** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
@@ -77,9 +77,9 @@ SHA256 checksums are provided alongside each release. Always verify your downloa
 
 On Linux:
 
-````bash
-sudo dd if=kibatv-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```bash
+sudo dd if=kibatv-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
+```
 
 > [!IMPORTANT]
 > Replace `/dev/sdX` with your actual drive and `N` with the build number. You can also use tools like **Balena Etcher** or **Ventoy**.
@@ -111,8 +111,8 @@ The **Calamares** installer guides you through:
 Post-install, update your system:
 
 ```bash
-sudo apt update && sudo apt upgrade -y
-```bash
+sudo apk update && sudo apk upgrade
+```
 
 ---
 
@@ -120,7 +120,7 @@ sudo apt update && sudo apt upgrade -y
 
 ### Shell
 
-<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square`&logo=zsh&logoColor=white" alt="Shell: Zsh">
+<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
 <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square" alt="Kernel: CachyOS">
 
 KibaTV uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
@@ -133,17 +133,17 @@ KibaTV uses **Zsh** by default with a pre-configured system-wide config at **`/e
 **Useful Aliases:**
 
 - `ll` -> `ls -lah`
-- `update` -> `sudo nala update && sudo nala upgrade -y`
-- `install` -> `sudo nala install`
+- `update` -> `sudo apk update && sudo apk upgrade`
+- `install` -> `sudo apk add`
 
 ### Theme
 
-<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square`&logo=dracula&logoColor=white" alt="Theme: Dracula">
+<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
 
 KibaTV ships the **Dracula** color scheme system-wide using the official palette
 
-| Color      | Hex       | Role         |
-| ---------- | --------- | ------------ |
+| Color      | Hex           | Role         |
+| ---------- | ------------- | ------------ |
 | Background | `hex #282a36` | Primary BG   |
 | Purple     | `hex #bd93f9` | Accent Color |
 | Pink       | `hex #ff79c6` | Selection    |
@@ -165,12 +165,12 @@ The scheme is applied to **Plasma Bigscreen**, **Konsole**, **KWin** decorations
 ## Build System
 
 <p align="left">
-  <img src="https://img.shields.io/badge/Build-live--build-blue?style=flat-square" alt="Build: live-build">
-  <img src="https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
-  <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square`&logo=docker&logoColor=white" alt="Infrastructure: Docker">
+  <img src="https://img.shields.io/badge/Build-pmbootstrap-blue?style=flat-square" alt="Build: pmbootstrap">
+  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
+  <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
 </p>
 
-KibaTV is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
+KibaTV is built using **pmbootstrap** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
 
 - **Orchestration:** `.github/workflows/kiba.yml`
 - **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
@@ -181,14 +181,14 @@ KibaTV is built using **live-build** inside a **Debian Trixie** **Docker** conta
 Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
 ```bash
-git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
+git clone https://github.com/WolfTech-Innovations/Kiba
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
   debian:trixie \
   /w/scripts/kibatv-build.sh
-```bash
+```
 
 > [!NOTE]
 > The build process is encapsulated in the `scripts/kibatv-build.sh` script and can be executed locally using Docker.
@@ -207,7 +207,7 @@ Kiba/
 ├── docs/                      # In-depth documentation
 ├── Notes/                     # Automatic release notes
 └── README.md                  # Project documentation
-```bash
+```
 
 ---
 
@@ -227,4 +227,3 @@ KibaTV is a distribution, not a single codebase. Individual components are subje
 
 KibaTV is a **WolfTech Innovations** project.
 [Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)
-````

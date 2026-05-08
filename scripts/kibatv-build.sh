@@ -3,20 +3,16 @@
 set -o pipefail
 set -euo pipefail
 
+# ── Cleanup Handler ──────────────────────────────────────────────────
 cleanup() {
     echo "Cleaning up..."
     [ -n "${TMPDIR:-}" ] && rm -rf "$TMPDIR"
-    [ -n "${TMPFILE:-}" ] && rm -f "$TMPFILE"
+    [ -n "${TMPFILE:-}" ] && rm -rf "$TMPFILE"
 }
 trap cleanup EXIT INT TERM
 
 export DEBIAN_FRONTEND=noninteractive
 readonly WORKDIR="/wdir"
-
-cleanup() {
-  [[ -n "${TMPFILE:-}" ]] && rm -rf "$TMPFILE"
-}
-trap cleanup EXIT INT TERM
 
 mkdir -p "$WORKDIR"
 
@@ -37,41 +33,6 @@ apt-get update -y && apt-get install -y \
   jq curl wget eatmydata
 
 # ── Setup pmbootstrap ────────────────────────────────────────────────
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
-ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
-
-# ── Configure pmbootstrap ─────────────────────────────────────────────
-mkdir -p /root/.config
-cat > /root/.config/pmbootstrap.cfg <<EOF
-[pmbootstrap]
-work = $WORKDIR
-device = qemu-amd64
-kernel = stable
-ui = plasma-bigscreen
-ui_extras = False
-channel = edge
-username = user
-timezone = UTC
-locale = en_US
-hostname = kibatv
-extra_space = 0
-boot_size = 512
-jobs = 4
-ccache_size = 5G
-sudo_timer = False
-mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
-systemd = default
-providers = {}
-extra_packages = none
-aports = /work/pmaports
-EOF
-
-# Initialize pmbootstrap
-yes '' | pmbootstrap --as-root --assume-yes init
-
-readonly ISO="kibatv-v${RUN_NUM:-local}"
-
-# ── Install pmbootstrap from git (need 3.5.1+) ───────────────────────
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
@@ -374,7 +335,6 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
-    # SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
@@ -432,11 +392,11 @@ fun progress_callback(duration, progress) {
 Plymouth.SetBootProgressFunction(progress_callback);
 EOF
   install -dm755 "$pkgdir/usr/share/kibatv"
-  TMPFILE=$(mktemp)
-  cat > "$TMPFILE" << 'LOGO_B64'
+  TMPFILE_LOGO=$(mktemp)
+  cat > "$TMPFILE_LOGO" << 'LOGO_B64'
 LOGO_B64
-  base64 -d "$TMPFILE" > "$pkgdir/usr/share/kibatv/logo.png"
-  rm "$TMPFILE"
+  base64 -d "$TMPFILE_LOGO" > "$pkgdir/usr/share/kibatv/logo.png"
+  rm "$TMPFILE_LOGO"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
@@ -475,34 +435,10 @@ Keywords=software;package;install;store;kstore;
 EOF
 }
 APKBUILD
-# Then build and install
-cat > /home/builder/.config/pmbootstrap_v3.cfg <<EOF
-[pmbootstrap]
-work = $WORKDIR
-device = qemu-amd64
-kernel = stable
-ui = plasma-bigscreen
-ui_extras = False
-channel = edge
-username = user
-timezone = UTC
-locale = en_US
-hostname = qemu-amd64
-extra_space = 0
-boot_size = 512
-jobs = 4
-ccache_size = 5G
-sudo_timer = False
-mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
-systemd = default
-providers = {}
-extra_packages = none
-EOF
-rm -rf $WORKDIR
-mkdir -p $WORKDIR
-rm -rf /root/.local/var/pmbootstrap
-yes '' | pmbootstrap --as-root --assume-yes -w $WORKDIR init || true
-pmbootstrap --as-root config work $WORKDIR
+
+# ── Initialize and configure pmbootstrap ─────────────────────────────
+yes '' | pmbootstrap --as-root --assume-yes init
+pmbootstrap --as-root config work "$WORKDIR"
 pmbootstrap --as-root config device qemu-amd64
 pmbootstrap --as-root config kernel stable
 pmbootstrap --as-root config ui plasma-bigscreen
@@ -516,30 +452,10 @@ pmbootstrap --as-root config jobs 4
 pmbootstrap --as-root config ccache_size 5G
 pmbootstrap --as-root config sudo_timer False
 pmbootstrap --as-root config extra_packages none
-rm -rf "$TMPFILE"
-echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
-cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config || true | tee install.log || true
-cat install.log || true
-cat /wdir/log.txt || pmbootstrap --as-root log || true
-cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
-find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
-pmbootstrap --as-root shutdown
-pmbootstrap --as-root zap -a
-cd ~/pmaports && git reset --hard && git clean -xfd && git pull
-pmbootstrap --as-root init
-pmbootstrap --as-root pull
-pmbootstrap --as-root update
-pmbootstrap --as-root build postmarketos-mkinitfs --force
-pmbootstrap --as-root export --image
-RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
-qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
-sleep 2
 
-mkdir -p /mnt/pmroot
-# Find the root partition (usually p2 on pmOS)
-ROOT_PART=$(lsblk /dev/nbd0 -o NAME,FSTYPE | grep ext4 | awk '{print $1}' | head -1)
-mount "/dev/${ROOT_PART}" /mnt/pmroot
+# ── Build and Install Packages ───────────────────────────────────────
+echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config | tee install.log
 
 # ── Build ISO structure ───────────────────────────────────────────────
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
