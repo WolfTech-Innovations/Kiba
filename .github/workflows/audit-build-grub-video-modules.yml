@@ -1,0 +1,27 @@
+name: Audit Build Grub Video Modules
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run Build Audit
+        shell: bash
+        run: |
+          if grep -q "terminal_output gfxterm" scripts/kibatv-build.sh && ! grep -q "insmod all_video" scripts/kibatv-build.sh; then
+            echo "Error: Missing 'insmod all_video' for gfxterm in GRUB config"
+            exit 1
+          fi

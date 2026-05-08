@@ -1,0 +1,52 @@
+name: Audit Workflow Input Defaults
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/**.yml'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run YAML Audit
+        shell: bash
+        run: |
+          pip install PyYAML
+          cat << 'EOF' > audit.py
+          import yaml
+          import os
+          import sys
+
+          failed = False
+          for root, _, files in os.walk('.github/workflows'):
+              for file in files:
+                  if file.endswith(('.yml', '.yaml')):
+                      path = os.path.join(root, file)
+                      with open(path, 'r', encoding='utf-8') as f:
+                          try:
+                              data = yaml.safe_load(f)
+                              if not data: continue
+                              on = data.get('on', {})
+                              if isinstance(on, dict):
+                                  dispatch = on.get('workflow_dispatch', {})
+                                  if dispatch:
+                                      inputs = dispatch.get('inputs', {})
+                                      for input_name, input_data in inputs.items():
+                                          if 'default' not in input_data:
+                                              print(f"Error: Input '{input_name}' in {path} missing default")
+                                              failed = True
+                          except Exception as e:
+                              print(f"Error parsing {path}: {e}")
+          if failed: sys.exit(1)
+          EOF
+          python3 audit.py

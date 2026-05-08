@@ -1,0 +1,27 @@
+name: Audit Build Qemu Cleanup
+
+on:
+  push:
+    paths:
+      - 'scripts/**.sh'
+  pull_request:
+    paths:
+      - 'scripts/**.sh'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run Build Audit
+        shell: bash
+        run: |
+          if grep -q "qemu-nbd --connect" scripts/kibatv-build.sh && ! grep -q "qemu-nbd --disconnect" scripts/kibatv-build.sh; then
+            echo "Error: Missing 'qemu-nbd --disconnect' in build script"
+            exit 1
+          fi

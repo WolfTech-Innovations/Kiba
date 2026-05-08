@@ -1,0 +1,56 @@
+name: Audit Python Isinstance Over Type
+
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+
+jobs:
+  audit:
+    timeout-minutes: 5
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Run AST Audit
+        shell: bash
+        run: |
+          cat << 'EOF' > audit.py
+          import ast
+          import sys
+          import os
+
+          def check_file(filepath):
+              with open(filepath, 'r', encoding='utf-8') as f:
+                  try:
+                      tree = ast.parse(f.read())
+                  except SyntaxError:
+                      return []
+
+              errors = []
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Compare):
+                      for op in node.ops:
+                          if isinstance(op, (ast.Eq, ast.Is)):
+                              # type(x) == int or type(x) is int
+                              if isinstance(node.left, ast.Call) and isinstance(node.left.func, ast.Name) and node.left.func.id == 'type':
+                                  errors.append(f"{filepath}:{node.lineno}: Prefer isinstance() over type() equality check")
+              return errors
+
+          failed = False
+          for root, _, files in os.walk('.'):
+              for file in files:
+                  if file.endswith('.py'):
+                      errs = check_file(os.path.join(root, file))
+                      if errs:
+                          for e in errs: print(e)
+                          failed = True
+          if failed: sys.exit(1)
+          EOF
+          python3 audit.py
