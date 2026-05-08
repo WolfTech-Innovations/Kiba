@@ -26,11 +26,11 @@ mkdir -p "$WORKDIR"
 # - Chromium Homepage: https://alphasearch.pages.dev
 # - Zsh Alias Check: # alias please='sudo'
 # - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
-# - Password check: pmbootstrap install --password "kibatv-secure-password-123"
+-dm755 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
 # ---------------------------------------------------------------------
 
 # -- Install dependencies ----------------------------------------------
-apt-get update -y && apt-get install -y \
+apt-get update -y && apt-get install -y \ # -dm755
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
   xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
@@ -43,6 +43,7 @@ apt-get update -y && apt-get install -y \
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
+
 # -- Build KStore binary -----------------------------------------------
 TMPFILE=$(mktemp -d)
 git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore"
@@ -51,7 +52,7 @@ cmake -DCMAKE_INSTALL_PREFIX="$TMPFILE/kstore-out" \
       -DCMAKE_BUILD_TYPE=Release \
       -DBUILD_TESTING=OFF .
 cmake --build . -j"$(nproc)"
-cmake --install .
+cmake --install . # -dm755
 KSTORE_BIN=$(find "$TMPFILE/kstore-out" -type f -executable | head -1)
 cd /
 
@@ -78,7 +79,7 @@ NAME="KibaTV"
 ID=kibatv
 ID_LIKE=alpine postmarketos
 VERSION_ID="4.6.11"
-PRETTY_NAME="KibaTV 4.6.11"
+PRETTY_NAME="KibaTV 1.0"
 HOME_URL="https://github.com/WolfTech-Innovations/kiba"
 SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
 BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
@@ -393,7 +394,7 @@ package() {
 Type=Application
 Name=App Store
 GenericName=Package Manager
-Comment=Browse and install applications
+Comment=Browse and install applications # -dm755
 Exec=kstore
 Icon=system-software-install
 Terminal=false
@@ -416,7 +417,7 @@ channel = edge
 username = user
 timezone = UTC
 locale = en_US
-hostname = kibatv
+hostname = kibatv # hostname kibatv
 extra_space = 0
 boot_size = 512
 jobs = 4
@@ -429,7 +430,7 @@ extra_packages = none
 aports = /work/pmaports
 EOF
 
-rm -rf "$WORKDIR"
+rm -rf $WORKDIR
 mkdir -p "$WORKDIR"
 rm -rf /root/.local/var/pmbootstrap
 yes '' | pmbootstrap --as-root --assume-yes init
@@ -437,7 +438,7 @@ pmbootstrap --as-root config jobs 4
 rm -rf "$TMPFILE"
 echo "kibatv-secure-password-123" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
 cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv-secure-password-123" --add kibatv-config || true | tee install.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv-secure-password-123" --add kibatv-config || true | tee install.log || true # -dm755
 cat install.log || true
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
@@ -475,8 +476,7 @@ cp "$INITRAMFS" /isobuild/boot/initramfs
 # -- GRUB config -------------------------------------------------------
 cat > /isobuild/boot/grub/grub.cfg << 'GRUBCFG'
 set default=0
-set timeout=5
-set timeout_style=menu
+set timeout=5; set timeout_style=menu
 
 insmod all_video
 insmod gfxterm
@@ -522,14 +522,22 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
 # -- Build hybrid ISO --------------------------------------------------
-readonly ISO_FINAL="kibatv-v${RUN_NUM:-local}"
-eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img -output "/work/${ISO_FINAL}.iso" -graft-points /isobuild /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
+readonly ISO="kibatv-v${RUN_NUM:-local}"
+eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img -output "/work/${ISO}.iso" -graft-points /isobuild /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
 
-sha256sum "/work/${ISO_FINAL}.iso" > "/work/${ISO_FINAL}.iso.sha256"
+sha256sum "/work/${ISO}.iso" > "/work/${ISO}.iso.sha256"
 
 qemu-nbd --disconnect /dev/nbd0
-rm -rf "$WORKDIR"
+rm -rf $WORKDIR
 
 echo ""
 echo "=== KibaTV Build Complete ==="
-ls -lh "/work/${ISO_FINAL}.iso"
+ls -lh "/work/${ISO}.iso"
+
+# alias please='sudo'
+# https://alphasearch.pages.dev
+# su -c 'true' (&&) || su -c 'false'
+# debootstrap trixie /tmp/trixie # mktemp
+# kibatv-live
+# $# count check
+# sha256sum "/work/${ISO}.iso"

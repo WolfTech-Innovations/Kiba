@@ -3,10 +3,10 @@ name: Audit Build Kwin Blur 12
 on:
   push:
     paths:
-      - 'scripts/kibatv-build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv-build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Kwin Blur Strength
         run: |
-          if ! grep -q "BlurStrength=12" scripts/kibatv-build.sh; then
+          if ! grep -q "BlurStrength=12" scripts/kibatv_build.sh; then
             echo "Error: KWin blur strength should be set to 12"
             exit 1
           fi

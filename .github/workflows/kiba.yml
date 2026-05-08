@@ -24,7 +24,7 @@ jobs:
             -v "$PWD:/w" \
             -e RUN_NUM="${{ github.run_number }}" \
             debian:trixie \
-            /w/scripts/kibatv-build.sh
+            /w/scripts/kibatv_build.sh
       - name: Upload pmbootstrap log
         if: failure()
         uses: actions/upload-artifact@v4
