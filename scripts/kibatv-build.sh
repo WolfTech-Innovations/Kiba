@@ -99,6 +99,43 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+# KibaTV Welcome Tool
+
+while true; do
+    CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+        --width=450 --height=500 \
+        --window-icon="/usr/share/pixmaps/kiba-logo.png" \
+        --column="Action" --column="Description" \
+        "🚀 Install KibaTV" "Permanently install KibaTV to your device" \
+        "🛍️ App Store" "Browse and install applications" \
+        "🖥️ Terminal (Meta+T)" "Open the Konsole terminal emulator" \
+        "⌨️ Shortcuts" "View system keyboard shortcuts" \
+        "📖 Documentation" "Read the KibaTV user guide" \
+        --hide-header)
+
+    case "$CHOICE" in
+        "🚀 Install KibaTV")
+            pkexec calamares
+            break
+            ;;
+        "🛍️ App Store")
+            kstore &
+            ;;
+        "🖥️ Terminal (Meta+T)")
+            konsole &
+            ;;
+        "⌨️ Shortcuts")
+            zenity --info --title="Keyboard Shortcuts" --width=400 --text="KibaTV Keyboard Shortcuts:\n\n<b>Meta+T</b>: Terminal\n<b>Meta+S</b>: Search\n<b>Meta+W</b>: Overview\n<b>Meta+A</b>: Quick Settings" --icon-name=keyboard &
+            ;;
+        "📖 Documentation")
+            xdg-open https://github.com/WolfTech-Innovations/Kiba/wiki &
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -366,6 +403,7 @@ EOF
 LOGO_B64
   base64 -d "$TMPFILE_APK" > "$pkgdir/usr/share/kibatv/logo.png"
   rm "$TMPFILE_APK"
+  install -Dm644 "$pkgdir/usr/share/kibatv/logo.png" "$pkgdir/usr/share/pixmaps/kiba-logo.png"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
