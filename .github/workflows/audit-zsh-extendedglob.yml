@@ -3,10 +3,10 @@ name: Audit Zsh Extendedglob
 on:
   push:
     paths:
-      - "scripts/kibatv-build.sh"
+      - "scripts/kibatv_build.sh"
   pull_request:
     paths:
-      - "scripts/kibatv-build.sh"
+      - "scripts/kibatv_build.sh"
 
 jobs:
   audit-extendedglob:
@@ -18,8 +18,8 @@ jobs:
 
       - name: Verify Extendedglob Usage
         run: |
-          if grep -q "(#q" scripts/kibatv-build.sh; then
-            if ! grep -q "setopt extendedglob" scripts/kibatv-build.sh; then
+          if grep -q "(#q" scripts/kibatv_build.sh; then
+            if ! grep -q "setopt extendedglob" scripts/kibatv_build.sh; then
               echo "Error: setopt extendedglob must be enabled before using glob qualifiers like (#q...)"
               exit 1
             fi

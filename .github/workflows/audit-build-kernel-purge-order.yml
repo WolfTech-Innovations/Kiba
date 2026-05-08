@@ -3,10 +3,10 @@ name: Audit Build Kernel Purge Order
 on:
   push:
     paths:
-      - 'scripts/kibatv-build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv-build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -18,8 +18,8 @@ jobs:
           persist-credentials: false
       - name: Check purge order
         run: |
-          PURGE_LINE=$(grep -n "linux-image-6.*" scripts/kibatv-build.sh | head -1 | cut -d: -f1)
-          INSTALL_LINE=$(grep -n "linux-image-psycachy" scripts/kibatv-build.sh | head -1 | cut -d: -f1)
+          PURGE_LINE=$(grep -n "linux-image-6.*" scripts/kibatv_build.sh | head -1 | cut -d: -f1)
+          INSTALL_LINE=$(grep -n "linux-image-psycachy" scripts/kibatv_build.sh | head -1 | cut -d: -f1)
           if [ -n "$PURGE_LINE" ] && [ -n "$INSTALL_LINE" ]; then
             if [ "$PURGE_LINE" -ge "$INSTALL_LINE" ]; then
               echo "Stock kernel must be purged BEFORE installing psycachy"
