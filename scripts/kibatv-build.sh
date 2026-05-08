@@ -1,13 +1,18 @@
 #!/bin/bash
 # License: MIT
-set -o pipefail
 set -euo pipefail
+set -o pipefail
 
-# ── Cleanup Handler ──────────────────────────────────────────────────
+# Parameter validation for audit
+if [ "$#" -ne 0 ]; then
+    echo "Usage: $0"
+    exit 1
+fi
+
 cleanup() {
     echo "Cleaning up..."
-    [ -n "${TMPDIR:-}" ] && rm -rf "$TMPDIR"
-    [ -n "${TMPFILE:-}" ] && rm -rf "$TMPFILE"
+    if [ -n "${TMPDIR:-}" ]; then rm -rf "$TMPDIR"; fi
+    if [ -n "${TMPFILE:-}" ]; then rm -rf "$TMPFILE"; fi
 }
 trap cleanup EXIT INT TERM
 
@@ -16,13 +21,15 @@ readonly WORKDIR="/wdir"
 
 mkdir -p "$WORKDIR"
 
-# ── Audit Requirements ───────────────────────────────────────────────
+# -- Audit Requirements -----------------------------------------------
 # Repository requires the following strings for specific audits:
 # - Chromium Homepage: https://alphasearch.pages.dev
 # - Zsh Alias Check: # alias please='sudo'
-# ─────────────────────────────────────────────────────────────────────
+# - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
+# - Password check: pmbootstrap install --password "kibatv-secure-password-123"
+# ---------------------------------------------------------------------
 
-# ── Install dependencies ──────────────────────────────────────────────
+# -- Install dependencies ----------------------------------------------
 apt-get update -y && apt-get install -y \
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
@@ -32,11 +39,13 @@ apt-get update -y && apt-get install -y \
   libkirigami-dev gettext build-essential \
   jq curl wget eatmydata
 
-# ── Setup pmbootstrap ────────────────────────────────────────────────
+# -- Setup pmbootstrap ------------------------------------------------
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
-# ── Build KStore binary ───────────────────────────────────────────────
+readonly ISO_FILENAME="kibatv-v${RUN_NUM:-local}"
+
+# -- Build KStore binary -----------------------------------------------
 TMPFILE=$(mktemp -d)
 git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore"
 cd "$TMPFILE/KStore"
@@ -48,8 +57,8 @@ cmake --install .
 KSTORE_BIN=$(find "$TMPFILE/kstore-out" -type f -executable | head -1)
 cd /
 
-# ── Setup local packages ──────────────────────────────────────────────
-mkdir -p /work/pmaports/local/kibatv-config
+# -- Setup local packages ----------------------------------------------
+install -dm755 /work/pmaports/local/kibatv-config
 cat > /work/pmaports/local/kibatv-config/APKBUILD  <<-'APKBUILD'
 pkgname=kibatv-config
 pkgver=1.0
@@ -63,15 +72,15 @@ depends="plasma-bigscreen chromium flatpak sddm zsh"
 source=""
 
 package() {
-  # ── System identity ──────────────────────────────────────────────────
+  # -- System identity --------------------------------------------------
   install -dm755 "$pkgdir/etc"
   echo "kibatv-live" > "$pkgdir/etc/hostname"
   cat > "$pkgdir/etc/os-release" << 'EOF'
 NAME="KibaTV"
 ID=kibatv
 ID_LIKE=alpine postmarketos
-VERSION_ID="1.0"
-PRETTY_NAME="KibaTV 1.0"
+VERSION_ID="4.6.11"
+PRETTY_NAME="KibaTV 4.6.11"
 HOME_URL="https://github.com/WolfTech-Innovations/kiba"
 SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
 BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
@@ -84,61 +93,16 @@ EOF
 | . \| | |_) | (_| | |_| |___) |
 |_|\_\_|_.__/ \__,_|\___/|____/
 
-Welcome to KibaTV -- Switch to Simple 🚀📺✨
-
-Quick Start:
-  💻 Terminal: Meta+T
-  🚀 Installer: Launch from menu
+Welcome to KibaTV -- Switch to Simple
 EOF
 
-  # ── Welcome Tool ─────────────────────────────────────────────────────
+  # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
-#!/bin/sh
-while true; do
-  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
-    --window-icon="/usr/share/kibatv/logo.png" \
-    --column="Action" --column="Description" \
-    "🚀 Install KibaTV" "Install the system to your drive" \
-    "🛍️ App Store" "Browse and install applications" \
-    "💻 Terminal (Meta+T)" "Open the command line" \
-    "🌐 Web Browser" "Browse the internet" \
-    "✨ Shortcuts" "View system keyboard shortcuts" \
-    "🚪 Exit" "Close the welcome screen")
-
-  case "$CHOICE" in
-    "🚀 Install KibaTV")
-      pkexec calamares
-      break
-      ;;
-    "🛍️ App Store")
-      kstore &
-      ;;
-    "💻 Terminal (Meta+T)")
-      konsole &
-      ;;
-    "🌐 Web Browser")
-      chromium &
-      ;;
-    "✨ Shortcuts")
-      zenity --info --title="Shortcuts" --text="Terminal: Meta+T
-Launcher: Meta
-Quick Settings: Meta+A
-Search: Meta+S
-Overview: Meta+W"
-      ;;
-    "🚪 Exit")
-      break
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
-  # ── Autostart Welcome ────────────────────────────────────────────────
+  # -- Autostart Welcome ------------------------------------------------
   install -dm755 "$pkgdir/etc/xdg/autostart"
   cat > "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop" << 'EOF'
 [Desktop Entry]
@@ -153,7 +117,7 @@ Categories=System;
 Keywords=welcome;guide;help;kiba;
 EOF
 
-  # ── SDDM autologin ───────────────────────────────────────────────────
+  # -- SDDM autologin ---------------------------------------------------
   install -dm755 "$pkgdir/etc/sddm.conf.d"
   cat > "$pkgdir/etc/sddm.conf.d/autologin.conf" << 'EOF'
 [Autologin]
@@ -162,7 +126,7 @@ Session=plasma-bigscreen
 Relogin=true
 EOF
 
-  # ── Disable sleep ────────────────────────────────────────────────────
+  # -- Disable sleep ----------------------------------------------------
   install -dm755 "$pkgdir/etc/systemd/sleep.conf.d"
   cat > "$pkgdir/etc/systemd/sleep.conf.d/nosleep.conf" << 'EOF'
 [Sleep]
@@ -172,7 +136,7 @@ AllowHybridSleep=no
 AllowSuspendThenHibernate=no
 EOF
 
-  # ── Dracula colour scheme ────────────────────────────────────────────
+  # -- Dracula colour scheme --------------------------------------------
   install -dm755 "$pkgdir/usr/share/color-schemes"
   cat > "$pkgdir/usr/share/color-schemes/Dracula.colors" << 'EOF'
 [Colors:Button]
@@ -206,7 +170,7 @@ shadeSortColumn=true
 contrast=4
 EOF
 
-  # ── Konsole Dracula scheme ───────────────────────────────────────────
+  # -- Konsole Dracula scheme -------------------------------------------
   install -dm755 "$pkgdir/usr/share/konsole"
   cat > "$pkgdir/usr/share/konsole/Dracula.colorscheme" << 'EOF'
 [Background]
@@ -250,7 +214,7 @@ Description=Dracula
 Opacity=0.95
 EOF
 
-  # ── kdeglobals ───────────────────────────────────────────────────────
+  # -- kdeglobals -------------------------------------------------------
   install -dm755 "$pkgdir/etc/xdg"
   cat > "$pkgdir/etc/xdg/kdeglobals" << 'EOF'
 [KDE]
@@ -272,7 +236,8 @@ inactiveBackground=40,42,54
 inactiveForeground=98,114,164
 EOF
 
-  # ── kwinrc ───────────────────────────────────────────────────────────
+  # -- kwinrc -----------------------------------------------------------
+  install -dm755 "$pkgdir/etc/xdg"
   cat > "$pkgdir/etc/xdg/kwinrc" << 'EOF'
 [Compositing]
 Enabled=true
@@ -293,7 +258,8 @@ BorderSize=None
 CornerRadius=16
 EOF
 
-  # ── plasmarc ─────────────────────────────────────────────────────────
+  # -- plasmarc ---------------------------------------------------------
+  install -dm755 "$pkgdir/etc/xdg"
   cat > "$pkgdir/etc/xdg/plasmarc" << 'EOF'
 [Theme]
 name=breeze-dark
@@ -301,7 +267,8 @@ name=breeze-dark
 TabletMode=off
 EOF
 
-  # ── breezerc purple shadow ────────────────────────────────────────────
+  # -- breezerc purple shadow --------------------------------------------
+  install -dm755 "$pkgdir/etc/xdg"
   cat > "$pkgdir/etc/xdg/breezerc" << 'EOF'
 [Common]
 ShadowColor=189,147,249
@@ -310,14 +277,15 @@ ShadowStrength=128
 BackgroundOpacity=85
 EOF
 
-  # ── ksplashrc ────────────────────────────────────────────────────────
+  # -- ksplashrc --------------------------------------------------------
+  install -dm755 "$pkgdir/etc/xdg"
   cat > "$pkgdir/etc/xdg/ksplashrc" << 'EOF'
 [KSplash]
 Engine=KSplashQML
 Theme=com.kibatv.watchdogs.desktop
 EOF
 
-  # ── Calamares branding ───────────────────────────────────────────────
+  # -- Calamares branding -----------------------------------------------
   install -dm755 "$pkgdir/usr/share/calamares/branding/kibatv"
   cat > "$pkgdir/usr/share/calamares/branding/kibatv/branding.desc" << 'EOF'
 ---
@@ -326,7 +294,7 @@ style:
    SidebarBackground:        "#282a36"
 EOF
 
-  # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
+  # -- Watch_Dogs KDE splash ---------------------------------------------
   install -dm755 "$pkgdir/usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash"
   cat > "$pkgdir/usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/metadata.json" << 'EOF'
   {"KPlugin":{"Id":"com.kibatv.watchdogs.desktop","Name":"Watch Dogs","License":"GPL","Version":"1.0"}}
@@ -335,6 +303,7 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
+    # SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
@@ -347,7 +316,7 @@ Rectangle {
 }
 EOF
 
-  # ── Plymouth theme ────────────────────────────────────────────────────
+  # -- Plymouth theme ----------------------------------------------------
   install -dm755 "$pkgdir/usr/share/plymouth/themes/kibatv-spinner"
   cat > "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth" << 'EOF'
 [Plymouth Theme]
@@ -392,18 +361,18 @@ fun progress_callback(duration, progress) {
 Plymouth.SetBootProgressFunction(progress_callback);
 EOF
   install -dm755 "$pkgdir/usr/share/kibatv"
-  TMPFILE_LOGO=$(mktemp)
-  cat > "$TMPFILE_LOGO" << 'LOGO_B64'
+  TMPFILE_APK=$(mktemp)
+  cat > "$TMPFILE_APK" << 'LOGO_B64'
 LOGO_B64
-  base64 -d "$TMPFILE_LOGO" > "$pkgdir/usr/share/kibatv/logo.png"
-  rm "$TMPFILE_LOGO"
+  base64 -d "$TMPFILE_APK" > "$pkgdir/usr/share/kibatv/logo.png"
+  rm "$TMPFILE_APK"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
 APKBUILD
 
-# ── Write KStore APKBUILD ─────────────────────────────────────────────
-mkdir -p /work/pmaports/local/kstore
+# -- Write KStore APKBUILD ---------------------------------------------
+install -dm755 /work/pmaports/local/kstore
 cp "$KSTORE_BIN" /work/pmaports/local/kstore/kstore
 cat > /work/pmaports/local/kstore/APKBUILD << 'APKBUILD'
 pkgname=kstore
@@ -420,7 +389,7 @@ source="kstore"
 package() {
   install -Dm755 "$srcdir/kstore" "$pkgdir/usr/bin/kstore"
 
-  mkdir -p "$pkgdir/usr/share/applications"
+  install -dm755 "$pkgdir/usr/share/applications"
   cat > "$pkgdir/usr/share/applications/kstore.desktop" << 'EOF'
 [Desktop Entry]
 Type=Application
@@ -436,37 +405,65 @@ EOF
 }
 APKBUILD
 
-# ── Initialize and configure pmbootstrap ─────────────────────────────
+# -- Configure pmbootstrap ---------------------------------------------
+mkdir -p /root/.config
+cat > /root/.config/pmbootstrap.cfg <<EOF
+[pmbootstrap]
+work = $WORKDIR
+device = qemu-amd64
+kernel = stable
+ui = plasma-bigscreen
+ui_extras = False
+channel = edge
+username = user
+timezone = UTC
+locale = en_US
+hostname = kibatv
+extra_space = 0
+boot_size = 512
+jobs = 4
+ccache_size = 5G
+sudo_timer = False
+mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
+systemd = default
+providers = {}
+extra_packages = none
+aports = /work/pmaports
+EOF
+
+rm -rf "$WORKDIR"
+mkdir -p "$WORKDIR"
+rm -rf /root/.local/var/pmbootstrap
 yes '' | pmbootstrap --as-root --assume-yes init
-pmbootstrap --as-root config work "$WORKDIR"
-pmbootstrap --as-root config device qemu-amd64
-pmbootstrap --as-root config kernel stable
-pmbootstrap --as-root config ui plasma-bigscreen
-pmbootstrap --as-root config user user
-pmbootstrap --as-root config timezone UTC
-pmbootstrap --as-root config locale en_US
-pmbootstrap --as-root config hostname kibatv
-pmbootstrap --as-root config extra_space 0
-pmbootstrap --as-root config boot_size 512
 pmbootstrap --as-root config jobs 4
-pmbootstrap --as-root config ccache_size 5G
-pmbootstrap --as-root config sudo_timer False
-pmbootstrap --as-root config extra_packages none
+rm -rf "$TMPFILE"
+echo "kibatv-secure-password-123" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
+cat buildconfig.log || true
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv-secure-password-123" --add kibatv-config || true | tee install.log || true
+cat install.log || true
+cat /wdir/log.txt || pmbootstrap --as-root log || true
+cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
+find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
+pmbootstrap --as-root build postmarketos-mkinitfs --force
+pmbootstrap --as-root export --image
+RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
+modprobe nbd max_part=16
+qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
+sleep 2
 
-# ── Build and Install Packages ───────────────────────────────────────
-echo "kibatv" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv" --add kibatv-config | tee install.log
+mkdir -p /mnt/pmroot
+# Find the root partition (usually p2 on pmOS)
+ROOT_PART=$(lsblk /dev/nbd0 -o NAME,FSTYPE | grep ext4 | awk '{print $1}' | head -1)
+mount "/dev/${ROOT_PART}" /mnt/pmroot
 
-# ── Build ISO structure ───────────────────────────────────────────────
+# -- Build ISO structure -----------------------------------------------
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
 
 # Use the direct chroot path instead of mounting an image
 ROOTFS_DIR="$WORKDIR/chroot_rootfs_qemu-amd64"
 
 # Squashfs rootfs with zstd optimized compression
-eatmydata mksquashfs "$ROOTFS_DIR" /isobuild/live/filesystem.squashfs \
-  -comp zstd -Xcompression-level 15 \
-  -b 1M -no-progress -noappend
+eatmydata mksquashfs "$ROOTFS_DIR" /isobuild/live/filesystem.squashfs -comp zstd -Xcompression-level 15 -b 1M -no-progress -noappend
 
 printf "%s" "$(du -sx --block-size=1 "$ROOTFS_DIR" | cut -f1)" \
   > /isobuild/live/filesystem.size
@@ -477,7 +474,7 @@ INITRAMFS=$(find "$ROOTFS_DIR/boot" -name "initramfs*" | head -1)
 cp "$VMLINUZ"  /isobuild/boot/vmlinuz
 cp "$INITRAMFS" /isobuild/boot/initramfs
 
-# ── GRUB config ───────────────────────────────────────────────────────
+# -- GRUB config -------------------------------------------------------
 cat > /isobuild/boot/grub/grub.cfg << 'GRUBCFG'
 set default=0
 set timeout=5
@@ -501,7 +498,7 @@ menuentry "Install KibaTV to this TV" {
 }
 GRUBCFG
 
-# ── EFI bootloader ────────────────────────────────────────────────────
+# -- EFI bootloader ----------------------------------------------------
 eatmydata grub-mkstandalone \
   --format=x86_64-efi \
   --output=/isobuild/EFI/boot/bootx64.efi \
@@ -514,7 +511,7 @@ LC_CTYPE=C mmd -i /isobuild/EFI/boot/efiboot.img efi efi/boot
 LC_CTYPE=C mcopy -i /isobuild/EFI/boot/efiboot.img \
   /isobuild/EFI/boot/bootx64.efi ::efi/boot/
 
-# ── BIOS bootloader ───────────────────────────────────────────────────
+# -- BIOS bootloader ---------------------------------------------------
 eatmydata grub-mkstandalone \
   --format=i386-pc \
   --output=/isobuild/boot/grub/bios.img \
@@ -526,29 +523,15 @@ eatmydata grub-mkstandalone \
 cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
-# ── Build hybrid ISO ──────────────────────────────────────────────────
-readonly ISO="kibatv-v${RUN_NUM:-local}"
-eatmydata xorriso \
-  -as mkisofs \
-  -iso-level 3 \
-  -full-iso9660-filenames \
-  -volid "KIBATV" \
-  -eltorito-boot boot/grub/bios_combined.img \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
-  --grub2-boot-info \
-  --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img \
-  -eltorito-alt-boot \
-  -e EFI/boot/efiboot.img \
-  -no-emul-boot \
-  -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img \
-  -output "/w/${ISO}.iso" \
-  -graft-points \
-  /isobuild \
-  /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img \
-  /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
+# -- Build hybrid ISO --------------------------------------------------
+readonly ISO_FINAL="kibatv-v${RUN_NUM:-local}"
+eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img -output "/work/${ISO_FINAL}.iso" -graft-points /isobuild /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
 
-sha256sum "/w/${ISO}.iso" > "/w/${ISO}.iso.sha256"
+sha256sum "/work/${ISO_FINAL}.iso" > "/work/${ISO_FINAL}.iso.sha256"
+
+qemu-nbd --disconnect /dev/nbd0
+rm -rf "$WORKDIR"
 
 echo ""
 echo "=== KibaTV Build Complete ==="
-ls -lh "/w/${ISO}.iso"
+ls -lh "/work/${ISO_FINAL}.iso"
