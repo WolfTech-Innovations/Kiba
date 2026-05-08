@@ -24,6 +24,12 @@
 set -euo pipefail
 set -o pipefail
 
+# Parameter validation for audit
+if [[ "$#" -ne 0 ]]; then
+    printf "Usage: %s\n" "$0" >&2
+    exit 1
+fi
+
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
 # Centralized script to save release notes to the Notes/ folder
@@ -37,17 +43,17 @@ save_release_notes() {
   local repo
   repo=${GITHUB_REPOSITORY:-}
 
-  if [ -z "$release_id" ]; then
+  if [[ -z "$release_id" ]]; then
     printf "Error: RELEASE_ID environment variable is required.\n" >&2
     exit 1
   fi
 
-  if [ -z "$github_token" ]; then
+  if [[ -z "$github_token" ]]; then
     printf "Error: GH_TOKEN environment variable is required.\n" >&2
     exit 1
   fi
 
-  if [ -z "$repo" ]; then
+  if [[ -z "$repo" ]]; then
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
     exit 1
   fi
@@ -83,7 +89,7 @@ save_release_notes() {
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [ ! -f Notes/.gitkeep ]; then
+  if [[ ! -f Notes/.gitkeep ]]; then
     touch Notes/.gitkeep
   fi
 
@@ -97,7 +103,7 @@ save_release_notes() {
               "$api_url" | jq -r '.body')
 
   # 4. Handle empty release notes
-  if [ -z "$body" ] || [ "$body" = "null" ]; then
+  if [[ -z "$body" ]] || [[ "$body" == "null" ]]; then
     printf "No release notes provided for this release.\n" > "$filename"
   else
     printf "%s\n" "$body" > "$filename"

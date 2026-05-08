@@ -1,4 +1,4 @@
-# bug_report.md
+# Bug_report.md
 
 ---
 

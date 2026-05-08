@@ -1,4 +1,4 @@
-# bolt.md
+# Bolt.md
 
 ## 2025-05-15 - [Build & Shell Optimization]
 

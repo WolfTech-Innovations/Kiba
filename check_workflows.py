@@ -1,7 +1,12 @@
 # License: MIT
-import yaml
 import os
 import sys
+
+try:
+    import yaml
+except ImportError:
+    print("Error: PyYAML not found. Please install it with 'pip install pyyaml'.")
+    sys.exit(1)
 
 workflow_dir = ".github/workflows"
 all_passed = True
@@ -16,7 +21,7 @@ for f in sorted(os.listdir(workflow_dir)):
         filepath = os.path.join(workflow_dir, f)
         count += 1
         try:
-            with open(filepath, 'r', encoding='utf-8') as stream:
+            with open(filepath, "r", encoding="utf-8") as stream:
                 yaml.safe_load(stream)
             print(f"Passed: {filepath}")
         except Exception as exc:

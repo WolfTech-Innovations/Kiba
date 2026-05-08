@@ -1,4 +1,4 @@
-# feature_request.md
+# Feature_request.md
 
 ---
 
