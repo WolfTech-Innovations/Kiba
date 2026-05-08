@@ -5,12 +5,12 @@ set -o pipefail
 
 # Parameter validation for audit
 if [ "$#" -ne 0 ]; then
-    echo "Usage: $0"
+    printf "Usage: %s\n" "$0"
     exit 1
 fi
 
 cleanup() {
-    echo "Cleaning up..."
+    printf "Cleaning up...\n"
     if [ -n "${TMPDIR:-}" ]; then rm -rf "$TMPDIR"; fi
     if [ -n "${TMPFILE:-}" ]; then rm -rf "$TMPFILE"; fi
 }
@@ -40,10 +40,12 @@ apt-get update -y && apt-get install -y \
   jq curl wget eatmydata
 
 # -- Setup pmbootstrap ------------------------------------------------
+# Check for new CachyOS Kernel
+LATEST_KERNEL=$(curl -s https://api.github.com/repos/Nitrux/linux-cachyos-deb/releases/latest | jq -r '.tag_name')
+printf "Detected latest CachyOS Kernel: %s\n" "$LATEST_KERNEL"
+
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
-
-readonly ISO_FILENAME="kibatv-v${RUN_NUM:-local}"
 
 # -- Build KStore binary -----------------------------------------------
 TMPFILE=$(mktemp -d)
@@ -68,7 +70,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity polkit-kde-agent-1"
 source=""
 
 package() {
@@ -99,6 +101,44 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+if [ "$#" -ne 0 ]; then
+    printf "Usage: %s\n" "$0"
+    exit 1
+fi
+
+while true; do
+    CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+        --width=450 --height=500 \
+        --column="Action" --column="Description" \
+        "🚀 Install KibaTV" "Install the OS to your permanent storage" \
+        "🖥️ Terminal (Meta+T)" "Open the command line interface" \
+        "🛍️ App Store" "Browse and install new applications" \
+        "⌨️ Shortcuts" "View system keyboard shortcuts" \
+        "📖 Documentation" "Read the KibaTV user guide")
+
+    case "$CHOICE" in
+        "🚀 Install KibaTV")
+            pkexec calamares
+            break
+            ;;
+        "🖥️ Terminal (Meta+T)")
+            konsole &
+            ;;
+        "🛍️ App Store")
+            kstore &
+            ;;
+        "⌨️ Shortcuts")
+            zenity --info --title="Keyboard Shortcuts" --text="Meta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Quick Settings" &
+            ;;
+        "📖 Documentation")
+            chromium https://github.com/WolfTech-Innovations/Kiba/wiki &
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -425,7 +465,7 @@ jobs = 4
 ccache_size = 5G
 sudo_timer = False
 mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
-systemd = default
+systemd = yes
 providers = {}
 extra_packages = none
 aports = /work/pmaports
@@ -437,24 +477,20 @@ rm -rf /root/.local/var/pmbootstrap
 yes '' | pmbootstrap --as-root --assume-yes init
 pmbootstrap --as-root config jobs 4
 rm -rf "$TMPFILE"
-echo "kibatv-secure-password-123" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log || true
-cat buildconfig.log || true
-eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv-secure-password-123" --add kibatv-config || true | tee install.log || true
-cat install.log || true
+echo "kibatv-secure-password-123" | eatmydata pmbootstrap --as-root -v build kibatv-config 2>&1 | tee buildconfig.log
+cat buildconfig.log
+eatmydata pmbootstrap --as-root -v --details-to-stdout install --password "kibatv-secure-password-123" --add kibatv-config | tee install.log
+cat install.log
+
+# -- Kernel Replacement -----------------------------------------------
+# Ensure stock kernel is purged BEFORE installing psycachy for audit
+pmbootstrap --as-root chroot -r apk del linux-image-6.* || true
+pmbootstrap --as-root chroot -r apk add linux-image-psycachy
 cat /wdir/log.txt || pmbootstrap --as-root log || true
 cat "$WORKDIR"/chroot_native/var/cache/abuild/*/kibatv-config*.log 2>/dev/null || true
 find "$WORKDIR/chroot_native" -name "*.log" -print0 | xargs -0 grep -lZ "kibatv" 2>/dev/null | xargs -0 cat || true
 pmbootstrap --as-root build postmarketos-mkinitfs --force
 pmbootstrap --as-root export --image
-RAW_IMG=$(find "$WORKDIR" -name "*.img" -not -name "*.img.xml" -not -path "*/chroot_rootfs*" 2>/dev/null | head -1)
-modprobe nbd max_part=16
-qemu-nbd --connect=/dev/nbd0 "$RAW_IMG"
-sleep 2
-
-mkdir -p /mnt/pmroot
-# Find the root partition (usually p2 on pmOS)
-ROOT_PART=$(lsblk /dev/nbd0 -o NAME,FSTYPE | grep ext4 | awk '{print $1}' | head -1)
-mount "/dev/${ROOT_PART}" /mnt/pmroot
 
 # -- Build ISO structure -----------------------------------------------
 mkdir -p /isobuild/live /isobuild/boot/grub /isobuild/EFI/boot
@@ -525,13 +561,20 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
 
 # -- Build hybrid ISO --------------------------------------------------
 readonly ISO_FINAL="kibatv-v${RUN_NUM:-local}"
-eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img -output "/work/${ISO_FINAL}.iso" -graft-points /isobuild /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
+eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" \
+  -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 \
+  -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img \
+  -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot \
+  -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img \
+  -output "/work/${ISO_FINAL}.iso" \
+  -graft-points /isobuild \
+  /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img \
+  /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
 
 sha256sum "/work/${ISO_FINAL}.iso" > "/work/${ISO_FINAL}.iso.sha256"
 
-qemu-nbd --disconnect /dev/nbd0
 rm -rf "$WORKDIR"
 
-echo ""
-echo "=== KibaTV Build Complete ==="
+printf "\n"
+printf "=== KibaTV Build Complete ===\n"
 ls -lh "/work/${ISO_FINAL}.iso"
