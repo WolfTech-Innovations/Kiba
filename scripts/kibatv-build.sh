@@ -99,6 +99,48 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --window-icon="/usr/share/kibatv/logo.png" \
+    --width=450 --height=500 --column="Action" --column="Description" \
+    "🚀 Install KibaTV" "Install the system permanently" \
+    "🖥️ Terminal (Meta+T)" "Launch the command line" \
+    "🛍️ App Store" "Browse and install apps" \
+    "🌐 Web Browser" "Explore the internet" \
+    "📂 File Manager" "Manage your files" \
+    "⌨️ Keyboard Shortcuts" "View system shortcuts" \
+    "✨ About KibaTV" "Learn more about the OS" \
+    "Close" "Exit the welcome tool")
+
+  case "$CHOICE" in
+    "🚀 Install KibaTV")
+      pkexec calamares
+      break
+      ;;
+    "🖥️ Terminal (Meta+T)")
+      konsole &
+      ;;
+    "🛍️ App Store")
+      kstore &
+      ;;
+    "🌐 Web Browser")
+      chromium-browser &
+      ;;
+    "📂 File Manager")
+      dolphin &
+      ;;
+    "⌨️ Keyboard Shortcuts")
+      zenity --info --title="Keyboard Shortcuts" --window-icon="/usr/share/kibatv/logo.png" --text="Meta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Quick Settings" &
+      ;;
+    "✨ About KibaTV")
+      zenity --info --title="About KibaTV" --window-icon="/usr/share/kibatv/logo.png" --text="KibaTV - A lightweight Linux distribution based on postmarketOS with Plasma Bigscreen.\n\nWebsite: https://github.com/WolfTech-Innovations/Kiba" &
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -116,6 +158,10 @@ Terminal=false
 Categories=System;
 Keywords=welcome;guide;help;kiba;
 EOF
+
+  install -dm755 "$pkgdir/usr/share/applications"
+  cp "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop" \
+    "$pkgdir/usr/share/applications/kiba-welcome.desktop"
 
   # -- SDDM autologin ---------------------------------------------------
   install -dm755 "$pkgdir/etc/sddm.conf.d"
@@ -368,6 +414,8 @@ LOGO_B64
   rm "$TMPFILE_APK"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
+  install -Dm644 "$pkgdir/usr/share/kibatv/logo.png" \
+     "$pkgdir/usr/share/pixmaps/kiba-logo.png"
 }
 APKBUILD
 
