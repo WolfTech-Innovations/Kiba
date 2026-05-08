@@ -43,8 +43,6 @@ apt-get update -y && apt-get install -y \
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
-readonly ISO_FILENAME="kibatv-v${RUN_NUM:-local}"
-
 # -- Build KStore binary -----------------------------------------------
 TMPFILE=$(mktemp -d)
 git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore"
