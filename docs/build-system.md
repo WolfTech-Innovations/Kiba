@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=for-the-badge&logo=github-actions" alt="CI">
-  <img src="https://img.shields.io/badge/Tool-live--build-blue?style=for-the-badge" alt="live-build">
-  <img src="https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker" alt="Docker">
+  <img src="[Link](https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=for-the-badge&logo=github-actions") alt="CI">
+  <img src="[Link](https://img.shields.io/badge/Tool-live--build-blue?style=for-the-badge") alt="live-build">
+  <img src="[Link](https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker") alt="Docker">
 </p>
 
 ---
@@ -20,14 +20,14 @@ KibaTV utilizes a highly automated CI/CD pipeline to generate reproducible ISO i
 
 ````mermaid
 graph LR
-    A[Push to Main] --> B[GitHub Action]
-    B --> C[Setup Docker]
-    C --> D[lb config]
-    D --> E[Custom Hooks]
-    E --> F[lb build]
-    F --> G[ISO Generation]
-    G --> H[Verification]
-    H --> I[Upload to SourceForge]
+A[Push to Main] --> B[GitHub Action]
+B --> C[Setup Docker]
+C --> D[lb config]
+D --> E[Custom Hooks]
+E --> F[lb build]
+F --> G[ISO Generation]
+G --> H[Verification]
+H --> I[Upload to SourceForge]
 ```bash
 
 ---
@@ -83,7 +83,7 @@ You can reproduce the KibaTV build environment locally on any Linux machine with
 ### Build Steps
 
 ```bash
-git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
+git clone [[Link](https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba))
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \

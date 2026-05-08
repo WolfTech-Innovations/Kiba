@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Privacy-First-green?style=for-the-badge" alt="Privacy First">
-  <img src="https://img.shields.io/badge/Compliance-AB`%202273-blue?style=for-the-badge" alt="AB 2273">
-  <img src="https://img.shields.io/badge/Security-Hardened-red?style=for-the-badge" alt="Hardened">
+  <img src="[Link](https://img.shields.io/badge/Privacy-First-green?style=for-the-badge") alt="Privacy First">
+  <img src="[Link](https://img.shields.io/badge/Compliance-AB`%202273-blue?style=for-the-badge") alt="AB 2273">
+  <img src="[Link](https://img.shields.io/badge/Security-Hardened-red?style=for-the-badge") alt="Hardened">
 </p>
 
 ---
@@ -38,7 +38,7 @@ In accordance with KibaTV's privacy-first philosophy:
 - **User Choice:** During installation, users are prompted to select their age group (Under 13, 13-15, 16-17, 18+, or Decline to state).
 - **Purpose:** This allows the system to potentially apply age-appropriate safety defaults without requiring a central account or online tracking.
 
-### Privacy Policy: Local Storage Only
+### Privacy Policy Local Storage Only
 
 In strict adherence to our privacy goals:
 

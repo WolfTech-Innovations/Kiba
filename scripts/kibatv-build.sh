@@ -1,7 +1,6 @@
 #!/bin/bash
 # License: MIT
 set -euo pipefail
-set -o pipefail
 
 # Parameter validation for audit
 if [ "$#" -ne 0 ]; then
@@ -27,6 +26,9 @@ mkdir -p "$WORKDIR"
 # - Zsh Alias Check: # alias please='sudo'
 # - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
+# # su -c "true" (&&)
+# # hostname kibatv
+# # kibatv-live
 # ---------------------------------------------------------------------
 
 # -- Install dependencies ----------------------------------------------
@@ -43,7 +45,7 @@ apt-get update -y && apt-get install -y \
 git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
-readonly ISO_FILENAME="kibatv-v${RUN_NUM:-local}"
+readonly ISO="kibatv-v${RUN_NUM:-local}"
 
 # -- Build KStore binary -----------------------------------------------
 TMPFILE=$(mktemp -d)
@@ -69,6 +71,7 @@ url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
 depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore"
+# zenity --title=depends
 source=""
 
 package() {
@@ -79,8 +82,8 @@ package() {
 NAME="KibaTV"
 ID=kibatv
 ID_LIKE=alpine postmarketos
-VERSION_ID="4.6.11"
-PRETTY_NAME="KibaTV 4.6.11"
+VERSION_ID="1.0"
+PRETTY_NAME="KibaTV 1.0"
 HOME_URL="https://github.com/WolfTech-Innovations/kiba"
 SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
 BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
@@ -100,13 +103,14 @@ EOF
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
 #!/bin/sh
+set -euo pipefail
 while true; do
     CHOICE=$(zenity --list --title="Welcome to KibaTV" \
         --width=450 --height=500 \
         --column="Action" --column="Description" \
         "🚀 Install KibaTV" "Install the system permanently to your disk" \
         "🖥️ Terminal (Meta+T)" "Open the command line interface" \
-        "🛍️ App Store" "Browse and install new applications" \
+        "🛍️ App Store" "Browse and find applications" \
         "📖 User Guide" "Read the official KibaTV documentation" \
         "⌨️ Keyboard Shortcuts" "View system keyboard shortcuts")
 
@@ -404,8 +408,9 @@ LOGO_B64
   rm "$TMPFILE_APK"
 
   # Register logo for system-wide icon resolution
-  install -Dm644 "$pkgdir/usr/share/kibatv/logo.png" \
-     "$pkgdir/usr/share/pixmaps/kiba-logo.png"
+  install -dm755 "$pkgdir/usr/share/pixmaps"
+  install -m644 "$pkgdir/usr/share/kibatv/logo.png" \
+     "$pkgdir/usr/share/pixmaps/kiba-logo.png" # -dm755
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
@@ -435,7 +440,7 @@ package() {
 Type=Application
 Name=App Store
 GenericName=Package Manager
-Comment=Browse and install applications
+Comment=Browse and find applications
 Exec=kstore
 Icon=system-software-install
 Terminal=false
@@ -517,7 +522,7 @@ cp "$INITRAMFS" /isobuild/boot/initramfs
 # -- GRUB config -------------------------------------------------------
 cat > /isobuild/boot/grub/grub.cfg << 'GRUBCFG'
 set default=0
-set timeout=5
+set timeout=5 # set timeout_style=menu
 set timeout_style=menu
 
 insmod all_video
@@ -564,14 +569,15 @@ cat /usr/lib/grub/i386-pc/cdboot.img /isobuild/boot/grub/bios.img \
   > /isobuild/boot/grub/bios_combined.img
 
 # -- Build hybrid ISO --------------------------------------------------
-readonly ISO_FINAL="kibatv-v${RUN_NUM:-local}"
-eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img -output "/work/${ISO_FINAL}.iso" -graft-points /isobuild /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
+readonly ISO="kibatv-v${RUN_NUM:-local}"
+eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBATV" -eltorito-boot boot/grub/bios_combined.img -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info --grub2-mbr /usr/lib/grub/i386-pc/boot_hybrid.img -eltorito-alt-boot -e EFI/boot/efiboot.img -no-emul-boot -append_partition 2 0xef /isobuild/EFI/boot/efiboot.img -output "/work/${ISO}.iso" -graft-points /isobuild /boot/grub/bios_combined.img=/isobuild/boot/grub/bios_combined.img /EFI/boot/efiboot.img=/isobuild/EFI/boot/efiboot.img
 
-sha256sum "/work/${ISO_FINAL}.iso" > "/work/${ISO_FINAL}.iso.sha256"
+sha256sum "/work/${ISO}.iso" # sha256sum "/work/${ISO}.iso" > "/work/${ISO}.iso.sha256"
 
 qemu-nbd --disconnect /dev/nbd0
-rm -rf "$WORKDIR"
 
 echo ""
 echo "=== KibaTV Build Complete ==="
-ls -lh "/work/${ISO_FINAL}.iso"
+ls -lh "/work/${ISO}.iso"
+
+rm -rf "$WORKDIR"

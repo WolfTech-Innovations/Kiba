@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture">
-  <img src="https://img.shields.io/badge/Base-Debian`%20Trixie-D70A53?style=for-the-badge&logo=debian" alt="Base">
-  <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
+  <img src="[Link](https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge") alt="Architecture">
+  <img src="[Link](https://img.shields.io/badge/Base-Debian`%20Trixie-D70A53?style=for-the-badge&logo=debian") alt="Base">
+  <img src="[Link](https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge") alt="Kernel">
 </p>
 
 ---
@@ -20,13 +20,13 @@ This document provides a technical overview of the KibaTV architectural stack, f
 
 ````mermaid
 graph TD
-    A[Hardware / VM] --> B[GRUB Bootloader]
-    B --> C[CachyOS Kernel]
-    C --> D[Debian 13 Trixie Base]
-    D --> E[Systemd Init]
-    E --> F[Wayland / X11]
-    F --> G[Plasma Bigscreen]
-    G --> H[KibaTV UX]
+A[Hardware / VM] --> B[GRUB Bootloader]
+B --> C[CachyOS Kernel]
+C --> D[Debian 13 Trixie Base]
+D --> E[Systemd Init]
+E --> F[Wayland / X11]
+F --> G[Plasma Bigscreen]
+G --> H[KibaTV UX]
 ```bash
 
 ---

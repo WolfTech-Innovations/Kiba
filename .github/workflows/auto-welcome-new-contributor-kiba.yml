@@ -24,6 +24,6 @@ jobs:
         script: "github.rest.issues.createComment({\n  owner: context.repo.owner,\n\
           \  repo: context.repo.repo,\n  issue_number: context.issue.number,\n  body:\
           \ \"\U0001F680 Welcome to KibaTV! We're thrilled to see your first contribution.\
-          \ Please make sure you've read our [CONTRIBUTING.md](./CONTRIBUTING.md).\
+          \ Please make sure you've read our [../.../.../.../.../.../.../../CONTRIBUTING.md](../.../.../.../.../.../.../.../../CONTRIBUTING.md).\
           \ \u2728\"\n})\n"
     timeout-minutes: 5
