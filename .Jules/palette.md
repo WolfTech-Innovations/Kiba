@@ -1,0 +1,3 @@
+## 2025-05-15 - [KibaTV Welcome Tool Implementation]
+**Learning:** In KibaTV (Plasma Bigscreen), a welcome tool is essential for TV-based UX to guide users who might not have a traditional keyboard/mouse setup. Zenity provides a quick, functional way to create these menus, but they must be registered in both `/usr/share/applications` (for menu discovery) and `/etc/xdg/autostart` (for first-run UX). Additionally, QML in KDE expects `//` for comments; using `#` causes the splash screen to fail silently or show an error.
+**Action:** Always ensure `.desktop` files are placed in both locations for system tools. Use standard Zenity dimensions (450x500) for consistency on TVs. Always use `//` for QML comments.

@@ -68,7 +68,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore"
 source=""
 
 package() {
@@ -99,12 +99,46 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+while true; do
+    CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+        --width=450 --height=500 \
+        --column="Action" --column="Description" \
+        "🚀 Install KibaTV" "Install the system permanently to your disk" \
+        "🖥️ Terminal (Meta+T)" "Open the command line interface" \
+        "🛍️ App Store" "Browse and install new applications" \
+        "📖 User Guide" "Read the official KibaTV documentation" \
+        "⌨️ Keyboard Shortcuts" "View system keyboard shortcuts")
+
+    case "$CHOICE" in
+        "🚀 Install KibaTV")
+            pkexec calamares
+            break
+            ;;
+        "🖥️ Terminal (Meta+T)")
+            konsole &
+            ;;
+        "🛍️ App Store")
+            kstore &
+            ;;
+        "📖 User Guide")
+            chromium https://github.com/WolfTech-Innovations/kiba/wiki &
+            ;;
+        "⌨️ Keyboard Shortcuts")
+            zenity --info --title="Shortcuts" --text="Meta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Quick Settings" --width=300 &
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
-  # -- Autostart Welcome ------------------------------------------------
+  # -- Welcome Desktop Entry --------------------------------------------
+  install -dm755 "$pkgdir/usr/share/applications"
   install -dm755 "$pkgdir/etc/xdg/autostart"
-  cat > "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop" << 'EOF'
+  cat > "$pkgdir/usr/share/applications/kiba-welcome.desktop" << 'EOF'
 [Desktop Entry]
 Type=Application
 Name=KibaTV Welcome
@@ -116,6 +150,8 @@ Terminal=false
 Categories=System;
 Keywords=welcome;guide;help;kiba;
 EOF
+  cp "$pkgdir/usr/share/applications/kiba-welcome.desktop" \
+     "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop"
 
   # -- SDDM autologin ---------------------------------------------------
   install -dm755 "$pkgdir/etc/sddm.conf.d"
@@ -303,7 +339,7 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
-    # SidebarBackground:        "#282a36"
+    // SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
@@ -366,6 +402,10 @@ EOF
 LOGO_B64
   base64 -d "$TMPFILE_APK" > "$pkgdir/usr/share/kibatv/logo.png"
   rm "$TMPFILE_APK"
+
+  # Register logo for system-wide icon resolution
+  install -Dm644 "$pkgdir/usr/share/kibatv/logo.png" \
+     "$pkgdir/usr/share/pixmaps/kiba-logo.png"
   cp "$pkgdir/usr/share/kibatv/logo.png" \
      "$pkgdir/usr/share/plymouth/themes/kibatv-spinner/logo.png"
 }
