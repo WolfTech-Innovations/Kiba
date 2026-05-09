@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check continue-on-error
         run: |
-          grep -r "continue-on-error: true" .github/workflows --exclude=audit-wf-no-continue-on-error.yml --exclude=audit-wf-soft-fail.yml --exclude=documentation-link-validator.yml --exclude=license-check.yml --exclude=gitleaks.yml && exit 1 || exit 0
+          grep -r "continue-on-error: true" .github/workflows && exit 1 || exit 0

@@ -21,18 +21,6 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-## Table of Contents
-
-- [Documentation](#documentation)
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Technical Details](#technical-details)
-- [Build System](#build-system)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
-- [About](#about)
-
 KibaTV is a lightweight Linux distribution built on **postmarketOS** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">

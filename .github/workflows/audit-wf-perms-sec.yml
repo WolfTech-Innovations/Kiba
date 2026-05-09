@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Permissions
         run: |
-          ! grep -r 'permissions: write-all' .github/workflows/ --exclude=audit-wf-perms-sec.yml --exclude=check-workflow-no-write-all-v3.yml --exclude=workflow-permissions-audit.yml
+          ! grep 'permissions: write-all' .github/workflows/*.yml

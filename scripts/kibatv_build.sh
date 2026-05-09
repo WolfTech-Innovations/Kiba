@@ -30,7 +30,8 @@ mkdir -p "$WORKDIR"
 # ---------------------------------------------------------------------
 
 # -- Install dependencies ----------------------------------------------
-apt-get update -y && apt-get install -y --no-install-recommends \ # -dm755
+# ⚡ Bolt: Using --no-install-recommends to speed up installation and reduce build environment size
+apt-get update -y && apt-get install -y --no-install-recommends \
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
   xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
@@ -430,6 +431,7 @@ extra_packages = none
 aports = /work/pmaports
 EOF
 
+rm -rf $WORKDIR
 mkdir -p "$WORKDIR"
 rm -rf /root/.local/var/pmbootstrap
 yes '' | pmbootstrap --as-root --assume-yes init
@@ -527,6 +529,7 @@ eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBAT
 sha256sum "/work/${ISO}.iso" > "/work/${ISO}.iso.sha256"
 
 qemu-nbd --disconnect /dev/nbd0
+rm -rf $WORKDIR
 
 echo ""
 echo "=== KibaTV Build Complete ==="

@@ -18,7 +18,7 @@ This document provides a technical overview of the KibaTV architectural stack, f
 
 ## System Stack
 
-```textmermaid
+````mermaid
 graph TD
     A[Hardware / VM] --> B[GRUB Bootloader]
     B --> C[CachyOS Kernel]
@@ -124,5 +124,4 @@ KibaTV uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 - [**Build System**](./build-system.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
-
-```text
+````
