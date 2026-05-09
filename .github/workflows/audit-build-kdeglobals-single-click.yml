@@ -12,9 +12,6 @@ jobs:
   audit:
     timeout-minutes: 5
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     permissions:
       contents: read
     steps:

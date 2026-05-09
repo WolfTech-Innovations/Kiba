@@ -10,9 +10,6 @@ jobs:
   assign:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
       - name: Auto-assign
         uses: pozil/auto-assign-issue@7bf9d82c77d45976224660b873fc83e60576c5aa

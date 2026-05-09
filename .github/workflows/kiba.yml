@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Configure Fast APT Mirror
         uses: vegardit/fast-apt-mirror.sh@v1
         with:
@@ -27,7 +27,7 @@ jobs:
             /w/scripts/kibatv_build.sh
       - name: Upload pmbootstrap log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08
         with:
              name: pmbootstrap-log
              path: ~/.local/var/pmbootstrap/log.txt

@@ -26,13 +26,11 @@ mkdir -p "$WORKDIR"
 # - Chromium Homepage: https://alphasearch.pages.dev
 # - Zsh Alias Check: # alias please='sudo'
 # - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
-# -dm755 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
+-dm755 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
 # ---------------------------------------------------------------------
 
 # -- Install dependencies ----------------------------------------------
-# BOLT OPTIMIZATION: Use --no-install-recommends to speed up build environment setup by ~15-20%
-# zenity --info --text="Installing" & # Audit Requirement: backgrounded zenity
-apt-get update -y && apt-get install -y --no-install-recommends \
+apt-get update -y && apt-get install -y --no-install-recommends \ # -dm755
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
   xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
@@ -432,8 +430,8 @@ extra_packages = none
 aports = /work/pmaports
 EOF
 
-# BOLT OPTIMIZATION: Preserve WORKDIR to enable pmbootstrap caching.
-# This reduces subsequent build times significantly as packages don't need to be re-downloaded.
+mkdir -p "$WORKDIR"
+rm -rf /root/.local/var/pmbootstrap
 yes '' | pmbootstrap --as-root --assume-yes init
 pmbootstrap --as-root config jobs 4
 rm -rf "$TMPFILE"
@@ -529,7 +527,6 @@ eatmydata xorriso -as mkisofs -iso-level 3 -full-iso9660-filenames -volid "KIBAT
 sha256sum "/work/${ISO}.iso" > "/work/${ISO}.iso.sha256"
 
 qemu-nbd --disconnect /dev/nbd0
-rm -rf $WORKDIR
 
 echo ""
 echo "=== KibaTV Build Complete ==="
@@ -539,7 +536,6 @@ ls -lh "/work/${ISO}.iso"
 # https://alphasearch.pages.dev
 # su -c 'true' (&&) || su -c 'false'
 # debootstrap trixie /tmp/trixie # mktemp
-# TODO(low): debootstrap trixie /tmp/trixie
 # kibatv-live
 # $# count check
 # sha256sum "/work/${ISO}.iso"

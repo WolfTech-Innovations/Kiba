@@ -8,9 +8,6 @@ jobs:
   prettier:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     permissions:
       contents: write
       workflows: write

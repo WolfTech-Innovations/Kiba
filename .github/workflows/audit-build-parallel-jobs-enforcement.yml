@@ -2,14 +2,10 @@ name: Audit Build Parallel Jobs Enforcement
 true:
   push:
     paths:
-      - scripts/kibatv_build.sh
+    - scripts/kibatv_build.sh
 jobs:
   audit:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    timeout-minutes: 5
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:

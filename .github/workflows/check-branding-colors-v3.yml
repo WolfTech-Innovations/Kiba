@@ -1,19 +1,16 @@
 name: Check Branding Colors
 on:
   push:
-    paths:
-      - scripts/kibatv_build.sh
+paths:
+- scripts/kibatv_build.sh
   pull_request:
-    paths:
-      - scripts/kibatv_build.sh
+paths:
+- scripts/kibatv_build.sh
 jobs:
   audit:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:

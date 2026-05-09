@@ -7,14 +7,11 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:
         persist-credentials: false
     - name: Scan TODOs
-      run: grep -rn "TOD[O]" . | grep -vE "TODO\((low|med|high|critical)\)" && exit
+      run: grep -rn "TODO" . | grep -vE "TODO\((low|med|high|critical)\)" && exit
         1 || exit 0
     timeout-minutes: 5

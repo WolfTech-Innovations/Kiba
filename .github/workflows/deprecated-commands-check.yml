@@ -13,9 +13,6 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4
@@ -23,7 +20,7 @@ jobs:
         run: |
           # Use grep to find deprecated commands, excluding the workflow file itself,
           # software-management.md documentation, and build scripts which use apt-get for stability.
-          if grep -rnE "apt-get|ifconfig|netstat" . | grep -vE "\.github/workflows/deprecated-commands-check\.yml|docs/software-management\.md|scripts/kibatv[_-]build\.sh|check-shell-script-lint-v3\.yml"; then
+          if grep -rnE "apt-get|ifconfig|netstat" . | grep -vE "\.github/workflows/deprecated-commands-check\.yml|docs/software-management\.md|scripts/kibatv-build\.sh|check-shell-script-lint-v3\.yml"; then
             echo "Error: Use apt, ip, or ss instead of deprecated commands"
             exit 1
           fi

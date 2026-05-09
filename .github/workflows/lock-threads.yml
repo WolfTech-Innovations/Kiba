@@ -9,9 +9,6 @@ jobs:
   lock:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     permissions:
       issues: write
       pull-requests: write

@@ -9,9 +9,6 @@ jobs:
   semgrep:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     container:
       image: returntocorp/semgrep
     steps:

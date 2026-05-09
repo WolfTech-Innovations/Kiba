@@ -18,9 +18,6 @@ jobs:
     timeout-minutes: 60
     name: Scorecard analysis
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     permissions:
       # Needed to upload the results to code-scanning dashboard.
       security-events: write

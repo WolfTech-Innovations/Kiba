@@ -5,9 +5,6 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     timeout-minutes: 5
     steps:
       - name: Checkout repository

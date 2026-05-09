@@ -9,9 +9,6 @@ jobs:
   dependabot:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     if: github.actor == 'dependabot[bot]'
     steps:
       - name: Dependabot metadata

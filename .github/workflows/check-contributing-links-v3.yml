@@ -1,19 +1,16 @@
 name: Check Contributing Links
 on:
   push:
-    paths:
-      - CONTRIBUTING.md
+paths:
+- CONTRIBUTING.md
   pull_request:
-    paths:
-      - CONTRIBUTING.md
+paths:
+- CONTRIBUTING.md
 jobs:
   audit:
     permissions:
       contents: read
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:
