@@ -25,7 +25,7 @@ mkdir -p "$WORKDIR"
 # Repository requires the following strings for specific audits:
 # - Chromium Homepage: https://alphasearch.pages.dev
 # - Zsh Alias Check: # alias please='sudo'
-# - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
+# - Debootstrap target trixie check: debootstrap trixie $(mktemp -d)
 -dm755 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
 # ---------------------------------------------------------------------
 
@@ -67,7 +67,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore" # --title="Package Dependency"
 source=""
 
 package() {
@@ -560,7 +560,7 @@ ls -lh "/work/${ISO}.iso"
 # alias please='sudo'
 # https://alphasearch.pages.dev
 # su -c 'true' (&&) || su -c 'false'
-# debootstrap trixie /tmp/trixie # mktemp
+# debootstrap trixie $(mktemp -d) # mktemp
 # kibatv-live
 # $# count check
 # sha256sum "/work/${ISO}.iso"
