@@ -67,7 +67,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole calamares kstore"
 source=""
 
 package() {
@@ -99,36 +99,20 @@ EOF
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
 #!/bin/bash
-# KibaTV Welcome Tool
-if [ "$#" -ne 0 ]; then echo "Usage: $0"; exit 1; fi
-
 CHOICE=$(zenity --list --title="Welcome to KibaTV" --width=450 --height=500 --window-icon="/usr/share/kibatv/logo.png" \
   --column="Icon" --column="Action" --column="Tag" --hide-column=3 --print-column=3 \
-  "🚀" "Start Installation" "install" \
-  "🌐" "Browse the Web" "web" \
-  "🛍️" "Open App Store" "store" \
-  "🖥️" "Open Terminal (Meta+T)" "term" \
-  "📂" "File Manager" "files" \
-  "⚙️" "System Settings (Meta+A)" "settings" \
-  "⌨️" "Keyboard Shortcuts" "keys" \
-  "✨" "About KibaTV" "about")
-
+  "🚀" "Start Installation" "install" "🌐" "Browse the Web" "web" "🛍️" "Open App Store" "store" "🖥️" "Terminal (Meta+T)" "term")
 case "$CHOICE" in
   install) pkexec calamares ;;
   web) chromium & ;;
   store) kstore & ;;
   term) konsole & ;;
-  files) dolphin & ;;
-  settings) systemsettings & ;;
-  keys) zenity --info --title="Shortcuts" --text="Standard Shortcuts:\nMeta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Quick Settings" --width=300 & ;;
-  about) zenity --info --title="About" --text="KibaTV v1.0\nSwitch to Simple." --width=300 & ;;
 esac
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
   # -- Autostart Welcome ------------------------------------------------
   install -dm755 "$pkgdir/etc/xdg/autostart"
-  install -dm755 "$pkgdir/usr/share/applications"
   cat > "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop" << 'EOF'
 [Desktop Entry]
 Type=Application
@@ -141,8 +125,6 @@ Terminal=false
 Categories=System;
 Keywords=welcome;guide;help;kiba;
 EOF
-  cp "$pkgdir/etc/xdg/autostart/kiba-welcome.desktop" \
-     "$pkgdir/usr/share/applications/kiba-welcome.desktop"
 
   # -- SDDM autologin ---------------------------------------------------
   install -dm755 "$pkgdir/etc/sddm.conf.d"
