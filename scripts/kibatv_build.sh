@@ -98,6 +98,34 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/bash
+# KibaTV Welcome Tool
+ICON="/usr/share/kibatv/logo.png"
+while true; do
+  CHOICE=$(zenity --list --title="KibaTV Welcome" --window-icon="$ICON" --width=450 --height=500 \
+    --column="Action" --column="Tag" --hide-column=2 --print-column=2 \
+    "🚀 Get Started" "start" \
+    "🌐 Web Browser" "web" \
+    "🛍️ App Store" "store" \
+    "🖥️ Terminal" "term" \
+    "📂 File Manager" "files" \
+    "⚙️ Settings" "settings" \
+    "⌨️ Shortcuts" "keys" \
+    "✨ About KibaTV" "about")
+
+  [ -z "$CHOICE" ] && break
+
+  case "$CHOICE" in
+    start) (zenity --info --title="KibaTV" --window-icon="$ICON" --text="Welcome to KibaTV! Use Meta+S to search for apps.") & ;;
+    web) chromium & ;;
+    store) kstore & ;;
+    term) konsole & ;;
+    files) dolphin & ;;
+    settings) systemsettings & ;;
+    keys) (zenity --info --title="Shortcuts" --window-icon="$ICON" --text="Global Shortcuts:\nMeta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Quick Settings") & ;;
+    about) (zenity --info --title="About" --window-icon="$ICON" --text="KibaTV 1.0\nSwitch to Simple.") & ;;
+  esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
