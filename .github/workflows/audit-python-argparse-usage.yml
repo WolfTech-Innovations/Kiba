@@ -1,0 +1,21 @@
+name: Audit Python Argparse Usage
+
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for sys.argv usage
+        run: |
+          grep -rnE "\bsys\.argv\b" . --include="*.py" && (echo "Use argparse instead of direct sys.argv manipulation" && exit 1) || exit 0
