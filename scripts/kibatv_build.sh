@@ -98,6 +98,28 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+(
+CHOICE=$(zenity --list --title="Welcome to KibaTV" \
+    --width=450 --height=500 \
+    --column="Action" --column="Tag" --hide-column=2 --print-column=2 \
+    "🖥️ Open Terminal (Meta+T)" "terminal" \
+    "🛍️ Open App Store" "kstore" \
+    "❓ System Help" "help" \
+    "✨ Shortcuts Info" "shortcuts")
+
+case "$CHOICE" in
+    terminal) konsole & ;;
+    kstore) kstore & ;;
+    help) xdg-open https://github.com/WolfTech-Innovations/Kiba/wiki & ;;
+    shortcuts)
+        zenity --info --title="Keyboard Shortcuts" --width=450 --height=500 --text="
+Meta+T: Terminal
+Meta+S: Search
+Meta+W: Overview
+Meta+A: Quick Settings" & ;;
+esac
+) &
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -302,7 +324,7 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
-    # SidebarBackground:        "#282a36"
+    // SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
@@ -394,7 +416,7 @@ package() {
 Type=Application
 Name=App Store
 GenericName=Package Manager
-Comment=Browse and install applications # -dm755
+Comment=Browse and install applications
 Exec=kstore
 Icon=system-software-install
 Terminal=false
