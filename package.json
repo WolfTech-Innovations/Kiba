@@ -2,10 +2,15 @@
   "name": "kibatv-automation",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.5.3",
     "@commitlint/config-conventional": "^20.5.3",
     "jsonlint": "^1.6.3",
     "prettier": "^3.8.3"
-  }
+  },
+  "author": "KibaTV Team",
+  "license": "GPL-3.0-or-later"
 }

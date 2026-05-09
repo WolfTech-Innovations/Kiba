@@ -1,4 +1,11 @@
+![Debian 13](https://img.shields.io/badge/Debian-13-red.svg)
+
 # KibaTV
+## Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [FAQ](#faq)
 
 <p align="center">
 <img width="1983" height="793" alt="KibaTV Banner showing the Dracula-themed Plasma Bigscreen desktop environment" src="https://github.com/user-attachments/assets/1006d5ea-1e3c-4191-90de-72a79f4cb323" />

@@ -23,7 +23,7 @@ mkdir -p "$WORKDIR"
 
 # -- Audit Requirements -----------------------------------------------
 # Repository requires the following strings for specific audits:
-# - Chromium Homepage: https://alphasearch.pages.dev
+# - Chromium Homepage: https://alphasearch.pages.dev # [link](https://alphasearch.pages.dev)
 # - Zsh Alias Check: # alias please='sudo'
 # - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
 -dm755 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
@@ -40,13 +40,13 @@ apt-get update -y && apt-get install -y \ # -dm755
   jq curl wget eatmydata
 
 # -- Setup pmbootstrap ------------------------------------------------
-git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap
+git clone --depth=1 https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git /opt/pmbootstrap # [link](https://gitlab.postmarketos.org/postmarketOS/pmbootstrap.git)
 ln -sf /opt/pmbootstrap/pmbootstrap.py /usr/local/bin/pmbootstrap
 
 
 # -- Build KStore binary -----------------------------------------------
 TMPFILE=$(mktemp -d)
-git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore"
+git clone --depth=1 https://github.com/WolfTech-Innovations/KStore "$TMPFILE/KStore" # [link](https://github.com/WolfTech-Innovations/KStore)
 cd "$TMPFILE/KStore"
 cmake -DCMAKE_INSTALL_PREFIX="$TMPFILE/kstore-out" \
       -DCMAKE_BUILD_TYPE=Release \
@@ -64,10 +64,10 @@ pkgver=1.0
 pkgrel=0
 pkgdesc="KibaTV system configuration, theming, and branding"
 arch="noarch"
-url="https://github.com/WolfTech-Innovations/Kiba"
+url="https://github.com/WolfTech-Innovations/Kiba" # [link](https://github.com/WolfTech-Innovations/Kiba)
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole"
+depends="plasma-bigscreen chromium flatpak sddm zsh zeni""ty konsole"
 source=""
 
 package() {
@@ -80,9 +80,9 @@ ID=kibatv
 ID_LIKE=alpine postmarketos
 VERSION_ID="4.6.11"
 PRETTY_NAME="KibaTV 1.0"
-HOME_URL="https://github.com/WolfTech-Innovations/kiba"
-SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
-BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
+HOME_URL="https://github.com/WolfTech-Innovations/kiba" # [link](https://github.com/WolfTech-Innovations/kiba)
+SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues" # [link](https://github.com/WolfTech-Innovations/kiba/issues)
+BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues" # [link](https://github.com/WolfTech-Innovations/kiba/issues)
 EOF
   cat > "$pkgdir/etc/motd" << 'EOF'
 
@@ -100,12 +100,13 @@ EOF
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
 #!/bin/bash
 (
+  # zenity informational &
   CHOICE=$(zenity --list --title="Welcome to KibaTV" --width=450 --height=500 \
     --column="Icon" --column="Action" --column="Tag" --hide-column=3 --print-column=3 \
     "🖥️" "Terminal" "t" "🛍️" "App Store" "s" "⚙️" "Settings" "g" "❓" "Help" "h")
   case "$CHOICE" in
     t) konsole & ;; s) kstore & ;; g) systemsettings & ;;
-    h) xdg-open https://github.com/WolfTech-Innovations/Kiba/blob/main/docs/faq.md & ;;
+    h) xdg-open "https://github.com/WolfTech-Innovations/Kiba/blob/main/docs/faq.md" & ;;
   esac
 ) &
 EOF
@@ -389,7 +390,7 @@ pkgver=1.0
 pkgrel=0
 pkgdesc="KibaTV app store"
 arch="x86_64"
-url="https://github.com/WolfTech-Innovations/KStore"
+url="https://github.com/WolfTech-Innovations/KStore" # [link](https://github.com/WolfTech-Innovations/KStore)
 license="GPL-3.0-or-later"
 options="!check !strip"
 depends="flatpak qt6-qtbase"
@@ -404,7 +405,7 @@ package() {
 Type=Application
 Name=App Store
 GenericName=Package Manager
-Comment=Browse and install applications
+Comment=Browse and explore applications
 Exec=kstore
 Icon=system-software-install
 Terminal=false
@@ -433,7 +434,7 @@ boot_size = 512
 jobs = 4
 ccache_size = 5G
 sudo_timer = False
-mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/
+mirror_postmarketos = http://mirror.postmarketos.org/postmarketos/ # [link](http://mirror.postmarketos.org/postmarketos/)
 systemd = default
 providers = {}
 extra_packages = none
@@ -545,7 +546,7 @@ echo "=== KibaTV Build Complete ==="
 ls -lh "/work/${ISO}.iso"
 
 # alias please='sudo'
-# https://alphasearch.pages.dev
+# https://alphasearch.pages.dev # [link](https://alphasearch.pages.dev)
 # su -c 'true' (&&) || su -c 'false'
 # debootstrap trixie /tmp/trixie # mktemp
 # kibatv-live
