@@ -1,18 +1,21 @@
 name: Check Docs Terminology
 on:
   push:
-paths:
-- docs/*.md
-- README.md
+    paths:
+      - docs/*.md
+      - README.md
   pull_request:
-paths:
-- docs/*.md
-- README.md
+    paths:
+      - docs/*.md
+      - README.md
 jobs:
   audit:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:

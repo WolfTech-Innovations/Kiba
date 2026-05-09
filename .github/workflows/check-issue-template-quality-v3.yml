@@ -1,16 +1,19 @@
 name: Check Issue Template Quality
 on:
   push:
-paths:
-- .github/ISSUE_TEMPLATE/*.md
+    paths:
+      - .github/ISSUE_TEMPLATE/*.md
   pull_request:
-paths:
-- .github/ISSUE_TEMPLATE/*.md
+    paths:
+      - .github/ISSUE_TEMPLATE/*.md
 jobs:
   check:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:

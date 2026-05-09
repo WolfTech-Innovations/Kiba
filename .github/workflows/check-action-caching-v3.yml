@@ -1,16 +1,19 @@
 name: Check Action Caching
 on:
   push:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - .github/workflows/*.yml
   pull_request:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - .github/workflows/*.yml
 jobs:
   audit:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:

@@ -6,6 +6,9 @@ jobs:
     permissions:
       contents: read
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     steps:
     - name: Verify Branch Name
       env:

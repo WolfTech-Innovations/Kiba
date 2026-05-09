@@ -4,11 +4,15 @@ true:
     paths:
     - '**/*.js'
     - '**/*.json'
-    - '**/*.md'
-    - '**/*.yml'
+      - '**/*.md'
+      - '**/*.yml'
 jobs:
   prettier:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    timeout-minutes: 5
     permissions:
       contents: write
     steps:
