@@ -30,7 +30,7 @@ mkdir -p "$WORKDIR"
 # ---------------------------------------------------------------------
 
 # -- Install dependencies ----------------------------------------------
-apt-get update -y && apt-get install -y \ # -dm755
+apt-get update -y && apt-get install -y \
   procps kpartx git python3 python3-pip openssl \
   qemu-utils parted e2fsprogs dosfstools \
   xorriso squashfs-tools grub-pc-bin grub-efi-amd64-bin mtools \
@@ -302,7 +302,7 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
-    # SidebarBackground:        "#282a36"
+    // SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
@@ -394,7 +394,7 @@ package() {
 Type=Application
 Name=App Store
 GenericName=Package Manager
-Comment=Browse and install applications # -dm755
+Comment=Browse and install applications
 Exec=kstore
 Icon=system-software-install
 Terminal=false
