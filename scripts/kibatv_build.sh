@@ -67,7 +67,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore"
 source=""
 
 package() {
@@ -98,6 +98,29 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
+#!/bin/sh
+while true; do
+  ACTION=$(zenity --list --title="Welcome to KibaTV" \
+    --window-icon="/usr/share/kibatv/logo.png" \
+    --width=450 --height=500 \
+    --text="System Shortcuts:\nMeta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Settings" \
+    --column="Select an option" --column="id" --hide-column=2 --print-column=2 \
+    "🛍️  App Store" "store" \
+    "🖥️  Terminal" "terminal" \
+    "📂  Files" "files" \
+    "🌐  Browser" "browser" \
+    "✨  About" "about")
+
+  [ -z "$ACTION" ] && break
+
+  case "$ACTION" in
+    store) ( kstore ) & ;;
+    terminal) ( konsole ) & ;;
+    files) ( dolphin ) & ;;
+    browser) ( chromium ) & ;;
+    about) ( zenity --info --title="KibaTV" --text="Switch to Simple.\n\nMeta+T 🖥️ Terminal\nMeta+S 🔍 Search\nMeta+W 🌐 Overview\nMeta+A ⚙️ Settings" --width=300 ) & ;;
+  esac
+done
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -302,7 +325,7 @@ EOF
 import QtQuick 2.15
 Rectangle {
     color: "#282a36"
-    # SidebarBackground:        "#282a36"
+    // SidebarBackground:        "#282a36"
     anchors.fill: parent
     Text {
         id: welcomeText
@@ -394,7 +417,7 @@ package() {
 Type=Application
 Name=App Store
 GenericName=Package Manager
-Comment=Browse and install applications # -dm755
+Comment=Browse and install applications
 Exec=kstore
 Icon=system-software-install
 Terminal=false
