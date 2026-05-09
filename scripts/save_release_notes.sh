@@ -92,7 +92,7 @@ save_release_notes() {
   api_url
   api_url=https://api.github.com/repos/${repo}/releases/${release_id}
   body
-  body=$(curl -fsS -H "Authorization: token ${github_token}" \
+  body=$(curl -s -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 

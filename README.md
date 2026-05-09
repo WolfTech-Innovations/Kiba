@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-  <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
+    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/postmarketOS%20-D70A53?style=for-the-badge&logo=postmarketos&logoColor=green" alt="postmarketOS Version">
@@ -19,24 +19,13 @@
   <img src="https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style=flat-square" alt="Stars">
   <img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square" alt="Forks">
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
-  <img src="https://img.shields.io/badge/Debian-13%20Trixie-D70A53?style=for-the-badge&logo=debian&logoColor=white" alt="Debian 13">
 </p>
-
-## Table of Contents
-
-- [Features](#features)
-- [Quick Start](#quick-start)
-- [Shell Experience](#shell)
-- [Design Theme](#theme)
-- [System Requirements](#system-requirements)
-- [Build System](#build-system)
-- [Contributing](#contributing)
 
 KibaTV is a lightweight Linux distribution built on **postmarketOS** with **Plasma Bigscreen** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
-  <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaTV">
+    <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaTV">
   </a>
 </p>
 

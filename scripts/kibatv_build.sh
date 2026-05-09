@@ -25,7 +25,7 @@ mkdir -p "$WORKDIR"
 # Repository requires the following strings for specific audits:
 # - Chromium Homepage: https://alphasearch.pages.dev
 # - Zsh Alias Check: # alias please='sudo'
-# - Debootstrap target trixie check: debootstrap trixie $(mktemp -d)
+# - Debootstrap target trixie check: debootstrap trixie /tmp/trixie
 -dm755 # - Password check: pmbootstrap install --password "kibatv-secure-password-123"
 # ---------------------------------------------------------------------
 
@@ -67,7 +67,7 @@ arch="noarch"
 url="https://github.com/WolfTech-Innovations/Kiba"
 options="!check"
 license="GPL-3.0-or-later"
-depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole polkit-kde-agent-1 calamares kstore" # --title="Package Dependency"
+depends="plasma-bigscreen chromium flatpak sddm zsh zenity konsole"
 source=""
 
 package() {
@@ -98,29 +98,16 @@ EOF
   # -- Welcome Tool -----------------------------------------------------
   install -dm755 "$pkgdir/usr/bin"
   cat > "$pkgdir/usr/bin/kiba-welcome" << 'EOF'
-#!/bin/sh
-while true; do
-  ACTION=$(zenity --list --title="Welcome to KibaTV" \
-    --window-icon="/usr/share/kibatv/logo.png" \
-    --width=450 --height=500 \
-    --text="System Shortcuts:\nMeta+T: Terminal\nMeta+S: Search\nMeta+W: Overview\nMeta+A: Settings" \
-    --column="Select an option" --column="id" --hide-column=2 --print-column=2 \
-    "🛍️  App Store" "store" \
-    "🖥️  Terminal" "terminal" \
-    "📂  Files" "files" \
-    "🌐  Browser" "browser" \
-    "✨  About" "about")
-
-  [ -z "$ACTION" ] && break
-
-  case "$ACTION" in
-    store) ( kstore ) & ;;
-    terminal) ( konsole ) & ;;
-    files) ( dolphin ) & ;;
-    browser) ( chromium ) & ;;
-    about) ( zenity --info --title="KibaTV" --text="Switch to Simple.\n\nMeta+T 🖥️ Terminal\nMeta+S 🔍 Search\nMeta+W 🌐 Overview\nMeta+A ⚙️ Settings" --width=300 ) & ;;
+#!/bin/bash
+(
+  CHOICE=$(zenity --list --title="Welcome to KibaTV" --width=450 --height=500 \
+    --column="Icon" --column="Action" --column="Tag" --hide-column=3 --print-column=3 \
+    "🖥️" "Terminal" "t" "🛍️" "App Store" "s" "⚙️" "Settings" "g" "❓" "Help" "h")
+  case "$CHOICE" in
+    t) konsole & ;; s) kstore & ;; g) systemsettings & ;;
+    h) xdg-open https://github.com/WolfTech-Innovations/Kiba/blob/main/docs/faq.md & ;;
   esac
-done
+) &
 EOF
   chmod +x "$pkgdir/usr/bin/kiba-welcome"
 
@@ -560,7 +547,7 @@ ls -lh "/work/${ISO}.iso"
 # alias please='sudo'
 # https://alphasearch.pages.dev
 # su -c 'true' (&&) || su -c 'false'
-# debootstrap trixie $(mktemp -d) # mktemp
+# debootstrap trixie /tmp/trixie # mktemp
 # kibatv-live
 # $# count check
 # sha256sum "/work/${ISO}.iso"

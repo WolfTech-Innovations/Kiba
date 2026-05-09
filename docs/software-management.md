@@ -42,7 +42,7 @@ KibaStore comes pre-configured with the **Flathub** remote. This gives you insta
 
 For those who prefer the command line, KibaTV defaults to **Nala** — a modern frontend for `apt` that makes package management beautiful and safer.
 
-### Why Nala
+### Why Nala?
 
 - **Parallel Downloads:** Downloads multiple packages simultaneously to save time.
 - **Transaction History:** View every install/remove operation and easily **undo** changes.

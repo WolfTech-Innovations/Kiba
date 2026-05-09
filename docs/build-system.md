@@ -20,14 +20,14 @@ KibaTV utilizes a highly automated CI/CD pipeline to generate reproducible ISO i
 
 ````mermaid
 graph LR
-  A[Push to Main] --> B[GitHub Action]
-  B --> C[Setup Docker]
-  C --> D[lb config]
-  D --> E[Custom Hooks]
-  E --> F[lb build]
-  F --> G[ISO Generation]
-  G --> H[Verification]
-  H --> I[Upload to SourceForge]
+    A[Push to Main] --> B[GitHub Action]
+    B --> C[Setup Docker]
+    C --> D[lb config]
+    D --> E[Custom Hooks]
+    E --> F[lb build]
+    F --> G[ISO Generation]
+    G --> H[Verification]
+    H --> I[Upload to SourceForge]
 ```bash
 
 ---
