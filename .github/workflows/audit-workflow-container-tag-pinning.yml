@@ -1,0 +1,21 @@
+name: Audit Workflow Container Tag Pinning
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/**.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check container tag pinning
+        run: |
+          grep -rnE "\bimage:\s*[^[:space:]]+:latest" .github/workflows && (echo "Containers should use specific version tags, not :latest" && exit 1) || exit 0

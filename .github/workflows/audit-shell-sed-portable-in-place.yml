@@ -1,0 +1,21 @@
+name: Audit Shell Sed Portable In Place
+
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check sed -i usage
+        run: |
+          grep -rnE "\bsed\s+\-i\b" . --include="*.sh" && (echo "Avoid non-portable sed -i; use temporary files instead" && exit 1) || exit 0

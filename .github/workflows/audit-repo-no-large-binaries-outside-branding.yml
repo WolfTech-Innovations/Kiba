@@ -1,0 +1,17 @@
+name: Audit Repo No Large Binaries Outside Branding
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check for large binaries
+        run: |
+          find . -type f -not -path "./.git/*" -not -path "./branding/*" -size +1M && (echo "Large binaries (>1M) should only be in the branding/ directory" && exit 1) || exit 0

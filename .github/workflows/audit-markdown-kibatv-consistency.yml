@@ -1,0 +1,21 @@
+name: Audit Markdown KibaTV Consistency
+
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check KibaTV brand consistency
+        run: |
+          grep -rnEi "Kiba TV|kibatv" . --include="*.md" | grep -v "KibaTV" && (echo "Ensure KibaTV brand consistency (not 'Kiba TV' or 'kibatv')" && exit 1) || exit 0
