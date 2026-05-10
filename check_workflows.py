@@ -1,5 +1,9 @@
 # License: MIT
 import yaml
+try:
+    from yaml import CSafeLoader as Loader
+except ImportError:
+    from yaml import SafeLoader as Loader
 import os
 import sys
 
@@ -17,7 +21,8 @@ for f in sorted(os.listdir(workflow_dir)):
         count += 1
         try:
             with open(filepath, 'r', encoding='utf-8') as stream:
-                yaml.safe_load(stream)
+                # Use CSafeLoader for significant performance gains on large numbers of files
+                yaml.load(stream, Loader=Loader)
             print(f"Passed: {filepath}")
         except Exception as exc:
             print(f"Failed: {filepath} - {exc}")
