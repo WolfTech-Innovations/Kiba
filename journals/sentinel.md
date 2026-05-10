@@ -1,4 +1,4 @@
-# sentinel.md
+# Sentinel.md
 
 ## 2025-05-15 - [Strong Default Password Requirements]
 

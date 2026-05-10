@@ -1,4 +1,4 @@
-# bug_report.md
+# Bug_report.md
 
 ---
 
@@ -8,7 +8,7 @@ about: Create a report to help us improve
 title: ""
 labels: ""
 
-## assignees: ""
+## Assignees: ""
 
 **Describe the bug**
 A clear and concise description of what the bug is.

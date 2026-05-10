@@ -1,29 +1,31 @@
 # License: MIT
-import yaml
-import os
 import sys
+from pathlib import Path
+import yaml
 
-workflow_dir = ".github/workflows"
-all_passed = True
-count = 0
+def check_workflows():
+    workflow_dir = Path(".github/workflows")
+    all_passed = True
+    count = 0
 
-if not os.path.exists(workflow_dir):
-    print(f"Error: {workflow_dir} does not exist")
-    sys.exit(1)
+    if not workflow_dir.exists():
+        print(f"Error: {workflow_dir} does not exist")
+        sys.exit(1)
 
-for f in sorted(os.listdir(workflow_dir)):
-    if f.endswith(".yml") or f.endswith(".yaml"):
-        filepath = os.path.join(workflow_dir, f)
+    for filepath in sorted(workflow_dir.glob("*.y*ml")):
         count += 1
         try:
-            with open(filepath, 'r', encoding='utf-8') as stream:
+            with filepath.open('r', encoding='utf-8') as stream:
                 yaml.safe_load(stream)
             print(f"Passed: {filepath}")
         except Exception as exc:
             print(f"Failed: {filepath} - {exc}")
             all_passed = False
 
-if not all_passed:
-    sys.exit(1)
-else:
-    print(f"All {count} workflows passed YAML syntax check.")
+    if not all_passed:
+        sys.exit(1)
+    else:
+        print(f"All {count} workflows passed YAML syntax check.")
+
+if __name__ == "__main__":
+    check_workflows()

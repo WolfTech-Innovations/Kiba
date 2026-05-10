@@ -30,24 +30,21 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  release_id
-  release_id=${RELEASE_ID:-}
-  github_token
-  github_token=${GH_TOKEN:-}
-  repo
-  repo=${GITHUB_REPOSITORY:-}
+  release_id="${RELEASE_ID:-}"
+  github_token="${GH_TOKEN:-}"
+  repo="${GITHUB_REPOSITORY:-}"
 
-  if [ -z "$release_id" ]; then
+  if [ -z "${release_id}" ]; then
     printf "Error: RELEASE_ID environment variable is required.\n" >&2
     exit 1
   fi
 
-  if [ -z "$github_token" ]; then
+  if [ -z "${github_token}" ]; then
     printf "Error: GH_TOKEN environment variable is required.\n" >&2
     exit 1
   fi
 
-  if [ -z "$repo" ]; then
+  if [ -z "${repo}" ]; then
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
     exit 1
   fi
@@ -58,28 +55,19 @@ save_release_notes() {
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  dd
   dd=$(date +%d)
 
-  h_val
   h_val=$(date +%-H)
-  hours
-  hours=0123456789ABCDEFGHIJKLMN
-  h
-  h=$(printf "%s" "$hours" | cut -c $((h_val + 1)))
+  hours="0123456789ABCDEFGHIJKLMN"
+  h=$(printf "%s" "${hours}" | cut -c "$((h_val + 1))")
 
-  y
   y=$(date +%y | cut -c 2)
 
-  m_val
   m_val=$(date +%-m)
-  months
-  months=123456789ABC
-  m
-  m=$(printf "%s" "$months" | cut -c "$m_val")
+  months="123456789ABC"
+  m=$(printf "%s" "${months}" | cut -c "${m_val}")
 
-  filename
-  filename=Notes/NTE-${dd}${h}${y}${m}.md
+  filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
@@ -89,25 +77,23 @@ save_release_notes() {
 
   # 3. Fetch release body using curl and jq
   # Uses GH_TOKEN from environment
-  api_url
-  api_url=https://api.github.com/repos/${repo}/releases/${release_id}
-  body
-  body=$(curl -s -H "Authorization: token ${github_token}" \
+  api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
+  body=$(curl -fsS -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
-              "$api_url" | jq -r '.body')
+              "${api_url}" | jq -r '.body')
 
   # 4. Handle empty release notes
-  if [ -z "$body" ] || [ "$body" = "null" ]; then
-    printf "No release notes provided for this release.\n" > "$filename"
+  if [ -z "${body}" ] || [ "${body}" = "null" ]; then
+    printf "No release notes provided for this release.\n" > "${filename}"
   else
-    printf "%s\n" "$body" > "$filename"
+    printf "%s\n" "${body}" > "${filename}"
   fi
 
   # 5. Git operations
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
-  git add "$filename" Notes/.gitkeep
-  git commit -m "docs: add release notes $filename [skip ci]" || printf "No changes to commit\n"
+  git add "${filename}" Notes/.gitkeep
+  git commit -m "docs: add release notes ${filename} [skip ci]" || printf "No changes to commit\n"
   git pull --rebase origin main
   git push origin main
 }
