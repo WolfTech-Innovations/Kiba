@@ -3,6 +3,13 @@ import yaml
 import os
 import sys
 
+# Bolt: Use C-based loader if available for significant performance boost
+# on repositories with a large number of workflows.
+try:
+    from yaml import CSafeLoader as Loader
+except ImportError:
+    from yaml import SafeLoader as Loader
+
 workflow_dir = ".github/workflows"
 all_passed = True
 count = 0
@@ -17,7 +24,8 @@ for f in sorted(os.listdir(workflow_dir)):
         count += 1
         try:
             with open(filepath, 'r', encoding='utf-8') as stream:
-                yaml.safe_load(stream)
+                # Bolt: Optimized parsing using CSafeLoader
+                yaml.load(stream, Loader=Loader)
             print(f"Passed: {filepath}")
         except Exception as exc:
             print(f"Failed: {filepath} - {exc}")
