@@ -1,7 +1,7 @@
 # KibaOS
 
 <p align="center">
-<img width="1330" height="519" alt="image" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8" />
+<img width="1330" height="519" alt="KibaOS Desktop Preview" src="https://github.com/user-attachments/assets/e4a14aef-f23e-4890-96a5-86c34b31f5d8" />
 </p>
 
 <p align="center">
@@ -27,6 +27,28 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
+
+---
+
+## Table of Contents
+
+- [Documentation](#documentation)
+- [Features](#features)
+- [Quick Start](#quick-start)
+  - [Download](#download)
+  - [Writing to a USB Drive](#writing-to-a-usb-drive)
+  - [Live Session](#live-session)
+  - [Installation](#installation)
+- [Technical Details](#technical-details)
+  - [Shell](#shell)
+  - [Theme](#theme)
+  - [System Requirements](#system-requirements)
+- [Build System](#build-system)
+  - [Building Locally](#building-locally)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
+- [About](#about)
 
 ---
 
