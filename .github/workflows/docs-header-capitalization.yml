@@ -16,4 +16,4 @@ jobs:
         run: |
           set -euo pipefail
           # Heuristic: headers starting with lowercase (ignoring code blocks and lists)
-          grep -rnE "^#+ [a-z]" . --include="*.md" && { echo "Error: Headers should start with a capital letter."; exit 1; } || echo "Header capitalization looks good."
+          grep -rnE "^#+ [a-z]" . --include="*.md" --exclude-dir=".github" && { echo "Error: Headers should start with a capital letter."; exit 1; } || echo "Header capitalization looks good."

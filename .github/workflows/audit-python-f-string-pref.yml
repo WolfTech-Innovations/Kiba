@@ -18,4 +18,7 @@ jobs:
           persist-credentials: false
       - name: Check formatting
         run: |
-          grep -rE "\.format\(|% [\(\s]*['"]" . --include="*.py" && (echo "F-strings preferred over .format() or % formatting" && exit 1) || exit 0
+          if grep -rE "\.format\(|% [\(\s]*['\"]" . --include="*.py"; then
+            echo "F-strings preferred over .format() or % formatting"
+            exit 1
+          fi
