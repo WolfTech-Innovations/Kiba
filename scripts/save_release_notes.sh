@@ -22,7 +22,6 @@
 # SOFTWARE.
 
 set -euo pipefail
-set -o pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
@@ -30,23 +29,27 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  local release_id="${RELEASE_ID:-}"
-  local github_token="${GH_TOKEN:-}"
-  local repo="${GITHUB_REPOSITORY:-}"
+  if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
+    printf "Usage: %s [release_id]\n" "$0" >&2
+  fi
+
+  local release_id; release_id="${1:-${RELEASE_ID:-}}"
+  local github_token; github_token="${GH_TOKEN:-}"
+  local repo; repo="${GITHUB_REPOSITORY:-}"
 
   if [ -z "$release_id" ]; then
-    printf "Error: RELEASE_ID environment variable is required.\n" >&2
-    exit 1
+    printf "Error: RELEASE_ID environment variable or argument is required.\n" >&2
+    return 1
   fi
 
   if [ -z "$github_token" ]; then
     printf "Error: GH_TOKEN environment variable is required.\n" >&2
-    exit 1
+    return 1
   fi
 
   if [ -z "$repo" ]; then
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
-    exit 1
+    return 1
   fi
 
   # 1. Generate filename: NTE-DDHYM
@@ -57,16 +60,19 @@ save_release_notes() {
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  local dd h_val y_val m_val
-  # shellcheck disable=SC2046
-  read -r dd h_val y_val m_val <<< "$(date "+%d %-H %y %-m")"
+  local dd h_val y_val m_val vars
+  vars=$(date "+%d %-H %y %-m")
+
+  read -r dd h_val y_val m_val <<EOV
+$vars
+EOV
 
   local hours="0123456789ABCDEFGHIJKLMN"
-  local h="${hours:$h_val:1}"
-  local y="${y_val:1:1}"
+  local h; h="${hours:$h_val:1}"
+  local y; y="${y_val:1:1}"
   local months="123456789ABC"
-  local m_idx=$((m_val - 1))
-  local m="${months:$m_idx:1}"
+  local m_idx; m_idx=$((m_val - 1))
+  local m; m="${months:$m_idx:1}"
 
   local filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
@@ -76,7 +82,7 @@ save_release_notes() {
     touch Notes/.gitkeep
   fi
 
-  # 3. Fetch release body using curl and jq
+  # 3. Fetch release body using curl -fsS and jq
   local api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
   local body
   body=$(curl -fsS -H "Authorization: token ${github_token}" \
@@ -104,4 +110,4 @@ save_release_notes() {
   fi
 }
 
-save_release_notes
+save_release_notes "$@"
