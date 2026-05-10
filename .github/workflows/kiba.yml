@@ -1226,11 +1226,11 @@ jobs:
           (
           CHOICE=$(zenity --list --title="Welcome to KibaOS" \
             --text="Welcome to KibaOS! Switch to Simple.\n\nQuick Shortcuts:\n  Meta+T: Terminal  |  Meta+S: Search\n  Meta+W: Overview  |  Meta+A: Settings\n\nWhat would you like to do?" \
-            --column="Action" --column="Description" --column="Tag" \
-            --hide-column=3 --print-column=3 \
-            "Install KibaOS" "Install the system permanently to your disk" "INSTALL" \
-            "Web Browser" "Browse the internet" "BROWSER" \
-            "Software Center" "Discover and install new applications" "STORE" \
+            --column=" " --column="Action" --column="Description" --column="Tag" \
+            --image-column=1 --hide-column=4 --print-column=4 \
+            "calamares" "Install KibaOS" "Install the system permanently to your disk" "INSTALL" \
+            "chromium" "Web Browser" "Browse the internet" "BROWSER" \
+            "org.kde.discover" "Software Center" "Discover and install new applications" "STORE" \
             --width=450 --height=500 2>/dev/null)
 
           case "$CHOICE" in
@@ -1253,6 +1253,7 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          Comment=Get started with KibaOS
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
