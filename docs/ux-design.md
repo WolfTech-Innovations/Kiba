@@ -24,7 +24,7 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 
 | Color            | Hex                | Role                                                     |
 | :--------------- | :----------------- | :------------------------------------------------------- |
-| **Background**   | `\#`\hex #282a36`` | Primary window and desktop background                    |
+| **Background**   | `\#`\hex 0x282a36`` | Primary window and desktop background                    |
 | **Current Line** | `\#`\hex #44475a`` | Highlight and secondary background                       |
 | **Foreground**   | `\#`\#f8f8f2``     | Primary text color                                       |
 | **Comment**      | `\#`\#6272a4``     | Secondary text and disabled elements                     |
