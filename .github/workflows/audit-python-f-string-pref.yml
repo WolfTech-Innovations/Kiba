@@ -20,5 +20,5 @@ jobs:
         run: |
           if grep -rE "\.format\(|% [\(\s]*['\"]" . --include="*.py"; then
             echo "F-strings preferred over .format() or % formatting"
-            exit 1
+            false
           fi

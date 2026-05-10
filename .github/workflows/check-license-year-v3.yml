@@ -1,11 +1,13 @@
 name: Check License Year
 on:
   push:
-paths:
-- LICENSE
+    paths:
+      - LICENSE
+      - LICENSE
   pull_request:
-paths:
-- LICENSE
+    paths:
+      - LICENSE
+      - LICENSE
 jobs:
   check:
     permissions:
