@@ -35,11 +35,11 @@ graph TD
 
 ### Debian 13 (Trixie)
 
-KibaTV is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
+KibaTV is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma 6) while inheriting the robust package management and security infrastructure of Debian.
 
 ### CachyOS Kernel
 
-We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
+We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `psygreg/linux-psycachy`).
 
 - **BORE Scheduler:** Optimized for desktop responsiveness.
 - **Improved Performance:** Built with modern compiler optimizations.
