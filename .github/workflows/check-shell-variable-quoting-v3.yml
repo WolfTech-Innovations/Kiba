@@ -1,11 +1,11 @@
 name: Check Shell Variable Quoting
 on:
   push:
-paths:
-- scripts/*.sh
+    paths:
+      - scripts/*.sh
   pull_request:
-paths:
-- scripts/*.sh
+    paths:
+      - scripts/*.sh
 jobs:
   audit:
     permissions:

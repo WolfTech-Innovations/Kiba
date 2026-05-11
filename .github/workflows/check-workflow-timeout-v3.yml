@@ -1,11 +1,11 @@
 name: Check Workflow Timeout
 on:
   push:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - .github/workflows/*.yml
   pull_request:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - .github/workflows/*.yml
 jobs:
   audit:
     permissions:
