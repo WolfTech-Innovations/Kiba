@@ -9,3 +9,8 @@
 
 **Learning:** For documentation-heavy repositories, the README is the primary UI. Long READMEs (>100 lines) require a "Table of Contents" for better navigability (and to pass CI audits), and hero images must have descriptive alt text to ensure an accessible first impression for screen-reader users.
 **Action:** Always include a Table of Contents for READMEs exceeding 100 lines and audit all documentation images for descriptive `alt` attributes instead of generic placeholders like "image".
+
+## 2026-05-11 - [Standardized Shortcuts & Onboarding UI]
+
+**Learning:** Aligning system shortcuts (Meta+T, Meta+S, Meta+W, Meta+A) with onboarding documentation creates a cohesive first-run experience. Zenity list menus are significantly more professional when utilizing icon columns and descriptive action labels ("Launch") instead of generic defaults.
+**Action:** Ensure `kglobalshortcutsrc` is synchronized with `kiba-welcome` shortcut advertisements and always use `--image-column` and `--ok-label` for Zenity menus.
