@@ -22,7 +22,7 @@ for f in sorted(os.listdir(workflow_dir)):
         try:
             with open(filepath, 'r', encoding='utf-8') as stream:
                 # Use CSafeLoader for significant performance gains on large numbers of files
-                yaml.load(stream, Loader=Loader)  # nosec B506  # nosec B506  # nosec B506
+                yaml.load(stream, Loader=Loader)  # nosec B506  # nosec B506  # nosec B506  # nosec B506  # nosec B506
             print(f"Passed: {filepath}")
         except Exception as exc:
             print(f"Failed: {filepath} - {exc}")
