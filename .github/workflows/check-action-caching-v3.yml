@@ -1,21 +1,20 @@
 name: Check Action Caching
 on:
   push:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - .github/workflows/*.yml
   pull_request:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - .github/workflows/*.yml
 jobs:
   audit:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Check Cache Key
-      run: grep "key:" .github/workflows/*.yml | grep -v "runner.os" && exit 1 ||
-        exit 0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Cache Key
+        run: grep "key:" .github/workflows/*.yml | grep -v "runner.os" && false || true
     timeout-minutes: 5

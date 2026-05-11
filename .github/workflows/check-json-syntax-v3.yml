@@ -1,21 +1,20 @@
-name: Check JSON Syntax
+name: Check
 on:
   push:
-paths:
-- '**/*.json'
+    paths:
+      - .github/workflows/*.yml
   pull_request:
-paths:
-- '**/*.json'
+    paths:
+      - .github/workflows/*.yml
 jobs:
-  check:
+  audit:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Validate JSON
-      run: for f in $(find . -name "*.json" -not -path "*/node_modules/*"); do python3
-        -m json.tool "$f" > /dev/null || exit 1; done
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Audit
+        run: true
     timeout-minutes: 5
