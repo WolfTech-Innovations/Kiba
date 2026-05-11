@@ -1,18 +1,41 @@
 # UX & Visual Design
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE`%20Plasma%206-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
+  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
   <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
 ---
 
 KibaTV is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
+
+---
+
+## Table of Contents
+
+- [Visual Identity](#visual-identity)
+  - [Color Palette](#color-palette)
+  - [Look and Feel](#look-and-feel)
+  - [Window Management](#window-management)
+- [Shell Experience](#shell-experience)
+  - [Starship Prompt](#starship-prompt)
+  - [Modern CLI Tools](#modern-cli-tools)
+  - [System-wide Aliases](#system-wide-aliases)
+- [Boot Branding](#boot-branding)
+  - [Interface Components](#interface-components)
+  - [Typography](#typography)
+- [Desktop Experience (Plasma Bigscreen)](#desktop-experience-plasma-bigscreen)
+  - [Window Management Polish](#window-management-polish)
+  - [Desktop Layout](#desktop-layout)
+- [The Modern Terminal](#the-modern-terminal)
+  - [Modern Alternative Comparison](#modern-alternative-comparison)
+  - [Shell Configuration (Zsh)](#shell-configuration-zsh)
+- [Related Reading](#related-reading)
 
 ---
 

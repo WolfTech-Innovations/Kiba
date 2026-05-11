@@ -1,7 +1,7 @@
 # KibaTV Wiki
 
 <p align="center">
-  <img src="branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -13,6 +13,30 @@
 </p>
 
 Welcome to the official **KibaTV Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaTV.
+
+---
+
+## Table of Contents
+
+- [Extended Documentation](#-extended-documentation)
+- [Architecture & Core Components](#-architecture--core-components)
+  - [Base System](#base-system)
+  - [Extreme Minimization](#extreme-minimization)
+- [User Experience (UX) & Design](#-user-experience-ux--design)
+  - [Visual Identity](#visual-identity)
+  - [Shell Experience](#shell-experience)
+  - [Boot & Branding](#boot--branding)
+- [Software Management](#-software-management)
+  - [KibaStore](#kibastore)
+  - [Repositories & Packages](#repositories--packages)
+- [Security & Compliance](#-security--compliance)
+  - [California AADC (AB 2273)](#california-aadc-ab-2273)
+- [Build Infrastructure](#-build-infrastructure)
+  - [Build Pipeline](#build-pipeline)
+  - [Image Optimization](#image-optimization)
+- [Build Locally](#-build-locally)
+- [Community & Support](#-community--support)
+- [License](#-license)
 
 ---
 
@@ -138,15 +162,15 @@ KibaTV uses a highly automated CI/CD pipeline.
 
 To reproduce the build environment on your own machine:
 
-````bash
-git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
+```bash
+git clone https://github.com/WolfTech-Innovations/Kiba
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
-```bash
+```
 
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.
@@ -168,4 +192,3 @@ KibaTV is a distribution composed of many independent components. While each com
 
 > [!NOTE]
 > KibaTV is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
-````
