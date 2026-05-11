@@ -20,7 +20,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
 
           # ── Install live-build and build deps ─────────────────────────────────
-          apt-get update && apt-get install -y \
+          apt update && apt install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
             qemu-system-x86 \
@@ -143,7 +143,7 @@ jobs:
           fi
 
           # Install
-          apt-get install -y ./*.deb || {
+          apt install -y ./*.deb || {
             echo "WARNING: CachyOS Kernel install failed, falling back to stock"
             cd / && rm -rf /tmp/cachyos
             exit 0
@@ -154,8 +154,8 @@ jobs:
 
           # Remove stock kernel meta-packages to keep it minimal
           # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-          apt-get purge -y linux-image-amd64 linux-headers-amd64
-          apt-get autoremove -y
+          apt purge -y linux-image-amd64 linux-headers-amd64
+          apt autoremove -y
 
           echo "=== CachyOS Kernel installed ==="
           CACHY_HOOK
@@ -624,7 +624,7 @@ jobs:
           alias edit='${EDITOR:-micro}'
           alias please='sudo'
           alias cls='clear'
-          alias path='echo -e "${PATH//:/\\n}"'
+          alias path='print -l $path'
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
@@ -750,12 +750,18 @@ jobs:
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
-              color: "#000000"
+              color: "#282a36"
               anchors.fill: parent
               Text {
+                  id: welcomeText
                   anchors.centerIn: parent
                   text: "KibaOS | Switch to simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
+                  opacity: 0
+                  SequentialAnimation {
+                      running: true
+                      NumberAnimation { target: welcomeText; property: "opacity"; from: 0; to: 1; duration: 1000 }
+                  }
               }
           }
           WATCHSPLASH
@@ -1223,25 +1229,45 @@ jobs:
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Functional welcome menu for KibaOS
-          CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-            --text="Welcome to KibaOS! What would you like to do?" \
-            --column="Action" --column="Description" \
-            "Install KibaOS" "Install the system permanently to your disk" \
-            "Web Browser" "Browse the internet" \
-            "Software Center" "Discover and install new applications" \
-            --width=450 --height=300 2>/dev/null)
+          while true; do
+            CHOICE=$(zenity --list --title="Welcome to KibaOS" \
+              --window-icon="/usr/share/kibaos/logo.png" \
+              --text="Welcome to KibaOS! What would you like to do?" \
+              --column="Action" --column="Description" \
+              "Install KibaOS" "Install the system permanently to your disk" \
+              "Web Browser" "Browse the internet" \
+              "Software Center" "Discover and install new applications" \
+              "Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "Online Wiki" "Read the technical documentation" \
+              --width=500 --height=400 2>/dev/null)
 
-          case "$CHOICE" in
-            "Install KibaOS")
-              sudo calamares &
-              ;;
-            "Web Browser")
-              chromium &
-              ;;
-            "Software Center")
-              plasma-discover &
-              ;;
-          esac
+            [ -z "$CHOICE" ] && break
+
+            case "$CHOICE" in
+              "Install KibaOS")
+                sudo calamares &
+                break
+                ;;
+              "Web Browser")
+                chromium &
+                break
+                ;;
+              "Software Center")
+                plasma-discover &
+                break
+                ;;
+              "Keyboard Shortcuts")
+                zenity --info --title="Keyboard Shortcuts" \
+                  --window-icon="/usr/share/kibaos/logo.png" \
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
+                  --width=400 2>/dev/null
+                ;;
+              "Online Wiki")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
+                break
+                ;;
+            esac
+          done
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
@@ -1292,6 +1318,8 @@ jobs:
             SidebarText:              "#f8f8f2"
             SidebarTextCurrent:       "#282a36"
             SidebarBackgroundCurrent: "#bd93f9"
+            WindowBackground:         "#282a36"
+            WindowForeground:         "#f8f8f2"
           slideshow: "show.qml"
           BRANDING
 
@@ -1707,7 +1735,7 @@ jobs:
             echo "SourceForge credentials not configured. Skipping upload."
             exit 0
           fi
-          sudo apt-get update && sudo apt-get install -y sshpass rsync
+          sudo apt update && sudo apt install -y sshpass rsync
           for iso_file in *.iso; do
             [ -f "$iso_file" ] || continue
             echo "Uploading $iso_file to SourceForge..."
