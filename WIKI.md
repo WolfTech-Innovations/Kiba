@@ -19,7 +19,7 @@ Welcome to the official **KibaTV Wiki**. This document provides an exhaustive de
 ## Table of Contents
 
 - [Extended Documentation](#-extended-documentation)
-- [Architecture & Core Components](#architecture--core-components)
+- [Architecture & Core Components](#-architecture--core-components)
   - [Base System](#base-system)
   - [Extreme Minimization](#extreme-minimization)
 - [User Experience (UX) & Design](#-user-experience-ux--design)
@@ -29,14 +29,14 @@ Welcome to the official **KibaTV Wiki**. This document provides an exhaustive de
 - [Software Management](#-software-management)
   - [KibaStore](#kibastore)
   - [Repositories & Packages](#repositories--packages)
-- [Security & Compliance](#security--compliance)
+- [Security & Compliance](#-security--compliance)
   - [California AADC (AB 2273)](#california-aadc-ab-2273)
 - [Build Infrastructure](#-build-infrastructure)
   - [Build Pipeline](#build-pipeline)
   - [Image Optimization](#image-optimization)
-- [Build Locally](#build-locally)
+- [Build Locally](#-build-locally)
 - [Community & Support](#-community--support)
-- [License](#license)
+- [License](#-license)
 
 ---
 
@@ -82,15 +82,15 @@ The system undergoes aggressive footprint reduction during the build process:
 
 KibaTV follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component | Choice |
-| :--- | :--- |
+| Component               | Choice               |
+| ----------------------- | -------------------- |
 | **Desktop Environment** | **Plasma Bigscreen** |
-| **Global Theme** | **Ant-Dark** |
-| **Color Scheme** | **Dracula** |
-| **Icon Theme** | **Kora** |
-| **Cursor Theme** | **Vimix** |
-| **System Font** | **Inter** |
-| **Monospace Font** | **JetBrains Mono** |
+| **Global Theme**        | **Ant-Dark**         |
+| **Color Scheme**        | **Dracula**          |
+| **Icon Theme**          | **Kora**             |
+| **Cursor Theme**        | **Vimix**            |
+| **System Font**         | **Inter**            |
+| **Monospace Font**      | **JetBrains Mono**   |
 
 ### Shell Experience
 
@@ -146,10 +146,10 @@ KibaTV uses a highly automated CI/CD pipeline.
 
 ### Build Pipeline
 
-1.  **Tooling:** Built using **live-build** (lb).
-2.  **Environment:** **Docker** container running **Debian Trixie**.
-3.  **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
-4.  **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
+1. **Tooling:** Built using **live-build** (lb).
+2. **Environment:** **Docker** container running **Debian Trixie**.
+3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
+4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
 
 ### Image Optimization
 

@@ -1,4 +1,4 @@
-name: "KibaTV Build"
+name: "KibaOS Build"
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v4
 
       - name: Create build script
         run: |
@@ -30,7 +30,7 @@ jobs:
             gcc g++ gettext
 
           cd /w
-          ISO="kibatv-v${RUN_NUM}"
+          ISO="kibaos-v${RUN_NUM}"
 
           echo "=== Configuring live-build ==="
 
@@ -48,8 +48,8 @@ jobs:
             --bootappend-live "boot=live components quiet splash console=ttyS0" \
             --bootappend-install "auto=true priority=critical" \
             --bootloaders "grub-pc,grub-efi" \
-            --iso-application "KibaTV" \
-            --iso-volume "KIBATV" \
+            --iso-application "KibaOS" \
+            --iso-volume "KIBAOS" \
             --cache true \
             --cache-packages true \
             --cache-stages "bootstrap chroot rootfs binary" \
@@ -184,7 +184,7 @@ jobs:
           rm -rf /var/lib/apt/lists/*
 
           # 4. Remove temporary files
-          rm -rf /tmp/ - /var/tmp/*
+          rm -rf /tmp/* /var/tmp/*
 
           echo "=== Aggressive Minimization complete ==="
           MIN_HOOK
@@ -199,7 +199,7 @@ jobs:
 
           # System-wide Managed Policies
           mkdir -p /etc/chromium/policies/managed
-          cat > /etc/chromium/policies/managed/kibatv.json << 'CPOLICY'
+          cat > /etc/chromium/policies/managed/kibaos.json << 'CPOLICY'
           {
             "HomepageLocation": "https://alphasearch.pages.dev",
             "HomepageIsNewTabPage": false,
@@ -207,7 +207,7 @@ jobs:
             "RestoreOnStartupURLs": ["https://alphasearch.pages.dev"],
             "ManagedBookmarks": [
               {
-                "name": "KibaTV GitHub",
+                "name": "KibaOS GitHub",
                 "url": "https://github.com/WolfTech-Innovations/Kiba"
               }
             ],
@@ -234,15 +234,15 @@ jobs:
             for cfg in $GRUB_CONFIGS; do
               echo "  Patched: $cfg"
               sed -i \
-                -e 's/Debian GNU\/Linux/KibaTV/g' \
-                -e 's/Debian Live/KibaTV/g' \
-                -e 's/GNU\/Linux Live/KibaTV/g' \
-                -e 's/Live system (amd64)/Start KibaTV/g' \
-                -e 's/Live system/Start KibaTV/g' \
-                -e 's/Graphical install/Install KibaTV to this computer/g' \
-                -e 's/Install with Speech Synthesis/Start KibaTV (screen reader)/g' \
+                -e 's/Debian GNU\/Linux/KibaOS/g' \
+                -e 's/Debian Live/KibaOS/g' \
+                -e 's/GNU\/Linux Live/KibaOS/g' \
+                -e 's/Live system (amd64)/Start KibaOS/g' \
+                -e 's/Live system/Start KibaOS/g' \
+                -e 's/Graphical install/Install KibaOS to this computer/g' \
+                -e 's/Install with Speech Synthesis/Start KibaOS (screen reader)/g' \
                 -e 's/Advanced options for/More options for/g' \
-                -e 's/Live system (failsafe mode)/Start KibaTV (safe mode)/g' \
+                -e 's/Live system (failsafe mode)/Start KibaOS (safe mode)/g' \
                 "$cfg"
             done
           else
@@ -256,7 +256,7 @@ jobs:
           echo "=== Adding packages ==="
 
           mkdir -p config/package-lists
-          cat > config/package-lists/kibatv.list.chroot << 'PACKAGES'
+          cat > config/package-lists/kibaos.list.chroot << 'PACKAGES'
           # ── Base system ───────────────────────────────────────────────────────
           linux-image-amd64
           linux-headers-amd64
@@ -406,33 +406,33 @@ jobs:
           set -e
 
           # ── Plymouth theme ────────────────────────────────────────────────────
-          mkdir -p /usr/share/kibatv
+          mkdir -p /usr/share/kibaos
           touch ~/.zshrc
-          mkdir -p /usr/share/plymouth/themes/kibatv-spinner
+          mkdir -p /usr/share/plymouth/themes/kibaos-spinner
 
           # Decode embedded fallback logo
-          if [ ! -f /usr/share/kibatv/logo.png ]; then
+          if [ ! -f /usr/share/kibaos/logo.png ]; then
             cat > /tmp/logo_b64.txt << 'LOGO_B64'
           iVBORw0KGgoAAAANSUhEUgAAAyAAAAJYCAYAAACadoJwAAAQXklEQVR4nO3dS5LbyhFAUfYL7cJT79Px9ump10EPbEoU1c3mB7ioAs7ZQBchDepGIsmP8/l84i4PCACAZ3xsfYCR/dj6AIMQGQAALOXe3fLwcXLUABEcAABs4fYeerggOUqACA4AAEZ0uCDZc4CIDgAAZnN9h91ljOwtQEQHAAB7scsY2UuACA8AAPbsct+dPkRmDxDhAQDAkUwfIrMGiPAAAODIpg2R2QJEeAAAwC/ThcgsASI8AADga9OEyOgBIjwAAOBxw4fIX1sf4A7xAQAArxn2Lj3iBGTYhwUAABMZchoy2gREfAAAwLKGumOPMgEZ6qEAAMDODDMNGWECIj4AAKCx+d176wDZ/AEAAMDBbHoH3+oVLOEBAADb2eyVrC0mIOIDAADGkN/N6wARHwAAMJb0jl4GiPgAAIAxZXf1KkDEBwAAjC25sxcBIj4AAGBfFr3jLxkg4gMAAPZpsbt+/UvoAADAgS0VIKYfAACwb4vc+ZcIEPEBAABH8Pbd/90AER8AAHAsbzWAHRAAACDzToCYfgAAwDG93AKvBoj4AACAY3upCbyCBQAAZF4JENMPAADgdHqhDZ4NEPEBAABbe6oRvIIFAABkngkQ0w8AAOAzD7eCCQgAAJB5NEBMPwAAgHseagYTEAAAIPNIgJh+AAAAj/i2HUxAAACAzHcBYvoBAAA8425DmIAAAACZewFi+gEAALziy5YwAQEAADJfBYjpBwAA8I5Pm8IEBAAAyNwLEFMQAADgFV+2hAkIAACQ+S5ATEEAAIBn3G0IExAAACDzSICYggAAAI/4th1MQAAAgMyjAWIKAgAA3PNQM5iAAAAAmWcCxBQEAAD4zMOtYAICAABkng0QUxAAAODaU43wygREhAAAAKfTC23gFSwAACDzaoCYggAAwLG91ATvTEBECAAAHNPLLeAVLAAAIPNugJiCAADAsbzVAEtMQEQIAAAcw9t3/6VewRIhAACwb4vc+e2AAAAAmSUDxBQEAAD2abG7/tITEBECAAD7sugdf41XsEQIAADMbZU7/ZpL6CIEAADmtNqdfu1vwRIhAAAwl1Xv8MXX8IoQAACYw+p39+p3QEQIAACMLbmzlz9EKEIAAGBM2V29/iV0EQIAAGNJ7+h1gJxOIgQAAEaR381/1H/w/y4f9LzR3wcAgCPbbCiwxQTkmmkIAAC0Nr2Dbx0gp5MIAQCAyuZ3761ewbrllSwAAFjP5uFxMcIE5NowDwYAAHZiqDv2KBOQa6YhAADwvqHC42K0Aci1IR8YAABMYNi79IgTkGumIQAA8Lhhw+Ni9AC5ECIAAPC14cPjYpYAuRAiAADwyzThcTFbgFwIEQAAjmy68LiYNUAuhAgAAEcybXhczB4gF0IEAIA9mz48LvYSIBfX/zBiBACAme0mOq7tLUCuiREAAGazi+i4tucAuXb7DylIAAAYwe6D49ZRAuSWIAEAYAuHC45bRw2QW/f+I4gTAACecfjIuOe/Ds4zCD9oqXsAAAAASUVORK5CYII=
           LOGO_B64
-            base64 -d /tmp/logo_b64.txt > /usr/share/kibatv/logo.png
+            base64 -d /tmp/logo_b64.txt > /usr/share/kibaos/logo.png
             rm /tmp/logo_b64.txt
           fi
-          cp /usr/share/kibatv/logo.png /usr/share/kibatv/logo-plymouth.png
+          cp /usr/share/kibaos/logo.png /usr/share/kibaos/logo-plymouth.png
 
-          # ── Plymouth theme — KibaTV boot splash ───────────────────────────────
-          cat > /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth << 'PLYMOUTH_THEME'
+          # ── Plymouth theme — KibaOS boot splash ───────────────────────────────
+          cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth << 'PLYMOUTH_THEME'
           [Plymouth Theme]
-          Name=KibaTV
-          Description=KibaTV boot splash
+          Name=KibaOS
+          Description=KibaOS boot splash
           ModuleName=script
 
           [script]
-          ImageDir=/usr/share/plymouth/themes/kibatv-spinner
-          ScriptFile=/usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.script
+          ImageDir=/usr/share/plymouth/themes/kibaos-spinner
+          ScriptFile=/usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script
           PLYMOUTH_THEME
 
-          cat > /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.script << 'PLYMOUTH_SCRIPT'
+          cat > /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.script << 'PLYMOUTH_SCRIPT'
           Window.SetBackgroundTopColor(0.157, 0.165, 0.212);
           Window.SetBackgroundBottomColor(0.157, 0.165, 0.212);
           screen_width  = Window.GetWidth();
@@ -444,14 +444,14 @@ jobs:
           logo_target_w = 160;
           logo_scale    = logo_target_w / logo.image.GetWidth();
           logo.scaled   = logo.image.Scale(
-                            Math.Int(logo.image.GetWidth()   - logo_scale),
-                            Math.Int(logo.image.GetHeight()  - logo_scale));
+                            Math.Int(logo.image.GetWidth()  * logo_scale),
+                            Math.Int(logo.image.GetHeight() * logo_scale));
           logo.sprite   = Sprite(logo.scaled);
           logo.x = cx - logo.scaled.GetWidth()  / 2;
           logo.y = cy - logo.scaled.GetHeight() / 2 - 60;
           logo.sprite.SetPosition(logo.x, logo.y, 1);
 
-          label.image  = Image.Text("KibaTV", 0.741, 0.576, 0.976, 1, "Sans Bold 20");
+          label.image  = Image.Text("KibaOS", 0.741, 0.576, 0.976, 1, "Sans Bold 20");
           label.sprite = Sprite(label.image);
           label.sprite.SetPosition(
             cx - label.image.GetWidth() / 2,
@@ -477,7 +477,7 @@ jobs:
           bar_fg.width  = 1;
 
           fun progress_callback(duration, progress) {
-              new_w = Math.Int(bar_w  - progress);
+              new_w = Math.Int(bar_w * progress);
               if (new_w < 1) { new_w = 1; }
               if (new_w != bar_fg.width) {
                   bar_fg.image  = Image(new_w, bar_h);
@@ -497,14 +497,14 @@ jobs:
           Plymouth.SetMessageFunction(message_callback);
           PLYMOUTH_SCRIPT
 
-          cp /usr/share/kibatv/logo-plymouth.png \
-             /usr/share/plymouth/themes/kibatv-spinner/logo.png
+          cp /usr/share/kibaos/logo-plymouth.png \
+             /usr/share/plymouth/themes/kibaos-spinner/logo.png
 
           update-alternatives --install \
             /usr/share/plymouth/themes/default.plymouth default.plymouth \
-            /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth 100
+            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100
           update-alternatives --set default.plymouth \
-            /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth
+            /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth
 
           # ── Aggressive Initrd Compression ────────────────────────────────────
           sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
@@ -535,8 +535,13 @@ jobs:
           # Nala wraps apt; we alias apt→nala in the system zshrc and bashrc
           # so users interacting with the terminal get the nicer interface.
           cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
-          # KibaTV: use nala as the default package manager frontend
+          # KibaOS: use nala as the default package manager frontend
           if command -v nala >/dev/null 2>&1; then
+            alias apt='nala'
+            alias apt-get='nala'
+          fi
+          NALA_ALIAS
+          chmod +x /etc/profile.d/nala-alias.sh
 
           # ── Zsh config (auto-generated) ───────────────────────────────────────
           # The zshrc is written by this hook and placed in /etc/zsh/zshrc
@@ -544,7 +549,7 @@ jobs:
           mkdir -p /etc/zsh
           cat > /etc/zsh/zshrc << 'ZSHRC'
           # ═══════════════════════════════════════════════════════
-          #  KibaTV system-wide zshrc — auto-generated at build time
+          #  KibaOS system-wide zshrc — auto-generated at build time
           # ═══════════════════════════════════════════════════════
 
           # ── Environment ────────────────────────────────────────
@@ -606,7 +611,7 @@ jobs:
 
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
-            A="alias"; $A apt='nala'
+            alias apt='nala'
             alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
@@ -615,7 +620,7 @@ jobs:
             alias search='nala search'
           fi
 
-          # ── KibaTV Aliases ──────────────────────────────────────
+          # ── KibaOS Aliases ──────────────────────────────────────
           alias edit='${EDITOR:-micro}'
           alias please='sudo'
           alias cls='clear'
@@ -623,27 +628,27 @@ jobs:
 
           # ── Modern Aliases ──────────────────────────────────────
           if command -v eza >/dev/null 2>&1; then
-            A="alias"; $A ls='eza --icons --group-directories-first'
-            A="alias"; $A ll='eza -lah --icons --group-directories-first'
-            A="alias"; $A la='eza -A --icons'
+            alias ls='eza --icons --group-directories-first'
+            alias ll='eza -lah --icons --group-directories-first'
+            alias la='eza -A --icons'
             alias tree='eza --tree --icons'
           else
-            A="alias"; $A ls='ls --color=auto'
-            A="alias"; $A ll='ls -lah'
-            A="alias"; $A la='ls -A'
+            alias ls='ls --color=auto'
+            alias ll='ls -lah'
+            alias la='ls -A'
           fi
 
           if command -v bat >/dev/null 2>&1; then
-            A="alias"; $A cat='bat --paging=never'
+            alias cat='bat --paging=never'
           elif command -v batcat >/dev/null 2>&1; then
-            A="alias"; $A cat='batcat --paging=never'
+            alias cat='batcat --paging=never'
             alias bat='batcat'
           fi
 
           if command -v rg >/dev/null 2>&1; then
-            A="alias"; $A grep='rg'
+            alias grep='rg'
           elif command -v ripgrep >/dev/null 2>&1; then
-            A="alias"; $A grep='ripgrep'
+            alias grep='ripgrep'
           fi
 
           if command -v fdfind >/dev/null 2>&1; then
@@ -652,9 +657,9 @@ jobs:
 
           if command -v tldr >/dev/null 2>&1; then
             # Use tealdeer if available
-            A="alias"; $A help='tldr'
+            alias help='tldr'
           elif command -v tealdeer >/dev/null 2>&1; then
-            A="alias"; $A help='tealdeer'
+            alias help='tealdeer'
             alias tldr='tealdeer'
           fi
 
@@ -738,11 +743,11 @@ jobs:
           rm -rf /tmp/ant-themes
 
           # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
-          mkdir -p /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/images
-          cat > /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/metadata.json << 'WATCHMETA'
-          {"KPlugin":{"Id":"com.kibatv.watchdogs.desktop","Name":"Watch Dogs","License":"GPL","Version":"1.0"}}
+          mkdir -p /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/images
+          cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/metadata.json << 'WATCHMETA'
+          {"KPlugin":{"Id":"com.kibaos.watchdogs.desktop","Name":"Watch Dogs","License":"GPL","Version":"1.0"}}
           WATCHMETA
-          cat > /usr/share/plasma/look-and-feel/com.kibatv.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
+          cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/Splash.qml << 'WATCHSPLASH'
           import QtQuick 2.15
           Rectangle {
               color: "#282a36"
@@ -750,7 +755,7 @@ jobs:
               Text {
                   id: welcomeText
                   anchors.centerIn: parent
-                  text: "KibaTV | Switch to simple"
+                  text: "KibaOS | Switch to simple"
                   font.pixelSize: 48; font.bold: true; color: "#bd93f9"
                   opacity: 0
                   SequentialAnimation {
@@ -861,13 +866,13 @@ jobs:
 
           # ── Konsole profile ────────────────────────────────────────────────────
           mkdir -p /etc/skel/.local/share/konsole
-          cat > /etc/skel/.local/share/konsole/KibaTV.profile << 'KONSOLE_PROFILE'
+          cat > /etc/skel/.local/share/konsole/KibaOS.profile << 'KONSOLE_PROFILE'
           [Appearance]
           ColorScheme=Dracula
           Font=Monospace,11,-1,5,50,0,0,0,0,0
           [General]
           Command=/bin/zsh
-          Name=KibaTV
+          Name=KibaOS
           Parent=FALLBACK/
           TerminalColumns=100
           TerminalRows=30
@@ -877,7 +882,7 @@ jobs:
 
           cat > /etc/skel/.local/share/konsole/konsolerc << 'KONSOLERC'
           [Desktop Entry]
-          DefaultProfile=KibaTV.profile
+          DefaultProfile=KibaOS.profile
           KONSOLERC
 
           # ── KDE global settings ────────────────────────────────────────────────
@@ -971,7 +976,7 @@ jobs:
           cat > "$SKEL_KDE/ksplashrc" << 'KSPLASHRC'
           [KSplash]
           Engine=KSplashQML
-          Theme=com.kibatv.watchdogs.desktop
+          Theme=com.kibaos.watchdogs.desktop
           KSPLASHRC
 
           # ── kcminputrc — Vimix cursors ─────────────────────────────────────────
@@ -1079,7 +1084,7 @@ jobs:
           [Containments][1][Applets][10][Configuration][General]
           applicationName=calamares
           iconPath=/usr/share/applications/calamares.desktop
-          label=Install KibaTV
+          label=Install KibaOS
           [Containments][1][Applets][10][Geometry]
           x=20; y=40; width=64; height=64
 
@@ -1135,7 +1140,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
+          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1149,11 +1154,11 @@ jobs:
           # Only runs in the live session (the installed system removes this file
           # in post-install step 14).
           mkdir -p /etc/xdg/autostart
-          cat > /etc/xdg/autostart/kibatv-installer.desktop << 'AUTOSTART'
+          cat > /etc/xdg/autostart/kibaos-installer.desktop << 'AUTOSTART'
           [Desktop Entry]
           Type=Application
-          Name=Install KibaTV
-          Comment=Start the KibaTV installer
+          Name=Install KibaOS
+          Comment=Start the KibaOS installer
           Exec=bash -c 'sleep 4 && sudo calamares'
           Icon=calamares
           Terminal=false
@@ -1164,8 +1169,8 @@ jobs:
 
           # Also add to /etc/skel so it appears for the live user's home
           mkdir -p /etc/skel/.config/autostart
-          cp /etc/xdg/autostart/kibatv-installer.desktop \
-             /etc/skel/.config/autostart/kibatv-installer.desktop
+          cp /etc/xdg/autostart/kibaos-installer.desktop \
+             /etc/skel/.config/autostart/kibaos-installer.desktop
 
           # ── Services ────────────────────────────────────────────────────────────
           systemctl enable sddm           || true
@@ -1190,21 +1195,21 @@ jobs:
             https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
 
           # ── System identity ────────────────────────────────────────────────────
-          echo "kibatv-live" > /etc/hostname
+          echo "kibaos-live" > /etc/hostname
 
           cat > /etc/os-release << 'EOF'
-          NAME="KibaTV"
-          ID=kibatv
+          NAME="KibaOS"
+          ID=kibaos
           ID_LIKE=debian
           VERSION_ID="1.0"
-          PRETTY_NAME="KibaTV 1.0"
+          PRETTY_NAME="KibaOS 1.0"
           HOME_URL="https://github.com/WolfTech-Innovations/kiba"
           SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           EOF
 
           cat > /etc/issue << 'EOF'
-          KibaTV \r (\l)
+          KibaOS \r (\l)
           EOF
 
           cat > /etc/motd << 'EOF'
@@ -1215,7 +1220,7 @@ jobs:
           | . \| | |_) | (_| | |_| |___) |
           |_|\_\_|_.__/ \__,_|\___/|____/
 
-          Welcome to KibaTV — Switch to Simple
+          Welcome to KibaOS — Switch to Simple
 
           EOF
 
@@ -1226,7 +1231,7 @@ jobs:
           # Functional welcome menu for KibaTV
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaTV" \
-              --window-icon="/usr/share/kibatv/logo.png" \
+              --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaTV! What would you like to do?" \
               --column=" " --column="Action" --column="Description" \
               --image-column=1 --print-column=2 \
@@ -1256,7 +1261,7 @@ jobs:
               "Keyboard Shortcuts")
                 (
                   zenity --info --title="Keyboard Shortcuts" \
-                    --window-icon="/usr/share/kibatv/logo.png" \
+                    --window-icon="/usr/share/kibaos/logo.png" \
                     --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Meta + T</b>: Open Terminal (Konsole)\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + W</b>: Desktop Overview\n  • <b>Meta + A</b>: Quick Settings\n  • <b>Meta + E</b>: File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen" \
                     --width=450 2>/dev/null
                 ) &
@@ -1307,20 +1312,20 @@ jobs:
           echo "=== Creating Calamares config ==="
 
           # ── Calamares branding ─────────────────────────────────────────────────
-          mkdir -p config/includes.chroot/etc/calamares/branding/kibatv
-          cat > config/includes.chroot/etc/calamares/branding/kibatv/branding.desc << 'BRANDING'
-          componentName: kibatv
+          mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
+          cat > config/includes.chroot/etc/calamares/branding/kibaos/branding.desc << 'BRANDING'
+          componentName: kibaos
           welcomeStyleCalamares: true
           welcomeExpandingLogo: true
           slideshowAPI: 2
           strings:
-            productName: "KibaTV"
-            shortProductName: "KibaTV"
+            productName: "KibaOS"
+            shortProductName: "KibaOS"
             version: "1.8"
             shortVersion: "1.8"
-            versionedName: "KibaTV"
-            shortVersionedName: "KibaTV"
-            bootloaderEntryName: "KibaTV"
+            versionedName: "KibaOS"
+            shortVersionedName: "KibaOS"
+            bootloaderEntryName: "KibaOS"
             productUrl: "https://github.com/WolfTech-Innovations/kiba"
             supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
             knownIssuesUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
@@ -1343,9 +1348,9 @@ jobs:
           cat > config/hooks/live/0110-calamares-branding.hook.chroot << 'BRANDING_HOOK'
           #!/bin/bash
           set -e
-          mkdir -p /etc/calamares/branding/kibatv
-          cp /usr/share/kibatv/logo.png /etc/calamares/branding/kibatv/logo.png
-          cp /usr/share/kibatv/logo.png /etc/calamares/branding/kibatv/welcome.png
+          mkdir -p /etc/calamares/branding/kibaos
+          cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
+          cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
 
           # ── Write complete Calamares settings.conf ──────────────────────────────
           cat > /etc/calamares/settings.conf << 'CALASETTINGS'
@@ -1387,7 +1392,7 @@ jobs:
             - show:
               - finished
 
-          branding: kibatv
+          branding: kibaos
           prompt-install: false
           dont-chroot: false
           oem-setup: false
@@ -1403,7 +1408,7 @@ jobs:
 
           cat > /etc/calamares/modules/welcome.conf << 'WELCOMECONF'
           ---
-          # KibaTV welcome page — plain English, no technical jargon
+          # KibaOS welcome page — plain English, no technical jargon
           requirements:
             check:
               - storage
@@ -1484,7 +1489,7 @@ jobs:
           ---
           dontChroot: true
           files:
-            - dest: /var/log/kibatv-install.log
+            - dest: /var/log/kibaos-install.log
               from: /var/log/calamares/session.log
               perm: "0644"
           PRESFILES
@@ -1496,11 +1501,11 @@ jobs:
           timeout: 300
           verbose: true
           script:
-            - "/usr/share/kibatv/post-install.sh"
+            - "/usr/share/kibaos/post-install.sh"
           POSTINSTALL
 
           # ── Calamares slideshow ─────────────────────────────────────────────────
-          cat > /etc/calamares/branding/kibatv/show.qml << 'SHOWQML'
+          cat > /etc/calamares/branding/kibaos/show.qml << 'SHOWQML'
           import calamares.slideshow 1.0;
           Presentation {
               id: presentation
@@ -1510,8 +1515,8 @@ jobs:
                   repeat: true
                   onTriggered: presentation.goToNextSlide()
               }
-              Slide { centeredText: "Welcome to KibaTV!\n\nYour computer is getting set up.\nThis usually takes about 10 minutes." }
-              Slide { centeredText: "KibaTV is built to stay out of your way.\n\nEverything you need is already here —\njust open it and go." }
+              Slide { centeredText: "Welcome to KibaOS!\n\nYour computer is getting set up.\nThis usually takes about 10 minutes." }
+              Slide { centeredText: "KibaOS is built to stay out of your way.\n\nEverything you need is already here —\njust open it and go." }
               Slide { centeredText: "Your files, your apps, your way.\n\nHead to the app store after setup\nto install anything you like." }
               Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour computer will restart when it's ready." }
               function onActivate() { presentation.currentSlide = 0; }
@@ -1525,8 +1530,8 @@ jobs:
           [Desktop Entry]
           Type=Application
           Version=1.0
-          Name=Install KibaTV
-          Comment=Install KibaTV on your PC
+          Name=Install KibaOS
+          Comment=Install KibaOS on your PC
           Exec=sudo calamares
           Icon=calamares
           Terminal=false
@@ -1535,12 +1540,12 @@ jobs:
 
 
           # ── Post-install script ─────────────────────────────────────────────────
-          mkdir -p /usr/share/kibatv
-          cat > /usr/share/kibatv/post-install.sh << 'POSTINSTALLSH'
+          mkdir -p /usr/share/kibaos
+          cat > /usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
           #!/bin/bash
-          # KibaTV post-install — runs chrooted inside installed system
+          # KibaOS post-install — runs chrooted inside installed system
           set -e
-          exec > /var/log/kibatv-post-install.log 2>&1
+          exec > /var/log/kibaos-post-install.log 2>&1
 
           TARGET_USER=$(getent passwd 1000 | cut -d: -f1 || true)
           [ -z "$TARGET_USER" ] && TARGET_USER=$(ls /home 2>/dev/null | head -1 || true)
@@ -1579,21 +1584,21 @@ jobs:
           rm -f /etc/sudoers.d/live-user
 
           # 6. System identity
-          echo "kibatv" > /etc/hostname
+          echo "kibaos" > /etc/hostname
           cat > /etc/hosts << 'HOSTS'
           127.0.0.1   localhost
-          127.0.1.1   kibatv
+          127.0.1.1   kibaos
           ::1         localhost ip6-localhost ip6-loopback
           HOSTS
           cat > /etc/os-release << 'OSREL'
-          NAME="KibaTV"
-          ID=kibatv
+          NAME="KibaOS"
+          ID=kibaos
           ID_LIKE=debian
           VERSION_ID="1.0"
-          PRETTY_NAME="KibaTV 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kibatv"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibatv/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibatv/issues"
+          PRETTY_NAME="KibaOS 1.0"
+          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
           OSREL
 
           # 7. Sleep disabled on installed system
@@ -1607,13 +1612,13 @@ jobs:
           NOSLEEP
 
           # 8. Plymouth — re-register and rebuild initramfs
-          if [ -f /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth ]; then
+          if [ -f /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth ]; then
             update-alternatives --install \
               /usr/share/plymouth/themes/default.plymouth default.plymouth \
-              /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth 100 \
+              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth 100 \
               2>/dev/null || true
             update-alternatives --set default.plymouth \
-              /usr/share/plymouth/themes/kibatv-spinner/kibatv-spinner.plymouth \
+              /usr/share/plymouth/themes/kibaos-spinner/kibaos-spinner.plymouth \
               2>/dev/null || true
           fi
           sed -i 's/^COMPRESS=.*/COMPRESS=zstd/' /etc/initramfs-tools/initramfs.conf
@@ -1647,18 +1652,19 @@ jobs:
           for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
             if [ -f "$RCFILE" ] && ! grep -q "nala" "$RCFILE"; then
               cat >> "$RCFILE" << 'NALABASH'
-          # KibaTV: nala as package manager frontend
+          # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
-            A="alias"; $A apt='nala'
-            \alias apt_nala="nala"
+            alias apt='nala'
+            alias apt-get='nala'
+          }
           NALABASH
             fi
           done
           chown "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.bashrc" 2>/dev/null || true
 
-          echo "=== KibaTV post-install COMPLETE ==="
+          echo "=== KibaOS post-install COMPLETE ==="
           POSTINSTALLSH
-          chmod +x /usr/share/kibatv/post-install.sh
+          chmod +x /usr/share/kibaos/post-install.sh
 
           BRANDING_HOOK
           chmod +x config/hooks/live/0110-calamares-branding.hook.chroot
@@ -1723,7 +1729,7 @@ jobs:
             echo "VERIFIED: Boot test completed without panics"
 
             echo ""
-            echo "═══ KibaTV Build Complete ═══"
+            echo "═══ KibaOS Build Complete ═══"
             ls -lh "${ISO}.iso"
           else
             echo "ERROR: ISO file not found!"
@@ -1758,7 +1764,7 @@ jobs:
               if sshpass -p "$SF_PASS" rsync -avP \
                 -e "ssh -o StrictHostKeyChecking=no" \
                 "$iso_file" \
-                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibatv/"; then
+                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"; then
                 echo "Successfully uploaded $iso_file"
                 break
               else

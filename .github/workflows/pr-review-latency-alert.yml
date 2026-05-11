@@ -1,7 +1,7 @@
 name: PR Review Latency Alert
 on:
   schedule:
-    - cron: "0 9  -  - 1-5"
+    - cron: "0 9 * * 1-5"
   workflow_dispatch:
 jobs:
   review-alert:
@@ -22,7 +22,7 @@ jobs:
             let found = false;
             for (const pr of pullRequests) {
               const created = new Date(pr.created_at);
-              const diffDays = Math.ceil((now - created) / (1000  - 60  - 60  - 24));
+              const diffDays = Math.ceil((now - created) / (1000 * 60 * 60 * 24));
               if (diffDays > 3 && pr.requested_reviewers.length > 0) {
                 report += `- [ ] PR [#${pr.number}](${pr.html_url}) has been open for ${diffDays} days with pending reviews.\n`;
                 found = true;

@@ -15,7 +15,7 @@ jobs:
 
         # Simple check for unquoted variables in command arguments
 
-        grep -rnE "[a-z0-9_]+=. - \$\{[a-z0-9_]+\}" scripts/ && exit 1 || exit 0
+        grep -rnE "[a-z0-9_]+=.* \$\{[a-z0-9_]+\}" scripts/ && exit 1 || exit 0
 
         '
     timeout-minutes: 5

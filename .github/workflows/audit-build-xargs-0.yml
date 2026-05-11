@@ -21,4 +21,4 @@ jobs:
       - name: Check for xargs null delimiter
         run: |
           # Robust check for xargs without -0 or --null when used with find
-          grep -rnE "^[^#]*find . - -print0" scripts/ | xargs -I {} sh -c 'grep -qE "xargs.*(\-0|\-\-null)" scripts/ || (echo "Use xargs -0 with find -print0 for robust filename handling" && exit 1)'
+          grep -rnE "^[^#]*find .* -print0" scripts/ | xargs -I {} sh -c 'grep -qE "xargs.*(\-0|\-\-null)" scripts/ || (echo "Use xargs -0 with find -print0 for robust filename handling" && exit 1)'

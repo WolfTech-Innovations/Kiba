@@ -1,7 +1,7 @@
 name: Issue Needs-Info Auto-Closer
 on:
   schedule:
-    - cron: "0 0  -  - *"
+    - cron: "0 0 * * *"
   workflow_dispatch:
 jobs:
   auto-close:
@@ -21,7 +21,7 @@ jobs:
             const now = new Date();
             for (const issue of issues) {
               const updated = new Date(issue.updated_at);
-              const diffDays = Math.ceil((now - updated) / (1000  - 60  - 60  - 24));
+              const diffDays = Math.ceil((now - updated) / (1000 * 60 * 60 * 24));
               if (diffDays > 14) {
                 await github.rest.issues.createComment({
                   owner: context.repo.owner,

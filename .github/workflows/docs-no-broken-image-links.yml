@@ -20,8 +20,8 @@ jobs:
             dir_path=$(dirname "$file_path")
             img_path=$(echo "$line" | sed -E 's/.*!\[.*\]\((.*)\)/\1/')
 
-            if [[ "$img_path" != http - ]]; then
-              if [[ "$img_path" == / - ]]; then
+            if [[ "$img_path" != http* ]]; then
+              if [[ "$img_path" == /* ]]; then
                 # Root-relative
                 [ -f ".${img_path}" ] || { echo "Broken root-relative image link: $img_path in $file_path"; exit 1; }
               else

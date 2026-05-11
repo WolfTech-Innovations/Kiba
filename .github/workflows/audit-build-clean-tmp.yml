@@ -21,4 +21,4 @@ jobs:
       - name: Check for /tmp cleanup
         run: |
           # Check if scripts use /tmp and have a cleanup mechanism
-          grep -rnE "^[^#]*/tmp/" scripts/ && (grep -qE "rm -rf /tmp/|trap . - /tmp/" scripts/ || (echo "Ensure temporary files in /tmp are cleaned up using rm or trap" && exit 1)) || exit 0
+          grep -rnE "^[^#]*/tmp/" scripts/ && (grep -qE "rm -rf /tmp/|trap .* /tmp/" scripts/ || (echo "Ensure temporary files in /tmp are cleaned up using rm or trap" && exit 1)) || exit 0

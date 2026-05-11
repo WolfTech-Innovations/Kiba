@@ -16,5 +16,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Quoting
-      run: grep -rnE "[a-z0-9_]+=. - \$[a-z0-9_]+" scripts/ && exit 1 || exit 0
+      run: grep -rnE "[a-z0-9_]+=.* \$[a-z0-9_]+" scripts/ && exit 1 || exit 0
     timeout-minutes: 5
