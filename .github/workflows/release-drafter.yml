@@ -12,7 +12,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  update_release_draft:
+  update-release-draft:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
