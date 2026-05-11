@@ -1038,6 +1038,40 @@ jobs:
           Mask=2
           BREEZERC
 
+          # ── kglobalshortcutsrc — Standard KibaTV shortcuts ─────────────────────
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'KSHORTCUTS'
+          [khotkeys]
+          _k_friendly_name=khotkeys
+          {d03619b6-9b3c-48cc-9d9c-a2aadb485550}=Meta+T,none,Open Terminal
+
+          [kwin]
+          _k_friendly_name=KWin
+          Overview=Meta+W,none,Overview
+          ShowDesktopGrid=none,none,Show Desktop Grid
+
+          [org.kde.krunner.desktop]
+          _k_friendly_name=Search
+          _launch=Meta+S,Alt+Space,Search
+
+          [plasma-pa]
+          _k_friendly_name=Audio Volume
+          toggle_mute=Volume Mute,none,Mute
+
+          [plasmashell]
+          _k_friendly_name=plasmashell
+          manage activities=Meta+Q,none,Show Activity Switcher
+          next activity=none,none,Next Activity
+          previous activity=none,none,Previous Activity
+          activate task manager entry 1=Meta+1,none,Activate Task Manager Entry 1
+          activate task manager entry 2=Meta+2,none,Activate Task Manager Entry 2
+          activate task manager entry 3=Meta+3,none,Activate Task Manager Entry 3
+          activate task manager entry 4=Meta+4,none,Activate Task Manager Entry 4
+          show-on-mouse-pos=Meta+A,none,Activate Quick Settings
+
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+          KSHORTCUTS
+
           # ── plasmashellrc — floating panel ─────────────────────────────────────
           cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
           [PlasmaViews][Panel 2][Defaults]
@@ -1233,36 +1267,38 @@ jobs:
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaOS! What would you like to do?" \
-              --column="Action" --column="Description" \
-              "Install KibaOS" "Install the system permanently to your disk" \
-              "Web Browser" "Browse the internet" \
-              "Software Center" "Discover and install new applications" \
-              "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "Online Wiki" "Read the technical documentation" \
-              --width=500 --height=400 2>/dev/null)
+              --column=" " --column="Action" --column="Description" --column="Tag" \
+              --image-column=1 --hide-column=4 --print-column=4 \
+              "calamares" "Install KibaOS" "Install the system permanently to your disk" "INSTALL" \
+              "chromium" "Web Browser" "Browse the internet" "BROWSER" \
+              "org.kde.discover" "Software Center" "Discover and install new applications" "STORE" \
+              "help-contents" "Keyboard Shortcuts" "View useful desktop shortcuts" "SHORTCUTS" \
+              "text-html" "Online Wiki" "Read the technical documentation" "WIKI" \
+              --width=450 --height=500 \
+              --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
 
             [ -z "$CHOICE" ] && break
 
             case "$CHOICE" in
-              "Install KibaOS")
+              "INSTALL")
                 sudo calamares &
                 break
                 ;;
-              "Web Browser")
+              "BROWSER")
                 chromium &
                 break
                 ;;
-              "Software Center")
+              "STORE")
                 plasma-discover &
                 break
                 ;;
-              "Keyboard Shortcuts")
-                zenity --info --title="Keyboard Shortcuts" \
+              "SHORTCUTS")
+                (zenity --info --title="Keyboard Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
-                  --width=400 2>/dev/null
+                  --text="<b>Standard KibaTV Shortcuts:</b>\n\n  • <b>Meta + T</b>: Terminal (Konsole)\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + W</b>: Overview (Window Grid)\n  • <b>Meta + A</b>: Quick Settings\n\n<b>Other Useful Shortcuts:</b>\n  • <b>Meta + E</b>: File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
+                  --width=400 2>/dev/null) &
                 ;;
-              "Online Wiki")
+              "WIKI")
                 chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
                 break
                 ;;
@@ -1276,6 +1312,7 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          Comment=Explore KibaTV and learn about desktop shortcuts
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
