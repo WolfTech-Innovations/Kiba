@@ -1,7 +1,7 @@
 name: PR Milestone Due Date Reminder
 on:
   schedule:
-    - cron: '0 9 * * 1' # Every Monday at 9:00 AM
+    - cron: '0 9  -  - 1' # Every Monday at 9:00 AM
 jobs:
   remind-milestones:
     runs-on: ubuntu-latest

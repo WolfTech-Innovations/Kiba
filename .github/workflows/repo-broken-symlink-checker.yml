@@ -4,7 +4,7 @@ on:
     paths-ignore:
       - 'node_modules/**'
   schedule:
-    - cron: "0 0 * * 0"
+    - cron: "0 0  -  - 0"
 jobs:
   check-symlinks:
     runs-on: ubuntu-latest

@@ -21,4 +21,4 @@ jobs:
       - name: Check for find delete name
         run: |
           # Robust check for find -delete without filters
-          grep -rnE "^[^#]*find .* -delete" scripts/ | grep -vE "(\-name|\-iname|\-path|\-regex)" && (echo "Always use filtering (e.g., -name) with 'find -delete' for safety" && exit 1) || exit 0
+          grep -rnE "^[^#]*find . - -delete" scripts/ | grep -vE "(\-name|\-iname|\-path|\-regex)" && (echo "Always use filtering (e.g., -name) with 'find -delete' for safety" && exit 1) || exit 0

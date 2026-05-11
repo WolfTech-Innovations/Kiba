@@ -2,7 +2,7 @@ name: Close Inactive PRs
 
 on:
   schedule:
-    - cron: "0 0 * * 0"
+    - cron: "0 0  -  - 0"
 
 jobs:
   close-prs:
@@ -22,7 +22,7 @@ jobs:
             const now = new Date();
             for (const pr of prs) {
               const updatedAt = new Date(pr.updated_at);
-              const diffDays = Math.ceil(Math.abs(now - updatedAt) / (1000 * 60 * 60 * 24));
+              const diffDays = Math.ceil(Math.abs(now - updatedAt) / (1000  - 60  - 60  - 24));
               if (diffDays > 60) {
                 await github.rest.pulls.update({
                   owner: context.repo.owner,

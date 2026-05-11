@@ -23,7 +23,7 @@ jobs:
 
         '
     - name: Commit changes
-      uses: stefanzweifel/git-auto-commit-action@v5
+      uses: stefanzweifel/git-auto-commit-action@8621497c8c39c72f3e2a999a26b4ca1b5058a842
       with:
         commit_message: "\U0001F3A8 Palette: fix formatting with Prettier"
     timeout-minutes: 5

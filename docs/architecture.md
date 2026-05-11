@@ -40,14 +40,14 @@ This document provides a technical overview of the KibaTV architectural stack, f
 
 ```mermaid
 graph TD
-    A[Hardware / VM] --> B[GRUB Bootloader]
-    B --> C[CachyOS Kernel]
-    C --> D[Debian 13 Trixie Base]
-    D --> E[Systemd Init]
-    E --> F[Wayland / X11]
-    F --> G[Plasma Bigscreen]
-    G --> H[KibaTV UX]
-```
+    A [Hardware / VM] --> B [GRUB Bootloader]
+    B --> C [CachyOS Kernel]
+    C --> D [Debian 13 Trixie Base]
+    D --> E [Systemd Init]
+    E --> F [Wayland / X11]
+    F --> G [Plasma Bigscreen]
+    G --> H [KibaTV UX]
+```mermaid
 
 ---
 
@@ -61,17 +61,17 @@ KibaTV is built upon the **Debian 13 (Trixie)** testing branch. This allows us t
 
 We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
 
-- **BORE Scheduler:** Optimized for desktop responsiveness.
-- **Improved Performance:** Built with modern compiler optimizations.
-- **Gaming Ready:** Includes patches for improved wine/proton performance.
+-   **BORE Scheduler:** Optimized for desktop responsiveness.
+-   **Improved Performance:** Built with modern compiler optimizations.
+-   **Gaming Ready:** Includes patches for improved wine/proton performance.
 
 > [!IMPORTANT]
 > To maintain a clean system, we explicitly purge the stock `linux-image-amd64` and `linux-headers-amd64` meta-packages during the build process to ensure only the optimized CachyOS kernel remains.
 
 ### Init & Display
 
-- **Init System:** **Systemd** provides reliable service orchestration.
-- **Display Server:** **Wayland** is the default for its security and modern features, with **X11** (via XWayland) ensuring compatibility with legacy applications.
+-   **Init System:** **Systemd** provides reliable service orchestration.
+-   **Display Server:** **Wayland** is the default for its security and modern features, with **X11** (via XWayland) ensuring compatibility with legacy applications.
 
 ---
 
@@ -83,8 +83,8 @@ KibaTV follows a strict "No Bloat" policy. We use aggressive strategies to keep 
 
 During the build process, a custom hook removes all non-essential documentation to save hundreds of megabytes:
 
-- **Paths:** `/usr/share/doc`, `/usr/share/man`, `/usr/share/info`, `/usr/share/help`.
-- **Exception:** Shell integration scripts (e.g., **`fzf`** examples) are moved to `/usr/share/fzf` before the purge.
+-   **Paths:** `/usr/share/doc`, `/usr/share/man`, `/usr/share/info`, `/usr/share/help`.
+-   **Exception:** Shell integration scripts (e.g., **`fzf`** examples) are moved to `/usr/share/fzf` before the purge.
 
 ### Locale Pruning
 
@@ -102,7 +102,7 @@ We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-bi
 
 The live root filesystem is compressed using **Zstd** at level 19 with a 1MB block size.
 
-- **Benefit:** High compression ratio (smaller ISO) with extremely fast decompression (faster app launches).
+-   **Benefit:** High compression ratio (smaller ISO) with extremely fast decompression (faster app launches).
 
 ### Initramfs
 
@@ -110,10 +110,10 @@ The live root filesystem is compressed using **Zstd** at level 19 with a 1MB blo
 
 During the build process, a custom hook removes all non-essential documentation files:
 
-- `/usr/share/doc/*`
-- `/usr/share/man/*`
-- `/usr/share/info/*`
-- `/usr/share/help/*`
+-   `/usr/share/doc/*`
+-   `/usr/share/man/*`
+-   `/usr/share/info/*`
+-   `/usr/share/help/*`
 
 _Note: Critical shell integration scripts (like those for `fzf`) are preserved before stripping._
 
@@ -134,13 +134,13 @@ Configured for maximum compression using **`zstd -19`** in **`/etc/initramfs-too
 
 KibaTV uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 
-- **Hybrid Support:** Works on both BIOS (Legacy) and UEFI systems.
-- **Branded Menu:** A custom binary hook patches `grub.cfg` to provide user-friendly, branded menu entries like _"Start KibaTV"_ and _"Install KibaTV"_.
+-   **Hybrid Support:** Works on both BIOS (Legacy) and UEFI systems.
+-   **Branded Menu:** A custom binary hook patches `grub.cfg` to provide user-friendly, branded menu entries like _"Start KibaTV"_ and _"Install KibaTV"_.
 
 ---
 
 ## Related Reading
 
-- [**Build System**](./build-system.md)
-- [**UX & Design**](./ux-design.md)
-- [**WIKI**](../WIKI.md)
+-   [**Build System**](./build-system.md)
+-   [**UX & Design**](./ux-design.md)
+-   [**WIKI**](../WIKI.md)

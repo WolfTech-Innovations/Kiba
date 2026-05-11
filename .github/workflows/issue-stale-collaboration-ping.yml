@@ -1,7 +1,7 @@
 name: Issue Stale Collaboration Ping
 on:
   schedule:
-    - cron: '0 10 * * *' # Daily
+    - cron: '0 10  -  - *' # Daily
 jobs:
   ping-collaboration:
     runs-on: ubuntu-latest

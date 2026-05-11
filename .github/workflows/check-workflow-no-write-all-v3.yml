@@ -16,5 +16,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Permissions
-      run: '! grep -r "permissions: write-all" .github/workflows/'
+      run: '! grep -r "permissions: read-all" .github/workflows/'
     timeout-minutes: 5

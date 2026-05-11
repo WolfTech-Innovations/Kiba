@@ -52,7 +52,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_run" ]]; then
             HEAD_BRANCH="${{ github.event.workflow_run.head_branch }}"
-            if [[ "$HEAD_BRANCH" == jules/* ]]; then
+            if [[ "$HEAD_BRANCH" == jules/ - ]]; then
               echo "Detected failure on a Jules branch ($HEAD_BRANCH). Skipping to avoid infinite loop."
               echo "skip=true" >> $GITHUB_OUTPUT
             else

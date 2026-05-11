@@ -2,7 +2,7 @@ name: Draft PR Stale Notifier
 
 on:
   schedule:
-    - cron: "0 0 * * 1" # Every Monday
+    - cron: "0 0  -  - 1" # Every Monday
   workflow_dispatch:
 
 jobs:
