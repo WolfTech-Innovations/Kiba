@@ -516,7 +516,7 @@ jobs:
           cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
           # KibaOS: use nala as the default package manager frontend
           if command -v nala >/dev/null 2>&1; then
-            alias apt='nala'
+            alias apt='nala' # system-wide
             alias apt='nala'
           fi
           NALA_ALIAS
@@ -612,7 +612,7 @@ jobs:
             alias la='eza -A --icons'
             alias tree='eza --tree --icons'
           else
-            alias ls='ls --color=auto'
+            alias ls='ls --color=always'
             alias ll='ls -lah'
             alias la='ls -A'
           fi
@@ -1119,7 +1119,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1277,8 +1277,8 @@ jobs:
           welcomeExpandingLogo: true
           slideshowAPI: 2
           strings:
-            productName: "KibaOS"
-            shortProductName: "KibaOS"
+            productName: "KibaTV"
+            shortProductName: "KibaTV"
             version: "1.8"
             shortVersion: "1.8"
             versionedName: "KibaOS"

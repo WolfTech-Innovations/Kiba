@@ -12,6 +12,6 @@ jobs:
       with:
         persist-credentials: false
     - name: Scan TODOs
-      run: grep -rn "TODO" . | grep -vE "TODO\((low|med|high|critical)\)" && exit
+      run: grep -rn "TODO" . | grep -v "check-todo-format-v3.yml" | grep -vE "TODO\((low|med|high|critical)\)" && exit
         1 || exit 0
     timeout-minutes: 5
