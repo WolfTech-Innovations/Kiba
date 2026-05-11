@@ -47,7 +47,7 @@ graph TD
     E --> F[Wayland / X11]
     F --> G[Plasma Bigscreen]
     G --> H[KibaTV UX]
-```
+```mermaid
 
 ---
 

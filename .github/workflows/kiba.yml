@@ -1140,7 +1140,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1290,13 +1290,13 @@ jobs:
           welcomeExpandingLogo: true
           slideshowAPI: 2
           strings:
-            productName: "KibaOS"
-            shortProductName: "KibaOS"
+            productName: "KibaTV"
+            shortProductName: "KibaTV"
             version: "1.8"
             shortVersion: "1.8"
-            versionedName: "KibaOS"
-            shortVersionedName: "KibaOS"
-            bootloaderEntryName: "KibaOS"
+            versionedName: "KibaTV"
+            shortVersionedName: "KibaTV"
+            bootloaderEntryName: "KibaTV"
             productUrl: "https://github.com/WolfTech-Innovations/kiba"
             supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
             knownIssuesUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
