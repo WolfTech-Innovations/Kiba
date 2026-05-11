@@ -15,10 +15,15 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify job IDs are kebab-case
         run: |
-          for file in .github/workflows/*.yml; do
-            bad_jobs=$(yq '.jobs | keys | .[]' "$file" | grep -vE "^[a-z0-9-]+$")
-            if [ -n "$bad_jobs" ]; then
-              echo "Error: $file contains job IDs not in kebab-case: $bad_jobs"
-              exit 1
-            fi
-          done
+          # Use optimized python script if PyYAML is available, otherwise fallback to yq
+          if python3 -c "import yaml" 2>/dev/null; then
+            python3 scripts/audit_workflow_job_ids.py
+          else
+            for file in .github/workflows/*.yml; do
+              bad_jobs=$(yq '.jobs | keys | .[]' "$file" | grep -vE "^[a-z0-9-]+$")
+              if [ -n "$bad_jobs" ]; then
+                echo "Error: $file contains job IDs not in kebab-case: $bad_jobs"
+                exit 1
+              fi
+            done
+          fi
