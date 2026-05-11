@@ -333,20 +333,8 @@ jobs:
           # ── Calamares installer ───────────────────────────────────────────────
           calamares
           calamares-settings-debian
-          libkpmcore12
           libparted2t64
           libpwquality1
-          libpython3.13
-          libqt6core6t64
-          libqt6dbus6
-          libqt6gui6
-          libqt6network6
-          libqt6qml6
-          libqt6quick6
-          libqt6quickwidgets6
-          libqt6svg6
-          libqt6widgets6
-          libqt6xml6
           qml6-module-qtquick
           qml6-module-qtquick-controls
           qml6-module-qtquick-layouts
@@ -991,6 +979,22 @@ jobs:
           [Icon Theme]
           Inherits=Vimix-cursors
           CURSOR_DEFAULT
+
+          # ── kglobalshortcutsrc — KibaTV standard shortcuts ─────────────────────
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'KGLOBALSHORTCUTS'
+          [kwin]
+          Overview=Meta+W,none,Overview
+          [plasmashell]
+          activate status notifier item 1=Meta+A,none,Activate Status Notifier Item 1
+          [services][org.kde.dolphin.desktop]
+          _launch=Meta+E,none,File Manager
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T,none,Terminal
+          [services][org.kde.krunner.desktop]
+          _launch=Meta+S,none,Search
+          [ksmserver]
+          Lock Session=Meta+L,Meta+L\tScreensaver,Lock Session
+          KGLOBALSHORTCUTS
 
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
           cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
