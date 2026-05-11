@@ -1,12 +1,12 @@
 # UX & Visual Design
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE`%20Plasma%206-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
+  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
   <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
@@ -16,21 +16,43 @@ KibaTV is built with a focus on "modern simplicity." This document details the v
 
 ---
 
+## Table of Contents
+
+- [Visual Identity](#visual-identity)
+  - [Color Palette](#color-palette)
+  - [Look and Feel](#look-and-feel)
+  - [Window Management](#window-management)
+- [Shell Experience](#shell-experience)
+  - [Starship Prompt](#starship-prompt)
+  - [Modern CLI Tools](#modern-cli-tools)
+  - [System-wide Aliases](#system-wide-aliases)
+- [Boot Branding](#boot-branding)
+  - [Interface Components](#interface-components)
+- [Desktop Experience (Plasma Bigscreen)](#desktop-experience-plasma-bigscreen)
+  - [Window Management Polish](#window-management-polish)
+  - [Desktop Layout](#desktop-layout)
+- [The Modern Terminal](#the-modern-terminal)
+  - [Modern Alternative Comparison](#modern-alternative-comparison)
+  - [Shell Configuration (Zsh)](#shell-configuration-zsh)
+- [Related Reading](#related-reading)
+
+---
+
 ## Visual Identity
 
 The KibaTV aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
 
 ### Color Palette
 
-| Color            | Hex                | Role                                                     |
-| :--------------- | :----------------- | :------------------------------------------------------- |
-| **Background**   | `\#`\hex #282a36`` | Primary window and desktop background                    |
-| **Current Line** | `\#`\hex #44475a`` | Highlight and secondary background                       |
-| **Foreground**   | `\#`\#f8f8f2``     | Primary text color                                       |
-| **Comment**      | `\#`\#6272a4``     | Secondary text and disabled elements                     |
-| **Purple**       | `\#`\#bd93f9``     | Accent color, selection background, and primary branding |
-| **Pink**         | `\#`\#ff79c6``     | Selection foreground and highlights                      |
-| **Green**        | `\#`\#50fa7b``     | Success states and active terminal elements              |
+| Color            | Hex       | Role                                                     |
+| :--------------- | :-------- | :------------------------------------------------------- |
+| **Background**   | `#282a36` | Primary window and desktop background                    |
+| **Current Line** | `#44475a` | Highlight and secondary background                       |
+| **Foreground**   | `#f8f8f2` | Primary text color                                       |
+| **Comment**      | `#6272a4` | Secondary text and disabled elements                     |
+| **Purple**       | `#bd93f9` | Accent color, selection background, and primary branding |
+| **Pink**         | `#ff79c6` | Selection foreground and highlights                      |
+| **Green**        | `#50fa7b` | Success states and active terminal elements              |
 
 ### Look and Feel
 
@@ -94,9 +116,11 @@ The branding experience starts from the moment the system boots:
 - **Global Theme:** A customized **Ant-Dark** theme, providing a consistent base for all applications.
 - **Icons:** The **Kora** icon theme offers a colorful, modern, and high-resolution set of assets.
 - **Cursors:** **Vimix-cursors** are used for a sleek, high-visibility pointer experience.
-- **Typography:**
-  - **System UI:** **Inter** (11pt) — A modern sans-serif designed for screens.
-  - **Monospace:** **JetBrains Mono** (11pt) — Optimized for code and terminal legibility.
+
+### Typography
+
+- **System UI:** **Inter** (11pt) — A modern sans-serif designed for screens.
+- **Monospace:** **JetBrains Mono** (11pt) — Optimized for code and terminal legibility.
 
 ---
 

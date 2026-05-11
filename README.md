@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
+<img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Debian-13%20Trixie-D70A53?style=for-the-badge&logo=debian&logoColor=white" alt="Debian Version">
@@ -24,7 +24,7 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
-    <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
+<img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
 
@@ -98,7 +98,7 @@ SHA256 checksums are provided alongside each release. Always verify your downloa
 
 On Linux:
 
-```bash
+```text
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```
 
@@ -131,7 +131,7 @@ The **Calamares** installer guides you through:
 
 Post-install, update your system:
 
-```bash
+```text
 sudo apt update && sudo apt upgrade -y
 ```
 
@@ -201,7 +201,7 @@ KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** conta
 
 Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
-```bash
+```text
 git clone https://github.com/WolfTech-Innovations/Kiba
 cd Kiba
 docker run --rm --privileged \

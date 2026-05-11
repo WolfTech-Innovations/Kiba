@@ -1,12 +1,12 @@
 # Architecture Deep-Dive
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture">
-  <img src="https://img.shields.io/badge/Base-Debian`%20Trixie-D70A53?style=for-the-badge&logo=debian" alt="Base">
+  <img src="https://img.shields.io/badge/Base-Debian-D70A53?style=for-the-badge&logo=debian" alt="Base">
   <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
 </p>
 
@@ -16,18 +16,42 @@ This document provides a technical overview of the KibaTV architectural stack, f
 
 ---
 
+## Table of Contents
+
+- [System Stack](#system-stack)
+- [Core Foundation](#core-foundation)
+  - [Debian 13 (Trixie)](#debian-13-trixie)
+  - [CachyOS Kernel](#cachyos-kernel)
+  - [Init & Display](#init--display)
+- [Extreme Minimization](#extreme-minimization)
+  - [Documentation & Help](#documentation--help)
+  - [Locale Pruning](#locale-pruning)
+  - [Dependency Pruning](#dependency-pruning)
+- [Filesystem & Boot Performance](#filesystem--boot-performance)
+  - [SquashFS Optimization](#squashfs-optimization)
+  - [Initramfs](#initramfs)
+  - [Binary Compression](#binary-compression)
+  - [Bootloader](#bootloader)
+- [Related Reading](#related-reading)
+
+---
+
 ## System Stack
 
-````mermaid
+```text
+
+```
+
 graph TD
-    A[Hardware / VM] --> B[GRUB Bootloader]
-    B --> C[CachyOS Kernel]
-    C --> D[Debian 13 Trixie Base]
-    D --> E[Systemd Init]
-    E --> F[Wayland / X11]
-    F --> G[Plasma Bigscreen]
-    G --> H[KibaTV UX]
-```bash
+A[Hardware / VM] --> B[GRUB Bootloader]
+B --> C[CachyOS Kernel]
+C --> D[Debian 13 Trixie Base]
+D --> E[Systemd Init]
+E --> F[Wayland / X11]
+F --> G[Plasma Bigscreen]
+G --> H[KibaTV UX]
+
+```text
 
 ---
 
@@ -124,4 +148,4 @@ KibaTV uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 - [**Build System**](./build-system.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
-````
+```
