@@ -1228,23 +1228,25 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Functional welcome menu for KibaOS
+          # Functional welcome menu for KibaTV
           while true; do
-            CHOICE=$(zenity --list --title="Welcome to KibaOS" \
+            CHOICE=$(zenity --list --title="Welcome to KibaTV" \
               --window-icon="/usr/share/kibaos/logo.png" \
-              --text="Welcome to KibaOS! What would you like to do?" \
-              --column="Action" --column="Description" \
-              "Install KibaOS" "Install the system permanently to your disk" \
-              "Web Browser" "Browse the internet" \
-              "Software Center" "Discover and install new applications" \
-              "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "Online Wiki" "Read the technical documentation" \
-              --width=500 --height=400 2>/dev/null)
+              --text="Welcome to KibaTV! What would you like to do?" \
+              --column=" " --column="Action" --column="Description" \
+              --image-column=1 --print-column=2 \
+              --ok-label="Launch" --cancel-label="Close" \
+              "calamares" "Install KibaTV" "Install the system permanently to your disk" \
+              "chromium" "Web Browser" "Browse the internet" \
+              "org.kde.discover" "Software Center" "Discover and install new applications" \
+              "preferences-desktop-keyboard" "Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "help-browser" "Online Wiki" "Read the technical documentation" \
+              --width=450 --height=500 2>/dev/null)
 
             [ -z "$CHOICE" ] && break
 
             case "$CHOICE" in
-              "Install KibaOS")
+              "Install KibaTV")
                 sudo calamares &
                 break
                 ;;
@@ -1257,10 +1259,12 @@ jobs:
                 break
                 ;;
               "Keyboard Shortcuts")
-                zenity --info --title="Keyboard Shortcuts" \
-                  --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
-                  --width=400 2>/dev/null
+                (
+                  zenity --info --title="Keyboard Shortcuts" \
+                    --window-icon="/usr/share/kibaos/logo.png" \
+                    --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Meta + T</b>: Open Terminal (Konsole)\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + W</b>: Desktop Overview\n  • <b>Meta + A</b>: Quick Settings\n  • <b>Meta + E</b>: File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen" \
+                    --width=450 2>/dev/null
+                ) &
                 ;;
               "Online Wiki")
                 chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
@@ -1276,11 +1280,28 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          Comment=Onboarding and useful shortcuts for KibaTV
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
           X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
+
+          # ── kglobalshortcutsrc — synchronized shortcuts ───────────────────────
+          cat > /etc/skel/.config/kglobalshortcutsrc << 'SHORTCUTRC'
+          [kwin]
+          Overview=Meta+W,none,Overview
+
+          [plasmashell]
+          manage-activities=Meta+A,none,Show Activity Manager
+          activate widget 1=Meta+A,none,Activate Widget 1
+
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T
+
+          [services][org.kde.krunner.desktop]
+          _launch=Meta+S,Alt+Space,Search
+          SHORTCUTRC
 
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
