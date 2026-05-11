@@ -9,3 +9,7 @@
 
 **Learning:** For documentation-heavy repositories, the README is the primary UI. Long READMEs (>100 lines) require a "Table of Contents" for better navigability (and to pass CI audits), and hero images must have descriptive alt text to ensure an accessible first impression for screen-reader users.
 **Action:** Always include a Table of Contents for READMEs exceeding 100 lines and audit all documentation images for descriptive `alt` attributes instead of generic placeholders like "image".
+
+## 2026-05-11 - [Zenity UX and Icon Alignment]
+**Learning:** Zenity list dialogs are more intuitive with an icon column. Using `--image-column=1` requires an empty header `--column=" "` and `--print-column=2` to maintain both visual appeal and script functionality.
+**Action:** Standardize KibaTV Zenity lists to 450x500 with icon columns and backgrounded info boxes.
