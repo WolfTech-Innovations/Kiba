@@ -110,5 +110,5 @@ By contributing to KibaTV, you agree that your contributions will be licensed un
 ## Related Reading
 
 - [**Build System**](./docs/build-system.md)
-- [**Architecture**](./architecture.md)
-- [**FAQ**](./faq.md)
+- [**Architecture**](./docs/architecture.md)
+- [**FAQ**](./docs/faq.md)

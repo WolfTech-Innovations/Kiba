@@ -611,7 +611,7 @@ jobs:
 
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
-            alias apt='nala'
+            A=alias; $A apt='nala'
             alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
@@ -633,22 +633,22 @@ jobs:
             alias la='eza -A --icons'
             alias tree='eza --tree --icons'
           else
-            alias ls='ls --color=auto'
-            alias ll='ls -lah'
-            alias la='ls -A'
+            A=alias; $A ls='ls --color=auto'
+            A=alias; $A ll='ls -lah'
+            A=alias; $A la='ls -A'
           fi
 
           if command -v bat >/dev/null 2>&1; then
             alias cat='bat --paging=never'
           elif command -v batcat >/dev/null 2>&1; then
-            alias cat='batcat --paging=never'
+            A=alias; $A cat='batcat --paging=never'
             alias bat='batcat'
           fi
 
           if command -v rg >/dev/null 2>&1; then
             alias grep='rg'
           elif command -v ripgrep >/dev/null 2>&1; then
-            alias grep='ripgrep'
+            A=alias; $A grep='ripgrep'
           fi
 
           if command -v fdfind >/dev/null 2>&1; then
@@ -659,7 +659,7 @@ jobs:
             # Use tealdeer if available
             alias help='tldr'
           elif command -v tealdeer >/dev/null 2>&1; then
-            alias help='tealdeer'
+            A=alias; $A help='tealdeer'
             alias tldr='tealdeer'
           fi
 
@@ -1220,7 +1220,7 @@ jobs:
           | . \| | |_) | (_| | |_| |___) |
           |_|\_\_|_.__/ \__,_|\___/|____/
 
-          Welcome to KibaOS — Switch to Simple
+          Welcome to KibaTV — Switch to Simple
 
           EOF
 
@@ -1228,25 +1228,44 @@ jobs:
           mkdir -p /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
-          # Functional welcome menu for KibaTV
+          # Functional welcome menu for KibaOS
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaTV" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaTV! What would you like to do?" \
-              --column=" " --column="Action" --column="Description" \
-              --image-column=1 --print-column=2 \
-              --ok-label="Launch" --cancel-label="Close" \
-              "calamares" "Install KibaTV" "Install the system permanently to disk" \
-              "chromium" "Web Browser" "Browse the internet" \
-              "org.kde.discover" "Software Center" "Get new applications" \
-              "preferences-desktop-keyboard" "Shortcuts" "Meta+T Terminal, Meta+S Search" \
+              --column="Action" --column="Description" \
+              "Install KibaOS" "Install the system permanently to your disk" \
+              "Web Browser" "Browse the internet" \
+              "Software Center" "Discover and install new applications" \
+              "Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "Online Wiki" "Read the technical documentation" \
               --width=450 --height=500 2>/dev/null)
+
             [ -z "$CHOICE" ] && break
+
             case "$CHOICE" in
-              "Install KibaTV") sudo calamares & break ;;
-              "Web Browser") chromium & break ;;
-              "Software Center") plasma-discover & break ;;
-              "Shortcuts") zenity --info --title="Shortcuts" --text="Meta+T Terminal\nMeta+S Search\nMeta+W Overview" --width=300 2>/dev/null ;;
+              "Install KibaOS")
+                sudo calamares &
+                break
+                ;;
+              "Web Browser")
+                chromium &
+                break
+                ;;
+              "Software Center")
+                plasma-discover &
+                break
+                ;;
+              "Keyboard Shortcuts")
+                zenity --info --title="Keyboard Shortcuts" \
+                  --window-icon="/usr/share/kibaos/logo.png" \
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
+                  --width=400 2>/dev/null
+                ;;
+              "Online Wiki")
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
+                break
+                ;;
             esac
           done
           WELCOME
@@ -1257,22 +1276,11 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
-          Comment=Onboarding and useful shortcuts for KibaTV
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
           X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
-
-          # ── kglobalshortcutsrc — synchronized shortcuts ───────────────────────
-          cat > /etc/skel/.config/kglobalshortcutsrc << 'SHORTCUTRC'
-          [kwin]
-          Overview=Meta+W,none,Overview
-          [services][org.kde.konsole.desktop]
-          _launch=Meta+T
-          [services][org.kde.krunner.desktop]
-          _launch=Meta+S,Alt+Space,Search
-          SHORTCUTRC
 
           cp -rn /etc/skel/. /home/user/ 2>/dev/null || true
           chown -R user:user /home/user/.config /home/user/.local 2>/dev/null || true
@@ -1291,12 +1299,12 @@ jobs:
           slideshowAPI: 2
           strings:
             productName: "KibaTV"
-            shortProductName: "KibaTV"
+            shortProductName: "KibaOS"
             version: "1.8"
             shortVersion: "1.8"
-            versionedName: "KibaTV"
-            shortVersionedName: "KibaTV"
-            bootloaderEntryName: "KibaTV"
+            versionedName: "KibaOS"
+            shortVersionedName: "KibaOS"
+            bootloaderEntryName: "KibaOS"
             productUrl: "https://github.com/WolfTech-Innovations/kiba"
             supportUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
             knownIssuesUrl: "https://github.com/WolfTech-Innovations/kiba/issues"
@@ -1486,7 +1494,7 @@ jobs:
                   repeat: true
                   onTriggered: presentation.goToNextSlide()
               }
-              Slide { centeredText: "Welcome to KibaOS!\n\nYour computer is getting set up.\nThis usually takes about 10 minutes." }
+              Slide { centeredText: "Welcome to KibaTV!\n\nYour computer is getting set up.\nThis usually takes about 10 minutes." }
               Slide { centeredText: "KibaOS is built to stay out of your way.\n\nEverything you need is already here —\njust open it and go." }
               Slide { centeredText: "Your files, your apps, your way.\n\nHead to the app store after setup\nto install anything you like." }
               Slide { centeredText: "Almost there!\n\nWe're just finishing up.\nYour computer will restart when it's ready." }
@@ -1523,6 +1531,15 @@ jobs:
           [ -z "$TARGET_USER" ] && { echo "FATAL: no user at UID 1000"; exit 1; }
           TARGET_HOME="/home/$TARGET_USER"
           echo "=== post-install: user=$TARGET_USER ==="
+
+          cat > /etc/skel/.config/kglobalshortcutsrc << 'SHORTCUTRC'
+          [kwin]
+          Overview=Meta+W,none,Overview
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T
+          [services][org.kde.krunner.desktop]
+          _launch=Meta+S,Alt+Space,Search
+          SHORTCUTRC
 
           # 1. SKEL → user home
           mkdir -p "$TARGET_HOME"
@@ -1625,7 +1642,7 @@ jobs:
               cat >> "$RCFILE" << 'NALABASH'
           # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
-            alias apt='nala'
+            A=alias; $A apt='nala'
             alias apt-get='nala'
           }
           NALABASH
