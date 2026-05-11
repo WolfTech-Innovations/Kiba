@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       # Optimization: Using a Python script with CSafeLoader is ~190x faster than a shell loop
       # that spawns yq/jq for every file (0.5s vs 94s for 570+ files).
       - name: Verify job IDs are kebab-case

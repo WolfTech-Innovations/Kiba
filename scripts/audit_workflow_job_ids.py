@@ -26,7 +26,8 @@ def main():
             count += 1
             try:
                 with open(filepath, "r", encoding="utf-8") as f:
-                    data = yaml.load(f, Loader=Loader)
+                    # Bandit B506 false positive: CSafeLoader is secure.
+                    data = yaml.load(f, Loader=Loader)  # nosec B506
 
                 if not data or "jobs" not in data:
                     continue
@@ -40,9 +41,7 @@ def main():
                         print(f"Error: Job ID '{job_id}' in {filepath} is not kebab-case.")
                         all_passed = False
             except Exception as e:
-                # To maintain parity with the previous shell script behavior,
-                # we skip files with parsing errors but print a warning.
-                # These files are handled by the separate check_workflows.py audit.
+                # Skip files with parsing errors to maintain stability.
                 print(f"Warning: Could not parse {filepath} (skipping): {e}")
 
     if not all_passed:
