@@ -14,3 +14,8 @@
 
 **Learning:** When adding an icon column as the first column in a Zenity list dialog (`--image-column=1`), the `--print-column=2` flag (or similar) must be used. Zenity returns the first column by default, and if that column contains icons, the return value will be the icon name rather than the human-readable action text, breaking subsequent bash logic.
 **Action:** Always verify which column Zenity is returning when using icon columns in list dialogs.
+
+## 2027-05-11 - [Synchronized OS Shortcuts]
+
+**Learning:** For OS-level UX, advertised keyboard shortcuts in onboarding tools (like `kiba-welcome`) must be synchronized with the actual system configuration (e.g., `kglobalshortcutsrc`). Discrepancies lead to user frustration and a "broken" feel.
+**Action:** When advertising shortcuts in Welcome screens, ensure the corresponding KDE global shortcut configuration is applied to `/etc/skel`.

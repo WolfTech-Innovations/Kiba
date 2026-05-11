@@ -169,13 +169,11 @@ docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
   debian:trixie \
-
   /w/build.sh
-```bash
+```
 
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.
-
 
 ---
 

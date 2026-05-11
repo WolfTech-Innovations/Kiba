@@ -46,9 +46,8 @@ graph TD
     D --> E[Systemd Init]
     E --> F[Wayland / X11]
     F --> G[Plasma Bigscreen]
-
     G --> H[KibaTV UX]
-```mermaid
+```
 
 ---
 
@@ -59,7 +58,6 @@ graph TD
 KibaTV is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
 
 ### CachyOS Kernel
-
 
 We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
 

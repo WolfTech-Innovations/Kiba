@@ -537,7 +537,8 @@ jobs:
           cat > /etc/profile.d/nala-alias.sh << 'NALA_ALIAS'
           # KibaOS: use nala as the default package manager frontend
           if command -v nala >/dev/null 2>&1; then
-            alias aptget_sys='nala'
+            alias apt='nala'
+            alias apt-get='nala'
           fi
           NALA_ALIAS
           chmod +x /etc/profile.d/nala-alias.sh
@@ -610,8 +611,8 @@ jobs:
 
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
-            alias apt_zsh='nala'
-            alias aptget_zsh='nala'
+            alias apt='nala'
+            alias apt-get='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
             alias update='sudo nala update && sudo nala upgrade -y'
@@ -632,22 +633,22 @@ jobs:
             alias la='eza -A --icons'
             alias tree='eza --tree --icons'
           else
-            alias ls_std='ls --color=auto'
-            alias ll_std='ls -lah'
-            alias la_std='ls -A'
+            alias ls='ls --color=auto'
+            alias ll='ls -lah'
+            alias la='ls -A'
           fi
 
           if command -v bat >/dev/null 2>&1; then
             alias cat='bat --paging=never'
           elif command -v batcat >/dev/null 2>&1; then
-            alias cat_std='batcat --paging=never'
+            alias cat='batcat --paging=never'
             alias bat='batcat'
           fi
 
           if command -v rg >/dev/null 2>&1; then
             alias grep='rg'
           elif command -v ripgrep >/dev/null 2>&1; then
-            alias grep_std='ripgrep'
+            alias grep='ripgrep'
           fi
 
           if command -v fdfind >/dev/null 2>&1; then
@@ -658,7 +659,7 @@ jobs:
             # Use tealdeer if available
             alias help='tldr'
           elif command -v tealdeer >/dev/null 2>&1; then
-            alias help_std='tealdeer'
+            alias help='tealdeer'
             alias tldr='tealdeer'
           fi
 
@@ -1139,7 +1140,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
+          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1235,40 +1236,17 @@ jobs:
               --column=" " --column="Action" --column="Description" \
               --image-column=1 --print-column=2 \
               --ok-label="Launch" --cancel-label="Close" \
-              "calamares" "Install KibaTV" "Install the system permanently to your disk" \
+              "calamares" "Install KibaTV" "Install the system permanently to disk" \
               "chromium" "Web Browser" "Browse the internet" \
-              "org.kde.discover" "Software Center" "Discover and install new applications" \
-              "preferences-desktop-keyboard" "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "help-browser" "Online Wiki" "Read the technical documentation" \
+              "org.kde.discover" "Software Center" "Get new applications" \
+              "preferences-desktop-keyboard" "Shortcuts" "Meta+T Terminal, Meta+S Search" \
               --width=450 --height=500 2>/dev/null)
-
             [ -z "$CHOICE" ] && break
-
             case "$CHOICE" in
-              "Install KibaTV")
-                sudo calamares &
-                break
-                ;;
-              "Web Browser")
-                chromium &
-                break
-                ;;
-              "Software Center")
-                plasma-discover &
-                break
-                ;;
-              "Keyboard Shortcuts")
-                (
-                  zenity --info --title="Keyboard Shortcuts" \
-                    --window-icon="/usr/share/kibaos/logo.png" \
-                    --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Meta + T</b>: Open Terminal (Konsole)\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + W</b>: Desktop Overview\n  • <b>Meta + A</b>: Quick Settings\n  • <b>Meta + E</b>: File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen" \
-                    --width=450 2>/dev/null
-                ) &
-                ;;
-              "Online Wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
-                break
-                ;;
+              "Install KibaTV") sudo calamares & break ;;
+              "Web Browser") chromium & break ;;
+              "Software Center") plasma-discover & break ;;
+              "Shortcuts") zenity --info --title="Shortcuts" --text="Meta+T Terminal\nMeta+S Search\nMeta+W Overview" --width=300 2>/dev/null ;;
             esac
           done
           WELCOME
@@ -1290,14 +1268,8 @@ jobs:
           cat > /etc/skel/.config/kglobalshortcutsrc << 'SHORTCUTRC'
           [kwin]
           Overview=Meta+W,none,Overview
-
-          [plasmashell]
-          manage-activities=Meta+A,none,Show Activity Manager
-          activate widget 1=Meta+A,none,Activate Widget 1
-
           [services][org.kde.konsole.desktop]
           _launch=Meta+T
-
           [services][org.kde.krunner.desktop]
           _launch=Meta+S,Alt+Space,Search
           SHORTCUTRC
@@ -1653,8 +1625,8 @@ jobs:
               cat >> "$RCFILE" << 'NALABASH'
           # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
-            alias apt_pkg='nala'
-            alias aptget_pkg='nala'
+            alias apt='nala'
+            alias apt-get='nala'
           }
           NALABASH
             fi
