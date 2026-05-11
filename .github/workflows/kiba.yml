@@ -18,7 +18,6 @@ jobs:
           #!/bin/bash
           set -ex
           export DEBIAN_FRONTEND=noninteractive
-          export LC_CTYPE=C
 
           # ── Install live-build and build deps ─────────────────────────────────
           apt-get update && apt-get install -y \
@@ -28,7 +27,7 @@ jobs:
             meson ninja-build pkg-config \
             libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
              libjson-glib-dev libostree-dev \
-            gcc g++ gettext eatmydata
+            gcc g++ gettext
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
@@ -110,53 +109,55 @@ jobs:
           set -e
           echo "=== Installing CachyOS Kernel ==="
 
-          # 1. Purge stock kernel packages first to ensure clean state
-          # We include wildcards to catch specific versions like linux-image-6.1.0-*-amd64
-          echo "Purging stock kernels..."
-          apt-get purge -y 'linux-image-6.*' linux-image-amd64 linux-headers-amd64 || true
-          apt-get autoremove -y
-
-          # 2. Fetch latest CachyOS (psycachy) release info
+          # Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
+          # For trixie, we'll try to find the latest version from their GitHub
           REPO="psygreg/linux-psycachy"
-          RELEASE_INFO=$(curl -fsS "https://api.github.com/repos/$REPO/releases/latest")
+          RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
           LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 
           if [ -z "$LATEST_TAG" ]; then
-            echo "ERROR: Could not fetch CachyOS Kernel tag. Reinstalling stock kernel as fallback."
-            apt-get install -y linux-image-amd64 linux-headers-amd64
+            echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
+            # Fallback to a known version or exit
             exit 0
           fi
 
           mkdir -p /tmp/cachyos
           cd /tmp/cachyos
 
-          # 3. Download image and headers
+          # Download image and headers
           IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
           HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
-          if [ -n "$IMAGE_URL" ] && [ -n "$HEADERS_URL" ]; then
-            curl -LfsSO "$IMAGE_URL"
-            curl -LfsSO "$HEADERS_URL"
+          if [ -n "$IMAGE_URL" ]; then
+            curl -LO "$IMAGE_URL"
           else
-            echo "WARNING: Could not find dynamic URLs, using fallback patterns for $LATEST_TAG"
-            curl -LfsSO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
-            curl -LfsSO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
+            echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
-          # 4. Install
-          echo "Installing CachyOS packages..."
+          if [ -n "$HEADERS_URL" ]; then
+            curl -LO "$HEADERS_URL"
+          else
+             echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
+          fi
+
+          # Install
           apt-get install -y ./*.deb || {
-            echo "ERROR: CachyOS Kernel install failed. Reinstalling stock kernel as fallback."
-            apt-get install -y linux-image-amd64 linux-headers-amd64
+            echo "WARNING: CachyOS Kernel install failed, falling back to stock"
             cd / && rm -rf /tmp/cachyos
             exit 0
           }
 
           # Cleanup
           cd / && rm -rf /tmp/cachyos
+
+          # Remove stock kernel meta-packages to keep it minimal
+          # We don't use wildcards to avoid purging the CachyOS kernel we just installed
+          apt-get purge -y linux-image-amd64 linux-headers-amd64
           apt-get autoremove -y
 
-          echo "=== CachyOS Kernel installed (Version: $LATEST_TAG) ==="
+          echo "=== CachyOS Kernel installed ==="
           CACHY_HOOK
           chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
@@ -1142,49 +1143,6 @@ jobs:
           Image=file://${WALLPAPER_PATH}
           LOCKRC
 
-          # ── Global Shortcuts ──────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'SHORTCUTS'
-          [org.kde.konsole.desktop]
-          _launch=Meta+T,none,Open Terminal
-
-          [plasmashell]
-          activate task manager entry 1=none,none,Activate Task Manager Entry 1
-          activate task manager entry 10=none,none,Activate Task Manager Entry 10
-          activate task manager entry 2=none,none,Activate Task Manager Entry 2
-          activate task manager entry 3=none,none,Activate Task Manager Entry 3
-          activate task manager entry 4=none,none,Activate Task Manager Entry 4
-          activate task manager entry 5=none,none,Activate Task Manager Entry 5
-          activate task manager entry 6=none,none,Activate Task Manager Entry 6
-          activate task manager entry 7=none,none,Activate Task Manager Entry 7
-          activate task manager entry 8=none,none,Activate Task Manager Entry 8
-          activate task manager entry 9=none,none,Activate Task Manager Entry 9
-          activate widget 3=none,none,Activate Widget 3
-          cycle-panels=Meta+Alt+P,none,Cycle Focus Between Panels
-          cycleNextAction=none,none,Cycle to Next Action
-          cyclePrevAction=none,none,Cycle to Previous Action
-          edit mode=Meta+L,none,Edit Mode
-          manage activities=Meta+Q,none,Show Activity Switcher
-          next activity=Meta+Tab,none,Walk through activities
-          previous activity=Meta+Shift+Tab,none,Walk through activities (Reverse)
-          show dashboard=Ctrl+F12,none,Show Desktop
-          show-barcode=none,none,Show Barcode…
-          show-on-mouse-pos=Meta+V,none,Show Clipboard Items at Mouse Position
-          stop current activity=Meta+S,none,Stop Current Activity
-          switch to next activity=none,none,Switch to Next Activity
-          switch to previous activity=none,none,Switch to Previous Activity
-          toggle do not disturb=none,none,Toggle do not disturb
-
-          [kwin]
-          Overview=Meta+W,none,Overview
-          ShowDesktopGrid=Meta+G,none,Show Desktop Grid
-          WalkThroughWindows=Alt+Tab,none,Walk Through Windows
-          WalkThroughWindows (Reverse)=Alt+Shift+Backtab,none,Walk Through Windows (Reverse)
-
-          [org.kde.krunner.desktop]
-          RunClipboard=Alt+Shift+F2,none,Run Command on clipboard contents
-          _launch=Meta+S,Alt+F2;Search,Search
-          SHORTCUTS
-
           # ── Calamares autostart on live session login ──────────────────────────
           # Uses KDE's XDG autostart so it fires after the desktop loads.
           # Only runs in the live session (the installed system removes this file
@@ -1265,42 +1223,25 @@ jobs:
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Functional welcome menu for KibaOS
-          # Advertised Shortcuts: Meta+T (Terminal), Meta+S (Search), Meta+W (Overview), Meta+A (Quick Settings)
-          (
-          WELCOME_TEXT="Welcome to KibaOS! Switch to Simple.
-
-Quick Shortcuts:
-  Meta+T: Terminal  |  Meta+S: Search
-  Meta+W: Overview  |  Meta+A: Settings
-
-What would you like to do?"
-
           CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-            --text="$WELCOME_TEXT" \
-            --ok-label="Launch" --cancel-label="Close" \
-            --column=" " --column="Action" --column="Description" --column="Tag" \
-            --image-column=1 --hide-column=4 --print-column=4 \
-            "calamares" "Install KibaOS" "Install the system permanently to your disk" "INSTALL" \
-            "utilities-terminal" "Terminal" "Open the modern terminal" "TERMINAL" \
-            "chromium" "Web Browser" "Browse the internet" "BROWSER" \
-            "org.kde.discover" "Software Center" "Discover and install new applications" "STORE" \
-            --width=450 --height=500 2>/dev/null)
+            --text="Welcome to KibaOS! What would you like to do?" \
+            --column="Action" --column="Description" \
+            "Install KibaOS" "Install the system permanently to your disk" \
+            "Web Browser" "Browse the internet" \
+            "Software Center" "Discover and install new applications" \
+            --width=450 --height=300 2>/dev/null)
 
           case "$CHOICE" in
-            "INSTALL")
+            "Install KibaOS")
               sudo calamares &
               ;;
-            "TERMINAL")
-              konsole &
-              ;;
-            "BROWSER")
+            "Web Browser")
               chromium &
               ;;
-            "STORE")
+            "Software Center")
               plasma-discover &
               ;;
           esac
-          ) &
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
@@ -1309,11 +1250,9 @@ What would you like to do?"
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
-          Comment=Get started with KibaOS and discover modern tools
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
-          Categories=System;KDE;Qt;
           X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
 
@@ -1567,7 +1506,7 @@ What would you like to do?"
 
           # 1. SKEL → user home
           mkdir -p "$TARGET_HOME"
-          cp -a /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
+          cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
           chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME"
 
           # 2. ZSH as default shell
@@ -1657,11 +1596,8 @@ What would you like to do?"
           systemctl disable live-config    2>/dev/null || true
           systemctl disable live-boot      2>/dev/null || true
 
-          # 14. Remove live artifacts from autostart
-          rm -f /etc/xdg/autostart/kibaos-installer.desktop 2>/dev/null || true
-          rm -f /etc/xdg/autostart/kiba-welcome.desktop 2>/dev/null || true
-          rm -f "$TARGET_HOME/.config/autostart/kibaos-installer.desktop" 2>/dev/null || true
-          rm -f "$TARGET_HOME/.config/autostart/kiba-welcome.desktop" 2>/dev/null || true
+          # 14. Remove installer from autostart
+          rm -f /etc/xdg/autostart/calamares.desktop 2>/dev/null || true
 
           # 15. Nala alias in bashrc (belt-and-suspenders alongside profile.d)
           for RCFILE in /root/.bashrc "$TARGET_HOME/.bashrc"; do
@@ -1686,7 +1622,7 @@ What would you like to do?"
 
 
           echo "=== Building ISO ==="
-          eatmydata lb build 2>&1 | tee build.log
+          lb build 2>&1 | tee build.log
 
           echo "=== Pipeline Verification ==="
           # Check for CachyOS kernel in the chroot environment
