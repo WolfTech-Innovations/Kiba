@@ -992,6 +992,49 @@ jobs:
           Inherits=Vimix-cursors
           CURSOR_DEFAULT
 
+          # ── kglobalshortcutsrc — KDE Plasma 6 standard shortcuts ────────────────
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'KSHORTCUTS'
+          [kwin]
+          Overview=Meta+W,none,Toggle Overview
+          ShowDesktopGrid=Meta+G,none,Show Desktop Grid
+          Window Quick Tile Bottom=Meta+Down,none,Window Quick Tile Bottom
+          Window Quick Tile Left=Meta+Left,none,Window Quick Tile Left
+          Window Quick Tile Right=Meta+Right,none,Window Quick Tile Right
+          Window Quick Tile Top=Meta+Up,none,Window Quick Tile Top
+          Window Maximize=Meta+PgUp,none,Maximize Window
+          Window Minimize=Meta+PgDn,none,Minimize Window
+
+          [plasmashell]
+          activate task manager entry 1=Meta+1,none,Activate Task Manager Entry 1
+          activate task manager entry 2=Meta+2,none,Activate Task Manager Entry 2
+          activate task manager entry 3=Meta+3,none,Activate Task Manager Entry 3
+          manage activities=Meta+Q,none,Show Activity Switcher
+          next activity=Meta+Tab,none,Walk through activities
+          previous activity=Meta+Shift+Tab,none,Walk through activities (Reverse)
+          show-barcode=Meta+B,none,Show Barcode…
+          show-on-mouse-pos=Meta+V,none,Show Clipboard Items at Mouse Position
+          stop current activity=Meta+S,none,Stop Current Activity
+          show dashboard=Meta+Ctrl+D,none,Show Dashboard
+          activate application launcher=Meta,Alt+F1,Activate Application Launcher
+          manage-widget-org.kde.plasma.quicksettings=Meta+A,none,Quick Settings
+
+          [services][org.kde.dolphin.desktop]
+          _launch=Meta+E,none,Dolphin
+
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+
+          [services][org.kde.krunner.desktop]
+          _launch=Meta+S,Alt+Space,Search
+
+          [org.kde.krunner.desktop]
+          RunClipboard=Meta+Shift+V,none,Run Command with Clipboard Contents
+          _launch=Meta+S,Alt+Space,Search
+
+          [ksmserver]
+          Lock Session=Meta+L,Screensaver,Lock Session
+          KSHORTCUTS
+
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
           cat > "$SKEL_KDE/kwinrc" << 'KWINRC'
           [Compositing]
@@ -1233,36 +1276,37 @@ jobs:
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaOS! What would you like to do?" \
-              --column="Action" --column="Description" \
-              "Install KibaOS" "Install the system permanently to your disk" \
-              "Web Browser" "Browse the internet" \
-              "Software Center" "Discover and install new applications" \
-              "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "Online Wiki" "Read the technical documentation" \
-              --width=500 --height=400 2>/dev/null)
+              --column=" " --column="Action" --column="Description" \
+              --image-column=1 --print-column=2 --hide-column=1 \
+              "calamares" "🚀 Install KibaOS" "Install the system permanently to your disk" \
+              "chromium" "🌐 Web Browser" "Browse the internet" \
+              "org.kde.discover" "🛍️ Software Center" "Discover and install new applications" \
+              "preferences-desktop-keyboard-shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "help-browser" "✨ Online Wiki" "Read the technical documentation" \
+              --width=450 --height=500 2>/dev/null)
 
             [ -z "$CHOICE" ] && break
 
             case "$CHOICE" in
-              "Install KibaOS")
+              "🚀 Install KibaOS")
                 sudo calamares &
                 break
                 ;;
-              "Web Browser")
+              "🌐 Web Browser")
                 chromium &
                 break
                 ;;
-              "Software Center")
+              "🛍️ Software Center")
                 plasma-discover &
                 break
                 ;;
-              "Keyboard Shortcuts")
-                zenity --info --title="Keyboard Shortcuts" \
+              "⌨️ Keyboard Shortcuts")
+                (zenity --info --title="Keyboard Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
-                  --width=400 2>/dev/null
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Meta + T</b>: Open Terminal (Konsole)\n  • <b>Meta + W</b>: Overview\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + A</b>: Quick Settings" \
+                  --width=450 --height=500 2>/dev/null) &
                 ;;
-              "Online Wiki")
+              "✨ Online Wiki")
                 chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
                 break
                 ;;
