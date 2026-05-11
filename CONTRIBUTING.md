@@ -1,7 +1,7 @@
 # Contributing to KibaTV
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -27,7 +27,7 @@ To begin contributing to the KibaTV build system or customization hooks, follow 
    git clone [https://github.com/YOUR_USERNAME/Kiba](https://github.com/YOUR_USERNAME/Kiba)
    cd Kiba
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
-```bash
+   ```
 
 ---
 

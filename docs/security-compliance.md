@@ -1,7 +1,7 @@
 # Security & Compliance
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">

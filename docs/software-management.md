@@ -1,7 +1,7 @@
 # Software Management
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -80,16 +80,13 @@ KibaTV includes **Ungoogled Chromium** as the default browser for users who prio
 
 While KibaStore is the preferred way to browse, you can manage Flatpaks directly from the terminal:
 
-````bash
-
+```bash
 ## Search for an app
-
 flatpak search <name>
 
 ## Install an app
-
 flatpak install flathub <app-id>
-```bash
+```
 
 ---
 
@@ -98,4 +95,3 @@ flatpak install flathub <app-id>
 - [**Architecture**](./architecture.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
-````

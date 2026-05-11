@@ -9,3 +9,8 @@
 
 **Learning:** For documentation-heavy repositories, the README is the primary UI. Long READMEs (>100 lines) require a "Table of Contents" for better navigability (and to pass CI audits), and hero images must have descriptive alt text to ensure an accessible first impression for screen-reader users.
 **Action:** Always include a Table of Contents for READMEs exceeding 100 lines and audit all documentation images for descriptive `alt` attributes instead of generic placeholders like "image".
+
+## 2026-05-11 - [Consistency in Documentation Branding]
+
+**Learning:** When renaming a project (e.g., KibaOS to KibaTV), a single-pass `sed` is not enough. All documentation files, especially those with structure trees or broken image paths, must be audited. Broken markdown syntax (like nested code blocks or mismatched fences) is a common side effect of automated replacements in complex docs.
+**Action:** Always verify rendered markdown structure and ensure code block fences are properly balanced and labeled after bulk documentation edits.
