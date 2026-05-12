@@ -11,7 +11,8 @@ jobs:
     steps:
     - name: Check for first PR
       id: check
-      uses: actions/github-script@v7
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
       with:
         script: "const { data: pulls } = await github.rest.pulls.list({\n  owner:\
           \ context.repo.owner,\n  repo: context.repo.repo,\n  state: 'all',\n  creator:\
@@ -19,7 +20,8 @@ jobs:
           \ {\n  core.setOutput('is_first', 'true');\n}\n"
     - name: Post Welcome Comment
       if: steps.check.outputs.is_first == 'true'
-      uses: actions/github-script@v7
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
       with:
         script: "github.rest.issues.createComment({\n  owner: context.repo.owner,\n\
           \  repo: context.repo.repo,\n  issue_number: context.issue.number,\n  body:\

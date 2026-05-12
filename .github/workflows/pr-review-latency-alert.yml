@@ -9,7 +9,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Notify of slow reviews
-        uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
         with:
           script: |
             const { data: pullRequests } = await github.rest.pulls.list({

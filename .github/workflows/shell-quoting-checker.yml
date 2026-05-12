@@ -11,7 +11,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
       - name: Verify variable quoting in kiba.yml
         run: |
           # Simple check for unquoted variables in shell blocks within kiba.yml

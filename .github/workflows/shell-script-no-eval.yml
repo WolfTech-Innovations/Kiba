@@ -12,7 +12,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
       - name: Check for eval usage
         run: |
           grep -rnE "^[[:space:]]*eval[[:space:]]+" . --include="*.sh" && { echo "eval usage found in shell scripts; avoid eval for security"; exit 1; } || echo "No eval usage found"

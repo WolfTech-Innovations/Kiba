@@ -10,7 +10,8 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
         with:
           script: |
             const { data: repo } = await github.rest.repos.get({

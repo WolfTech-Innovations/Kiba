@@ -13,7 +13,8 @@ jobs:
       github.event.pull_request.user.login != 'christopherfoxjr'
     steps:
       - name: Check for required labels
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b
+heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
+          persist-credentials: false
         with:
           script: |
             const pr = context.payload.pull_request;
