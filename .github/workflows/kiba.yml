@@ -889,6 +889,38 @@ jobs:
           SKEL_KDE=/etc/skel/.config
           mkdir -p "$SKEL_KDE" /etc/xdg
 
+          # ── KibaTV Standard Shortcuts ─────────────────────────────────────────
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'SHORTCUTS'
+          [kwin]
+          Overview=Meta+W,none,Toggle Overview
+          ShowDesktopGrid=Meta+G,none,Show Desktop Grid
+          Window Maximize=Meta+Up,none,Maximize Window
+          Window Minimize=Meta+Down,none,Minimize Window
+          Window Quick Tile Bottom=Meta+Alt+Down,none,Window Quick Tile Bottom
+          Window Quick Tile Left=Meta+Left,none,Window Quick Tile Left
+          Window Quick Tile Right=Meta+Right,none,Window Quick Tile Right
+          Window Quick Tile Top=Meta+Alt+Up,none,Window Quick Tile Top
+          Walk Through Windows=Alt+Tab,none,Walk Through Windows
+
+          [plasmashell]
+          manage-widget-org.kde.plasma.quicksettings=Meta+A,none,Toggle Quick Settings
+          activate task manager entry 1=Meta+1,none,Activate Task Manager Entry 1
+          activate task manager entry 2=Meta+2,none,Activate Task Manager Entry 2
+          activate task manager entry 3=Meta+3,none,Activate Task Manager Entry 3
+
+          [services][org.kde.dolphin.desktop]
+          _launch=Meta+E,none,Dolphin
+
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+
+          [services][org.kde.krunner.desktop]
+          _launch=Meta+S,none,KRunner
+
+          [ksmserver]
+          Lock Session=Meta+L,none,Lock Session
+          SHORTCUTS
+
           cat > /etc/xdg/kdeglobals << 'XDG_KDEGLOBALS'
           [KDE]
           LookAndFeelPackage=org.kde.breezedark.desktop
@@ -1233,13 +1265,15 @@ jobs:
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaOS! What would you like to do?" \
-              --column="Action" --column="Description" \
-              "Install KibaOS" "Install the system permanently to your disk" \
-              "Web Browser" "Browse the internet" \
-              "Software Center" "Discover and install new applications" \
-              "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "Online Wiki" "Read the technical documentation" \
-              --width=500 --height=400 2>/dev/null)
+              --ok-label="Launch" --cancel-label="Close" \
+              --image-column=1 --hide-column=1 --print-column=2 \
+              --column=" " --column="Action" --column="Description" \
+              "calamares" "Install KibaOS" "Install the system permanently to your disk" \
+              "chromium" "Web Browser" "Browse the internet" \
+              "org.kde.discover" "Software Center" "Discover and install new applications" \
+              "preferences-desktop-keyboard-shortcuts" "Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "help-browser" "Online Wiki" "Read the technical documentation" \
+              --width=450 --height=500 2>/dev/null)
 
             [ -z "$CHOICE" ] && break
 
@@ -1257,10 +1291,10 @@ jobs:
                 break
                 ;;
               "Keyboard Shortcuts")
-                zenity --info --title="Keyboard Shortcuts" \
+                (zenity --info --title="Keyboard Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Alt + Space</b>: KRunner (Quick Launch)\n  • <b>Ctrl + Alt + T</b>: Open Terminal (Konsole)\n  • <b>Meta (Super)</b>: Open Application Launcher\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
-                  --width=400 2>/dev/null
+                  --text="<b>Desktop Shortcuts:</b>\n\n  • <b>Meta + T</b>: Open Terminal (Konsole)\n  • <b>Meta + S</b>: KRunner (Quick Launch)\n  • <b>Meta + W</b>: Overview\n  • <b>Meta + A</b>: Quick Settings\n  • <b>Meta + E</b>: Open File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + D</b>: Show Desktop" \
+                  --width=400 2>/dev/null) &
                 ;;
               "Online Wiki")
                 chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
@@ -1276,6 +1310,7 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          Comment=Launch the KibaOS onboarding and welcome screen
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
