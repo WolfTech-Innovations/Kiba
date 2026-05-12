@@ -21,7 +21,7 @@ jobs:
       - name: Run Build Audit
         shell: bash
         run: |
-          if grep -q "terminal_output gfxterm" scripts/kibaos_build.sh && ! grep -q "insmod all_video" scripts/kibaos_build.sh; then
+          if grep -q "terminal_output gfxterm" scripts/kibatv_build.sh && ! grep -q "insmod all_video" scripts/kibatv_build.sh; then
             echo "Error: Missing 'insmod all_video' for gfxterm in GRUB config"
             exit 1
           fi

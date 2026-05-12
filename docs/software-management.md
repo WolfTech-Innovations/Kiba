@@ -1,7 +1,7 @@
 # Software Management
 
 <p align="center">
-  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
 </p>
 
 <p align="center">
@@ -12,13 +12,13 @@
 
 ---
 
-KibaOS provides a dual-layered approach to software management: a beginner-friendly graphical store and a powerful, modern command-line interface.
+KibaTV provides a dual-layered approach to software management: a beginner-friendly graphical store and a powerful, modern command-line interface.
 
 ---
 
 ## KibaStore (Bazaar)
 
-The primary graphical interface for managing software in KibaOS is **KibaStore**, which is a native implementation of **Bazaar**.
+The primary graphical interface for managing software in KibaTV is **KibaStore**, which is a native implementation of **Bazaar**.
 
 ### Native Build Philosophy
 
@@ -40,7 +40,7 @@ KibaStore comes pre-configured with the **Flathub** remote. This gives you insta
 
 ## Terminal Package Management (Nala)
 
-For those who prefer the command line, KibaOS defaults to **Nala** — a modern frontend for `apt` that makes package management beautiful and safer.
+For those who prefer the command line, KibaTV defaults to **Nala** — a modern frontend for `apt` that makes package management beautiful and safer.
 
 ### Why Nala
 
@@ -68,13 +68,13 @@ For those who prefer the command line, KibaOS defaults to **Nala** — a modern 
 
 ### Ungoogled Chromium
 
-KibaOS includes **Ungoogled Chromium** as a privacy-focused browser alternative. It is integrated into the system via a dedicated Open Build Service (OBS) repository to ensure regular updates directly from the source.
+KibaTV includes **Ungoogled Chromium** as a privacy-focused browser alternative. It is integrated into the system via a dedicated Open Build Service (OBS) repository to ensure regular updates directly from the source.
 
 ### Modern CLI Suite
 
-As detailed in the [UX Design](./ux-design.md) document, KibaOS ships with a suite of modern CLI tools like `eza`, `bat`, `btop`, and `yt-dlp` to provide a superior terminal experience.
+As detailed in the [UX Design](./ux-design.md) document, KibaTV ships with a suite of modern CLI tools like `eza`, `bat`, `btop`, and `yt-dlp` to provide a superior terminal experience.
 
-KibaOS includes **Ungoogled Chromium** as the default browser for users who prioritize privacy. It is integrated via a dedicated **OBS (Open Build Service)** repository, ensuring you receive timely security updates directly from the source.
+KibaTV includes **Ungoogled Chromium** as the default browser for users who prioritize privacy. It is integrated via a dedicated **OBS (Open Build Service)** repository, ensuring you receive timely security updates directly from the source.
 
 ### Flatpak (CLI)
 

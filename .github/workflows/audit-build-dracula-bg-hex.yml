@@ -3,10 +3,10 @@ name: Audit Build Dracula Bg Hex
 on:
   push:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Dracula Hex BG
         run: |
-          if ! grep -q "#282a36" scripts/kibaos_build.sh; then
+          if ! grep -q "#282a36" scripts/kibatv_build.sh; then
             echo "Error: Dracula background hex #282a36 should be used for branding"
             exit 1
           fi

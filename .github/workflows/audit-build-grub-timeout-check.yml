@@ -3,7 +3,7 @@ name: Audit Build GRUB Timeout
 on:
   push:
     paths:
-      - "scripts/kibaos_build.sh"
+      - "scripts/kibatv_build.sh"
 
 jobs:
   audit:
@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Timeout
         run: |
-          grep "set timeout=5" scripts/kibaos_build.sh
+          grep "set timeout=5" scripts/kibatv_build.sh

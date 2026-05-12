@@ -2,10 +2,10 @@ name: Check Build Cleanup
 on:
   push:
     paths:
-      - scripts/kibaos_build.sh
+      - scripts/kibatv_build.sh
   pull_request:
     paths:
-      - scripts/kibaos_build.sh
+      - scripts/kibatv_build.sh
 jobs:
   audit:
     permissions:
@@ -16,5 +16,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Cleanup
-      run: tail -n 20 scripts/kibaos_build.sh | grep "rm -rf \$WORKDIR" || exit 1
+      run: tail -n 20 scripts/kibatv_build.sh | grep "rm -rf \$WORKDIR" || exit 1
     timeout-minutes: 5

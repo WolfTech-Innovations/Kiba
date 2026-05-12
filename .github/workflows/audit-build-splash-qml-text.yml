@@ -3,7 +3,7 @@ name: Audit Build Splash QML Text
 on:
   push:
     paths:
-      - "scripts/kibaos_build.sh"
+      - "scripts/kibatv_build.sh"
 
 jobs:
   audit:
@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Text
         run: |
-          grep "text: \"KibaOS | Switch to simple\"" scripts/kibaos_build.sh
+          grep "text: \"KibaTV | Switch to simple\"" scripts/kibatv_build.sh

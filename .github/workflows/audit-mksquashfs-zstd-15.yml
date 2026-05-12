@@ -3,10 +3,10 @@ name: Audit mksquashfs Zstd Level
 on:
   push:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check mksquashfs zstd 15
         run: |
-          grep "mksquashfs" scripts/kibaos_build.sh | grep "zstd" | grep -q "15" || (echo "Incorrect zstd level" && exit 1)
+          grep "mksquashfs" scripts/kibatv_build.sh | grep "zstd" | grep -q "15" || (echo "Incorrect zstd level" && exit 1)

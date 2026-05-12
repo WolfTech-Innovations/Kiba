@@ -3,10 +3,10 @@ name: SDDM Autologin User Sync
 on:
   push:
     paths:
-      - "scripts/kibaos_build.sh"
+      - "scripts/kibatv_build.sh"
   pull_request:
     paths:
-      - "scripts/kibaos_build.sh"
+      - "scripts/kibatv_build.sh"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: SDDM Autologin User Sync
         run: |
-          U=$(grep "User=" scripts/kibaos_build.sh | cut -d= -f2); [ -n "$U" ] && ! grep -q "useradd.*$U" scripts/kibaos_build.sh && { echo "Error: user $U not created"; false; } || true
+          U=$(grep "User=" scripts/kibatv_build.sh | cut -d= -f2); [ -n "$U" ] && ! grep -q "useradd.*$U" scripts/kibatv_build.sh && { echo "Error: user $U not created"; false; } || true

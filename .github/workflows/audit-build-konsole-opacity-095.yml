@@ -3,10 +3,10 @@ name: Audit Build Konsole Opacity 095
 on:
   push:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Konsole Opacity
         run: |
-          if ! grep -q "Opacity=0.95" scripts/kibaos_build.sh; then
+          if ! grep -q "Opacity=0.95" scripts/kibatv_build.sh; then
             echo "Error: Konsole opacity should be set to 0.95"
             exit 1
           fi

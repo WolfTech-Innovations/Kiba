@@ -3,10 +3,10 @@ name: Audit Build Breezerc Purple Shadow
 on:
   push:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Breezerc Shadow Color
         run: |
-          if ! grep -q "ShadowColor=189,147,249" scripts/kibaos_build.sh; then
+          if ! grep -q "ShadowColor=189,147,249" scripts/kibatv_build.sh; then
             echo "Error: Breezerc shadow color should be Dracula purple (189,147,249)"
             exit 1
           fi

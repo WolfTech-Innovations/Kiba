@@ -3,10 +3,10 @@ name: Audit Build Sha256sum Iso
 on:
   push:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Sha256sum Iso
         run: |
-          if ! grep -q "sha256sum \"/work/\${ISO}.iso\"" scripts/kibaos_build.sh; then
+          if ! grep -q "sha256sum \"/work/\${ISO}.iso\"" scripts/kibatv_build.sh; then
             echo "Error: sha256sum should be run on the resulting ISO image"
             exit 1
           fi

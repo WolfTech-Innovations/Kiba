@@ -132,26 +132,14 @@ jobs:
             curl -LO "$IMAGE_URL"
           else
             echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-            for suffix in -3 -2 -1; do
-              FALLBACK_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}${suffix}_amd64.deb"
-              if curl -sL --head "$FALLBACK_URL" | grep "200 OK" > /dev/null; then
-                curl -LO "$FALLBACK_URL"
-                break
-              fi
-            done
+            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
           if [ -n "$HEADERS_URL" ]; then
             curl -LO "$HEADERS_URL"
           else
              echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-             for suffix in -3 -2 -1; do
-               FALLBACK_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}${suffix}_amd64.deb"
-               if curl -sL --head "$FALLBACK_URL" | grep "200 OK" > /dev/null; then
-                 curl -LO "$FALLBACK_URL"
-                 break
-               fi
-             done
+             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
           fi
 
           # Install
@@ -345,6 +333,27 @@ jobs:
           # ── Calamares installer ───────────────────────────────────────────────
           calamares
           calamares-settings-debian
+          libkpmcore12
+          libparted2t64
+          libpwquality1
+          libpython3.13
+          libqt6core6t64
+          libqt6dbus6
+          libqt6gui6
+          libqt6network6
+          libqt6qml6
+          libqt6quick6
+          libqt6quickwidgets6
+          libqt6svg6
+          libqt6widgets6
+          libqt6xml6
+          qml6-module-qtquick
+          qml6-module-qtquick-controls
+          qml6-module-qtquick-layouts
+          qml6-module-qtquick-window
+          qml6-module-qtqml
+          python3-pyqt6
+          python3-dbus
 
           # ── Browser ───────────────────────────────────────────────────────────
           chromium
@@ -1029,50 +1038,6 @@ jobs:
           Mask=2
           BREEZERC
 
-          # ── kglobalshortcutsrc — standard shortcuts ───────────────────────────
-          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'SHORTCUTRC'
-          [KVM]
-          _k_friendly_name=KWin
-          activate widget org.kde.plasma.quicksettings=Meta+A,none,Activate Quick Settings
-          exposé=Meta+W,none,Toggle Present Windows (All desktops)
-          grid-view=Meta+G,none,Toggle Grid View
-          Window Maximize=Meta+PgUp,none,Maximize Window
-          Window Minimize=Meta+PgDn,none,Minimize Window
-          Window Quick Tile Bottom=Meta+Down,none,Quick Tile Window to the Bottom
-          Window Quick Tile Left=Meta+Left,none,Quick Tile Window to the Left
-          Window Quick Tile Right=Meta+Right,none,Quick Tile Window to the Right
-          Window Quick Tile Top=Meta+Up,none,Quick Tile Window to the Top
-
-          [kwin]
-          Overview=Meta+W,none,Overview
-          ShowDesktopGrid=Meta+G,none,Show Desktop Grid
-
-          [plasmashell]
-          _k_friendly_name=plasmashell
-          activate task manager entry 1=Meta+1,none,Activate Task Manager Entry 1
-          activate task manager entry 2=Meta+2,none,Activate Task Manager Entry 2
-          activate task manager entry 3=Meta+3,none,Activate Task Manager Entry 3
-          activate task manager entry 4=Meta+4,none,Activate Task Manager Entry 4
-          activate task manager entry 5=Meta+5,none,Activate Task Manager Entry 5
-          activate task manager entry 6=Meta+6,none,Activate Task Manager Entry 6
-          activate task manager entry 7=Meta+7,none,Activate Task Manager Entry 7
-          activate task manager entry 8=Meta+8,none,Activate Task Manager Entry 8
-          activate task manager entry 9=Meta+9,none,Activate Task Manager Entry 9
-          manage-widget-org.kde.plasma.quicksettings=Meta+A,none,Manage Quick Settings Widget
-
-          [services][org.kde.dolphin.desktop]
-          _launch=Meta+E,none,Dolphin
-
-          [services][org.kde.konsole.desktop]
-          _launch=Meta+T,none,Konsole
-
-          [services][org.kde.krunner.desktop]
-          _launch=Meta+S,none,KRunner
-
-          [services][org.kde.kscreenlocker.desktop]
-          _launch=Meta+L,none,Lock Session
-          SHORTCUTRC
-
           # ── plasmashellrc — floating panel ─────────────────────────────────────
           cat > "$SKEL_KDE/plasmashellrc" << 'PLASMASHELLRC'
           [PlasmaViews][Panel 2][Defaults]
@@ -1295,7 +1260,7 @@ jobs:
               "Keyboard Shortcuts")
                 (zenity --info --title="Keyboard Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
-                  --text="<b>Standard KibaOS Shortcuts:</b>\n\n  • <b>Meta + T</b>: Terminal (Konsole)\n  • <b>Meta + W</b>: Overview (Window Grid)\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + A</b>: Quick Settings\n  • <b>Meta + E</b>: File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + 1-9</b>: Activate Task Manager Entries" \
+                  --text="<b>Standard KibaTV Shortcuts:</b>\n\n  • <b>Meta + T</b>: Terminal (Konsole)\n  • <b>Meta + W</b>: Overview (Window Grid)\n  • <b>Meta + S</b>: Search (KRunner)\n  • <b>Meta + A</b>: Quick Settings\n  • <b>Meta + E</b>: File Manager (Dolphin)\n  • <b>Meta + L</b>: Lock Screen\n  • <b>Meta + 1-9</b>: Activate Task Manager Entries" \
                   --width=450 2>/dev/null) &
                 ;;
               "Online Wiki")

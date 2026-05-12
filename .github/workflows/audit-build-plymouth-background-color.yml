@@ -3,10 +3,10 @@ name: Audit Build Plymouth Background Color
 on:
   push:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibaos_build.sh'
+      - 'scripts/kibatv_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Plymouth Background
         run: |
-          if ! grep -q "0.157, 0.165, 0.212" scripts/kibaos_build.sh; then
+          if ! grep -q "0.157, 0.165, 0.212" scripts/kibatv_build.sh; then
             echo "Error: Plymouth background color should be Dracula background (0.157, 0.165, 0.212)"
             exit 1
           fi

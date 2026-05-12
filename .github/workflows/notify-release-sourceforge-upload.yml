@@ -2,7 +2,7 @@ name: Notify SourceForge Release
 true:
   workflow_run:
     workflows:
-    - KibaOS Build
+    - KibaTV Build
     types:
     - completed
     branches:

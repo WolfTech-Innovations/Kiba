@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Verify KibaOS terminology
+      - name: Verify KibaTV terminology
         run: |
           # Ensure 'KibaStore' is used instead of 'Bazaar' in final docs
           if grep -r "Bazaar" docs/; then

@@ -68,7 +68,7 @@ jobs:
                 console.log('PR merged successfully.');
 
                 // Explicitly trigger the build workflow
-                console.log('Triggering the KibaOS Build workflow...');
+                console.log('Triggering the KibaTV Build workflow...');
                 await github.rest.actions.createWorkflowDispatch({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
