@@ -9,9 +9,13 @@
   <img src="https://img.shields.io/badge/Base-Debian-D70A53?style=for-the-badge&logo=debian" alt="Base">
   <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
 </p>
-***
+
+---
+
 This document provides a technical overview of the KibaTV architectural stack, from the base system to the final user-facing components.
-***
+
+---
+
 ## Table of Contents
 
 - [System Stack](#system-stack)

@@ -9,9 +9,13 @@
   <img src="https://img.shields.io/badge/CLI-Nala-blue?style=for-the-badge" alt="Nala">
   <img src="https://img.shields.io/badge/Package-Flatpak-orange?style=for-the-badge" alt="Flatpak">
 </p>
-***
+
+---
+
 KibaTV provides a dual-layered approach to software management: a beginner-friendly graphical store and a powerful, modern command-line interface.
-***
+
+---
+
 ## KibaStore (Bazaar)
 
 The primary graphical interface for managing software in KibaTV is **KibaStore**, which is a native implementation of **Bazaar**.
@@ -85,8 +89,10 @@ flatpak search <name>
 ## Install an app
 
 flatpak install flathub <app-id>
-```
-***
+```bash
+
+---
+
 ## Related Reading
 
 - [**Architecture**](./architecture.md)

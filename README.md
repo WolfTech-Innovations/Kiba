@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="[Kiba](https://github.com/WolfTech-Innovations/Kiba)/actions/workflows/kiba.yml">
+  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
@@ -27,7 +27,9 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
-***
+
+---
+
 ## Table of Contents
 
 - [Documentation](#documentation)
@@ -98,7 +100,7 @@ On Linux:
 
 ```bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
-```
+```bash
 
 > [!IMPORTANT]
 > Replace `/dev/sdX` with your actual drive and `N` with the build number. You can also use tools like **Balena Etcher** or **Ventoy**.
@@ -131,7 +133,7 @@ Post-install, update your system:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-```
+```bash
 
 ---
 
@@ -200,14 +202,14 @@ KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** conta
 Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
 ```bash
-git clone [Kiba](https://github.com/WolfTech-Innovations/Kiba)
+git clone https://github.com/WolfTech-Innovations/Kiba
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
-```
+```bash
 
 > [!NOTE]
 > The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
@@ -225,13 +227,13 @@ Kiba/
 │   └── kibaos_banner.png      # KibaOS brand assets
 ├── docs/                      # In-depth documentation
 └── README.md                  # Project documentation
-```
+```bash
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](<[Kiba](https://github.com/WolfTech-Innovations/Kiba)>) repository. Please open an issue before starting significant work, thanks!
+Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
 
 ---
 

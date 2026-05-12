@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set -euo pipefail
+set -eu
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
@@ -29,76 +29,75 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  if [[ "$#" -ne 1 && -z "${RELEASE_ID:-}" ]]; then
+  if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
     printf "Usage: %s [release_id]\n" "$0" >&2
     exit 1
   fi
 
-  local release_id="${1:-${RELEASE_ID:-}}"
-  local github_token="${GH_TOKEN:-}"
-  local repo="${GITHUB_REPOSITORY:-}"
+  release_id="${1:-${RELEASE_ID:-}}"
+  github_token="${GH_TOKEN:-}"
+  repo="${GITHUB_REPOSITORY:-}"
 
-  if [[ -z "$release_id" ]; then
+  if [ -z "$release_id" ]; then
     printf "Error: RELEASE_ID environment variable or argument is required.\n" >&2
     return 1
   fi
 
-  if [[ -z "$github_token" ]; then
+  if [ -z "$github_token" ]; then
     printf "Error: GH_TOKEN environment variable is required.\n" >&2
     return 1
   fi
 
-  if [[ -z "$repo" ]; then
+  if [ -z "$repo" ]; then
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
     return 1
   fi
 
   # 1. Generate filename: NTE-DDHYM
   # Optimization: Single date call reduces process spawning.
-  # Using Bash string manipulation instead of cut/printf.
   # DD: Day of month (01-31)
   # H: Hour of day (0-N for 0-23)
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  local dd h_val y_val m_val vars
-  vars=$(date "+%d %-H %y %-m")
+  vars=$(date "+%d %H %y %m")
+  dd=$(echo "$vars" | cut -d' ' -f1)
+  h_val=$(echo "$vars" | cut -d' ' -f2)
+  y_val=$(echo "$vars" | cut -d' ' -f3)
+  m_val=$(echo "$vars" | cut -d' ' -f4)
 
-  read -r dd h_val y_val m_val <<EOV
-$vars
-EOV
+  # Remove leading zeros to avoid octal interpretation in arithmetic
+  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
+  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
 
-  local hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c $((h_val + 1)))
-  y=$(echo "$y_val" | cut -c $((1 + 1)))
-  local months="123456789ABC"
-  local m_idx=$((m_val - 1))
-  m=$(echo "$months" | cut -c $((m_idx + 1)))
+  hours="0123456789ABCDEFGHIJKLMN"
+  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
+  y=$(echo "$y_val" | cut -c 2)
+  months="123456789ABC"
+  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
 
-  local filename="Notes/NTE-${dd}${h}${y}${m}.md"
+  filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [[ ! -f Notes/.gitkeep ]; then
+  if [ ! -f Notes/.gitkeep ]; then
     touch Notes/.gitkeep
   fi
 
   # 3. Fetch release body using curl -fsS and jq
-  local api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
-  local body
-  local body=$(curl -fsS -H "Authorization: token ${github_token}" \
+  api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
+  body=$(curl -fsS -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 
   # 4. Handle empty release notes
-  if [[ -z "$body" || "$body" == "null" ]]; then
+  if [ -z "$body" ] || [ "$body" = "null" ]; then
     printf "No release notes provided for this release.\n" > "$filename"
   else
     printf "%s\n" "$body" > "$filename"
   fi
 
   # 5. Git operations
-  # Optimization: Only perform network operations if there are changes to push.
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
   git add "$filename" Notes/.gitkeep
@@ -111,4 +110,4 @@ EOV
   fi
 }
 
-save_release_notes "$@"
+(save_release_notes "$@")
