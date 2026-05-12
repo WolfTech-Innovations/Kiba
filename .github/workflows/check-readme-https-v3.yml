@@ -1,11 +1,11 @@
 name: Check README HTTPS
 on:
   push:
-    paths:
-      - README.md
+paths:
+- README.md
   pull_request:
-    paths:
-      - README.md
+paths:
+- README.md
 jobs:
   check:
     permissions:

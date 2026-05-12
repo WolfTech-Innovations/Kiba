@@ -12,6 +12,8 @@ jobs:
   audit-versions:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -20,8 +22,7 @@ jobs:
       - name: Check action versions
         shell: bash
         run: |
-          # Check for actions/checkout specifically as an example, excluding this audit file
           versions=$(grep -h "uses: actions/checkout@" .github/workflows/*.yml | grep -v "workflow-action-version-consistency.yml" | sort | uniq)
-          count=$(echo "$versions" | wc -l)
+          count=$(echo "$versions" | grep -c "uses: actions/checkout@")
           test "$count" -le 1 || { echo "Error: Multiple versions found: $versions"; false; }
           echo "Action versions are consistent."

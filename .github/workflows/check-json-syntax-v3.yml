@@ -1,11 +1,11 @@
 name: Check JSON Syntax
 on:
   push:
-    paths:
-      - '**/*.json'
+paths:
+- '**/*.json'
   pull_request:
-    paths:
-      - '**/*.json'
+paths:
+- '**/*.json'
 jobs:
   check:
     permissions:

@@ -1,11 +1,11 @@
 name: Check Build Parallel
 on:
   push:
-    paths:
-      - scripts/kibatv_build.sh
+paths:
+- scripts/kibatv_build.sh
   pull_request:
-    paths:
-      - scripts/kibatv_build.sh
+paths:
+- scripts/kibatv_build.sh
 jobs:
   audit:
     permissions:

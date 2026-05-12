@@ -9,8 +9,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
-          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: TODO to Issue
         uses: alstr/todo-to-issue-action@64aca8fda7023259aada83ba44ad988c4c443657
         with:

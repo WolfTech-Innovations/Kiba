@@ -10,6 +10,8 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -18,15 +20,16 @@ jobs:
       - name: Verify job IDs are kebab-case
         shell: bash
         run: |
-          # Optimized: Use single-pass Python with CSafeLoader instead of yq loop (~500x faster)
+          # Optimized: Use single-pass Python with CSafeLoader (~500x speedup)
           python3 -c '
           import os, yaml, sys, re
           try: from yaml import CSafeLoader as Loader
           except ImportError: from yaml import SafeLoader as Loader
           fail = False
           for f in sorted(os.listdir(".github/workflows")):
-              if f.endswith(".yml") or f.endswith(".yaml"):
-                  with open(os.path.join(".github/workflows", f)) as s:
+              if f.endswith((".yml", ".yaml")):
+                  path = os.path.join(".github/workflows", f)
+                  with open(path) as s:
                       try:
                           d = yaml.load(s, Loader=Loader)
                           if d and isinstance(d, dict) and "jobs" in d:

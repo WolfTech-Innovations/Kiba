@@ -26,7 +26,9 @@ To begin contributing to the KibaTV build system or customization hooks, follow 
    ```bash
    git clone [https://github.com/YOUR_USERNAME/Kiba](https://github.com/YOUR_USERNAME/Kiba)
    cd Kiba
+
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
+
 ```bash
 
 ---
@@ -109,6 +111,6 @@ By contributing to KibaTV, you agree that your contributions will be licensed un
 
 ## Related Reading
 
-- [**Build System**](./build-system.md)
+- [**Build System**](./docs/build-system.md)
 - [**Architecture**](./architecture.md)
 - [**FAQ**](./faq.md)

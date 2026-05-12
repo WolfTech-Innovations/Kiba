@@ -3,21 +3,19 @@ name: Audit Workflow Job Name
 on:
   push:
     paths:
-      - '.github/workflows/**.yml'
+      - '.github/workflows/*.yml'
   pull_request:
     paths:
-      - '.github/workflows/**.yml'
+      - '.github/workflows/*.yml'
 
 jobs:
   audit:
-    runs-on: ubuntu-latest
     timeout-minutes: 5
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
       - name: Check job names
-        shell: bash
         run: |
-          ! grep -r "name: Job" .github/workflows/*.yml
+          grep -r "name: Job" .github/workflows/*.yml && exit 1 || exit 0

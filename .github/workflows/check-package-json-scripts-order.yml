@@ -12,8 +12,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout repository
-heckout@11bd71901bbe5b1630ceea73d27597364c9af683/a         with:
-          persist-credentials: false
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify scripts order
         run: |
           python3 -c "import json, sys; d = json.load(open('package.json')); scripts = d.get('scripts', {}); sorted_scripts = sorted(scripts.keys()); sys.exit(0 if list(scripts.keys()) == sorted_scripts else 1)" || { echo 'package.json scripts are not sorted alphabetically'; exit 1; }
