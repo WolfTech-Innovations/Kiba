@@ -1,0 +1,40 @@
+name: Documentation Version Audit
+
+on:
+  push:
+    paths:
+      - 'package.json'
+      - 'docs/**/*.md'
+      - 'README.md'
+  pull_request:
+    paths:
+      - 'package.json'
+      - 'docs/**/*.md'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: doc-version-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check version consistency
+        run: |
+          PACKAGE_VER=$(grep '"version":' package.json | cut -d'"' -f4)
+          echo "Package Version: $PACKAGE_VER"
+          if ! grep -q "$PACKAGE_VER" README.md; then
+            echo "Warning: README.md might not mention current version $PACKAGE_VER"
+          fi
+          if ! grep -q "$PACKAGE_VER" .github/workflows/kiba.yml; then
+            echo "Warning: kiba.yml might not be set to build version $PACKAGE_VER"
+          fi

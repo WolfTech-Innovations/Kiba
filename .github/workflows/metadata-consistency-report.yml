@@ -1,0 +1,38 @@
+name: Metadata Consistency Report
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  consistency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Cross-check Metadata
+        run: |
+          VERSION=$(grep '"version":' package.json | cut -d'"' -f4)
+          BUILD_NAME=$(grep 'productName:' .github/workflows/kiba.yml | cut -d'"' -f2)
+          echo "Version: $VERSION"
+          echo "Product Name: $BUILD_NAME"
+
+          # Fail if metadata is missing
+          if [ -z "$VERSION" ] || [ -z "$BUILD_NAME" ]; then
+             echo "Error: Missing metadata in package.json or kiba.yml"
+             exit 1
+          fi
+
+          # Cross-check with os-release if applicable
+          if grep -q "VERSION_ID=\"$VERSION\"" .github/workflows/kiba.yml; then
+             echo "OS Version matches package version."
+          else
+             echo "Warning: OS Version in kiba.yml does not match package.json version."
+          fi

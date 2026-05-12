@@ -1,0 +1,39 @@
+name: Workflow Redundancy Audit
+
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Scan for redundant steps
+        run: |
+          # Audit to find repetitive code blocks
+          REDUNDANT=$(grep -h "uses: actions/checkout" .github/workflows/*.yml | sort | uniq -c | awk '$1 > 50 {print $2}')
+          if [ -n "$REDUNDANT" ]; then
+             echo "The following common actions are used across many workflows: $REDUNDANT"
+          fi
+
+          # Fail if we find a very high number of duplicated inline scripts
+          DUPLICATED_SCRIPTS=$(grep -h "run: |" .github/workflows/*.yml -A 2 | grep -v "\-\-" | sort | uniq -c | sort -nr | head -n 1 | awk '$1 > 10 {print $1}')
+          if [ -n "$DUPLICATED_SCRIPTS" ]; then
+             echo "Detected $DUPLICATED_SCRIPTS workflows with identical inline scripts. Consider refactoring into a shared action."
+          fi

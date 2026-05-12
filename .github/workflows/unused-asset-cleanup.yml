@@ -1,0 +1,29 @@
+name: Unused Asset Cleanup
+
+on:
+  push:
+    paths:
+      - 'branding/**'
+      - '**/*.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  find-unused:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Identify Unused Images
+        run: |
+          for img in $(find branding -type f); do
+            IMG_NAME=$(basename "$img")
+            if ! grep -rq "$IMG_NAME" . --exclude-dir=.git; then
+              echo "Unused asset found: $img"
+            fi
+          done

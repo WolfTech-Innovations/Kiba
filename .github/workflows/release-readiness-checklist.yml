@@ -1,0 +1,25 @@
+name: Release Readiness Checklist
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  checklist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create Checklist Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --title "Release Readiness Checklist: ${{ github.ref_name }}" --body "### Tasks
+          - [ ] Verify ISO checksums
+          - [ ] Update SourceForge mirrors
+          - [ ] Announce on social media
+          - [ ] Close associated milestone"
