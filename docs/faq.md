@@ -7,9 +7,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Helpful-blue?style=for-the-badge" alt="Helpful">
 </p>
-
----
-
+***
 ## General Questions
 
 ### What is KibaTV

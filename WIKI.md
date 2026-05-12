@@ -18,25 +18,25 @@ Welcome to the official **KibaTV Wiki**. This document provides an exhaustive de
 
 ## Table of Contents
 
-- [Extended Documentation](#-extended-documentation)
-- [Architecture & Core Components](#-architecture--core-components)
+- [Extended Documentation](#extended-documentation)
+- [Architecture & Core Components](#architecture--core-components)
   - [Base System](#base-system)
   - [Extreme Minimization](#extreme-minimization)
-- [User Experience (UX) & Design](#-user-experience-ux--design)
+- [User Experience (UX) & Design](#user-experience-ux--design)
   - [Visual Identity](#visual-identity)
   - [Shell Experience](#shell-experience)
   - [Boot & Branding](#boot--branding)
-- [Software Management](#-software-management)
+- [Software Management](#software-management)
   - [KibaStore](#kibastore)
   - [Repositories & Packages](#repositories--packages)
-- [Security & Compliance](#-security--compliance)
+- [Security & Compliance](#security--compliance)
   - [California AADC (AB 2273)](#california-aadc-ab-2273)
-- [Build Infrastructure](#-build-infrastructure)
+- [Build Infrastructure](#build-infrastructure)
   - [Build Pipeline](#build-pipeline)
   - [Image Optimization](#image-optimization)
-- [Build Locally](#-build-locally)
-- [Community & Support](#-community--support)
-- [License](#-license)
+- [Build Locally](#build-locally)
+- [Community & Support](#community--support)
+- [License](#license)
 
 ---
 

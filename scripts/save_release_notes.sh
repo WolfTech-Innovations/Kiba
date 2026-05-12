@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # License: MIT
 #
 # Copyright (c) 2025 WolfTech Innovations
@@ -34,9 +34,9 @@ save_release_notes() {
     exit 1
   fi
 
-  local release_id; release_id="${1:-${RELEASE_ID:-}}"
-  local github_token; github_token="${GH_TOKEN:-}"
-  local repo; repo="${GITHUB_REPOSITORY:-}"
+  release_id; release_id="${1:-${RELEASE_ID:-}}"
+  github_token; github_token="${GH_TOKEN:-}"
+  repo; repo="${GITHUB_REPOSITORY:-}"
 
   if [ -z "$release_id" ]; then
     printf "Error: RELEASE_ID environment variable or argument is required.\n" >&2
@@ -61,21 +61,21 @@ save_release_notes() {
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  local dd h_val y_val m_val vars
+  dd h_val y_val m_val vars
   vars=$(date "+%d %-H %y %-m")
 
   read -r dd h_val y_val m_val <<EOV
 $vars
 EOV
 
-  local hours="0123456789ABCDEFGHIJKLMN"
-  local h; h="${hours:$h_val:1}"
-  local y; y="${y_val:1:1}"
-  local months="123456789ABC"
-  local m_idx; m_idx=$((m_val - 1))
-  local m; m="${months:$m_idx:1}"
+  hours="0123456789ABCDEFGHIJKLMN"
+  h; h=$(echo "$hours" | cut -c $((h_val + 1)))
+  y; y=$(echo "$y_val" | cut -c $((1 + 1)))
+  months="123456789ABC"
+  m_idx; m_idx=$((m_val - 1))
+  m; m=$(echo "$months" | cut -c $((m_idx + 1)))
 
-  local filename="Notes/NTE-${dd}${h}${y}${m}.md"
+  filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
@@ -84,8 +84,8 @@ EOV
   fi
 
   # 3. Fetch release body using curl -fsS and jq
-  local api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
-  local body
+  api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
+  body
   body=$(curl -fsS -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')

@@ -27,9 +27,7 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
-
----
-
+***
 ## Table of Contents
 
 - [Documentation](#documentation)

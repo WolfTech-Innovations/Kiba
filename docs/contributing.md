@@ -8,13 +8,9 @@
   <img src="https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge" alt="Welcome">
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
 </p>
-
----
-
+***
 First of all, thank you for your interest in contributing to KibaTV! We welcome contributions from developers, designers, and documentation enthusiasts.
-
----
-
+***
 ## Developer Quick Start
 
 To begin contributing to the KibaTV build system or customization hooks, follow these steps:
@@ -29,8 +25,16 @@ To begin contributing to the KibaTV build system or customization hooks, follow 
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
    ```
 
----
+```
 
+```
+
+```
+
+```
+
+````
+***
 ## How to Contribute
 
 ### Reporting Bugs
@@ -73,9 +77,7 @@ We love new ideas! Please open an issue to discuss significant features before i
 - **Branching:** Work on a descriptive branch name (e.g., `feature/custom-icons`).
 - **Commits:** Follow conventional commit messages.
 - **Testing:** Always run a local build (see above) to verify your changes don't break the ISO generation.
-
----
-
+***
 ## Project Structure
 
 | Directory               | Purpose                                         |
@@ -88,9 +90,7 @@ We love new ideas! Please open an issue to discuss significant features before i
 
 > [!TIP]
 > Most of the system customization logic resides in the **`build.sh`** generation block within **`.github/workflows/kiba.yml`**. Look for the `cat > config/hooks/live/...` sections.
-
----
-
+***
 ## Automated Triage
 
 We use automated workflows to help manage the project:
@@ -98,17 +98,15 @@ We use automated workflows to help manage the project:
 - **Labeler:** Automatically labels PRs based on changed files.
 - **Issue Triage:** Auto-labels new issues based on keywords (`bug`, `feature`, etc.).
 - **Stale:** Automatically closes inactive issues after a period of time.
-
----
-
+***
 ## License
 
 By contributing to KibaTV, you agree that your contributions will be licensed under the **MIT License**.
-
----
-
+***
 ## Related Reading
 
-- [**Build System**](./build-system.md)
-- [**Architecture**](./architecture.md)
-- [**FAQ**](./faq.md)
+- [**Build System**](./docs/build-system.md)
+- [**Architecture**](./docs/architecture.md)
+- [**FAQ**](./docs/faq.md)
+```bash
+````
