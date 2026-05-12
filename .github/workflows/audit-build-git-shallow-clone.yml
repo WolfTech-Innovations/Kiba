@@ -3,10 +3,10 @@ name: Audit Build Git Shallow Clone
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Git Shallow Clone
         run: |
-          if grep "git clone" scripts/kibatv_build.sh | grep -v "\-\-depth=1"; then
+          if grep "git clone" scripts/kibaos_build.sh | grep -v "\-\-depth=1"; then
             echo "Error: git clone should use --depth=1 to minimize build time and space"
             exit 1
           fi

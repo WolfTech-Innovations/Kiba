@@ -3,10 +3,10 @@ name: Starship Init Quoted Eval
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Starship Init Quoted Eval
         run: |
-          grep -q "starship init" scripts/kibatv_build.sh && ! grep -q "\'eval\' \"\$(starship init zsh)\"" scripts/kibatv_build.sh && { echo "Error: unquoted eval"; false; } || true
+          grep -q "starship init" scripts/kibaos_build.sh && ! grep -q "\'eval\' \"\$(starship init zsh)\"" scripts/kibaos_build.sh && { echo "Error: unquoted eval"; false; } || true

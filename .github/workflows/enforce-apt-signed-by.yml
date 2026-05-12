@@ -3,10 +3,10 @@ name: Enforce APT Signed-By
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Enforce APT Signed-By
         run: |
-          grep "deb http" scripts/kibatv_build.sh | grep -v "signed-by" && { echo "Warning: missing signed-by"; } || true
+          grep "deb http" scripts/kibaos_build.sh | grep -v "signed-by" && { echo "Warning: missing signed-by"; } || true

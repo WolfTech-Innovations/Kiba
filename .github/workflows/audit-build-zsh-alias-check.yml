@@ -3,7 +3,7 @@ name: Audit Build Zsh Alias
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
 
 jobs:
   audit:
@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Alias
         run: |
-          grep 'alias please=\'sudo\'' scripts/kibatv_build.sh
+          grep 'alias please=\'sudo\'' scripts/kibaos_build.sh

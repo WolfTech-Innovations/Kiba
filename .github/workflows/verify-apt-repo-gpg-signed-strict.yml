@@ -2,7 +2,7 @@ name: Verify APT Repo GPG Signed Strict
 true:
   push:
     paths:
-    - scripts/kibatv_build.sh
+    - scripts/kibaos_build.sh
 jobs:
   verify:
     runs-on: ubuntu-latest
@@ -13,7 +13,7 @@ jobs:
     - name: Check signed-by
       run: '# All external repos must use signed-by keyring
 
-        grep "sources.list.d" scripts/kibatv_build.sh -A 5 | grep -v "signed-by" |
+        grep "sources.list.d" scripts/kibaos_build.sh -A 5 | grep -v "signed-by" |
         grep "http" && exit 1 || exit 0
 
         '

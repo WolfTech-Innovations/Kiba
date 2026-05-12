@@ -3,10 +3,10 @@ name: Audit Build Pmbootstrap Status Stdout
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Pmbootstrap Install Status
         run: |
-          if ! grep -q "\-\-details-to-stdout" scripts/kibatv_build.sh; then
+          if ! grep -q "\-\-details-to-stdout" scripts/kibaos_build.sh; then
             echo "Error: pmbootstrap install should use --details-to-stdout for better logging"
             exit 1
           fi

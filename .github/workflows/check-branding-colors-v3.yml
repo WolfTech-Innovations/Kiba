@@ -2,10 +2,10 @@ name: Check Branding Colors
 on:
   push:
 paths:
-- scripts/kibatv_build.sh
+- scripts/kibaos_build.sh
   pull_request:
 paths:
-- scripts/kibatv_build.sh
+- scripts/kibaos_build.sh
 jobs:
   audit:
     permissions:
@@ -16,5 +16,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Hex
-      run: grep "#282a36" scripts/kibatv_build.sh && grep "#bd93f9" scripts/kibatv_build.sh
+      run: grep "#282a36" scripts/kibaos_build.sh && grep "#bd93f9" scripts/kibaos_build.sh
     timeout-minutes: 5

@@ -3,10 +3,10 @@ name: Package List Distro Purity
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Package List Distro Purity
         run: |
-          grep -E "<<.*PACKAGES" scripts/kibatv_build.sh -A 100 | grep -E "pacman|yum|apk" && { echo "Error: non-debian package"; false; } || true
+          grep -E "<<.*PACKAGES" scripts/kibaos_build.sh -A 100 | grep -E "pacman|yum|apk" && { echo "Error: non-debian package"; false; } || true

@@ -3,10 +3,10 @@ name: Audit Build Sddm Autologin User
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Sddm Autologin User
         run: |
-          if ! grep -q "User=user" scripts/kibatv_build.sh; then
+          if ! grep -q "User=user" scripts/kibaos_build.sh; then
             echo "Error: SDDM autologin user should be set to 'user'"
             exit 1
           fi

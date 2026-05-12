@@ -3,10 +3,10 @@ name: Secure APT Keyring Paths
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - "scripts/kibaos_build.sh"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Secure APT Keyring Paths
         run: |
-          grep -E "curl|wget" scripts/kibatv_build.sh | grep -E "\.gpg|\.asc" | grep -v "/usr/share/keyrings/" && { echo "Error: insecure path"; false; } || true
+          grep -E "curl|wget" scripts/kibaos_build.sh | grep -E "\.gpg|\.asc" | grep -v "/usr/share/keyrings/" && { echo "Error: insecure path"; false; } || true

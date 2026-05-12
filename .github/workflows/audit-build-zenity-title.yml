@@ -3,10 +3,10 @@ name: Audit Build Zenity Title
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check For Zenity Title
         run: |
-          if grep "zenity" scripts/kibatv_build.sh | grep -v "\-\-title="; then
+          if grep "zenity" scripts/kibaos_build.sh | grep -v "\-\-title="; then
             echo "Error: zenity dialogs should have a --title specified"
             exit 1
           fi

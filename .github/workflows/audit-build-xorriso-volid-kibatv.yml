@@ -3,10 +3,10 @@ name: Audit Build Xorriso Volid Kibatv
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Xorriso Volid
         run: |
-          if ! grep "xorriso" scripts/kibatv_build.sh | grep -q "\-volid \"KIBATV\""; then
-            echo "Error: xorriso should use -volid KIBATV"
+          if ! grep "xorriso" scripts/kibaos_build.sh | grep -q "\-volid \"KIBAOS\""; then
+            echo "Error: xorriso should use -volid KIBAOS"
             exit 1
           fi

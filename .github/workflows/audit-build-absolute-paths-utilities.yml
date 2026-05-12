@@ -3,10 +3,10 @@ name: Audit Build Absolute Paths Utilities
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - 'scripts/kibaos_build.sh'
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check absolute paths
         run: |
-          grep "/usr/local/bin" scripts/kibatv_build.sh || (echo "Absolute paths for utilities required in build scripts" && exit 1)
+          grep "/usr/local/bin" scripts/kibaos_build.sh || (echo "Absolute paths for utilities required in build scripts" && exit 1)
