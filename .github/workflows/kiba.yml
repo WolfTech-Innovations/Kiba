@@ -986,6 +986,40 @@ jobs:
           cursorSize=24
           KCMINPUTRC
 
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'KSHORTS'
+          [kwin]
+          Expose=Meta+W,none,Overview
+          Window Maximize=Meta+Up,none,Maximize Window
+          Window Minimize=Meta+Down,none,Minimize Window
+          Window Quick Tile Left=Meta+Left,none,Quick Tile Window to the Left
+          Window Quick Tile Right=Meta+Right,none,Quick Tile Window to the Right
+          Show Desktop Grid=Meta+G,none,Show Desktop Grid
+
+          [plasmashell]
+          activate task manager entry 1=Meta+1,none,Activate Task Manager Entry 1
+          activate task manager entry 2=Meta+2,none,Activate Task Manager Entry 2
+          activate task manager entry 3=Meta+3,none,Activate Task Manager Entry 3
+          activate task manager entry 4=Meta+4,none,Activate Task Manager Entry 4
+          activate task manager entry 5=Meta+5,none,Activate Task Manager Entry 5
+          activate task manager entry 6=Meta+6,none,Activate Task Manager Entry 6
+          activate task manager entry 7=Meta+7,none,Activate Task Manager Entry 7
+          activate task manager entry 8=Meta+8,none,Activate Task Manager Entry 8
+          activate task manager entry 9=Meta+9,none,Activate Task Manager Entry 9
+          manage-widget-org.kde.plasma.quicksettings=Meta+A,none,Show Quick Settings
+
+          [services][org.kde.dolphin.desktop]
+          _launch=Meta+E,none,Dolphin
+
+          [services][org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+
+          [services][org.kde.krunner.desktop]
+          _launch=Meta+S,none,Search
+
+          [ksmserver]
+          Lock Session=Meta+L,Ctrl+Alt+L,Lock Session
+          KSHORTS
+
           mkdir -p /usr/share/icons/default
           cat > /usr/share/icons/default/index.theme << 'CURSOR_DEFAULT'
           [Icon Theme]
@@ -1277,6 +1311,7 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          Comment=Onboarding and helpful links for KibaOS
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
