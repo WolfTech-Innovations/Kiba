@@ -31,6 +31,7 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 save_release_notes() {
   if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
     printf "Usage: %s [release_id]\n" "$0" >&2
+    exit 1
   fi
 
   local release_id; release_id="${1:-${RELEASE_ID:-}}"
