@@ -333,25 +333,6 @@ jobs:
           # ── Calamares installer ───────────────────────────────────────────────
           calamares
           calamares-settings-debian
-          libkpmcore12
-          libparted2t64
-          libpwquality1
-          libpython3.13
-          libqt6core6t64
-          libqt6dbus6
-          libqt6gui6
-          libqt6network6
-          libqt6qml6
-          libqt6quick6
-          libqt6quickwidgets6
-          libqt6svg6
-          libqt6widgets6
-          libqt6xml6
-          qml6-module-qtquick
-          qml6-module-qtquick-controls
-          qml6-module-qtquick-layouts
-          qml6-module-qtquick-window
-          qml6-module-qtqml
           python3-pyqt6
           python3-dbus
 
