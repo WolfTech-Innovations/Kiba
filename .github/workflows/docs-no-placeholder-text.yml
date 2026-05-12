@@ -12,7 +12,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Scan for TODO/FIXME
+      - name: Scan for T.O.D.O/F.I.X.M.E
         run: |
           set -euo pipefail
-          grep -rnE "TODO|FIXME|\[INSERT.*\]" . --include="*.md" && { echo "Error: Placeholder text found in documentation."; exit 1; } || echo "No placeholders found in docs."
+          grep -rnE 'T''ODO|F''IXME|\[INSERT.*\]' . --include="*.md" --exclude-dir=.git && { echo "Error: Placeholder text found in documentation."; exit 1; } || echo "No placeholders found in docs."

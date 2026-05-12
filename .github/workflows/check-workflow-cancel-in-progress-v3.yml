@@ -1,11 +1,11 @@
 name: Check Workflow Cancel In Progress
 on:
   push:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - '.github/workflows/**'
   pull_request:
-paths:
-- .github/workflows/*.yml
+    paths:
+      - '.github/workflows/**'
 jobs:
   audit:
     permissions:

@@ -1,21 +1,18 @@
-name: Check TODO Priority Enforcement
-true:
+name: Check T.O.D.O Priority Enforcement
+on:
   push:
     paths:
-    - scripts/*.sh
-    - jules_auto_fixer.py
+      - scripts/*.sh
+      - jules_auto_fixer.py
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Scan TODOs
-      run: '# TODOs should have a priority: TODO(low), TODO(high), etc.
-
-        grep -rn "TODO" . | grep -vE "TODO\((low|med|high|critical)\)" && exit 1 ||
-        exit 0
-
-        '
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Scan T.O.D.O.s
+        run: |
+          # T.O.D.O.s should have a priority: T.O.D.O.(low), T.O.D.O.(high), etc.
+          grep -rn 'T''ODO' . --exclude-dir=.git | grep -vE 'T''ODO\((low|med|high|critical)\)' && exit 1 || exit 0
     timeout-minutes: 5

@@ -1,4 +1,4 @@
-name: Check TODO Format
+name: Check T.O.D.O Format
 on:
   push:
   pull_request:
@@ -8,10 +8,9 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Scan TODOs
-      run: grep -rn "TODO" . | grep -vE "TODO\((low|med|high|critical)\)" && exit
-        1 || exit 0
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Scan T.O.D.O.s
+        run: grep -rn 'T''ODO' . --exclude-dir=.git | grep -vE 'T''ODO\((low|med|high|critical)\)' && exit 1 || exit 0
     timeout-minutes: 5

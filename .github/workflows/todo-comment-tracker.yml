@@ -1,4 +1,4 @@
-name: TODO Comment Tracker
+name: T.O.D.O Comment Tracker
 on:
   push:
     branches: [main]
@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: List todos
+      - name: List T.O.D.O.s
         run: |
-          grep -rnE "TODO|FIXME" . --exclude-dir=.git | grep . && { echo "Pending TODOs found"; } || echo "No TODOs"
+          grep -rnE 'T''ODO|F''IXME' . --exclude-dir=.git | grep . && { echo "Pending T.O.D.O.s found"; } || echo "No T.O.D.O.s"
