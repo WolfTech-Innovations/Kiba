@@ -1,0 +1,39 @@
+name: Glossary Term Consistency
+
+on:
+  push:
+    paths:
+      - 'docs/**/*.md'
+      - 'README.md'
+      - 'WIKI.md'
+  pull_request:
+    paths:
+      - 'docs/**/*.md'
+      - 'README.md'
+      - 'WIKI.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: glossary-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  consistency-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Enforce Naming
+        run: |
+          # Ensure KibaTV is not used in place of KibaOS
+          if grep -rq "KibaTV" docs/ README.md WIKI.md; then
+            echo "Error: Legacy term 'KibaTV' found. Please use 'KibaOS'."
+            grep -rn "KibaTV" docs/ README.md WIKI.md
+            exit 1
+          fi
+          echo "Glossary check passed."

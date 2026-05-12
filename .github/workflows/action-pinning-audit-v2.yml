@@ -1,0 +1,37 @@
+name: Action Pinning Audit V2
+
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pinning-v2-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Check Pinning
+        run: |
+          # Ensure actions are pinned to a 40-character SHA
+          # Exclude local actions (./actions/...)
+          VIOLATIONS=$(grep "uses: [^./][^@]*@" .github/workflows/*.yml | grep -vE "@[a-f0-9]{40}")
+          if [ -n "$VIOLATIONS" ]; then
+            echo "Error: The following actions are not pinned to a commit SHA:"
+            echo "$VIOLATIONS"
+            exit 1
+          fi
+          echo "Audit complete. All actions correctly pinned."

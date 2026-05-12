@@ -1,0 +1,34 @@
+name: KDE Config Schema Validator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kde-schema-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate KDE Configs
+        run: |
+          # Check for known malformed KDE config keys in kiba.yml
+          if grep -q "RoundedCorners=true" .github/workflows/kiba.yml; then
+             echo "Verified: RoundedCorners is enabled."
+          fi
+          # Check for common typos in kglobalshortcutsrc or kwinrc
+          grep -i "duraton" .github/workflows/kiba.yml && exit 1 || true

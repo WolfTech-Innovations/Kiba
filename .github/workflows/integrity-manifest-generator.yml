@@ -1,0 +1,32 @@
+name: Integrity Manifest Generator
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Generate Manifest
+        run: |
+          echo "# Critical File Integrity Manifest" > MANIFEST.md
+          echo "Generated: $(date)" >> MANIFEST.md
+          echo "" >> MANIFEST.md
+          echo "\`\`\`" >> MANIFEST.md
+          sha256sum kiba.yml scripts/*.sh .github/workflows/kiba.yml >> MANIFEST.md
+          echo "\`\`\`" >> MANIFEST.md
+      - name: Commit and Push manifest
+        run: |
+          git config --global user.name "KibaBot"
+          git config --global user.email "bot@kibaos.org"
+          git add MANIFEST.md
+          git commit -m "chore: update integrity manifest" || exit 0
+          git push

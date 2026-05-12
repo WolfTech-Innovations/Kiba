@@ -1,0 +1,40 @@
+name: Workflow Documentation Generator
+
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: workflow-doc-gen
+  cancel-in-progress: true
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Generate Workflow Index
+        run: |
+          echo "# GitHub Workflows Manual" > WORKFLOWS.md
+          echo "Generated on $(date)" >> WORKFLOWS.md
+          echo "" >> WORKFLOWS.md
+          echo "| Workflow Name | File Path |" >> WORKFLOWS.md
+          echo "|---------------|-----------|" >> WORKFLOWS.md
+          for f in .github/workflows/*.yml; do
+            NAME=$(grep -m 1 "^name:" "$f" | cut -d':' -f2- | xargs)
+            echo "| $NAME | \`$f\` |" >> WORKFLOWS.md
+          done
+      - name: Commit and Push changes
+        run: |
+          git config --global user.name "KibaBot"
+          git config --global user.email "bot@kibaos.org"
+          git add WORKFLOWS.md
+          git commit -m "docs: update workflows manual" || exit 0
+          git push
