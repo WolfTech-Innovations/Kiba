@@ -73,7 +73,7 @@ You can reproduce the KibaTV build environment locally on any Linux machine with
 ### Build Steps
 
 ```bash
-git clone [https://github.com/WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
+git clone [[Kiba](https://github.com/WolfTech-Innovations/Kiba)]([Kiba](https://github.com/WolfTech-Innovations/Kiba))
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \

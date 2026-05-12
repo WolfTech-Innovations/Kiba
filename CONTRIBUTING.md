@@ -15,31 +15,21 @@ First of all, thank you for your interest in contributing to KibaTV! We welcome 
 
 To begin contributing to the KibaTV build system or customization hooks, follow these steps:
 
-1. **Fork the Repo:** Create your own fork of [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba).
+1. **Fork the Repo:** Create your own fork of [WolfTech-Innovations/Kiba](<[Kiba](https://github.com/WolfTech-Innovations/Kiba)>).
 2. **Setup Environment:** Ensure you have **Docker** installed on a Linux host.
 3. **Local Build:** Run a local build to ensure your environment is working:
 
-   ```bash
+```bash
    git clone [https://github.com/YOUR_USERNAME/Kiba](https://github.com/YOUR_USERNAME/Kiba)
    cd Kiba
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
-   ```
-
-```
-
-```
-
-```
-
-```
-
-````
+bash
 ***
 ## How to Contribute
 
 ### Reporting Bugs
 
-If you find a bug, please open an issue on our [GitHub repository](https://github.com/WolfTech-Innovations/Kiba/issues). Provide as much detail as possible, including:
+If you find a bug, please open an issue on our [GitHub repository]([Kiba](https://github.com/WolfTech-Innovations/Kiba)/issues). Provide as much detail as possible, including:
 
 - A clear and descriptive title.
 - Steps to reproduce the bug.
@@ -108,5 +98,7 @@ By contributing to KibaTV, you agree that your contributions will be licensed un
 - [**Build System**](./docs/build-system.md)
 - [**Architecture**](./docs/architecture.md)
 - [**FAQ**](./docs/faq.md)
-```bash
-````
+bash
+
+`
+```

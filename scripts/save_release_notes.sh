@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # License: MIT
 #
 # Copyright (c) 2025 WolfTech Innovations
@@ -29,26 +29,26 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
+  if [[ "$#" -ne 1 && -z "${RELEASE_ID:-}" ]]; then
     printf "Usage: %s [release_id]\n" "$0" >&2
     exit 1
   fi
 
-  release_id; release_id="${1:-${RELEASE_ID:-}}"
-  github_token; github_token="${GH_TOKEN:-}"
-  repo; repo="${GITHUB_REPOSITORY:-}"
+  local release_id="${1:-${RELEASE_ID:-}}"
+  local github_token="${GH_TOKEN:-}"
+  local repo="${GITHUB_REPOSITORY:-}"
 
-  if [ -z "$release_id" ]; then
+  if [[ -z "$release_id" ]; then
     printf "Error: RELEASE_ID environment variable or argument is required.\n" >&2
     return 1
   fi
 
-  if [ -z "$github_token" ]; then
+  if [[ -z "$github_token" ]; then
     printf "Error: GH_TOKEN environment variable is required.\n" >&2
     return 1
   fi
 
-  if [ -z "$repo" ]; then
+  if [[ -z "$repo" ]; then
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
     return 1
   fi
@@ -61,37 +61,37 @@ save_release_notes() {
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  dd h_val y_val m_val vars
+  local dd h_val y_val m_val vars
   vars=$(date "+%d %-H %y %-m")
 
   read -r dd h_val y_val m_val <<EOV
 $vars
 EOV
 
-  hours="0123456789ABCDEFGHIJKLMN"
-  h; h=$(echo "$hours" | cut -c $((h_val + 1)))
-  y; y=$(echo "$y_val" | cut -c $((1 + 1)))
-  months="123456789ABC"
-  m_idx; m_idx=$((m_val - 1))
-  m; m=$(echo "$months" | cut -c $((m_idx + 1)))
+  local hours="0123456789ABCDEFGHIJKLMN"
+  h=$(echo "$hours" | cut -c $((h_val + 1)))
+  y=$(echo "$y_val" | cut -c $((1 + 1)))
+  local months="123456789ABC"
+  local m_idx=$((m_val - 1))
+  m=$(echo "$months" | cut -c $((m_idx + 1)))
 
-  filename="Notes/NTE-${dd}${h}${y}${m}.md"
+  local filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [ ! -f Notes/.gitkeep ]; then
+  if [[ ! -f Notes/.gitkeep ]; then
     touch Notes/.gitkeep
   fi
 
   # 3. Fetch release body using curl -fsS and jq
-  api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
-  body
-  body=$(curl -fsS -H "Authorization: token ${github_token}" \
+  local api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
+  local body
+  local body=$(curl -fsS -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 
   # 4. Handle empty release notes
-  if [ -z "$body" ] || [ "$body" = "null" ]; then
+  if [[ -z "$body" || "$body" == "null" ]]; then
     printf "No release notes provided for this release.\n" > "$filename"
   else
     printf "%s\n" "$body" > "$filename"

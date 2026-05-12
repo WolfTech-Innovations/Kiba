@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
+  <a href="[Kiba](https://github.com/WolfTech-Innovations/Kiba)/actions/workflows/kiba.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
@@ -200,7 +200,7 @@ KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** conta
 Requirements: **Docker**, a Linux host with at least 15 GB free space.
 
 ```bash
-git clone https://github.com/WolfTech-Innovations/Kiba
+git clone [Kiba](https://github.com/WolfTech-Innovations/Kiba)
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
@@ -231,7 +231,7 @@ Kiba/
 
 ## Contributing
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
+Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](<[Kiba](https://github.com/WolfTech-Innovations/Kiba)>) repository. Please open an issue before starting significant work, thanks!
 
 ---
 

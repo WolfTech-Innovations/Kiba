@@ -32,7 +32,7 @@ This document provides a technical overview of the KibaTV architectural stack, f
 
 ---
 
-## System Stack (system-stack) (system-stack)
+## System Stack
 
 ```mermaid
 graph TD
