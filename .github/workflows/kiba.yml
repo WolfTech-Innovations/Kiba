@@ -128,19 +128,30 @@ jobs:
           IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
           HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
 
-          if [ -n "$IMAGE_URL" ]; then
-            curl -LO "$IMAGE_URL"
-          else
-            echo "WARNING: Could not find CachyOS image URL, using fallback pattern"
-            curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}-3_amd64.deb"
+          if [ -z "$IMAGE_URL" ]; then
+            echo "WARNING: Could not find CachyOS image URL, using fallback pattern search"
+            for sfx in -3 -2 -1; do
+              TEST_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}${sfx}_amd64.deb"
+              if curl --head --silent --fail "$TEST_URL" >/dev/null; then
+                IMAGE_URL="$TEST_URL"
+                break
+              fi
+            done
           fi
 
-          if [ -n "$HEADERS_URL" ]; then
-            curl -LO "$HEADERS_URL"
-          else
-             echo "WARNING: Could not find CachyOS headers URL, using fallback pattern"
-             curl -LO "https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}-3_amd64.deb"
+          if [ -z "$HEADERS_URL" ]; then
+            echo "WARNING: Could not find CachyOS headers URL, using fallback pattern search"
+            for sfx in -3 -2 -1; do
+              TEST_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}${sfx}_amd64.deb"
+              if curl --head --silent --fail "$TEST_URL" >/dev/null; then
+                HEADERS_URL="$TEST_URL"
+                break
+              fi
+            done
           fi
+
+          if [ -n "$IMAGE_URL" ]; then curl -LO "$IMAGE_URL"; fi
+          if [ -n "$HEADERS_URL" ]; then curl -LO "$HEADERS_URL"; fi
 
           # Install
           apt install -y ./*.deb || {
@@ -289,7 +300,7 @@ jobs:
           plasma-workspace-wallpapers
           plasma-discover
           plasma-discover-backend-flatpak
-          
+
           sddm
           sddm-theme-debian-breeze
           plasma-nm
@@ -438,7 +449,7 @@ jobs:
             cx - label.image.GetWidth() / 2,
             logo.y + logo.scaled.GetHeight() + 16, 1);
 
-          tag.image  = Image.Text("Switch to Simple", 0.384, 0.447, 0.643, 1, "Sans 13");
+          tag.image  = Image.Text("Switch to simple", 0.384, 0.447, 0.643, 1, "Sans 13");
           tag.sprite = Sprite(tag.image);
           tag.sprite.SetPosition(
             cx - tag.image.GetWidth() / 2,
@@ -1237,7 +1248,7 @@ jobs:
           | . \| | |_) | (_| | |_| |___) |
           |_|\_\_|_.__/ \__,_|\___/|____/
 
-          Welcome to KibaOS — Switch to Simple
+          Welcome to KibaOS — Switch to simple
 
           EOF
 
@@ -1275,7 +1286,7 @@ jobs:
                 break
                 ;;
               "shortcuts")
-                (zenity --list --title="Keyboard Shortcuts" \
+                (zenity --list --title="KibaOS Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
                   --width=450 --height=500 \
                   --image-column=1 --column=" " --column="Action" --column="Shortcut" \
