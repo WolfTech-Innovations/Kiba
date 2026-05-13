@@ -1260,10 +1260,11 @@ jobs:
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
-              --text="Welcome to KibaOS! What would you like to do?" \
+              --text="Welcome to KibaOS! What would you like to do?\n\nTip: Press Meta+T to open the terminal anytime." \
               --image-column=1 --column=" " --column="Tag" --column="Action" --column="Description" \
               "calamares" "install" "🚀 Install KibaOS" "Install the system permanently to your disk" \
               "chromium" "browser" "🌐 Web Browser" "Browse the internet" \
+              "utilities-terminal" "terminal" "🖥️ Terminal" "Open the modern KibaOS shell" \
               "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
@@ -1283,6 +1284,10 @@ jobs:
                 ;;
               "store")
                 plasma-discover &
+                break
+                ;;
+              "terminal")
+                konsole &
                 break
                 ;;
               "shortcuts")
@@ -1317,10 +1322,12 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
-          Comment=Welcome to KibaOS
+          GenericName=Onboarding Tool
+          Comment=Get started with KibaOS and view system shortcuts
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
+          Categories=Qt;KDE;System;
           X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
 
