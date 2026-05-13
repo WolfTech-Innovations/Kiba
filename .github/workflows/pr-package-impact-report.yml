@@ -1,0 +1,22 @@
+name: PR Package Impact Report
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  pull-requests: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Compare Lists
+        run: |
+          git show origin/main:.github/workflows/kiba.yml | grep -A 200 "PACKAGES" | grep -v "PACKAGES" | sed '/^$/q' > old.txt
+          grep -A 200 "PACKAGES" .github/workflows/kiba.yml | grep -v "PACKAGES" | sed '/^$/q' > new.txt
+          diff -u old.txt new.txt > pkg_diff.txt || true

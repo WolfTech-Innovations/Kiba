@@ -1,0 +1,15 @@
+name: Monitor Ant Themes
+on:
+  schedule:
+    - cron: '0 5 * * *'
+permissions:
+  issues: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check-themes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get
+        run: curl -s https://api.github.com/repos/EliverLara/Ant-Themes/commits/master | jq -r .sha

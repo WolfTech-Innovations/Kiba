@@ -1,0 +1,17 @@
+name: Audit Shebang Consistency
+on:
+  push:
+    paths:
+      - '**/*.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit-shebang:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check
+        run: grep -r "^#!" . --exclude-dir=.git | head -n 20

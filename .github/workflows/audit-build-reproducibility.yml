@@ -1,0 +1,17 @@
+name: Audit Build Reproducibility
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit-repro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan
+        run: grep -E "date|random" .github/workflows/kiba.yml || echo "Clean"

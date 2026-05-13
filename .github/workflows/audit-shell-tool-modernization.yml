@@ -1,0 +1,20 @@
+name: Audit Shell Tool Modernization
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Modern Aliases
+        run: |
+          grep "alias ls='eza" .github/workflows/kiba.yml
+          grep "alias cat='bat" .github/workflows/kiba.yml

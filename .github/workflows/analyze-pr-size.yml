@@ -1,16 +1,14 @@
-name: Stale Issue Soft Closer
+name: Analyze PR Size
 on:
-  schedule:
-    - cron: '0 0 * * *'
+  pull_request:
 permissions:
-  issues: write
   pull-requests: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  stale-check:
+  analyze-size:
     runs-on: ubuntu-latest
     steps:
-      - name: Stale
-        run: echo "Checking for stale threads..."
+      - name: Size
+        run: echo "PR Size additions: ${{ github.event.pull_request.additions }}"
