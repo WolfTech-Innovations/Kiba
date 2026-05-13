@@ -18,4 +18,5 @@ jobs:
           persist-credentials: false
       - name: Check indented blocks
         run: |
-          grep -Er "^[[:space:]]{4}[^[:space:]*-]" . --include="*.md" && exit 1 || exit 0
+          # Exclude lines starting with '<' or containing ' <' (HTML tags) and lines containing '-->' (Mermaid diagrams)
+          grep -Er "^[[:space:]]{4}[^[:space:]*-]" . --include="*.md" | grep -vE "^\s*<|-->| <" && exit 1 || exit 0

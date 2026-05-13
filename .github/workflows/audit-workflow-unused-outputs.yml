@@ -19,7 +19,8 @@ jobs:
       - name: Check for unused outputs
         run: |
           for f in .github/workflows/*.yml; do
-            outputs=$(grep "outputs:" "$f" -A 10 | grep -v "outputs:" | cut -d':' -f1 | sed 's/^[[:space:]]*//' | grep -vE "^$")
+            # Only match "outputs:" at the beginning of a line (ignoring whitespace)
+            outputs=$(grep -E "^[[:space:]]*outputs:" "$f" -A 10 | grep -v "outputs:" | cut -d':' -f1 | sed 's/^[[:space:]]*//' | grep -vE "^$")
             for out in $outputs; do
               grep -q "needs\..*\.outputs\.$out" "$f" || (echo "Unused output $out in $f" && exit 1)
             done
