@@ -1290,11 +1290,14 @@ jobs:
                   --window-icon="/usr/share/kibaos/logo.png" \
                   --width=450 --height=500 \
                   --image-column=1 --column=" " --column="Action" --column="Shortcut" \
+                  "start-here-kde-symbolic" "Application Menu" "Meta" \
                   "utilities-terminal" "Terminal (Konsole)" "Meta + T" \
                   "view-presentation" "Overview (Grid)" "Meta + W" \
+                  "view-fullscreen" "Desktop Grid" "Meta + G" \
                   "edit-find" "Search (KRunner)" "Meta + S" \
                   "configure" "Quick Settings" "Meta + A" \
                   "user-desktop" "Show Desktop" "Meta + D" \
+                  "view-split-left-right" "Tile Window" "Meta + Arrows" \
                   "system-file-manager" "File Manager" "Meta + E" \
                   "system-lock-screen" "Lock Screen" "Meta + L" \
                   "view-list-icons" "Task Manager" "Meta + 1-9" \
@@ -1614,9 +1617,9 @@ jobs:
           ID_LIKE=debian
           VERSION_ID="1.0"
           PRETTY_NAME="KibaOS 1.0"
-          HOME_URL="https://github.com/WolfTech-Innovations/kibaos"
-          SUPPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
-          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kibaos/issues"
+          HOME_URL="https://github.com/WolfTech-Innovations/kiba"
+          SUPPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
+          BUG_REPORT_URL="https://github.com/WolfTech-Innovations/kiba/issues"
           OSREL
 
           # 7. Sleep disabled on installed system
