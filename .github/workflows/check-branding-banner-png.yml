@@ -3,7 +3,7 @@ name: Check Branding Banner PNG
 on:
   push:
     paths:
-      - "branding/kibatv_banner.png"
+      - "branding/kibaos_banner.png"
 
 jobs:
   audit:
@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Verify Banner
         run: |
-          test -f branding/kibatv_banner.png
+          test -f branding/kibaos_banner.png

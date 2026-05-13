@@ -3,10 +3,10 @@ name: Audit Build Kwin Compositing Enabled
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Kwin Compositing
         run: |
-          if ! grep -q "Enabled=true" scripts/kibatv_build.sh; then
+          if ! grep -q "Enabled=true" .github/workflows/kiba.yml; then
             echo "Error: KWin compositing should be enabled by default"
             exit 1
           fi

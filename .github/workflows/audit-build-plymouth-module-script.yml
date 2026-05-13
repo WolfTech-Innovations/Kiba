@@ -3,10 +3,10 @@ name: Audit Build Plymouth Module Script
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Plymouth Module
         run: |
-          if ! grep -q "ModuleName=script" scripts/kibatv_build.sh; then
+          if ! grep -q "ModuleName=script" .github/workflows/kiba.yml; then
             echo "Error: Plymouth module should be set to script"
             exit 1
           fi

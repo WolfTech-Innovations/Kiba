@@ -3,10 +3,10 @@ name: Audit Build Install Dm755
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -21,7 +21,7 @@ jobs:
       - name: Check Install Dm755
         run: |
           # Check that install for directories uses -dm755 as per pattern
-          if grep "install " scripts/kibatv_build.sh | grep -v "\-dm755" | grep -v "\-Dm755"; then
+          if grep "install " .github/workflows/kiba.yml | grep -v "\-dm755" | grep -v "\-Dm755"; then
             echo "Error: Directory creation with 'install' should use -dm755"
             exit 1
           fi

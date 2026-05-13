@@ -302,7 +302,7 @@ jobs:
           plasma-discover-backend-flatpak
 
           sddm
-          sddm-theme-debian-breeze
+          sddm-theme-breeze
           plasma-nm
           plasma-pa
           dolphin

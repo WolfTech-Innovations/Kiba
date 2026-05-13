@@ -2,10 +2,10 @@ name: Check Build Parallel
 on:
   push:
 paths:
-- scripts/kibatv_build.sh
+- .github/workflows/kiba.yml
   pull_request:
 paths:
-- scripts/kibatv_build.sh
+- .github/workflows/kiba.yml
 jobs:
   audit:
     permissions:
@@ -16,6 +16,6 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Flags
-      run: grep -E "make|cmake --build" scripts/kibatv_build.sh | grep -v "-j" &&
+      run: grep -E "make|cmake --build" .github/workflows/kiba.yml | grep -v "-j" &&
         exit 1 || exit 0
     timeout-minutes: 5

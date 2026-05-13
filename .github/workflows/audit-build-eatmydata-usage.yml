@@ -3,10 +3,10 @@ name: Audit Build Eatmydata Usage
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check eatmydata
         run: |
-          grep -q "eatmydata" scripts/kibatv_build.sh || (echo "eatmydata missing" && exit 1)
+          grep -q "eatmydata" .github/workflows/kiba.yml || (echo "eatmydata missing" && exit 1)

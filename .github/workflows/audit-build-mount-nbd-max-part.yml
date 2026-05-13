@@ -3,10 +3,10 @@ name: Audit Build Mount Nbd Max Part
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Nbd Max Part
         run: |
-          if ! grep -q "modprobe nbd max_part=16" scripts/kibatv_build.sh; then
+          if ! grep -q "modprobe nbd max_part=16" .github/workflows/kiba.yml; then
             echo "Error: modprobe nbd should use max_part=16"
             exit 1
           fi

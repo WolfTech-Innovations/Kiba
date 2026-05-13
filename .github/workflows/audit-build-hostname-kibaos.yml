@@ -1,12 +1,12 @@
-name: Audit Build Hostname Kibatv
+name: Audit Build Hostname Kibaos
 
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -21,11 +21,11 @@ jobs:
       - name: Check Hostname
         run: |
           # Check for hostname setting in multiple places
-          if ! grep -q "kibatv-live" scripts/kibatv_build.sh; then
-            echo "Error: Hostname kibatv-live should be defined in the build script"
+          if ! grep -q "kibaos-live" .github/workflows/kiba.yml; then
+            echo "Error: Hostname kibaos-live should be defined in the build script"
             exit 1
           fi
-          if ! grep -q "hostname kibatv" scripts/kibatv_build.sh; then
-            echo "Error: pmbootstrap hostname should be set to kibatv"
+          if ! grep -q "hostname kibaos" .github/workflows/kiba.yml; then
+            echo "Error: pmbootstrap hostname should be set to kibaos"
             exit 1
           fi

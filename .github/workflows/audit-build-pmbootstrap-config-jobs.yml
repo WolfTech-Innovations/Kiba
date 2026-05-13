@@ -3,10 +3,10 @@ name: Audit Build Pmbootstrap Config Jobs
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Pmbootstrap Jobs
         run: |
-          if ! grep -q "pmbootstrap .* config jobs 4" scripts/kibatv_build.sh; then
+          if ! grep -q "pmbootstrap .* config jobs 4" .github/workflows/kiba.yml; then
             echo "Error: pmbootstrap config jobs should be set to 4 for parallelism"
             exit 1
           fi

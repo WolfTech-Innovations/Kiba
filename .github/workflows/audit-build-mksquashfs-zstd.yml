@@ -3,10 +3,10 @@ name: Audit Build Mksquashfs Zstd
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -20,7 +20,7 @@ jobs:
           persist-credentials: false
       - name: Check Mksquashfs Compression
         run: |
-          if ! grep "mksquashfs" scripts/kibatv_build.sh | grep -q "\-comp zstd"; then
+          if ! grep "mksquashfs" .github/workflows/kiba.yml | grep -q "\-comp zstd"; then
             echo "Error: mksquashfs should use zstd compression"
             exit 1
           fi

@@ -21,7 +21,7 @@ jobs:
       - name: Run Build Audit
         shell: bash
         run: |
-          if grep -q "qemu-nbd --connect" scripts/kibatv_build.sh && ! grep -q "qemu-nbd --disconnect" scripts/kibatv_build.sh; then
+          if grep -q "qemu-nbd --connect" .github/workflows/kiba.yml && ! grep -q "qemu-nbd --disconnect" .github/workflows/kiba.yml; then
             echo "Error: Missing 'qemu-nbd --disconnect' in build script"
             exit 1
           fi

@@ -3,7 +3,7 @@ name: Audit Build Konsole Opacity
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Opacity
         run: |
-          grep "Opacity=0.95" scripts/kibatv_build.sh
+          grep "Opacity=0.95" .github/workflows/kiba.yml

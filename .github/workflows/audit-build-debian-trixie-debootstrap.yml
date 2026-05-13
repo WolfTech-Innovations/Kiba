@@ -3,10 +3,10 @@ name: Audit Build Debian Trixie Debootstrap
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check debootstrap trixie
         run: |
-          grep "debootstrap" scripts/kibatv_build.sh | grep -q "trixie" || (echo "Not targeting trixie" && exit 1)
+          grep "debootstrap" .github/workflows/kiba.yml | grep -q "trixie" || (echo "Not targeting trixie" && exit 1)

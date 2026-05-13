@@ -2,7 +2,7 @@ name: Audit Build Parallel Jobs Enforcement
 true:
   push:
     paths:
-    - scripts/kibatv_build.sh
+    - .github/workflows/kiba.yml
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -13,7 +13,7 @@ jobs:
     - name: Check Parallel Flags
       run: '# Ensure -j$(nproc) is used for make/cmake
 
-        grep -E "make|cmake --build" scripts/kibatv_build.sh | grep -v "\-j" && exit
+        grep -E "make|cmake --build" .github/workflows/kiba.yml | grep -v "\-j" && exit
         1 || exit 0
 
         '

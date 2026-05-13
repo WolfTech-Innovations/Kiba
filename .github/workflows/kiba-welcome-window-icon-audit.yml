@@ -3,10 +3,10 @@ name: Kiba Welcome Window Icon Audit
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Kiba Welcome Window Icon Audit
         run: |
-          grep -q "kiba-welcome" scripts/kibatv_build.sh && ! grep -q "\-\-window-icon=" scripts/kibatv_build.sh && { echo "Error: missing icon"; false; } || true
+          grep -q "kiba-welcome" .github/workflows/kiba.yml && ! grep -q "\-\-window-icon=" .github/workflows/kiba.yml && { echo "Error: missing icon"; false; } || true

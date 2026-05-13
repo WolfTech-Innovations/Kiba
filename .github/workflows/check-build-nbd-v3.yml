@@ -2,10 +2,10 @@ name: Check Build NBD
 on:
   push:
     paths:
-      - scripts/kibatv_build.sh
+      - .github/workflows/kiba.yml
   pull_request:
     paths:
-      - scripts/kibatv_build.sh
+      - .github/workflows/kiba.yml
 jobs:
   audit:
     permissions:
@@ -16,5 +16,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Verify Disconnect
-      run: grep -q "qemu-nbd --connect" scripts/kibatv_build.sh && grep -q "qemu-nbd --disconnect" scripts/kibatv_build.sh
+      run: grep -q "qemu-nbd --connect" .github/workflows/kiba.yml && grep -q "qemu-nbd --disconnect" .github/workflows/kiba.yml
     timeout-minutes: 5

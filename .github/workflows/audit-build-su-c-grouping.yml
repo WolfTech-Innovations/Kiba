@@ -3,10 +3,10 @@ name: Audit Build Su C Grouping
 on:
   push:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
   pull_request:
     paths:
-      - 'scripts/kibatv_build.sh'
+      - '.github/workflows/kiba.yml'
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check command grouping
         run: |
-          grep "su -c" scripts/kibatv_build.sh | grep -E "\(&&|\|\|\)" || (echo "Grouping recommended for chained su -c commands" && exit 1)
+          grep "su -c" .github/workflows/kiba.yml | grep -E "\(&&|\|\|\)" || (echo "Grouping recommended for chained su -c commands" && exit 1)
