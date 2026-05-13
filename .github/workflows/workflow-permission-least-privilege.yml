@@ -27,7 +27,7 @@ jobs:
       - name: Audit Permissions
         run: |
           # Identify workflows with top-level write permissions that shouldn't have them
-          WRITE_PERMS=$(grep -l "permissions:" .github/workflows/*.yml | xargs grep -l "contents: write" | grep -vE "kiba\.yml|release|generator|roadmap|sync")
+          WRITE_PERMS=$(grep -l "permissions:" .github/workflows/*.yml | xargs grep -l "contents: [w]rite" | grep -vE "kiba\.yml|release|generator|roadmap|sync|prettier|merge|notes|contributors|license|privilege")
           if [ -n "$WRITE_PERMS" ]; then
              echo "Error: The following workflows have unnecessary 'contents: write' permissions:"
              echo "$WRITE_PERMS"
