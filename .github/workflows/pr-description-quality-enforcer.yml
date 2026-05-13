@@ -22,8 +22,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate PR Description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          BODY="${{ github.event.pull_request.body }}"
+          BODY=$PR_BODY
           LENGTH=${#BODY}
           if [ "$LENGTH" -lt 50 ]; then
             echo "PR description is too short ($LENGTH characters). Please provide more context."

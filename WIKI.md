@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
+    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Status-Stable-success?style=for-the-badge" alt="Status">
@@ -170,7 +170,7 @@ docker run --rm --privileged \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
-```
+```bash
 
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.

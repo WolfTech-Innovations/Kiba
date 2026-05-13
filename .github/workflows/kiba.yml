@@ -953,6 +953,28 @@ jobs:
           TabletMode=off
           PLASMARC
 
+          # ── Shortcuts ──
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << "SHORTCUTRC"
+          [kwin]
+          Overview=Meta+W,none,Overview
+          [org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+          SHORTCUTRC
+          PLASMARC
+
+          # ── Shortcuts ──
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << "SHORTCUTRC"
+          [kwin]
+          Overview=Meta+W,none,Overview
+          [org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+          [org.kde.krunner.desktop]
+          _launch=Meta+S,Search,KRunner
+          [ksmserver]
+          Lock Session=Meta+L,Screensaver,Lock Session
+          SHORTCUTRC
+          PLASMARC
+
           # ── kglobalshortcutsrc — Standard KibaOS Shortcuts ─────────────────────
           cat > "$SKEL_KDE/kglobalshortcutsrc" << 'SHORTCUTRC'
           [kwin]
