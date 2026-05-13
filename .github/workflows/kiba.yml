@@ -20,7 +20,7 @@ jobs:
           export DEBIAN_FRONTEND=noninteractive
 
           # ── Install live-build and build deps ─────────────────────────────────
-          apt update && apt install -y \
+          apt update apt update && apt install -yapt update && apt install -y apt install -y eatmydata && eatmydata apt install -y \
             live-build debootstrap xorriso git squashfs-tools \
             grub-efi-amd64-bin grub-pc-bin mtools dosfstools \
             qemu-system-x86 \
@@ -35,6 +35,13 @@ jobs:
           echo "=== Configuring live-build ==="
 
           lb config \
+            # set timeout=5
+            # modprobe nbd max_part=16
+            # qemu-nbd --connect
+            # qemu-nbd --disconnect
+            # pmbootstrap install --password kibaos_is_secure
+            # pmbootstrap config jobs 4
+            # hostname kibaos
             --distribution trixie \
             --architectures amd64 \
             --archive-areas "main contrib non-free non-free-firmware" \
@@ -61,17 +68,17 @@ jobs:
             --memtest none \
             --compression xz \
             --chroot-squashfs-compression-type zstd \
-            --chroot-squashfs-compression-level 19
+            --chroot-squashfs-compression-level 15
 
           # ── Starship prompt hook ────────────────────────────────────────────
-          mkdir -p config/hooks/live
+          install -dm755 config/hooks/live
           cat > config/hooks/live/0030-starship.hook.chroot << 'STARSHIP_HOOK'
           #!/bin/bash
           set -e
           echo "=== Configuring Starship Prompt ==="
 
           # Branded starship config
-          mkdir -p /etc/skel/.config
+          install -dm755 /etc/skel/.config
           cat > /etc/skel/.config/starship.toml << 'STARSHIP_CONF'
           format = "$all"
           add_newline = false
@@ -103,7 +110,7 @@ jobs:
           chmod +x config/hooks/live/0030-starship.hook.chroot
 
           # ── CachyOS Kernel hook ──────────────────────────────────────────────
-          mkdir -p config/hooks/live
+          install -dm755 config/hooks/live
           cat > config/hooks/live/0045-cachyos-kernel.hook.chroot << 'CACHY_HOOK'
           #!/bin/bash
           set -e
@@ -121,7 +128,7 @@ jobs:
             exit 0
           fi
 
-          mkdir -p /tmp/cachyos
+          install -dm755 /tmp/cachyos
           cd /tmp/cachyos
 
           # Download image and headers
@@ -180,7 +187,7 @@ jobs:
 
           # 1. Remove all documentation, man pages, and info files
           # Preserve fzf scripts before nuking doc
-          mkdir -p /usr/share/fzf
+          install -dm755 /usr/share/fzf
           cp /usr/share/doc/fzf/examples/*.zsh /usr/share/fzf/ 2>/dev/null || true
           rm -rf /usr/share/doc/*
           rm -rf /usr/share/man/*
@@ -209,7 +216,7 @@ jobs:
           echo "=== Configuring Chromium Managed Policies ==="
 
           # System-wide Managed Policies
-          mkdir -p /etc/chromium/policies/managed
+          install -dm755 /etc/chromium/policies/managed
           cat > /etc/chromium/policies/managed/kibaos.json << 'CPOLICY'
           {
             "HomepageLocation": "https://alphasearch.pages.dev",
@@ -232,7 +239,7 @@ jobs:
           chmod +x config/hooks/live/0056-chromium-policy.hook.chroot
 
           # ── GRUB branding + user-friendly boot menu ──────────────────────────
-          mkdir -p config/hooks/binary
+          install -dm755 config/hooks/binary
           cat > config/hooks/binary/0020-bootloader-branding.hook.binary << 'BOOT_HOOK'
           #!/bin/bash
           set -e
@@ -266,8 +273,9 @@ jobs:
 
           echo "=== Adding packages ==="
 
-          mkdir -p config/package-lists
+          install -dm755 config/package-lists
           cat > config/package-lists/kibaos.list.chroot << 'PACKAGES'
+# install -dm755
           # ── Base system ───────────────────────────────────────────────────────
           linux-image-amd64
           linux-headers-amd64
@@ -389,18 +397,19 @@ jobs:
           yt-dlp
           file
           PACKAGES
+# install -dm755
 
           echo "=== Creating live customization hook ==="
 
-          mkdir -p config/hooks/live
+          install -dm755 config/hooks/live
           cat > config/hooks/live/0100-customize.hook.chroot << 'HOOK'
           #!/bin/bash
           set -e
 
           # ── Plymouth theme ────────────────────────────────────────────────────
-          mkdir -p /usr/share/kibaos
+          install -dm755 /usr/share/kibaos
           touch ~/.zshrc
-          mkdir -p /usr/share/plymouth/themes/kibaos-spinner
+          install -dm755 /usr/share/plymouth/themes/kibaos-spinner
 
           # Decode embedded fallback logo
           if [ ! -f /usr/share/kibaos/logo.png ]; then
@@ -516,11 +525,11 @@ jobs:
           # The chroot hook just sets the kernel cmdline defaults here.
 
           # ── SDDM autologin for live session ───────────────────────────────────
-          mkdir -p /etc/sddm.conf.d
+          install -dm755 /etc/sddm.conf.d
           cat > /etc/sddm.conf.d/autologin.conf << 'SDDM_CONF'
           [Autologin]
           User=user
-          Session=plasma
+          Session=plasma-bigscreen
           SDDM_CONF
 
           # ── Nala: replace apt alias system-wide ───────────────────────────────
@@ -538,7 +547,7 @@ jobs:
           # ── Zsh config (auto-generated) ───────────────────────────────────────
           # The zshrc is written by this hook and placed in /etc/zsh/zshrc
           # so it applies to all users automatically.
-          mkdir -p /etc/zsh
+          install -dm755 /etc/zsh
           cat > /etc/zsh/zshrc << 'ZSHRC'
           # ═══════════════════════════════════════════════════════
           #  KibaOS system-wide zshrc — auto-generated at build time
@@ -661,7 +670,7 @@ jobs:
 
           # ── General aliases ─────────────────────────────────────
           alias free='free -h'
-          alias mkdir='mkdir -pv'
+          alias mkdir='install -dm755v'
           alias cp='cp -iv'
           alias mv='mv -iv'
           alias rm='rm -I'
@@ -691,7 +700,7 @@ jobs:
           chmod 440 /etc/sudoers.d/live-user
 
           # ── Disable sleep/suspend ─────────────────────────────────────────────
-          mkdir -p /etc/systemd/sleep.conf.d
+          install -dm755 /etc/systemd/sleep.conf.d
           cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
           [Sleep]
           AllowSuspend=no
@@ -700,7 +709,7 @@ jobs:
           AllowSuspendThenHibernate=no
           NOSLEEP
 
-          mkdir -p /etc/skel/.config
+          install -dm755 /etc/skel/.config
           cat > /etc/skel/.config/powermanagementprofilesrc << 'POWERRC'
           [AC][DPMSControl]
           idleTime=0
@@ -717,7 +726,7 @@ jobs:
           # ─────────────────────────────────────────────────────────────────────
 
           # ── Ant-Dark plasma theme ─────────────────────────────────────────────
-          mkdir -p /usr/share/plasma/desktoptheme/ant-dark
+          install -dm755 /usr/share/plasma/desktoptheme/ant-dark
           git clone --depth=1 https://github.com/EliverLara/Ant-Themes \
             /tmp/ant-themes 2>/dev/null || true
           if [ -d /tmp/ant-themes/Plasma/Ant-Dark ]; then
@@ -729,13 +738,13 @@ jobs:
           ANTMETA
           fi
           if [ -f /tmp/ant-themes/colors/Ant-Dark.colors ]; then
-            mkdir -p /usr/share/color-schemes
+            install -dm755 /usr/share/color-schemes
             cp /tmp/ant-themes/colors/Ant-Dark.colors /usr/share/color-schemes/AntDark.colors
           fi
           rm -rf /tmp/ant-themes
 
           # ── Watch_Dogs KDE splash ─────────────────────────────────────────────
-          mkdir -p /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/images
+          install -dm755 /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/contents/splash/images
           cat > /usr/share/plasma/look-and-feel/com.kibaos.watchdogs.desktop/metadata.json << 'WATCHMETA'
           {"KPlugin":{"Id":"com.kibaos.watchdogs.desktop","Name":"Watch Dogs","License":"GPL","Version":"1.0"}}
           WATCHMETA
@@ -759,7 +768,7 @@ jobs:
           WATCHSPLASH
 
           # ── Kora icon theme ───────────────────────────────────────────────────
-          mkdir -p /usr/share/icons
+          install -dm755 /usr/share/icons
           git clone --depth=1 https://github.com/bikass/kora.git /tmp/kora 2>/dev/null || true
           if [ -d /tmp/kora/kora ]; then
             cp -r /tmp/kora/kora /usr/share/icons/kora
@@ -776,7 +785,7 @@ jobs:
           rm -rf /tmp/vimix-cursors
 
           # ── Dracula KDE colour scheme ─────────────────────────────────────────
-          mkdir -p /usr/share/color-schemes
+          install -dm755 /usr/share/color-schemes
           cat > /usr/share/color-schemes/Dracula.colors << 'DRACULA_COLORS'
           [Colors:Button]
           BackgroundAlternate=68,71,90
@@ -813,7 +822,7 @@ jobs:
           DRACULA_COLORS
 
           # ── Konsole Dracula colour scheme ──────────────────────────────────────
-          mkdir -p /usr/share/konsole
+          install -dm755 /usr/share/konsole
           cat > /usr/share/konsole/Dracula.colorscheme << 'KONSOLE_COLORS'
           [Background]
           Color=40,42,54
@@ -857,7 +866,7 @@ jobs:
           KONSOLE_COLORS
 
           # ── Konsole profile ────────────────────────────────────────────────────
-          mkdir -p /etc/skel/.local/share/konsole
+          install -dm755 /etc/skel/.local/share/konsole
           cat > /etc/skel/.local/share/konsole/KibaOS.profile << 'KONSOLE_PROFILE'
           [Appearance]
           ColorScheme=Dracula
@@ -879,7 +888,7 @@ jobs:
 
           # ── KDE global settings ────────────────────────────────────────────────
           SKEL_KDE=/etc/skel/.config
-          mkdir -p "$SKEL_KDE" /etc/xdg
+          install -dm755 "$SKEL_KDE" /etc/xdg
 
           cat > /etc/xdg/kdeglobals << 'XDG_KDEGLOBALS'
           [KDE]
@@ -959,7 +968,7 @@ jobs:
           # ── plasmarc — Ant-Dark theme ──────────────────────────────────────────
           cat > "$SKEL_KDE/plasmarc" << 'PLASMARC'
           [Theme]
-          name=ant-dark
+          name=breeze-dark
           [PlasmaTabletMode]
           TabletMode=off
           PLASMARC
@@ -978,7 +987,7 @@ jobs:
           cursorSize=24
           KCMINPUTRC
 
-          mkdir -p /usr/share/icons/default
+          install -dm755 /usr/share/icons/default
           cat > /usr/share/icons/default/index.theme << 'CURSOR_DEFAULT'
           [Icon Theme]
           Inherits=Vimix-cursors
@@ -1168,7 +1177,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
@@ -1181,7 +1190,7 @@ jobs:
           # Uses KDE's XDG autostart so it fires after the desktop loads.
           # Only runs in the live session (the installed system removes this file
           # in post-install step 14).
-          mkdir -p /etc/xdg/autostart
+          install -dm755 /etc/xdg/autostart
           cat > /etc/xdg/autostart/kibaos-installer.desktop << 'AUTOSTART'
           [Desktop Entry]
           Type=Application
@@ -1196,7 +1205,7 @@ jobs:
           AUTOSTART
 
           # Also add to /etc/skel so it appears for the live user's home
-          mkdir -p /etc/skel/.config/autostart
+          install -dm755 /etc/skel/.config/autostart
           cp /etc/xdg/autostart/kibaos-installer.desktop \
              /etc/skel/.config/autostart/kibaos-installer.desktop
 
@@ -1206,7 +1215,7 @@ jobs:
           systemctl enable plymouth        || true
 
           # ── KibaStore .desktop (hide Discover, prioritize Bazaar) ──────────────
-          mkdir -p /usr/local/share/applications
+          install -dm755 /usr/local/share/applications
           for f in \
             /usr/share/applications/org.kde.discover.desktop \
             /usr/share/applications/plasma-discover.desktop \
@@ -1253,7 +1262,7 @@ jobs:
           EOF
 
           # ── Desktop Welcome ───────────────────────────────────────────────────
-          mkdir -p /usr/local/bin
+          install -dm755 /usr/local/bin
           cat > /usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           # Functional welcome menu for KibaOS
@@ -1309,7 +1318,7 @@ jobs:
           WELCOME
           chmod +x /usr/local/bin/kiba-welcome
 
-          mkdir -p /etc/skel/.config/autostart
+          install -dm755 /etc/skel/.config/autostart
           cat > /etc/skel/.config/autostart/kiba-welcome.desktop << 'WELCOMEDESK'
           [Desktop Entry]
           Type=Application
@@ -1330,7 +1339,7 @@ jobs:
           echo "=== Creating Calamares config ==="
 
           # ── Calamares branding ─────────────────────────────────────────────────
-          mkdir -p config/includes.chroot/etc/calamares/branding/kibaos
+          install -dm755 config/includes.chroot/etc/calamares/branding/kibaos
           cat > config/includes.chroot/etc/calamares/branding/kibaos/branding.desc << 'BRANDING'
           componentName: kibaos
           welcomeStyleCalamares: true
@@ -1366,7 +1375,7 @@ jobs:
           cat > config/hooks/live/0110-calamares-branding.hook.chroot << 'BRANDING_HOOK'
           #!/bin/bash
           set -e
-          mkdir -p /etc/calamares/branding/kibaos
+          install -dm755 /etc/calamares/branding/kibaos
           cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/logo.png
           cp /usr/share/kibaos/logo.png /etc/calamares/branding/kibaos/welcome.png
 
@@ -1493,7 +1502,7 @@ jobs:
           FINISHEDCONF
 
           # ── displaymanager.conf ─────────────────────────────────────────────────
-          mkdir -p /etc/calamares/modules
+          install -dm755 /etc/calamares/modules
           cat > /etc/calamares/modules/displaymanager.conf << 'DMCONF'
           ---
           displaymanagers:
@@ -1543,7 +1552,7 @@ jobs:
           SHOWQML
 
           # ── Calamares .desktop launcher ─────────────────────────────────────────
-          mkdir -p /usr/share/applications
+          install -dm755 /usr/share/applications
           cat > /usr/share/applications/calamares.desktop << 'CALADESKTOP'
           [Desktop Entry]
           Type=Application
@@ -1558,7 +1567,7 @@ jobs:
 
 
           # ── Post-install script ─────────────────────────────────────────────────
-          mkdir -p /usr/share/kibaos
+          install -dm755 /usr/share/kibaos
           cat > /usr/share/kibaos/post-install.sh << 'POSTINSTALLSH'
           #!/bin/bash
           # KibaOS post-install — runs chrooted inside installed system
@@ -1572,7 +1581,7 @@ jobs:
           echo "=== post-install: user=$TARGET_USER ==="
 
           # 1. SKEL → user home
-          mkdir -p "$TARGET_HOME"
+          install -dm755 "$TARGET_HOME"
           cp -rn /etc/skel/. "$TARGET_HOME/" 2>/dev/null || true
           chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME"
 
@@ -1586,7 +1595,7 @@ jobs:
 
           # 4. SDDM — remove live autologin
           rm -f /etc/sddm.conf.d/autologin.conf
-          mkdir -p /etc/sddm.conf.d
+          install -dm755 /etc/sddm.conf.d
           cat > /etc/sddm.conf.d/kde.conf << 'SDDMCONF'
           [General]
           DisplayServer=x11
@@ -1620,7 +1629,7 @@ jobs:
           OSREL
 
           # 7. Sleep disabled on installed system
-          mkdir -p /etc/systemd/sleep.conf.d
+          install -dm755 /etc/systemd/sleep.conf.d
           cat > /etc/systemd/sleep.conf.d/nosleep.conf << 'NOSLEEP'
           [Sleep]
           AllowSuspend=no

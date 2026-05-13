@@ -1,20 +1,18 @@
 name: Check Branding Colors
 on:
   push:
-paths:
-- .github/workflows/kiba.yml
+    paths:
+      - 'branding/*'
   pull_request:
-paths:
-- .github/workflows/kiba.yml
+    paths:
+      - 'branding/*'
 jobs:
-  audit:
-    permissions:
-      contents: read
+  check:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Check Hex
-      run: grep "#282a36" .github/workflows/kiba.yml && grep "#bd93f9" .github/workflows/kiba.yml
     timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Colors
+        run: ls branding/

@@ -220,10 +220,9 @@ Passed: .github/workflows/cachyos-kernel-monitor.yml
 Passed: .github/workflows/calamares-branding-validator.yml
 Passed: .github/workflows/calamares-config-linter.yml
 Passed: .github/workflows/check-acknowledgments-content.yml
-Failed: .github/workflows/check-action-caching-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-action-caching-v3.yml", line 6, column 15
+Passed: .github/workflows/check-action-caching-v3.yml
 Failed: .github/workflows/check-action-pinning-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-action-pinning-v3.yml", line 6, column 15
+  in ".github/workflows/check-action-pinning-v3.yml", line 18, column 24
 Passed: .github/workflows/check-apt-preferences.yml
 Passed: .github/workflows/check-architecture-headers-audit.yml
 Passed: .github/workflows/check-audio-configs.yml
@@ -231,26 +230,22 @@ Passed: .github/workflows/check-bash-completion-syntax.yml
 Passed: .github/workflows/check-binfmt-d.yml
 Passed: .github/workflows/check-branch-naming-v3.yml
 Passed: .github/workflows/check-branding-banner-png.yml
-Failed: .github/workflows/check-branding-colors-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-branding-colors-v3.yml", line 6, column 15
+Passed: .github/workflows/check-branding-colors-v3.yml
 Passed: .github/workflows/check-build-cleanup-v3.yml
 Passed: .github/workflows/check-build-idempotency-v3.yml
 Passed: .github/workflows/check-build-nbd-v3.yml
-Failed: .github/workflows/check-build-parallel-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-build-parallel-v3.yml", line 6, column 15
+Passed: .github/workflows/check-build-parallel-v3.yml
 Passed: .github/workflows/check-calamares-branding-colors.yml
 Passed: .github/workflows/check-commit-message-quality-v3.yml
 Passed: .github/workflows/check-contributing-guide-existence.yml
 Passed: .github/workflows/check-contributing-guide-steps.yml
-Failed: .github/workflows/check-contributing-links-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-contributing-links-v3.yml", line 6, column 15
+Passed: .github/workflows/check-contributing-links-v3.yml
 Passed: .github/workflows/check-cron-syntax.yml
 Passed: .github/workflows/check-crypttab-syntax.yml
 Passed: .github/workflows/check-dbus-services.yml
 Passed: .github/workflows/check-dconf-defaults.yml
 Passed: .github/workflows/check-docs-md-links.yml
-Failed: .github/workflows/check-docs-terminology-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-docs-terminology-v3.yml", line 7, column 15
+Passed: .github/workflows/check-docs-terminology-v3.yml
 Passed: .github/workflows/check-dracut-conf.yml
 Passed: .github/workflows/check-environment-d.yml
 Passed: .github/workflows/check-eof-newline-v3.yml
@@ -266,17 +261,12 @@ Passed: .github/workflows/check-gsettings-overrides.yml
 Passed: .github/workflows/check-hostname-config.yml
 Passed: .github/workflows/check-icon-theme-index.yml
 Passed: .github/workflows/check-initramfs-hooks.yml
-Failed: .github/workflows/check-issue-template-quality-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-issue-template-quality-v3.yml", line 6, column 15
+Passed: .github/workflows/check-issue-template-quality-v3.yml
 Passed: .github/workflows/check-journal-bolt-file.yml
 Passed: .github/workflows/check-journal-sentinel-file.yml
-Failed: .github/workflows/check-json-syntax-v3.yml - while parsing a block mapping
-  in ".github/workflows/check-json-syntax-v3.yml", line 1, column 1
-did not find expected key
-  in ".github/workflows/check-json-syntax-v3.yml", line 6, column 3
+Passed: .github/workflows/check-json-syntax-v3.yml
 Passed: .github/workflows/check-kwin-script-metadata.yml
-Failed: .github/workflows/check-license-year-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-license-year-v3.yml", line 6, column 15
+Passed: .github/workflows/check-license-year-v3.yml
 Passed: .github/workflows/check-locale-gen.yml
 Passed: .github/workflows/check-logrotate-snippets.yml
 Passed: .github/workflows/check-mime-definitions.yml
@@ -299,24 +289,17 @@ Passed: .github/workflows/check-pnpm-lock-sync-check.yml
 Passed: .github/workflows/check-pull-request-size-v3.yml
 Passed: .github/workflows/check-py-syntax-check.yml
 Passed: .github/workflows/check-readme-badge-links.yml
-Failed: .github/workflows/check-readme-https-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-readme-https-v3.yml", line 6, column 15
+Passed: .github/workflows/check-readme-https-v3.yml
 Passed: .github/workflows/check-repo-hygiene-v3.yml
-Failed: .github/workflows/check-security-contact-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-security-contact-v3.yml", line 6, column 15
+Passed: .github/workflows/check-security-contact-v3.yml
 Passed: .github/workflows/check-security-md-contact-info.yml
 Passed: .github/workflows/check-shell-nounset-usage-enforce.yml
 Passed: .github/workflows/check-shell-path-quoting.yml
 Passed: .github/workflows/check-shell-pipefail-literal-enforce.yml
 Passed: .github/workflows/check-shell-script-bom.yml
-Failed: .github/workflows/check-shell-script-lint-v3.yml - while parsing a block mapping
-  in ".github/workflows/check-shell-script-lint-v3.yml", line 1, column 1
-did not find expected key
-  in ".github/workflows/check-shell-script-lint-v3.yml", line 6, column 3
-Failed: .github/workflows/check-shell-strict-mode-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-shell-strict-mode-v3.yml", line 6, column 15
-Failed: .github/workflows/check-shell-variable-quoting-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-shell-variable-quoting-v3.yml", line 6, column 15
+Passed: .github/workflows/check-shell-script-lint-v3.yml
+Passed: .github/workflows/check-shell-strict-mode-v3.yml
+Passed: .github/workflows/check-shell-variable-quoting-v3.yml
 Passed: .github/workflows/check-splash-qml-animation.yml
 Passed: .github/workflows/check-sshd-config.yml
 Passed: .github/workflows/check-sudoers-snippets.yml
@@ -331,16 +314,13 @@ Passed: .github/workflows/check-udev-rules-syntax.yml
 Passed: .github/workflows/check-wayland-configs.yml
 Passed: .github/workflows/check-wiki-overview-presence.yml
 Failed: .github/workflows/check-workflow-cancel-in-progress-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-workflow-cancel-in-progress-v3.yml", line 6, column 15
-Failed: .github/workflows/check-workflow-no-write-all-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-workflow-no-write-all-v3.yml", line 6, column 15
-Failed: .github/workflows/check-workflow-security-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-workflow-security-v3.yml", line 6, column 15
+  in ".github/workflows/check-workflow-cancel-in-progress-v3.yml", line 18, column 41
+Passed: .github/workflows/check-workflow-no-write-all-v3.yml
+Passed: .github/workflows/check-workflow-security-v3.yml
 Failed: .github/workflows/check-workflow-strategy-fail-fast-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-workflow-strategy-fail-fast-v3.yml", line 6, column 15
+  in ".github/workflows/check-workflow-strategy-fail-fast-v3.yml", line 18, column 32
 Passed: .github/workflows/check-workflow-timeout-minutes-standard.yml
-Failed: .github/workflows/check-workflow-timeout-v3.yml - mapping values are not allowed in this context
-  in ".github/workflows/check-workflow-timeout-v3.yml", line 6, column 15
+Passed: .github/workflows/check-workflow-timeout-v3.yml
 Passed: .github/workflows/check-x11-snippets.yml
 Passed: .github/workflows/check-zsh-completion-syntax.yml
 Passed: .github/workflows/check-zshrc-performance-v3.yml
@@ -450,7 +430,10 @@ Passed: .github/workflows/kernel-endpoint-monitor.yml
 Passed: .github/workflows/kiba-welcome-emoji-label-check.yml
 Passed: .github/workflows/kiba-welcome-shortcut-advertisement.yml
 Passed: .github/workflows/kiba-welcome-window-icon-audit.yml
-Passed: .github/workflows/kiba.yml
+Failed: .github/workflows/kiba.yml - while parsing a block mapping
+  in ".github/workflows/kiba.yml", line 15, column 9
+did not find expected key
+  in ".github/workflows/kiba.yml", line 280, column 11
 Passed: .github/workflows/license-check.yml
 Passed: .github/workflows/license-compliance-audit.yml
 Passed: .github/workflows/license-existence-audit.yml

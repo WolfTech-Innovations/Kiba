@@ -1,20 +1,18 @@
 name: Check README HTTPS
 on:
   push:
-paths:
-- README.md
+    paths:
+      - README.md
   pull_request:
-paths:
-- README.md
+    paths:
+      - README.md
 jobs:
   check:
-    permissions:
-      contents: read
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Verify HTTPS
-      run: grep "http://" README.md && exit 1 || exit 0
     timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify HTTPS
+        run: "! grep 'http://' README.md | grep -v 'http://localhost'"

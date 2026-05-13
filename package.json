@@ -2,6 +2,11 @@
   "name": "kibaos-automation",
   "version": "1.0.0",
   "private": true,
+  "author": "WolfTech Innovations",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",

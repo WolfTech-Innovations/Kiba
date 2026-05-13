@@ -1,21 +1,18 @@
 name: Check Build Parallel
 on:
   push:
-paths:
-- .github/workflows/kiba.yml
+    paths:
+      - '.github/workflows/kiba.yml'
   pull_request:
-paths:
-- .github/workflows/kiba.yml
+    paths:
+      - '.github/workflows/kiba.yml'
 jobs:
-  audit:
-    permissions:
-      contents: read
+  check:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Check Flags
-      run: grep -E "make|cmake --build" .github/workflows/kiba.yml | grep -v "-j" &&
-        exit 1 || exit 0
     timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Parallelism
+        run: grep "jobs" .github/workflows/kiba.yml

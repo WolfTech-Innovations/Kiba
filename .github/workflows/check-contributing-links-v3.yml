@@ -1,20 +1,18 @@
 name: Check Contributing Links
 on:
   push:
-paths:
-- CONTRIBUTING.md
+    paths:
+      - CONTRIBUTING.md
   pull_request:
-paths:
-- CONTRIBUTING.md
+    paths:
+      - CONTRIBUTING.md
 jobs:
-  audit:
-    permissions:
-      contents: read
+  check:
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Check Links
-      run: grep "\[.*\](.*)" CONTRIBUTING.md
     timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify Links
+        run: grep "https://" CONTRIBUTING.md

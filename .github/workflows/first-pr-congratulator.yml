@@ -13,11 +13,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Check for First PR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          PR_COUNT=$(gh pr list --author "${{ github.event.pull_request.user.login }}" --state all --json number --jq '. | length')
+          PR_COUNT=$(gh pr list --author "${{ github.event.pull_request.user.login }}" --state all --json number --jq '. | length' --repo ${{ github.repository }})
           if [ "$PR_COUNT" -eq 1 ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body "🎉 Congratulations on your first PR to KibaOS, @${{ github.event.pull_request.user.login }}! We appreciate your contribution."
+            gh pr comment ${{ github.event.pull_request.number }} --body "🎉 Congratulations on your first PR to KibaOS, @${{ github.event.pull_request.user.login }}! We appreciate your contribution." --repo ${{ github.repository }}
           fi

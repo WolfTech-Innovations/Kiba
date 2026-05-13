@@ -4,43 +4,21 @@
   <img src="branding/kibaos_banner.png" alt="KibaOS Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
-<p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
-  </a>
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Status-Stable-success?style=for-the-badge" alt="Status">
-</p>
-
 Welcome to the official **KibaOS Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaOS.
-
----
 
 ## Table of Contents
 
-- [Extended Documentation](#-extended-documentation)
-- [Architecture & Core Components](#-architecture--core-components)
-  - [Base System](#base-system)
-  - [Extreme Minimization](#extreme-minimization)
-- [User Experience (UX) & Design](#-user-experience-ux--design)
-  - [Visual Identity](#visual-identity)
-  - [Shell Experience](#shell-experience)
-  - [Boot & Branding](#boot--branding)
-- [Software Management](#-software-management)
-  - [KibaStore](#kibastore)
-  - [Repositories & Packages](#repositories--packages)
-- [Security & Compliance](#-security--compliance)
-  - [California AADC (AB 2273)](#california-aadc-ab-2273)
-- [Build Infrastructure](#-build-infrastructure)
-  - [Build Pipeline](#build-pipeline)
-  - [Image Optimization](#image-optimization)
-- [Build Locally](#-build-locally)
-- [Community & Support](#-community--support)
-- [License](#-license)
+- [Extended Documentation](#extended-documentation)
+- [Architecture & Core Components](#architecture-and-core-components)
+- [User Experience (UX) & Design](#user-experience-ux-and-design)
+- [Software Management](#software-management)
+- [Security & Compliance](#security-and-compliance)
+- [Build Infrastructure](#build-infrastructure)
+- [Build Locally](#build-locally)
+- [Community & Support](#community-and-support)
+- [License](#license)
 
----
-
-## 📖 Extended Documentation
+## Extended Documentation
 
 For more specific details on the various components of KibaOS, please refer to the following documents:
 
@@ -52,9 +30,7 @@ For more specific details on the various components of KibaOS, please refer to t
 - [**Contributing Guidelines**](./docs/contributing.md)
 - [**Frequently Asked Questions**](./docs/faq.md)
 
----
-
-## 🏗️ Architecture & Core Components
+## Architecture & Core Components
 
 ### Base System
 
@@ -71,12 +47,9 @@ The system undergoes aggressive footprint reduction during the build process:
 
 - **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
 - **Locale Optimization:** Only `en` and `en_US` locales are preserved.
-- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-bigscreen` + `plasma-workspace` combination.
-- **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
+- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-desktop` + `plasma-workspace` combination.
 
----
-
-## 🎨 User Experience (UX) & Design
+## User Experience (UX) & Design
 
 ### Visual Identity
 
@@ -84,7 +57,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
 | Component               | Choice               |
 | ----------------------- | -------------------- |
-| **Desktop Environment** | **Plasma Bigscreen** |
+| **Desktop Environment** | **Plasma 6**         |
 | **Global Theme**        | **Ant-Dark**         |
 | **Color Scheme**        | **Dracula**          |
 | **Icon Theme**          | **Kora**             |
@@ -108,14 +81,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
   - `fd-find` (Fast file finder)
   - `tealdeer` (`tldr` implementation)
 
-### Boot & Branding
-
-- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
-- **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
-
----
-
-## 📦 Software Management
+## Software Management
 
 ### KibaStore
 
@@ -127,9 +93,7 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 - **Flatpak:** Integrated by default with the **Flathub** remote.
 - **Nala:** Configured as the primary package manager frontend with system-wide aliases (`apt` -> `nala`).
 
----
-
-## 🛡️ Security & Compliance
+## Security & Compliance
 
 ### California AADC (AB 2273)
 
@@ -138,9 +102,7 @@ KibaOS includes a custom **Age Verification** module within the **Calamares** in
 - **Implementation:** A Python-based view module in the installer.
 - **Privacy:** Data is stored **locally only** at `/etc/kibaos/age-verify` and is never transmitted to external servers.
 
----
-
-## 🚀 Build Infrastructure
+## Build Infrastructure
 
 KibaOS uses a highly automated CI/CD pipeline.
 
@@ -151,14 +113,7 @@ KibaOS uses a highly automated CI/CD pipeline.
 3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
 4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
 
-### Image Optimization
-
-- **Compression:** The SquashFS filesystem is repacked with **Zstd** (compression level 19) for maximum space efficiency and decompression speed.
-- **Initramfs:** Configured with `zstd -19` for faster boot times.
-
----
-
-## 🛠️ Build Locally
+## Build Locally
 
 To reproduce the build environment on your own machine:
 
@@ -175,20 +130,13 @@ docker run --rm --privileged \
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.
 
----
-
-## 🤝 Community & Support
+## Community & Support
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
 - **Organization:** [WolfTech Innovations](https://github.com/WolfTech-Innovations)
 - **Acknowledgments:** [Community & FOSS](./ACKNOWLEDGMENTS.md)
 
----
-
-## ⚖️ License
+## License
 
 KibaOS is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
-
-> [!NOTE]
-> KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
