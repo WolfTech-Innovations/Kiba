@@ -1,0 +1,17 @@
+name: Audit Security Policy
+on:
+  push:
+    paths:
+      - 'SECURITY.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify
+        run: grep "security" SECURITY.md

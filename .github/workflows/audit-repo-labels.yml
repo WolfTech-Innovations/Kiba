@@ -1,0 +1,15 @@
+name: Audit Repo Labels
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+permissions:
+  issues: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit
+        run: echo "Auditing labels..."

@@ -1,0 +1,17 @@
+name: ISO Build Duration Tracker
+on:
+  workflow_run:
+    workflows: ["KibaOS Build"]
+    types: [completed]
+permissions:
+  contents: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  track:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Log Duration
+        run: echo "Build took ${{ github.event.workflow_run.updated_at }} - ${{ github.event.workflow_run.run_started_at }}"

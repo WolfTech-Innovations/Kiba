@@ -1,0 +1,15 @@
+name: Monitor Vimix Cursors
+on:
+  schedule:
+    - cron: '0 4 * * *'
+permissions:
+  issues: write
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check-cursors:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get
+        run: curl -s https://api.github.com/repos/vinceliuice/Vimix-cursors/commits/master | jq -r .sha

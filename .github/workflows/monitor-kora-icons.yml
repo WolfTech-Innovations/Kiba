@@ -1,16 +1,15 @@
-name: Stale Issue Soft Closer
+name: Monitor Kora Icons
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 3 * * *'
 permissions:
   issues: write
-  pull-requests: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  stale-check:
+  check-icons:
     runs-on: ubuntu-latest
     steps:
-      - name: Stale
-        run: echo "Checking for stale threads..."
+      - name: Get
+        run: curl -s https://api.github.com/repos/bikass/kora/releases/latest | jq -r .tag_name

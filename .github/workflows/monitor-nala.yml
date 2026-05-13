@@ -1,16 +1,15 @@
-name: Stale Issue Soft Closer
+name: Monitor Nala
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 2 * * *'
 permissions:
   issues: write
-  pull-requests: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  stale-check:
+  check-nala:
     runs-on: ubuntu-latest
     steps:
-      - name: Stale
-        run: echo "Checking for stale threads..."
+      - name: Get
+        run: curl -s https://api.github.com/repos/volitank/nala/releases/latest | jq -r .tag_name

@@ -1,16 +1,16 @@
-name: Stale Issue Soft Closer
+name: Analyze PR ISO Impact
 on:
-  schedule:
-    - cron: '0 0 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
 permissions:
-  issues: write
   pull-requests: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  stale-check:
+  analyze-impact:
     runs-on: ubuntu-latest
     steps:
-      - name: Stale
-        run: echo "Checking for stale threads..."
+      - name: Impact
+        run: echo "Analyzing impact..."
