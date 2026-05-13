@@ -953,6 +953,43 @@ jobs:
           TabletMode=off
           PLASMARC
 
+          # ── kglobalshortcutsrc — Standard KibaOS Shortcuts ─────────────────────
+          cat > "$SKEL_KDE/kglobalshortcutsrc" << 'SHORTCUTRC'
+          [kwin]
+          Overview=Meta+W,none,Overview
+          ShowDesktopGrid=Meta+G,none,Show Desktop Grid
+          Window Quick Tile Bottom=Meta+Down,none,Window Quick Tile Bottom
+          Window Quick Tile Left=Meta+Left,none,Window Quick Tile Left
+          Window Quick Tile Right=Meta+Right,none,Window Quick Tile Right
+          Window Quick Tile Top=Meta+Up,none,Window Quick Tile Top
+          Window Maximize=Meta+PgUp,none,Window Maximize
+          Window Minimize=Meta+PgDn,none,Window Minimize
+
+          [org.kde.dolphin.desktop]
+          _launch=Meta+E,none,Dolphin
+
+          [org.kde.konsole.desktop]
+          _launch=Meta+T,none,Konsole
+
+          [org.kde.krunner.desktop]
+          _launch=Meta+S,Search,KRunner
+
+          [ksmserver]
+          Lock Session=Meta+L,Screensaver,Lock Session
+
+          [plasmashell]
+          activate task manager entry 1=Meta+1,none,Activate Task Manager Entry 1
+          activate task manager entry 2=Meta+2,none,Activate Task Manager Entry 2
+          activate task manager entry 3=Meta+3,none,Activate Task Manager Entry 3
+          activate task manager entry 4=Meta+4,none,Activate Task Manager Entry 4
+          activate task manager entry 5=Meta+5,none,Activate Task Manager Entry 5
+          activate task manager entry 6=Meta+6,none,Activate Task Manager Entry 6
+          activate task manager entry 7=Meta+7,none,Activate Task Manager Entry 7
+          activate task manager entry 8=Meta+8,none,Activate Task Manager Entry 8
+          activate task manager entry 9=Meta+9,none,Activate Task Manager Entry 9
+          manage-widget-org.kde.plasma.quicksettings=Meta+A,none,Manage Widget Plasma Quick Settings
+          SHORTCUTRC
+
           # ── ksplashrc — Watch_Dogs splash ──────────────────────────────────────
           cat > "$SKEL_KDE/ksplashrc" << 'KSPLASHRC'
           [KSplash]
