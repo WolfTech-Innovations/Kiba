@@ -9,3 +9,8 @@
 
 **Learning:** For documentation-heavy repositories, the README is the primary UI. Long READMEs (>100 lines) require a "Table of Contents" for better navigability (and to pass CI audits), and hero images must have descriptive alt text to ensure an accessible first impression for screen-reader users.
 **Action:** Always include a Table of Contents for READMEs exceeding 100 lines and audit all documentation images for descriptive `alt` attributes instead of generic placeholders like "image".
+
+## 2026-05-13 - [Synchronized Shortcuts for Better Onboarding]
+
+**Learning:** Onboarding tools that advertise keyboard shortcuts create a "broken promise" if those shortcuts aren't explicitly configured in the system's skeleton profile. Users expect advertised interactions to work out-of-the-box, and failure to provide them breaks trust in the interface's reliability.
+**Action:** Always ensure any keyboard shortcut advertised in the UI (e.g., in a welcome dialog or wiki) is explicitly mapped in `kglobalshortcutsrc` within the build workflow.

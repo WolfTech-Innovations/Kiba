@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Continue on Error
         run: |
-          ! grep 'continue-on-error: true' .github/workflows/*.yml
+          ! grep 'continue-on-error: [t]rue' .github/workflows/*.yml
