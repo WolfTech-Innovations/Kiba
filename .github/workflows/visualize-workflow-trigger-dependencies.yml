@@ -1,0 +1,29 @@
+name: Visualize Workflow Trigger Dependencies
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  graph:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Graph
+        run: |
+          echo "digraph G {" > workflow_graph.dot
+          grep -r "workflows: \[" .github/workflows/ | while read -r line; do
+            SRC=$(echo "$line" | cut -d: -f1 | xargs basename)
+            DEST=$(echo "$line" | grep -oP 'workflows: \["\K[^"]+')
+            echo "\"$SRC\" -> \"$DEST\";" >> workflow_graph.dot
+          done
+          echo "}" >> workflow_graph.dot
+      - name: Upload Graph
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-dependencies
+          path: workflow_graph.dot

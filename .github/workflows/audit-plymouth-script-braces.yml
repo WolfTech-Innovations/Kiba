@@ -1,0 +1,26 @@
+name: Audit Plymouth Script Braces
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Braces in Plymouth Script
+        run: |
+          sed -n "/cat > \/usr\/share\/plymouth\/themes\/kibaos-spinner\/kibaos-spinner\.script << 'PLYMOUTH_SCRIPT'/,/PLYMOUTH_SCRIPT/p" .github/workflows/kiba.yml | grep -v "PLYMOUTH_SCRIPT" > script.script
+          [ -s script.script ] || (echo "Plymouth script not found" && exit 1)
+          OPEN=$(grep -o "{" script.script | wc -l)
+          CLOSE=$(grep -o "}" script.script | wc -l)
+          [ "$OPEN" -eq "$CLOSE" ] || (echo "Unbalanced braces in Plymouth script ($OPEN vs $CLOSE)" && exit 1)

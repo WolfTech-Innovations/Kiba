@@ -1,0 +1,25 @@
+name: Audit Embedded Zshrc Syntax Check
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Zshrc
+        run: |
+          sudo apt-get update && sudo apt-get install -y zsh
+          sed -n "/cat > \/etc\/zsh\/zshrc << 'ZSHRC'/,/ZSHRC/p" .github/workflows/kiba.yml | grep -v "ZSHRC" > zshrc
+          [ -s zshrc ] || (echo "zshrc not found" && exit 1)
+          zsh -n zshrc || (echo "Syntax error in embedded zshrc" && exit 1)

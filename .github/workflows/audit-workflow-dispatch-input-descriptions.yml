@@ -1,0 +1,35 @@
+name: Audit Workflow Dispatch Input Descriptions
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Inputs
+        run: |
+          # Use python for more robust parsing than grep
+          python3 -c "
+          import yaml, os
+          for root, dirs, files in os.walk('.github/workflows'):
+              for file in files:
+                  if not file.endswith('.yml'): continue
+                  with open(os.path.join(root, file)) as f:
+                      data = yaml.safe_load(f)
+                      if not data or 'on' not in data: continue
+                      triggers = data['on']
+                      if isinstance(triggers, dict) and 'workflow_dispatch' in triggers:
+                          inputs = triggers['workflow_dispatch'].get('inputs', {})
+                          for name, info in inputs.items():
+                              if 'description' not in info:
+                                  print(f'Missing description for input {name} in {file}')
+                                  exit(1)
+          "

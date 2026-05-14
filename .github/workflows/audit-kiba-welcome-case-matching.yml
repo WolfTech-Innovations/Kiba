@@ -1,0 +1,27 @@
+name: Audit Kiba Welcome Case Matching
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Case Statements
+        run: |
+          sed -n "/cat > \/usr\/local\/bin\/kiba-welcome << 'WELCOME'/,/WELCOME/p" .github/workflows/kiba.yml | grep -v "WELCOME" > kiba-welcome
+          [ -s kiba-welcome ] || (echo "kiba-welcome not found" && exit 1)
+          TAGS=$(grep -oP '"\K[^"]+(?=" "[^"]+" ".*")' kiba-welcome | sort -u)
+          for tag in $TAGS; do
+            grep -q "\"$tag\")" kiba-welcome || (echo "Missing case for tag: $tag" && exit 1)
+          done

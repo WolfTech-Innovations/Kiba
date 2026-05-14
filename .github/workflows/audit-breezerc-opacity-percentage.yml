@@ -1,0 +1,25 @@
+name: Audit Breezerc Opacity Percentage
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Opacity Range
+        run: |
+          OPACITIES=$(grep -oP 'BackgroundOpacity=\K[0-9]+' .github/workflows/kiba.yml)
+          for OPACITY in $OPACITIES; do
+            [ "$OPACITY" -ge 0 ] && [ "$OPACITY" -le 100 ] || (echo "Invalid opacity value: $OPACITY" && exit 1)
+          done

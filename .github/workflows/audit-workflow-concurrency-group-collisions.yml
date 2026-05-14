@@ -1,0 +1,19 @@
+name: Audit Workflow Concurrency Group Collisions
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Groups
+        run: |
+          grep -r "concurrency:" .github/workflows/ | grep -v "group:.*github\.workflow" && (echo "Concurrency groups should include github.workflow" && exit 1) || echo "All groups are good"

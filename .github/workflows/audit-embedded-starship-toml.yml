@@ -1,0 +1,24 @@
+name: Audit Embedded Starship TOML
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Starship TOML
+        run: |
+          sed -n "/cat > \/etc\/skel\/\.config\/starship\.toml << 'STARSHIP_CONF'/,/STARSHIP_CONF/p" .github/workflows/kiba.yml | grep -v "STARSHIP_CONF" > starship.toml
+          [ -s starship.toml ] || (echo "Starship config not found or empty" && exit 1)
+          grep "=" starship.toml || (echo "Invalid TOML in Starship config" && exit 1)

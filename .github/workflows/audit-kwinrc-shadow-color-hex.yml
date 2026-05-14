@@ -1,0 +1,22 @@
+name: Audit KWinRC Shadow Color Hex
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Dracula Shadow Color
+        run: |
+          grep -q "ShadowColor=189,147,249" .github/workflows/kiba.yml || (echo "ShadowColor must be Dracula Purple (189,147,249)" && exit 1)
