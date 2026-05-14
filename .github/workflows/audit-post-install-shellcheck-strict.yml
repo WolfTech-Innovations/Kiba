@@ -1,0 +1,24 @@
+name: Audit Post-Install Shellcheck Strict
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Shellcheck
+        run: |
+          sed -n "/cat > \/usr\/share\/kibaos\/post-install\.sh << 'POSTINSTALLSH'/,/POSTINSTALLSH/p" .github/workflows/kiba.yml | grep -v "POSTINSTALLSH" > post-install.sh
+          [ -s post-install.sh ] || (echo "post-install.sh not found" && exit 1)
+          shellcheck -e SC2148 post-install.sh

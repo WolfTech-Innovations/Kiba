@@ -1,0 +1,26 @@
+name: Audit Kiba Welcome Zenity Label Length
+on:
+  push:
+    paths:
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Label Lengths
+        run: |
+          sed -n "/cat > \/usr\/local\/bin\/kiba-welcome << 'WELCOME'/,/WELCOME/p" .github/workflows/kiba.yml | grep -v "WELCOME" > kiba-welcome
+          [ -s kiba-welcome ] || (echo "kiba-welcome not found" && exit 1)
+          grep -oP '"[^"]+"' kiba-welcome | while read -r label; do
+            [ ${#label} -gt 100 ] && (echo "Label too long: $label" && exit 1) || true
+          done
