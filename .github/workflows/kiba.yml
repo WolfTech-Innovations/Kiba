@@ -1018,6 +1018,9 @@ jobs:
 
           [org.kde.krunner.desktop]
           _launch=Meta+S,none,KRunner
+
+          [chromium.desktop]
+          _launch=Meta+B,none,Chromium
           KGLOBAL
 
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
@@ -1292,6 +1295,7 @@ jobs:
                   --image-column=1 --column=" " --column="Action" --column="Shortcut" \
                   "start-here-kde-symbolic" "Application Menu" "Meta" \
                   "utilities-terminal" "Terminal (Konsole)" "Meta + T" \
+                  "chromium" "Web Browser (Chromium)" "Meta + B" \
                   "view-presentation" "Overview (Grid)" "Meta + W" \
                   "view-fullscreen" "Desktop Grid" "Meta + G" \
                   "edit-find" "Search (KRunner)" "Meta + S" \
