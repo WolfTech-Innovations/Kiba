@@ -1,5 +1,5 @@
 name: Check TODO Priority Enforcement
-true:
+on:
   push:
     paths:
     - scripts/*.sh

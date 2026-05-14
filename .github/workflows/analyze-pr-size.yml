@@ -11,4 +11,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Size
-        run: echo "PR Size additions: ${{ github.event.pull_request.additions }}"
+        run: |
+          echo "PR Size additions: ${{ github.event.pull_request.additions }}"
