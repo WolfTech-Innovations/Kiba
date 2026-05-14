@@ -18,8 +18,12 @@ jobs:
           echo "digraph G {" > workflow_graph.dot
           grep -r "workflows: \[" .github/workflows/ | while read -r line; do
             SRC=$(echo "$line" | cut -d: -f1 | xargs basename)
-            DEST=$(echo "$line" | grep -oP 'workflows: \["\K[^"]+')
-            echo "\"$SRC\" -> \"$DEST\";" >> workflow_graph.dot
+            # Handle multiple workflows in the array
+            echo "$line" | grep -oP 'workflows: \[\K[^\]]+' | tr -d '" ' | tr ',' '\n' | while read -r DEST; do
+              if [ -n "$DEST" ]; then
+                echo "\"$SRC\" -> \"$DEST\";" >> workflow_graph.dot
+              fi
+            done
           done
           echo "}" >> workflow_graph.dot
       - name: Upload Graph

@@ -20,7 +20,13 @@ jobs:
       - name: Check Braces in Plymouth Script
         run: |
           sed -n "/cat > \/usr\/share\/plymouth\/themes\/kibaos-spinner\/kibaos-spinner\.script << 'PLYMOUTH_SCRIPT'/,/PLYMOUTH_SCRIPT/p" .github/workflows/kiba.yml | grep -v "PLYMOUTH_SCRIPT" > script.script
-          [ -s script.script ] || (echo "Plymouth script not found" && exit 1)
+          if [ ! -s script.script ]; then
+            echo "Plymouth script not found"
+            exit 1
+          fi
           OPEN=$(grep -o "{" script.script | wc -l)
           CLOSE=$(grep -o "}" script.script | wc -l)
-          [ "$OPEN" -eq "$CLOSE" ] || (echo "Unbalanced braces in Plymouth script ($OPEN vs $CLOSE)" && exit 1)
+          if [ "$OPEN" -ne "$CLOSE" ]; then
+            echo "Unbalanced braces in Plymouth script ($OPEN vs $CLOSE)"
+            exit 1
+          fi

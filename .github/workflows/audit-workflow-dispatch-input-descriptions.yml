@@ -16,20 +16,24 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Inputs
         run: |
-          # Use python for more robust parsing than grep
           python3 -c "
-          import yaml, os
+          import yaml, os, sys
+          failed = False
           for root, dirs, files in os.walk('.github/workflows'):
               for file in files:
-                  if not file.endswith('.yml'): continue
+                  if not (file.endswith('.yml') or file.endswith('.yaml')): continue
                   with open(os.path.join(root, file)) as f:
-                      data = yaml.safe_load(f)
+                      try:
+                          data = yaml.safe_load(f)
+                      except: continue
                       if not data or 'on' not in data: continue
                       triggers = data['on']
                       if isinstance(triggers, dict) and 'workflow_dispatch' in triggers:
                           inputs = triggers['workflow_dispatch'].get('inputs', {})
-                          for name, info in inputs.items():
-                              if 'description' not in info:
-                                  print(f'Missing description for input {name} in {file}')
-                                  exit(1)
+                          if inputs:
+                              for name, info in inputs.items():
+                                  if 'description' not in info:
+                                      print(f'Missing description for input {name} in {file}')
+                                      failed = True
+          if failed: sys.exit(1)
           "

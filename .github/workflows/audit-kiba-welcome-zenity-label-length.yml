@@ -20,7 +20,13 @@ jobs:
       - name: Check Label Lengths
         run: |
           sed -n "/cat > \/usr\/local\/bin\/kiba-welcome << 'WELCOME'/,/WELCOME/p" .github/workflows/kiba.yml | grep -v "WELCOME" > kiba-welcome
-          [ -s kiba-welcome ] || (echo "kiba-welcome not found" && exit 1)
-          grep -oP '"[^"]+"' kiba-welcome | while read -r label; do
-            [ ${#label} -gt 100 ] && (echo "Label too long: $label" && exit 1) || true
-          done
+          if [ ! -s kiba-welcome ]; then
+            echo "kiba-welcome not found"
+            exit 1
+          fi
+          while read -r label; do
+            if [ ${#label} -gt 100 ]; then
+              echo "Label too long: $label"
+              exit 1
+            fi
+          done < <(grep -oP '"[^"]+"' kiba-welcome)

@@ -20,5 +20,11 @@ jobs:
       - name: Check Shortcuts for Meta
         run: |
           sed -n "/cat > \"\$SKEL_KDE\/kglobalshortcutsrc\" << 'KGLOBAL'/,/KGLOBAL/p" .github/workflows/kiba.yml | grep "=" | grep -v "KGLOBAL" > shortcuts.txt
-          [ -s shortcuts.txt ] || (echo "Shortcuts not found" && exit 1)
-          grep "=" shortcuts.txt | grep -v "Meta" && (echo "Shortcut found without Meta key" && exit 1) || echo "All shortcuts use Meta"
+          if [ ! -s shortcuts.txt ]; then
+            echo "Shortcuts not found"
+            exit 1
+          fi
+          if grep "=" shortcuts.txt | grep -v "Meta"; then
+            echo "Shortcut found without Meta key"
+            exit 1
+          fi

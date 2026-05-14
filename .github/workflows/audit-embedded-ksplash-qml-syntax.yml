@@ -20,5 +20,11 @@ jobs:
       - name: Validate Splash QML
         run: |
           sed -n "/cat > \/usr\/share\/plasma\/look-and-feel\/com\.kibaos\.watchdogs\.desktop\/contents\/splash\/Splash\.qml << 'WATCHSPLASH'/,/WATCHSPLASH/p" .github/workflows/kiba.yml | grep -v "WATCHSPLASH" > Splash.qml
-          [ -s Splash.qml ] || (echo "Splash QML not found or empty" && exit 1)
-          grep -q "import QtQuick" Splash.qml || (echo "Missing QtQuick import in Splash.qml" && exit 1)
+          if [ ! -s Splash.qml ]; then
+            echo "Splash QML not found or empty"
+            exit 1
+          fi
+          if ! grep -q "import QtQuick" Splash.qml; then
+            echo "Missing QtQuick import in Splash.qml"
+            exit 1
+          fi

@@ -16,11 +16,11 @@ jobs:
       - name: Add Contributor
         run: |
           USER="${{ github.event.pull_request.user.login }}"
-          grep -q "$USER" ACKNOWLEDGMENTS.md || {
+          if ! grep -q "$USER" ACKNOWLEDGMENTS.md; then
             echo "- $USER" >> ACKNOWLEDGMENTS.md
             git config user.name "KibaBot"
             git config user.email "bot@kibaos.org"
             git add ACKNOWLEDGMENTS.md
             git commit -m "docs: add $USER to acknowledgments [skip ci]"
             git push
-          }
+          fi

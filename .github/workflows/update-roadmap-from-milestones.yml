@@ -20,5 +20,24 @@ jobs:
           MILESTONES=$(gh milestone list --json title,description,dueOn --state open)
           echo "### Roadmap" > roadmap.md
           echo "$MILESTONES" | jq -r '.[] | "* **" + .title + "**: " + (.description // "No description")' >> roadmap.md
-          # Logic to inject roadmap.md into README.md would go here
-          cat roadmap.md
+
+          # Use python to safely update README.md between markers
+          python3 -c "
+          import os
+          roadmap = open('roadmap.md').read()
+          readme = open('README.md').read()
+          if '<!-- ROADMAP_START -->' in readme:
+              start = readme.find('<!-- ROADMAP_START -->') + len('<!-- ROADMAP_START -->')
+              end = readme.find('<!-- ROADMAP_END -->')
+              new_readme = readme[:start] + '\n' + roadmap + '\n' + readme[end:]
+              with open('README.md', 'w') as f: f.write(new_readme)
+          "
+          if git diff --exit-code README.md; then
+            echo "No changes to roadmap"
+          else
+            git config user.name "KibaBot"
+            git config user.email "bot@kibaos.org"
+            git add README.md
+            git commit -m "docs: sync roadmap from milestones [skip ci]"
+            git push
+          fi

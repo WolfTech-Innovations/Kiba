@@ -15,4 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Env
         run: |
-          grep -rE "^[[:space:]]+env:" .github/workflows/ -A 10 | grep -v "env:" | sort | uniq -d | grep -v "\-\-" && (echo "Potential environment variable shadowing detected" && exit 1) || echo "No shadowing found"
+          if grep -rE "^[[:space:]]+env:" .github/workflows/ -A 10 | grep -v "env:" | sort | uniq -d | grep -v "\-\-"; then
+            echo "Potential environment variable shadowing detected"
+            exit 1
+          fi

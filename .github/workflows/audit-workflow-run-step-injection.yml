@@ -16,4 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for Direct Expansion
         run: |
-          grep -r "run:.*\${{.*github\.event\.pull_request\.body.*}}" .github/workflows/ && (echo "Direct expansion of PR body detected - use env variables instead" && exit 1) || echo "No direct expansion of PR body found"
+          if grep -r "run:.*\${{.*github\.event\.pull_request\.body.*}}" .github/workflows/; then
+            echo "Direct expansion of PR body detected - use env variables instead"
+            exit 1
+          fi

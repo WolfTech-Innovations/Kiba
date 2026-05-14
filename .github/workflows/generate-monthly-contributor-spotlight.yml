@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 permissions:
   issues: write
+  pull-requests: read
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -17,4 +18,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           CONTRIBUTOR=$(gh pr list --state merged --json author --limit 100 | jq -r '.[].author.login' | sort | uniq -c | sort -nr | head -1 | awk '{print $2}')
-          [ -n "$CONTRIBUTOR" ] && gh issue create --title "Monthly Contributor Spotlight: $CONTRIBUTOR" --body "Thanks to @$CONTRIBUTOR for their amazing contributions this month!" || echo "No contributors found"
+          if [ -n "$CONTRIBUTOR" ]; then
+            gh issue create --title "Monthly Contributor Spotlight: $CONTRIBUTOR" --body "Thanks to @$CONTRIBUTOR for their amazing contributions this month!"
+          else
+            echo "No contributors found"
+          fi

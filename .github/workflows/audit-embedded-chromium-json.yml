@@ -20,5 +20,8 @@ jobs:
       - name: Validate Chromium JSON
         run: |
           sed -n "/cat > \/etc\/chromium\/policies\/managed\/kibaos\.json << 'CPOLICY'/,/CPOLICY/p" .github/workflows/kiba.yml | grep -v "CPOLICY" > policy.json
-          [ -s policy.json ] || (echo "Chromium policy not found or empty" && exit 1)
+          if [ ! -s policy.json ]; then
+            echo "Chromium policy not found or empty"
+            exit 1
+          fi
           jq . policy.json || (echo "Invalid JSON in Chromium policy" && exit 1)

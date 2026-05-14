@@ -17,4 +17,7 @@ jobs:
       - name: Check for Conflicts
         run: |
           PACKAGES=$(grep -A 200 "PACKAGES" .github/workflows/kiba.yml | grep -v "PACKAGES" | sed '/^$/q')
-          echo "$PACKAGES" | grep -q "nano" && echo "$PACKAGES" | grep -q "micro" && (echo "Both nano and micro installed - choose one" && exit 1) || echo "No obvious duplicates"
+          if echo "$PACKAGES" | grep -q "nano" && echo "$PACKAGES" | grep -q "micro"; then
+            echo "Both nano and micro installed - choose one"
+            exit 1
+          fi

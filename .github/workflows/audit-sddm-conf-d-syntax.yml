@@ -20,5 +20,11 @@ jobs:
       - name: Validate SDDM Config
         run: |
           sed -n "/cat > \/etc\/sddm\.conf\.d\/autologin\.conf << 'SDDM_CONF'/,/SDDM_CONF/p" .github/workflows/kiba.yml | grep -v "SDDM_CONF" > sddm.conf
-          [ -s sddm.conf ] || (echo "sddm.conf not found" && exit 1)
-          grep -q "\[Autologin\]" sddm.conf || (echo "Missing Autologin section in SDDM config" && exit 1)
+          if [ ! -s sddm.conf ]; then
+            echo "sddm.conf not found"
+            exit 1
+          fi
+          if ! grep -q "\[Autologin\]" sddm.conf; then
+            echo "Missing Autologin section in SDDM config"
+            exit 1
+          fi

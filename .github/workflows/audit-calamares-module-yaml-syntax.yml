@@ -21,6 +21,9 @@ jobs:
         run: |
           grep -oP "cat > /etc/calamares/modules/\K[^ ]+\.conf" .github/workflows/kiba.yml | while read -r conf; do
             sed -n "/cat > \/etc\/calamares\/modules\/$conf << '.*'/,/^[A-Z_]\+$/p" .github/workflows/kiba.yml | grep -vE "^cat |^[A-Z_]+\$" > "$conf"
-            [ -s "$conf" ] || (echo "$conf not found or empty" && exit 1)
+            if [ ! -s "$conf" ]; then
+              echo "$conf not found or empty"
+              exit 1
+            fi
             python3 -c "import yaml; yaml.safe_load(open('$conf'))" || (echo "Invalid YAML in $conf" && exit 1)
           done

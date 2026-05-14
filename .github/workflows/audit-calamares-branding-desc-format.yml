@@ -20,5 +20,11 @@ jobs:
       - name: Validate Branding Desc
         run: |
           sed -n "/cat > config\/includes\.chroot\/etc\/calamares\/branding\/kibaos\/branding\.desc << 'BRANDING'/,/BRANDING/p" .github/workflows/kiba.yml | grep -v "BRANDING" > branding.desc
-          [ -s branding.desc ] || (echo "branding.desc not found" && exit 1)
-          grep -q "productName: \"KibaOS\"" branding.desc || (echo "Invalid product name in branding.desc" && exit 1)
+          if [ ! -s branding.desc ]; then
+            echo "branding.desc not found"
+            exit 1
+          fi
+          if ! grep -q "productName: \"KibaOS\"" branding.desc; then
+            echo "Invalid product name in branding.desc"
+            exit 1
+          fi

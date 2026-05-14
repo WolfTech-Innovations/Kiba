@@ -20,5 +20,11 @@ jobs:
       - name: Validate Starship TOML
         run: |
           sed -n "/cat > \/etc\/skel\/\.config\/starship\.toml << 'STARSHIP_CONF'/,/STARSHIP_CONF/p" .github/workflows/kiba.yml | grep -v "STARSHIP_CONF" > starship.toml
-          [ -s starship.toml ] || (echo "Starship config not found or empty" && exit 1)
-          grep "=" starship.toml || (echo "Invalid TOML in Starship config" && exit 1)
+          if [ ! -s starship.toml ]; then
+            echo "Starship config not found or empty"
+            exit 1
+          fi
+          if ! grep -q "=" starship.toml; then
+            echo "Invalid TOML in Starship config"
+            exit 1
+          fi

@@ -20,5 +20,11 @@ jobs:
       - name: Validate Konsole Colorscheme
         run: |
           sed -n "/cat > \/usr\/share\/konsole\/Dracula\.colorscheme << 'KONSOLE_COLORS'/,/KONSOLE_COLORS/p" .github/workflows/kiba.yml | grep -v "KONSOLE_COLORS" > dracula.colorscheme
-          [ -s dracula.colorscheme ] || (echo "Konsole colorscheme not found or empty" && exit 1)
-          grep -qE "Color=[0-9]+,[0-9]+,[0-9]+" dracula.colorscheme || (echo "Invalid color format in Konsole colorscheme" && exit 1)
+          if [ ! -s dracula.colorscheme ]; then
+            echo "Konsole colorscheme not found or empty"
+            exit 1
+          fi
+          if ! grep -qE "Color=[0-9]+,[0-9]+,[0-9]+" dracula.colorscheme; then
+            echo "Invalid color format in Konsole colorscheme"
+            exit 1
+          fi

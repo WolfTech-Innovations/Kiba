@@ -21,5 +21,8 @@ jobs:
         run: |
           sudo apt-get update && sudo apt-get install -y zsh
           sed -n "/cat > \/etc\/zsh\/zshrc << 'ZSHRC'/,/ZSHRC/p" .github/workflows/kiba.yml | grep -v "ZSHRC" > zshrc
-          [ -s zshrc ] || (echo "zshrc not found" && exit 1)
+          if [ ! -s zshrc ]; then
+            echo "zshrc not found"
+            exit 1
+          fi
           zsh -n zshrc || (echo "Syntax error in embedded zshrc" && exit 1)

@@ -19,7 +19,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Opacity Range
         run: |
-          OPACITIES=$(grep -oP 'BackgroundOpacity=\K[0-9]+' .github/workflows/kiba.yml)
-          for OPACITY in $OPACITIES; do
-            [ "$OPACITY" -ge 0 ] && [ "$OPACITY" -le 100 ] || (echo "Invalid opacity value: $OPACITY" && exit 1)
-          done
+          while read -r OPACITY; do
+            if [ "$OPACITY" -lt 0 ] || [ "$OPACITY" -gt 100 ]; then
+              echo "Invalid opacity value: $OPACITY"
+              exit 1
+            fi
+          done < <(grep -oP 'BackgroundOpacity=\K[0-9]+' .github/workflows/kiba.yml)
