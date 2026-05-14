@@ -11,7 +11,10 @@ concurrency:
 jobs:
   audit-pinning:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Check
         run: grep "uses: actions/" .github/workflows/*.yml | grep -v "@v" || echo "Pinned"

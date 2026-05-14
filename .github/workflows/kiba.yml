@@ -1,5 +1,7 @@
 name: "KibaOS Build"
 
+permissions:
+  contents: read
 on:
   workflow_dispatch:
 
@@ -11,6 +13,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Create build script
         run: |
@@ -1170,7 +1174,7 @@ jobs:
           PANELRC
 
           # ── kscreenlockerrc ────────────────────────────────────────────────────
-          cat > "$SKEL_KDE/kscreenlockerrc" << LOCKRC
+          cat > "$SKEL_KDE/kscreenlockerrc" << 'LOCKRC'
           [Daemon]
           Autolock=false
           LockOnResume=false
