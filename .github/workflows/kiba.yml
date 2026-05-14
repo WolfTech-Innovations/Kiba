@@ -993,6 +993,8 @@ jobs:
           Window Quick Tile Left=Meta+Left,none,Window Quick Tile Left
           Window Quick Tile Right=Meta+Right,none,Window Quick Tile Right
           Window Quick Tile Top=Meta+Up,none,Window Quick Tile Top
+          Window Maximize=Meta+PgUp,none,Window Maximize
+          Window Minimize=Meta+PgDn,none,Window Minimize
           Expose=Meta+G,none,Toggle Present Windows (Current desktop)
 
           [ksmserver]
@@ -1290,17 +1292,19 @@ jobs:
                   --window-icon="/usr/share/kibaos/logo.png" \
                   --width=450 --height=500 \
                   --image-column=1 --column=" " --column="Action" --column="Shortcut" \
-                  "start-here-kde-symbolic" "Application Menu" "Meta" \
-                  "utilities-terminal" "Terminal (Konsole)" "Meta + T" \
-                  "view-presentation" "Overview (Grid)" "Meta + W" \
-                  "view-fullscreen" "Desktop Grid" "Meta + G" \
-                  "edit-find" "Search (KRunner)" "Meta + S" \
-                  "configure" "Quick Settings" "Meta + A" \
-                  "user-desktop" "Show Desktop" "Meta + D" \
-                  "view-split-left-right" "Tile Window" "Meta + Arrows" \
-                  "system-file-manager" "File Manager" "Meta + E" \
-                  "system-lock-screen" "Lock Screen" "Meta + L" \
-                  "view-list-icons" "Task Manager" "Meta + 1-9" \
+                  "start-here-kde-symbolic" "🚀 Application Menu" "Meta" \
+                  "utilities-terminal" "🖥️ Terminal (Konsole)" "Meta + T" \
+                  "view-presentation" "📂 Overview (Grid)" "Meta + W" \
+                  "view-fullscreen" "✨ Desktop Grid" "Meta + G" \
+                  "edit-find" "🔍 Search (KRunner)" "Meta + S" \
+                  "configure" "⚙️ Quick Settings" "Meta + A" \
+                  "user-desktop" "🖥️ Show Desktop" "Meta + D" \
+                  "view-split-left-right" "🪟 Tile Window" "Meta + Arrows" \
+                  "window-maximize" "↕️ Maximize Window" "Meta + PgUp" \
+                  "window-minimize" "↔️ Minimize Window" "Meta + PgDn" \
+                  "system-file-manager" "📂 File Manager" "Meta + E" \
+                  "system-lock-screen" "🔒 Lock Screen" "Meta + L" \
+                  "view-list-icons" "🔢 Task Manager" "Meta + 1-9" \
                   --hide-column=1 --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
                 ;;
               "wiki")
@@ -1317,10 +1321,12 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          GenericName=Onboarding Tool
           Comment=Welcome to KibaOS
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
+          Categories=System;Utility;
           X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
 

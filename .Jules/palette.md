@@ -9,3 +9,8 @@
 
 **Learning:** For documentation-heavy repositories, the README is the primary UI. Long READMEs (>100 lines) require a "Table of Contents" for better navigability (and to pass CI audits), and hero images must have descriptive alt text to ensure an accessible first impression for screen-reader users.
 **Action:** Always include a Table of Contents for READMEs exceeding 100 lines and audit all documentation images for descriptive `alt` attributes instead of generic placeholders like "image".
+
+## 2025-05-20 - [Shortcut Consistency and Visual Scan-ability]
+
+**Learning:** Advertising keyboard shortcuts in onboarding tools (like `kiba-welcome`) creates a "broken promise" if they aren't explicitly configured in the system's `skel` (e.g., `kglobalshortcutsrc`). Adding emojis to list entries in tools like Zenity significantly improves visual scan-ability for users, especially in a TV or 10ft interface context.
+**Action:** Always synchronize advertised shortcuts with system configuration and use emojis to prefix actionable list items.
