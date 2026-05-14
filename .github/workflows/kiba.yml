@@ -1186,6 +1186,7 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Install KibaOS
+          GenericName=System Installer
           Comment=Start the KibaOS installer
           Exec=bash -c 'sleep 4 && sudo calamares'
           Icon=calamares
@@ -1265,6 +1266,7 @@ jobs:
               "calamares" "install" "🚀 Install KibaOS" "Install the system permanently to your disk" \
               "chromium" "browser" "🌐 Web Browser" "Browse the internet" \
               "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
+              "utilities-terminal" "terminal" "🖥️ Terminal" "Open the command line terminal" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
               --hide-column=1 --hide-column=2 --print-column=2 \
@@ -1283,6 +1285,10 @@ jobs:
                 ;;
               "store")
                 plasma-discover &
+                break
+                ;;
+              "terminal")
+                konsole &
                 break
                 ;;
               "shortcuts")
@@ -1317,10 +1323,12 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
+          GenericName=Onboarding Tool
           Comment=Welcome to KibaOS
           Exec=/usr/local/bin/kiba-welcome
           Icon=start-here-kde-symbolic
           Terminal=false
+          Categories=System;Utility;
           X-KDE-autostart-condition=kiba-welcome
           WELCOMEDESK
 
@@ -1552,6 +1560,7 @@ jobs:
           Type=Application
           Version=1.0
           Name=Install KibaOS
+          GenericName=System Installer
           Comment=Install KibaOS on your PC
           Exec=sudo calamares
           Icon=calamares
