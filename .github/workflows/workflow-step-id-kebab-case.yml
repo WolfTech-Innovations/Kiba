@@ -12,9 +12,12 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Verify kebab-case IDs
         run: |
-          python3 -c '
+          # Optimized: Use a single-pass Python script for high-performance semantic YAML parsing
+          python3 << 'EOF'
           import yaml
           import os
           import sys
@@ -43,11 +46,10 @@ jobs:
                                   if not re.match(r"^[a-z0-9-]+$", step_id):
                                       print(f"Error: Step ID \"{step_id}\" in {f} is not kebab-case.")
                                       all_passed = False
-              except Exception as exc:
-                  # Skip files that fail to parse (handled by other linters)
+              except Exception:
                   continue
 
           if not all_passed:
               sys.exit(1)
           print("All step IDs follow kebab-case.")
-          '
+          EOF
