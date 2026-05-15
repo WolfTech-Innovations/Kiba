@@ -9,3 +9,7 @@
 
 **Learning:** For documentation-heavy repositories, the README is the primary UI. Long READMEs (>100 lines) require a "Table of Contents" for better navigability (and to pass CI audits), and hero images must have descriptive alt text to ensure an accessible first impression for screen-reader users.
 **Action:** Always include a Table of Contents for READMEs exceeding 100 lines and audit all documentation images for descriptive `alt` attributes instead of generic placeholders like "image".
+
+## 2026-05-15 - [Productivity-Focused Onboarding]
+**Learning:** Adding direct access to primary tools (Terminal, File Manager) in the welcome tool with shortcut hints improves user onboarding and discoverability of system-wide hotkeys.
+**Action:** Always include high-priority "power-user" tools in onboarding menus and pair them with their Meta-key shortcuts to educate the user.

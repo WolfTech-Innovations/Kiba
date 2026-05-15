@@ -1267,6 +1267,8 @@ jobs:
               --image-column=1 --column=" " --column="Tag" --column="Action" --column="Description" \
               "calamares" "install" "🚀 Install KibaOS" "Install the system permanently to your disk" \
               "chromium" "browser" "🌐 Web Browser" "Browse the internet" \
+              "utilities-terminal" "terminal" "🖥️ Open Terminal" "Launch the Konsole terminal (Meta+T)" \
+              "system-file-manager" "files" "📁 File Manager" "Browse your files with Dolphin (Meta+E)" \
               "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
@@ -1282,6 +1284,14 @@ jobs:
                 ;;
               "browser")
                 chromium &
+                break
+                ;;
+              "terminal")
+                konsole &
+                break
+                ;;
+              "files")
+                dolphin &
                 break
                 ;;
               "store")
