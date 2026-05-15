@@ -303,6 +303,7 @@ jobs:
 
           sddm
           sddm-theme-debian-breeze
+          systemsettings
           plasma-nm
           plasma-pa
           dolphin
@@ -1274,6 +1275,7 @@ jobs:
               "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
               "utilities-terminal" "terminal" "🖥️ Open Terminal" "Productivity tip: Use Meta+T to launch" \
               "system-file-manager" "files" "📁 File Manager" "Productivity tip: Use Meta+E to browse" \
+              "preferences-system" "settings" "⚙️ System Settings" "Configure your desktop and hardware" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
               --hide-column=1 --hide-column=2 --print-column=2 \
@@ -1300,6 +1302,10 @@ jobs:
                 ;;
               "files")
                 dolphin &
+                break
+                ;;
+              "settings")
+                systemsettings &
                 break
                 ;;
               "shortcuts")
