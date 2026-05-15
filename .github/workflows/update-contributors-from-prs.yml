@@ -14,13 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Add Contributor
+        env:
+          PR_USER: ${{ github.event.pull_request.user.login }}
         run: |
-          USER="${{ github.event.pull_request.user.login }}"
-          grep -q "$USER" ACKNOWLEDGMENTS.md || {
-            echo "- $USER" >> ACKNOWLEDGMENTS.md
+          grep -q "$PR_USER" ACKNOWLEDGMENTS.md || {
+            echo "- $PR_USER" >> ACKNOWLEDGMENTS.md
             git config user.name "KibaBot"
             git config user.email "bot@kibaos.org"
             git add ACKNOWLEDGMENTS.md
-            git commit -m "docs: add $USER to acknowledgments [skip ci]"
+            git commit -m "docs: add $PR_USER to acknowledgments [skip ci]"
             git push
           }
