@@ -1,0 +1,28 @@
+name: Contributor Milestone Celebration
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  celebrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.pull_request.merged == true
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Count Merged PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          USER=${{ github.event.pull_request.user.login }}
+          PR_COUNT=$(gh pr list --state merged --author "$USER" --limit 100 --json number --jq '. | length')
+
+          case "$PR_COUNT" in
+            1) MSG="Congratulations on your first merged PR to KibaOS! :tada:" ;;
+            5) MSG="That's 5 merged PRs! You're becoming a KibaOS pro. :rocket:" ;;
+            10) MSG="10 merged PRs! Thank you for your incredible dedication to the project. :star2:" ;;
+            *) exit 0 ;;
+          esac
+
+          gh pr comment ${{ github.event.pull_request.number }} --body "$MSG"

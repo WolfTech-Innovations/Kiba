@@ -1,0 +1,51 @@
+name: ISO Duplicate Content Scanner
+on:
+  workflow_run:
+    workflows: ["KibaOS Build"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Download ISO Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kibaos-iso
+          path: .
+        continue-on-error: true
+
+      - name: Extract and Deduplicate
+        run: |
+          ISO_FILE=$(ls *.iso | head -1)
+          [ -z "$ISO_FILE" ] && echo "No ISO found" && exit 0
+
+          sudo apt-get update && sudo apt-get install -y squashfs-tools
+
+          # Extract the squashfs from the ISO (usually in live/filesystem.squashfs)
+          mkdir -p iso_mnt
+          sudo mount -o loop "$ISO_FILE" iso_mnt
+          cp iso_mnt/live/filesystem.squashfs .
+          sudo umount iso_mnt
+
+          # Scan for duplicates using md5sum
+          unsquashfs -l filesystem.squashfs | grep -v '/$' | awk '{print $NF}' > file_list.txt
+          # This is a bit slow on a full rootfs, so we'll target large files (>1MB)
+          # In a real environment, we'd mount the squashfs
+          mkdir -p rootfs
+          sudo unsquashfs -d rootfs filesystem.squashfs
+
+          echo "### ISO Duplicate File Audit (>1MB)" >> $GITHUB_STEP_SUMMARY
+          find rootfs -type f -size +1M -exec md5sum {} + | sort | uniq -w32 -d --all-repeated=separate > duplicates.txt
+
+          if [ -s duplicates.txt ]; then
+             echo "Potential space savings found:" >> $GITHUB_STEP_SUMMARY
+             echo '```' >> $GITHUB_STEP_SUMMARY
+             cat duplicates.txt | head -n 50 >> $GITHUB_STEP_SUMMARY
+             echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+             echo "No major duplicates found." >> $GITHUB_STEP_SUMMARY
+          fi

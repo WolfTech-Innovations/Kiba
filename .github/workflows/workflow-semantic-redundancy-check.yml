@@ -1,0 +1,24 @@
+name: Workflow Semantic Redundancy Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  redundancy-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find Duplicated Step Logic
+        run: |
+          echo "### Workflow Redundancy Audit" >> $GITHUB_STEP_SUMMARY
+
+          # Find frequently used 'run' blocks (ignoring whitespace)
+          grep -h "run:" .github/workflows/*.yml | sed 's/^[[:space:]]*run:[[:space:]]*//' | sort | uniq -c | sort -nr | head -n 10 > duplicates.txt
+
+          echo "The following logic appears in multiple workflows. Consider creating a custom action or shared script:" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat duplicates.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

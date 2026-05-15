@@ -1,0 +1,31 @@
+name: Branding Asset Specification Validator
+on:
+  pull_request:
+    paths:
+      - 'branding/**'
+  workflow_dispatch:
+
+jobs:
+  validate-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit Asset Specifications
+        run: |
+          sudo apt-get update && sudo apt-get install -y imagemagick
+
+          echo "### Branding Asset Specification Audit" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Resolution | Aspect Ratio |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------------|--------------|" >> $GITHUB_STEP_SUMMARY
+
+          for f in $(find branding -name "*.png" -o -name "*.jpg"); do
+            INFO=$(identify -format "%w %h" "$f")
+            W=$(echo $INFO | awk '{print $1}')
+            H=$(echo $INFO | awk '{print $2}')
+
+            # Simplified aspect ratio check
+            [ $W -gt $H ] && RATIO="Landscape" || RATIO="Portrait"
+
+            echo "| $(basename $f) | ${W}x${H} | $RATIO |" >> $GITHUB_STEP_SUMMARY
+          done

@@ -1,0 +1,50 @@
+name: ISO Boot Time Benchmark
+on:
+  workflow_run:
+    workflows: ["KibaOS Build"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Download ISO Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kibaos-iso # Assuming this is the artifact name
+          path: .
+        continue-on-error: true
+
+      - name: Run QEMU Boot Benchmark
+        run: |
+          ISO_FILE=$(ls *.iso | head -1)
+          if [ -z "$ISO_FILE" ]; then
+            echo "No ISO found for benchmarking."
+            exit 0
+          fi
+
+          echo "Starting boot benchmark for $ISO_FILE"
+          # Measure time to reach a serial output indicator
+          START_TIME=$(date +%s%N)
+          timeout 120s qemu-system-x86_64 \
+            -m 2G \
+            -cdrom "$ISO_FILE" \
+            -nographic \
+            -serial stdio \
+            -no-reboot | tee boot_log.txt || true
+          END_TIME=$(date +%s%N)
+
+          # Check for a specific marker in the log (e.g., "Welcome to KibaOS")
+          # This is an approximation as we don't have a real RTC sync here
+          ELAPSED=$(( (END_TIME - START_TIME) / 1000000 ))
+          echo "### Boot Performance Report" >> $GITHUB_STEP_SUMMARY
+          echo "- Total execution time (to timeout/exit): ${ELAPSED}ms" >> $GITHUB_STEP_SUMMARY
+
+          if grep -q "Welcome to KibaOS" boot_log.txt; then
+             echo "- :white_check_mark: Reached Welcome Screen" >> $GITHUB_STEP_SUMMARY
+          else
+             echo "- :warning: Welcome Screen marker not found in serial output" >> $GITHUB_STEP_SUMMARY
+          fi

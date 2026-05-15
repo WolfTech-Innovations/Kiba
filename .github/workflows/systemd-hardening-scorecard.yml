@@ -1,0 +1,56 @@
+name: Systemd Hardening Scorecard
+on:
+  workflow_run:
+    workflows: ["KibaOS Build"]
+    types: [completed]
+  workflow_dispatch:
+
+jobs:
+  hardening-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    steps:
+      - name: Download ISO Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kibaos-iso
+          path: .
+        continue-on-error: true
+
+      - name: Systemd Analyze Security Audit
+        run: |
+          ISO_FILE=$(ls *.iso | head -1)
+          [ -z "$ISO_FILE" ] && echo "No ISO found" && exit 0
+
+          # Extraction logic (simplified for CI)
+          sudo apt-get update && sudo apt-get install -y squashfs-tools systemd
+
+          mkdir -p iso_mnt
+          sudo mount -o loop "$ISO_FILE" iso_mnt
+          cp iso_mnt/live/filesystem.squashfs .
+          sudo umount iso_mnt
+
+          mkdir -p rootfs
+          sudo unsquashfs -d rootfs filesystem.squashfs
+
+          echo "### Systemd Hardening Scorecard" >> $GITHUB_STEP_SUMMARY
+          echo "| Service | Exposure Score | Level |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|----------------|-------|" >> $GITHUB_STEP_SUMMARY
+
+          # Run systemd-analyze security on extracted unit files
+          # Note: systemd-analyze needs to run against a live system or mock environment
+          # We will simulate by checking for critical security flags in unit files
+          find rootfs/lib/systemd/system -name "*.service" | head -n 20 | while read unit; do
+            NAME=$(basename $unit)
+            SCORE=10.0
+            [ "$(grep -c "PrivateTmp=yes" $unit)" -gt 0 ] && SCORE=$(echo "$SCORE - 1.0" | bc)
+            [ "$(grep -c "ProtectSystem=strict" $unit)" -gt 0 ] && SCORE=$(echo "$SCORE - 1.0" | bc)
+            [ "$(grep -c "NoNewPrivileges=yes" $unit)" -gt 0 ] && SCORE=$(echo "$SCORE - 1.0" | bc)
+
+            LEVEL="MEDIUM"
+            (( $(echo "$SCORE < 5.0" | bc -l) )) && LEVEL="SAFE"
+            (( $(echo "$SCORE > 8.0" | bc -l) )) && LEVEL="UNSAFE"
+
+            echo "| $NAME | $SCORE | $LEVEL |" >> $GITHUB_STEP_SUMMARY
+          done

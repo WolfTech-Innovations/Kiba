@@ -1,0 +1,34 @@
+name: PR Conflict Resolution Assistant
+on:
+  pull_request:
+    types: [synchronize, opened, reopened]
+
+jobs:
+  conflict-assist:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Mergeability
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MERGEABLE=$(gh pr view ${{ github.event.pull_request.number }} --json mergeable --jq .mergeable)
+
+          if [ "$MERGEABLE" == "CONFLICTING" ]; then
+            gh pr comment ${{ github.event.pull_request.number }} --body "## :warning: Merge Conflict Detected
+
+            It looks like this PR has conflicts with the base branch. Here is how you can resolve them:
+
+            \`\`\`bash
+            git fetch origin
+            git checkout ${{ github.event.pull_request.head.ref }}
+            git merge origin/${{ github.event.pull_request.base.ref }}
+            # Resolve conflicts in your editor
+            git add .
+            git commit -m \"chore: resolve merge conflicts\"
+            git push origin ${{ github.event.pull_request.head.ref }}
+            \`\`\`"
+          fi
