@@ -15,6 +15,7 @@ jobs:
       - name: Calculate Hotness
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           ISSUE_NUMBER=${{ github.event.issue.number }}
           REACTIONS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER --jq '.reactions."+1"')

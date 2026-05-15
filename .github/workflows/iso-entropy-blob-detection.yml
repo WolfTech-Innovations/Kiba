@@ -25,6 +25,9 @@ jobs:
 
           echo "### ISO Entropy Audit" >> $GITHUB_STEP_SUMMARY
           echo "Scanning for uncompressed/high-entropy segments that might indicate embedded binaries or encrypted data." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Offset | Entropy | Severity |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|---------|----------|" >> $GITHUB_STEP_SUMMARY
 
           # Use binwalk if available, or a simple head/entropy check
           # For CI, we'll use a simple python script to check entropy of chunks

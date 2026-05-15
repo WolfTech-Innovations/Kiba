@@ -12,6 +12,7 @@ jobs:
       - name: Calculate Minute Usage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           echo "### CI Minute Usage Report (Last 7 Days)" >> $GITHUB_STEP_SUMMARY
 

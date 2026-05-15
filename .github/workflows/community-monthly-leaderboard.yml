@@ -14,6 +14,7 @@ jobs:
       - name: Aggregate Contributions
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           echo "### :trophy: KibaOS Monthly Leaderboard ($(date +%B %Y))" >> $GITHUB_STEP_SUMMARY
           echo "A huge thank you to everyone who contributed this month!" >> $GITHUB_STEP_SUMMARY

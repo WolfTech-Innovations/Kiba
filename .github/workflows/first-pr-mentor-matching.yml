@@ -13,6 +13,7 @@ jobs:
       - name: Detect First-Timer
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           USER=${{ github.event.pull_request.user.login }}
           PR_COUNT=$(gh pr list --author "$USER" --state all --limit 10 --json number --jq '. | length')

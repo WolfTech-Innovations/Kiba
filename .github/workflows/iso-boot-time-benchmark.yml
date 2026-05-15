@@ -20,6 +20,7 @@ jobs:
 
       - name: Run QEMU Boot Benchmark
         run: |
+          sudo apt-get update && sudo apt-get install -y qemu-system-x86
           ISO_FILE=$(ls *.iso | head -1)
           if [ -z "$ISO_FILE" ]; then
             echo "No ISO found for benchmarking."

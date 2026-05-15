@@ -16,6 +16,7 @@ jobs:
       - name: Check for First PR
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
           PR_COUNT=$(gh pr list --author "${{ github.event.pull_request.user.login }}" --state all --json number --jq '. | length')
           if [ "$PR_COUNT" -eq 1 ]; then

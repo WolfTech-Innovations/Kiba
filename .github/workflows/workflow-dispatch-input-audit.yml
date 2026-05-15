@@ -16,7 +16,8 @@ jobs:
           echo "### Workflow Dispatch Security Audit" >> $GITHUB_STEP_SUMMARY
 
           # Look for github.event.inputs expanded directly in 'run' blocks
-          UNSAFE=$(grep -r "github.event.inputs" .github/workflows/*.yml | grep "run:" || true)
+          # We exclude this audit file itself to avoid false positives
+          UNSAFE=$(grep -r "github.event.inputs" .github/workflows/*.yml | grep "run:" | grep -v "workflow-dispatch-input-audit.yml" || true)
 
           if [ -n "$UNSAFE" ]; then
              echo ":warning: Potential shell injection risk! Inputs should be mapped to environment variables instead of expanded directly in 'run' blocks:" >> $GITHUB_STEP_SUMMARY
