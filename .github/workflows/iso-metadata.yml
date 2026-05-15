@@ -2,7 +2,7 @@ name: ISO Metadata
 
 on:
   workflow_run:
-    workflows: ["KibaTV Build"]
+    workflows: ["KibaOS Build"]
     types: [completed]
 
 jobs:

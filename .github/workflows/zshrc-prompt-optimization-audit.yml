@@ -3,10 +3,10 @@ name: Zshrc Prompt Optimization
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Zshrc Prompt Optimization
         run: |
-          grep -q "vcs_info" scripts/kibatv_build.sh && ! grep -q "if command -v starship" scripts/kibatv_build.sh && { echo "Warning: missing skip"; } || true
+          grep -q "vcs_info" .github/workflows/kiba.yml && ! grep -q "if command -v starship" .github/workflows/kiba.yml && { echo "Warning: missing skip"; } || true

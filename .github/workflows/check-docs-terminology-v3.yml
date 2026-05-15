@@ -1,13 +1,13 @@
 name: Check Docs Terminology
 on:
   push:
-paths:
-- docs/*.md
-- README.md
+    paths:
+      - docs/*.md
+      - README.md
   pull_request:
-paths:
-- docs/*.md
-- README.md
+    paths:
+      - docs/*.md
+      - README.md
 jobs:
   audit:
     permissions:
@@ -18,5 +18,5 @@ jobs:
       with:
         persist-credentials: false
     - name: Check Naming
-      run: grep -r "Kiba TV" docs/ && exit 1 || exit 0
+      run: grep -r "KibaOS" docs/ && exit 1 || exit 0
     timeout-minutes: 5

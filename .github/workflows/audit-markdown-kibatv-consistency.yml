@@ -1,4 +1,4 @@
-name: Audit Markdown KibaTV Consistency
+name: Audit Markdown KibaOS Consistency
 
 on:
   push:
@@ -16,6 +16,6 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Check KibaTV brand consistency
+      - name: Check KibaOS brand consistency
         run: |
-          grep -rnEi "Kiba TV|kibatv" . --include="*.md" | grep -v "KibaTV" && (echo "Ensure KibaTV brand consistency (not 'Kiba TV' or 'kibatv')" && exit 1) || exit 0
+          grep -rnEi "KibaOS|kibaos" . --include="*.md" | grep -v "KibaOS" && (echo "Ensure KibaOS brand consistency (not 'KibaOS' or 'kibaos')" && exit 1) || exit 0

@@ -1,11 +1,11 @@
 name: Check Security Contact
 on:
   push:
-paths:
-- SECURITY.md
+    paths:
+      - SECURITY.md
   pull_request:
-paths:
-- SECURITY.md
+    paths:
+      - SECURITY.md
 jobs:
   audit:
     permissions:
