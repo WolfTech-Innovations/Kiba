@@ -1,0 +1,30 @@
+name: Issue Hotness Priority Sync
+on:
+  issues:
+    types: [labeled, unlabeled, opened, edited]
+  issue_comment:
+    types: [created]
+
+jobs:
+  sync-priority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - name: Calculate Hotness
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_NUMBER=${{ github.event.issue.number }}
+          REACTIONS=$(gh api repos/${{ github.repository }}/issues/$ISSUE_NUMBER --jq '.reactions."+1"')
+
+          echo "Issue #$ISSUE_NUMBER has $REACTIONS thumbs up."
+
+          if [ "$REACTIONS" -ge 10 ]; then
+             gh issue edit $ISSUE_NUMBER --add-label "priority:high"
+             echo "Promoted to high priority."
+          elif [ "$REACTIONS" -ge 5 ]; then
+             gh issue edit $ISSUE_NUMBER --add-label "priority:medium"
+             echo "Promoted to medium priority."
+          fi

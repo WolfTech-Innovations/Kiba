@@ -1,0 +1,31 @@
+name: Milestone Burndown Visualizer
+on:
+  milestone:
+    types: [edited]
+  workflow_dispatch:
+
+jobs:
+  visualize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    steps:
+      - name: Generate Burndown Chart
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          MILESTONES=$(gh api repos/${{ github.repository }}/milestones --jq '.[] | select(.state=="open")')
+
+          for m in $(echo "$MILESTONES" | jq -r '.number'); do
+            TITLE=$(echo "$MILESTONES" | jq -r "select(.number==$m) | .title")
+            OPEN=$(echo "$MILESTONES" | jq -r "select(.number==$m) | .open_issues")
+            CLOSED=$(echo "$MILESTONES" | jq -r "select(.number==$m) | .closed_issues")
+            TOTAL=$((OPEN + CLOSED))
+
+            if [ $TOTAL -eq 0 ]; then PERCENT=0; else PERCENT=$((CLOSED * 100 / TOTAL)); fi
+
+            echo "### Progress for $TITLE" >> $GITHUB_STEP_SUMMARY
+            echo "![Progress](https://geps.dev/progress/$PERCENT)" >> $GITHUB_STEP_SUMMARY
+            echo "- $CLOSED / $TOTAL issues completed ($PERCENT%)" >> $GITHUB_STEP_SUMMARY
+          done

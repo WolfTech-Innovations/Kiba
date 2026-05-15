@@ -1,0 +1,32 @@
+name: GRUB Syntax Audit
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  grub-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Embedded GRUB Configs
+        run: |
+          # Extract GRUB config blocks from kiba.yml
+          sed -n '/BOOT_HOOK/,/BOOT_HOOK/p' .github/workflows/kiba.yml | grep "sed -i" > grub_patches.sh
+
+          echo "### GRUB Configuration Audit" >> $GITHUB_STEP_SUMMARY
+          if [ -s grub_patches.sh ]; then
+             echo "Verified: Build script contains GRUB branding logic." >> $GITHUB_STEP_SUMMARY
+             # Mock a grub.cfg to test the patches
+             echo "menuentry 'Debian Live' { linux /vmlinuz }" > mock_grub.cfg
+             bash grub_patches.sh mock_grub.cfg
+             if grep -q "KibaOS" mock_grub.cfg; then
+                echo "- :white_check_mark: Branding patches apply correctly to mock config." >> $GITHUB_STEP_SUMMARY
+             else
+                echo "- :x: Branding patches failed to transform 'Debian Live'." >> $GITHUB_STEP_SUMMARY
+             fi
+          else
+             echo "- :warning: No GRUB branding logic found in build script." >> $GITHUB_STEP_SUMMARY
+          fi

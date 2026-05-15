@@ -1,0 +1,39 @@
+name: Plymouth Script Validator
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/kiba.yml'
+  workflow_dispatch:
+
+jobs:
+  plymouth-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Plymouth Script Syntax
+        run: |
+          # Extract the Plymouth script from kiba.yml
+          sed -n '/PLYMOUTH_SCRIPT/,/PLYMOUTH_SCRIPT/p' .github/workflows/kiba.yml | grep -v 'PLYMOUTH_SCRIPT' > kibaos.script
+
+          echo "### Plymouth Script Validation" >> $GITHUB_STEP_SUMMARY
+
+          # Basic syntax check: look for unclosed braces or quotes
+          BRACES_OPEN=$(grep -o "{" kibaos.script | wc -l)
+          BRACES_CLOSE=$(grep -o "}" kibaos.script | wc -l)
+
+          if [ "$BRACES_OPEN" -eq "$BRACES_CLOSE" ]; then
+             echo "- :white_check_mark: Braces are balanced ($BRACES_OPEN open/close)." >> $GITHUB_STEP_SUMMARY
+          else
+             echo "- :x: Mismatched braces! ($BRACES_OPEN open vs $BRACES_CLOSE close)." >> $GITHUB_STEP_SUMMARY
+             exit 1
+          fi
+
+          # Check for mandatory Plymouth functions
+          for func in "Plymouth.SetBootProgressFunction" "Plymouth.SetMessageFunction"; do
+            if grep -q "$func" kibaos.script; then
+              echo "- :white_check_mark: Found mandatory call: $func" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- :warning: Missing mandatory call: $func" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

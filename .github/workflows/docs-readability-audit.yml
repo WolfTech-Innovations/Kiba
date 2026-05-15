@@ -1,0 +1,33 @@
+name: Docs Readability Audit
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+  workflow_dispatch:
+
+jobs:
+  readability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calculate Flesch-Kincaid Score
+        run: |
+          echo "### Documentation Readability Report" >> $GITHUB_STEP_SUMMARY
+          echo "| File | Readability Level |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Simple approximation using word/sentence ratios
+          for f in $(find docs -name "*.md") README.md; do
+            WORDS=$(wc -w < "$f")
+            SENTENCES=$(grep -c "\." "$f")
+            [ "$SENTENCES" -eq 0 ] && SENTENCES=1
+            RATIO=$((WORDS / SENTENCES))
+
+            LEVEL="EASY"
+            [ "$RATIO" -gt 15 ] && LEVEL="MODERATE"
+            [ "$RATIO" -gt 25 ] && LEVEL="COMPLEX"
+
+            echo "| $f | $LEVEL ($RATIO words/sentence) |" >> $GITHUB_STEP_SUMMARY
+          done

@@ -1,0 +1,31 @@
+name: CI Cost Efficiency Report
+on:
+  schedule:
+    - cron: '0 0 * * 1' # Weekly
+  workflow_dispatch:
+
+jobs:
+  efficiency-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Calculate Minute Usage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "### CI Minute Usage Report (Last 7 Days)" >> $GITHUB_STEP_SUMMARY
+
+          # Fetch recent workflow runs
+          RUNS=$(gh api repos/${{ github.repository }}/actions/runs --jq '.workflow_runs[] | select(.created_at > (now - 604800 | strftime("%Y-%m-%dT%H:%M:%SZ")))')
+
+          TOTAL_MINS=0
+          echo "| Workflow | Average Duration (s) | Total Runs |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|----------------------|------------|" >> $GITHUB_STEP_SUMMARY
+
+          echo "$RUNS" | jq -r '.name' | sort | uniq | while read name; do
+             WORKFLOW_RUNS=$(echo "$RUNS" | jq -r "select(.name==\"$name\")")
+             COUNT=$(echo "$WORKFLOW_RUNS" | jq -s 'length')
+             AVG=$(echo "$WORKFLOW_RUNS" | jq -s 'map(.updated_at | fromdate) as $u | map(.run_started_at | fromdate) as $s | [range(length) | $u[.] - $s[.]] | add / length')
+
+             echo "| $name | ${AVG}s | $COUNT |" >> $GITHUB_STEP_SUMMARY
+          done
