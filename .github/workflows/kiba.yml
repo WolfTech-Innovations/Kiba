@@ -17,6 +17,7 @@ jobs:
           cat > build.sh << 'BUILD_SCRIPT_EOF'
           #!/bin/bash
           set -ex
+          set -o pipefail
           export DEBIAN_FRONTEND=noninteractive
 
           # ── Install live-build and build deps ─────────────────────────────────
@@ -26,8 +27,8 @@ jobs:
             qemu-system-x86 \
             meson ninja-build pkg-config \
             libgtk-4-dev libadwaita-1-dev libflatpak-dev libappstream-dev \
-             libjson-glib-dev libostree-dev \
-            gcc g++ gettext
+            libjson-glib-dev libostree-dev \
+            gcc g++ gettext jq
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
@@ -112,63 +113,61 @@ jobs:
           # Use an active CachyOS kernel deb repository (psygreg/linux-psycachy)
           # For trixie, we'll try to find the latest version from their GitHub
           REPO="psygreg/linux-psycachy"
-          RELEASE_INFO=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
-          LATEST_TAG=$(echo "$RELEASE_INFO" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+          RELEASE_JSON=$(curl -s "https://api.github.com/repos/$REPO/releases/latest")
+          LATEST_TAG=$(echo "$RELEASE_JSON" | jq -r '.tag_name')
 
-          if [ -z "$LATEST_TAG" ]; then
-            echo "WARNING: Could not fetch CachyOS Kernel tag, using fallback"
-            # Fallback to a known version or exit
-            exit 0
-          fi
+          if [ -n "$LATEST_TAG" ] && [ "$LATEST_TAG" != "null" ]; then
+            mkdir -p /tmp/cachyos
+            cd /tmp/cachyos
 
-          mkdir -p /tmp/cachyos
-          cd /tmp/cachyos
+            # Download image and headers using jq for robust asset selection
+            IMAGE_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | contains("linux-image-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
+            HEADERS_URL=$(echo "$RELEASE_JSON" | jq -r '.assets[] | select(.name | contains("linux-headers-psycachy") and contains("amd64.deb")) | .browser_download_url' | head -n 1)
 
-          # Download image and headers
-          IMAGE_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-image-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
-          HEADERS_URL=$(echo "$RELEASE_INFO" | grep '"browser_download_url":' | grep "linux-headers-psycachy" | grep "amd64.deb" | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+            if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
+              echo "WARNING: Could not find CachyOS image URL via API, attempting fallback pattern search"
+              for sfx in -3 -2 -1; do
+                TEST_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}${sfx}_amd64.deb"
+                if curl --head --silent --fail "$TEST_URL" >/dev/null; then
+                  IMAGE_URL="$TEST_URL"
+                  break
+                fi
+              done
+            fi
 
-          if [ -z "$IMAGE_URL" ]; then
-            echo "WARNING: Could not find CachyOS image URL, using fallback pattern search"
-            for sfx in -3 -2 -1; do
-              TEST_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-image-psycachy_${LATEST_TAG}${sfx}_amd64.deb"
-              if curl --head --silent --fail "$TEST_URL" >/dev/null; then
-                IMAGE_URL="$TEST_URL"
-                break
-              fi
-            done
-          fi
+            if [ -z "$HEADERS_URL" ] || [ "$HEADERS_URL" = "null" ]; then
+              echo "WARNING: Could not find CachyOS headers URL via API, attempting fallback pattern search"
+              for sfx in -3 -2 -1; do
+                TEST_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}${sfx}_amd64.deb"
+                if curl --head --silent --fail "$TEST_URL" >/dev/null; then
+                  HEADERS_URL="$TEST_URL"
+                  break
+                fi
+              done
+            fi
 
-          if [ -z "$HEADERS_URL" ]; then
-            echo "WARNING: Could not find CachyOS headers URL, using fallback pattern search"
-            for sfx in -3 -2 -1; do
-              TEST_URL="https://github.com/$REPO/releases/download/$LATEST_TAG/linux-headers-psycachy_${LATEST_TAG}${sfx}_amd64.deb"
-              if curl --head --silent --fail "$TEST_URL" >/dev/null; then
-                HEADERS_URL="$TEST_URL"
-                break
-              fi
-            done
-          fi
+            if [ -n "$IMAGE_URL" ] && [ "$IMAGE_URL" != "null" ]; then curl -LO "$IMAGE_URL"; fi
+            if [ -n "$HEADERS_URL" ] && [ "$HEADERS_URL" != "null" ]; then curl -LO "$HEADERS_URL"; fi
 
-          if [ -n "$IMAGE_URL" ]; then curl -LO "$IMAGE_URL"; fi
-          if [ -n "$HEADERS_URL" ]; then curl -LO "$HEADERS_URL"; fi
+            # Install
+            if ls ./*.deb 1> /dev/null 2>&1; then
+              apt install -y ./*.deb || echo "WARNING: CachyOS Kernel install failed, falling back to stock"
+            fi
 
-          # Install
-          apt install -y ./*.deb || {
-            echo "WARNING: CachyOS Kernel install failed, falling back to stock"
+            # Cleanup
             cd / && rm -rf /tmp/cachyos
-            exit 0
-          }
 
-          # Cleanup
-          cd / && rm -rf /tmp/cachyos
+            # Remove stock kernel meta-packages to keep it minimal
+            # We don't use wildcards to avoid purging the CachyOS kernel we just installed
+            if [ -f /boot/vmlinuz*psycachy* ]; then
+              apt purge -y linux-image-amd64 linux-headers-amd64
+              apt autoremove -y
+            fi
+          else
+            echo "WARNING: Could not fetch CachyOS Kernel tag, skipping installation"
+          fi
 
-          # Remove stock kernel meta-packages to keep it minimal
-          # We don't use wildcards to avoid purging the CachyOS kernel we just installed
-          apt purge -y linux-image-amd64 linux-headers-amd64
-          apt autoremove -y
-
-          echo "=== CachyOS Kernel installed ==="
+          echo "=== CachyOS Kernel hook complete ==="
           CACHY_HOOK
           chmod +x config/hooks/live/0045-cachyos-kernel.hook.chroot
 
@@ -296,6 +295,7 @@ jobs:
 
           # ── KDE Plasma 6 minimal working set ─────────────────────────────────
           plasma-desktop
+          systemsettings
           plasma-workspace
           plasma-workspace-wallpapers
           plasma-discover
@@ -1271,10 +1271,12 @@ jobs:
               --image-column=1 --column=" " --column="Tag" --column="Action" --column="Description" \
               "calamares" "install" "🚀 Install KibaOS" "Install the system permanently to your disk" \
               "chromium" "browser" "🌐 Web Browser" "Browse the internet" \
-              "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
+              "org.kde.discover" "store" "🛍️ KibaStore (Software Center)" "Discover and install new applications" \
               "utilities-terminal" "terminal" "🖥️ Open Terminal" "Productivity tip: Use Meta+T to launch" \
               "system-file-manager" "files" "📁 File Manager" "Productivity tip: Use Meta+E to browse" \
+              "preferences-system" "settings" "⚙️ System Settings" "Configure desktop and system behavior" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "dialog-information" "info" "↕️ System Information" "View technical details about this build" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
               --hide-column=1 --hide-column=2 --print-column=2 \
               --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
@@ -1301,6 +1303,13 @@ jobs:
               "files")
                 dolphin &
                 break
+                ;;
+              "settings")
+                systemsettings &
+                break
+                ;;
+              "info")
+                (fastfetch | zenity --text-info --title="KibaOS System Information" --width=600 --height=500 --font="Monospace 10") &
                 ;;
               "shortcuts")
                 (zenity --list --title="KibaOS Shortcuts" \
@@ -1412,7 +1421,6 @@ jobs:
               - users
               - summary
             - exec:
-              - ageverify
               - partition
               - mount
               - unpackfs
