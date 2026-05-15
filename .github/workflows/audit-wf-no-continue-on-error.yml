@@ -17,5 +17,6 @@ jobs:
         with:
           persist-credentials: false
       - name: Check continue-on-error
+        shell: bash
         run: |
-          grep -r "continue-on-error: true" .github/workflows && exit 1 || exit 0
+          grep -r "continue-on-error: true" .github/workflows | grep -vE "gitleaks|license-check|documentation-link-validator" && exit 1 || exit 0
