@@ -1274,8 +1274,9 @@ jobs:
               "chromium" "browser" "🌐 Web Browser" "Browse the internet" \
               "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
               "utilities-terminal" "terminal" "🖥️ Open Terminal" "Productivity tip: Use Meta+T to launch" \
-              "system-file-manager" "files" "📁 File Manager" "Productivity tip: Use Meta+E to browse" \
+              "system-file-manager" "files" "📂 File Manager" "Productivity tip: Use Meta+E to browse" \
               "preferences-system" "settings" "⚙️ System Settings" "Configure your desktop and hardware" \
+              "dialog-information" "info" "ℹ️ System Information" "View technical system details" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
               --hide-column=1 --hide-column=2 --print-column=2 \
@@ -1308,23 +1309,26 @@ jobs:
                 systemsettings &
                 break
                 ;;
+              "info")
+                (fastfetch | zenity --text-info --title="KibaOS System Information" --font="Monospace 10" --width=600 --height=500) &
+                ;;
               "shortcuts")
                 (zenity --list --title="KibaOS Shortcuts" \
                   --window-icon="/usr/share/kibaos/logo.png" \
                   --width=450 --height=500 \
                   --image-column=1 --column=" " --column="Action" --column="Shortcut" \
-                  "start-here-kde-symbolic" "Application Menu" "Meta" \
-                  "utilities-terminal" "Terminal (Konsole)" "Meta + T" \
-                  "chromium" "Web Browser (Chromium)" "Meta + B" \
-                  "view-presentation" "Overview (Grid)" "Meta + W" \
-                  "view-fullscreen" "Desktop Grid" "Meta + G" \
-                  "edit-find" "Search (KRunner)" "Meta + S" \
-                  "configure" "Quick Settings" "Meta + A" \
-                  "user-desktop" "Show Desktop" "Meta + D" \
-                  "view-split-left-right" "Tile Window" "Meta + Arrows" \
-                  "system-file-manager" "File Manager" "Meta + E" \
-                  "system-lock-screen" "Lock Screen" "Meta + L" \
-                  "view-list-icons" "Task Manager" "Meta + 1-9" \
+                  "start-here-kde-symbolic" "🚀 Application Menu" "Meta" \
+                  "utilities-terminal" "🖥️ Terminal (Konsole)" "Meta + T" \
+                  "chromium" "🌐 Web Browser (Chromium)" "Meta + B" \
+                  "view-presentation" "↔️ Overview (Grid)" "Meta + W" \
+                  "view-fullscreen" "↕️ Desktop Grid" "Meta + G" \
+                  "edit-find" "🔍 Search (KRunner)" "Meta + S" \
+                  "configure" "⚙️ Quick Settings" "Meta + A" \
+                  "user-desktop" "✨ Show Desktop" "Meta + D" \
+                  "view-split-left-right" "↔️ Tile Window" "Meta + Arrows" \
+                  "system-file-manager" "📂 File Manager" "Meta + E" \
+                  "system-lock-screen" "🔒 Lock Screen" "Meta + L" \
+                  "view-list-icons" "↕️ Task Manager" "Meta + 1-9" \
                   --hide-column=1 --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
                 ;;
               "wiki")
