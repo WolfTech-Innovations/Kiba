@@ -23,11 +23,11 @@ To begin contributing to the KibaTV build system or customization hooks, follow 
 2. **Setup Environment:** Ensure you have **Docker** installed on a Linux host.
 3. **Local Build:** Run a local build to ensure your environment is working:
 
-   ```bash
-   git clone [https://github.com/YOUR_USERNAME/Kiba](https://github.com/YOUR_USERNAME/Kiba)
-   cd Kiba
-   docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
 ```bash
+git clone https://github.com/YOUR_USERNAME/Kiba
+cd Kiba
+docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
+```
 
 ---
 
@@ -58,7 +58,8 @@ If you're ready to contribute code or documentation:
 2. **Follow the coding style** used in the project.
 3. **Verify your changes** by running relevant build scripts or tests.
 4. **Submit a pull request** with a clear description of your changes and reference any related issues.
-   If you find a bug, please open an issue. Provide:
+
+If you find a bug, please open an issue. Provide:
 
 - Steps to reproduce.
 - Expected vs. Actual behavior.

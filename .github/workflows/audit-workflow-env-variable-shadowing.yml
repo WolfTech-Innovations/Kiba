@@ -12,7 +12,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Env
         run: |
           grep -rE "^[[:space:]]+env:" .github/workflows/ -A 10 | grep -v "env:" | sort | uniq -d | grep -v "\-\-" && (echo "Potential environment variable shadowing detected" && exit 1) || echo "No shadowing found"

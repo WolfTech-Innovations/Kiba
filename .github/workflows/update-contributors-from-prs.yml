@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 5
     if: github.event.pull_request.merged == true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Add Contributor
         shell: bash
         env:

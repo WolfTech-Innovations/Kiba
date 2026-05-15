@@ -98,7 +98,7 @@ SHA256 checksums are provided alongside each release. Always verify your downloa
 
 On Linux:
 
-```bash
+````bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```bash
 
@@ -247,3 +247,4 @@ KibaOS is a distribution, not a single codebase. Individual components are subje
 
 KibaOS is a **WolfTech Innovations** project.
 [Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)
+````

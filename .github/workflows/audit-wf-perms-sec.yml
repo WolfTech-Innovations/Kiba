@@ -12,5 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Permissions
+        shell: bash
         run: |
-          ! grep 'permissions: write-all' .github/workflows/*.yml
+          ! grep 'permissions: write-all' .github/workflows/*.yml | grep -v "audit-wf-perms-sec.yml"
