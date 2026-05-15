@@ -9,6 +9,10 @@ concurrency:
 jobs:
   check-name:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Validate
-        run: echo "Branch is ${{ github.head_ref }}"
+        shell: bash
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: echo "Branch is $HEAD_REF"

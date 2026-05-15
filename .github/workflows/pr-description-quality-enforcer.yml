@@ -22,6 +22,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Validate PR Description
+        shell: bash
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |

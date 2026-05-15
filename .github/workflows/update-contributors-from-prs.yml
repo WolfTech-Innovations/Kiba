@@ -10,10 +10,12 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: github.event.pull_request.merged == true
     steps:
       - uses: actions/checkout@v4
       - name: Add Contributor
+        shell: bash
         env:
           PR_USER: ${{ github.event.pull_request.user.login }}
         run: |
