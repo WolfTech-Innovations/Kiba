@@ -1268,8 +1268,6 @@ jobs:
               "calamares" "install" "🚀 Install KibaOS" "Install the system permanently to your disk" \
               "chromium" "browser" "🌐 Web Browser" "Browse the internet" \
               "org.kde.discover" "store" "🛍️ Software Center" "Discover and install new applications" \
-              "utilities-terminal" "terminal" "🖥️ Open Terminal" "Productivity tip: Use Meta+T to launch" \
-              "system-file-manager" "files" "📁 File Manager" "Productivity tip: Use Meta+E to browse" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
               --hide-column=1 --hide-column=2 --print-column=2 \
@@ -1288,14 +1286,6 @@ jobs:
                 ;;
               "store")
                 plasma-discover &
-                break
-                ;;
-              "terminal")
-                konsole &
-                break
-                ;;
-              "files")
-                dolphin &
                 break
                 ;;
               "shortcuts")
@@ -1331,10 +1321,8 @@ jobs:
           [Desktop Entry]
           Type=Application
           Name=Kiba Welcome
-          GenericName=Onboarding Tool
           Comment=Welcome to KibaOS
           Exec=/usr/local/bin/kiba-welcome
-          Categories=System;Utility;
           Icon=start-here-kde-symbolic
           Terminal=false
           X-KDE-autostart-condition=kiba-welcome
