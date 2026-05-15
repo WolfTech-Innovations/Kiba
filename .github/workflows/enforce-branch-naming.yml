@@ -11,4 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate
-        run: echo "Branch is ${{ github.head_ref }}"
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: echo "Branch is $HEAD_REF"

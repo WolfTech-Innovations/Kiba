@@ -16,4 +16,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check for Direct Expansion
         run: |
-          grep -r "run:.*\${{.*github\.event\.pull_request\.body.*}}" .github/workflows/ && (echo "Direct expansion of PR body detected - use env variables instead" && exit 1) || echo "No direct expansion of PR body found"
+          # Audit for direct expansion of potentially untrusted github context variables in run blocks.
+          # Untrusted: github.event.issue.title, github.event.issue.body, github.event.pull_request.title,
+          # github.event.pull_request.body, github.event.comment.body, github.event.review.body,
+          # github.event.review_comment.body, github.head_ref, github.base_ref, etc.
+          grep -rE "run:.*\$\{\{[[:space:]]*github\.(head_ref|base_ref|event\.(issue|pull_request|comment|review|review_comment)\.(title|body|head_ref|base_ref))" .github/workflows/ | grep -v "audit-workflow-run-step-injection.yml" && (echo "Direct expansion of potentially untrusted GitHub context detected in 'run' block - use environment variables instead to prevent command injection." && exit 1) || echo "No direct expansion of untrusted context found"

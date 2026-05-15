@@ -12,7 +12,9 @@ jobs:
         fetch-depth: 0
         persist-credentials: false
     - name: Verify Commits
-      run: "for sha in $(git rev-list origin/${{ github.base_ref }}..HEAD); do\n \
+      env:
+        BASE_REF: ${{ github.base_ref }}
+      run: "for sha in $(git rev-list origin/$BASE_REF..HEAD); do\n \
         \ subject=$(git log -1 --format=%s $sha)\n  if [ ${#subject} -lt 10 ]; then\
         \ echo \"Subject too short: $subject\"; exit 1; fi\ndone"
     timeout-minutes: 5
