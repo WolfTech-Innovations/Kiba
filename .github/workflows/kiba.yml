@@ -565,22 +565,26 @@ jobs:
           setopt INC_APPEND_HISTORY
 
           # ── Completion ─────────────────────────────────────────
-          autoload -Uz compinit && compinit -u
+          # KibaOS optimization: cache compinit dump for 24h
+          setopt extendedglob
+          if [[ -n ~/.zcompdump(N.mh-24) ]]; then
+            autoload -Uz compinit && compinit -u -C
+          else
+            autoload -Uz compinit && compinit -u
+          fi
           zstyle ':completion:*' menu select
           zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
           zstyle ':completion:*:descriptions' format '%F{yellow}-- %d --%f'
-
-          # ── VCS info (git branch in prompt) ────────────────────
-          autoload -Uz vcs_info
-          precmd() { vcs_info }
-          zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
-          setopt PROMPT_SUBST
 
           # ── Prompt — Starship (Modern) ──────────────────────────
           if command -v starship >/dev/null 2>&1; then
             eval "$(starship init zsh)"
           else
-            # Fallback to Dracula palette
+            # Fallback to Dracula palette with vcs_info only when starship is missing
+            autoload -Uz vcs_info
+            zstyle ':vcs_info:git:*' formats ' %F{#50fa7b}(%b)%f'
+            setopt PROMPT_SUBST
+            precmd() { vcs_info }
             PROMPT='%F{#bd93f9}%n@%m%f %F{#f8f8f2}%~%f${vcs_info_msg_0_} %F{#bd93f9}❯%f '
           fi
 
