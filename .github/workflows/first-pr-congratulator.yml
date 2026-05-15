@@ -17,10 +17,9 @@ jobs:
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_USER: ${{ github.event.pull_request.user.login }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          USER_LOGIN: ${{ github.event.pull_request.user.login }}
         run: |
-          PR_COUNT=$(gh pr list --author "$PR_USER" --state all --json number --jq '. | length')
+          PR_COUNT=$(gh pr list --author "$USER_LOGIN" --state all --json number --jq '. | length')
           if [ "$PR_COUNT" -eq 1 ]; then
-            gh pr comment "$PR_NUMBER" --body "🎉 Congratulations on your first PR to KibaOS, @$PR_USER! We appreciate your contribution."
+            gh pr comment ${{ github.event.pull_request.number }} --body "🎉 Congratulations on your first PR to KibaOS, @$USER_LOGIN! We appreciate your contribution."
           fi

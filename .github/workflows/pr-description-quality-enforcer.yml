@@ -26,11 +26,12 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          LENGTH=${#PR_BODY}
+          BODY="$PR_BODY"
+          LENGTH=${#BODY}
           if [ "$LENGTH" -lt 50 ]; then
             echo "PR description is too short ($LENGTH characters). Please provide more context."
             exit 1
           fi
-          if ! echo "$PR_BODY" | grep -qiE "closes|fixes|resolves"; then
+          if ! echo "$BODY" | grep -qiE "closes|fixes|resolves"; then
              echo "PR description should link to an issue (Closes #123)."
           fi

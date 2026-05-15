@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/checkout@v4
       - name: Check Shortcuts for Meta
         run: |
           sed -n "/cat > \"\$SKEL_KDE\/kglobalshortcutsrc\" << 'KGLOBAL'/,/KGLOBAL/p" .github/workflows/kiba.yml | grep "=" | grep -v "KGLOBAL" > shortcuts.txt

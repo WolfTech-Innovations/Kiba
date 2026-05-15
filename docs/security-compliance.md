@@ -1,7 +1,7 @@
 # Security & Compliance
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaOS Banner" width="100%">
 </p>
 
 <p align="center">
@@ -10,15 +10,11 @@
   <img src="https://img.shields.io/badge/Security-Hardened-red?style=for-the-badge" alt="Hardened">
 </p>
 
----
-
-KibaTV is built with a "Privacy by Design" philosophy. We go beyond standard security practices to ensure compliance with modern digital safety laws and to minimize the system's attack surface.
-
----
+KibaOS is built with a "Privacy by Design" philosophy. We go beyond standard security practices to ensure compliance with modern digital safety laws and to minimize the system's attack surface.
 
 ## California Age-Appropriate Design Code (AB 2273)
 
-To comply with the California Age-Appropriate Design Code Act, KibaTV features a custom **Age Verification** module within the **Calamares** installer.
+To comply with the California Age-Appropriate Design Code Act, KibaOS features a custom **Age Verification** module within the **Calamares** installer.
 
 ### Implementation
 
@@ -28,7 +24,7 @@ To comply with the California Age-Appropriate Design Code Act, KibaTV features a
 
 ### Privacy and Data Storage
 
-In accordance with KibaTV's privacy-first philosophy:
+In accordance with KibaOS's privacy-first philosophy:
 
 - **Local Storage Only:** The selected age group is stored exclusively on the user's local machine at `/etc/kibatv/age-verify`.
 - **No Transmission:** This data is **never** transmitted to WolfTech Innovations or any other external servers.
@@ -46,11 +42,9 @@ In strict adherence to our privacy goals:
 - **Local Record:** Data is stored exclusively at **`/etc/kibatv/age-verify`**.
 - **User Control:** You can delete or modify this file at any time after installation.
 
----
-
 ## System Hardening
 
-KibaTV implements several strategies to keep your data safe and your system resilient.
+KibaOS implements several strategies to keep your data safe and your system resilient.
 
 ### Minimal Attack Surface
 
@@ -67,17 +61,13 @@ The **CachyOS Kernel** isn't just for performance; it includes modern security p
 - **Live Session:** The `user` account has passwordless sudo for ease of testing.
 - **Installed System:** The installer forces the creation of a secure root and user password, and the passwordless sudo privilege is automatically revoked.
 
----
-
 ## Privacy by Design
 
 We believe your operating system should be a tool, not a tracker.
 
-- **No Telemetry:** KibaTV does not include any built-in telemetry or data collection services.
+- **No Telemetry:** KibaOS does not include any built-in telemetry or data collection services.
 - **Ungoogled Chromium:** Our default browser is stripped of Google-specific tracking and background services.
 - **Flatpak Sandboxing:** We encourage the use of Flatpaks via **KibaStore**, which provides an additional layer of isolation between your applications and your private data.
-
----
 
 ## Related Reading
 

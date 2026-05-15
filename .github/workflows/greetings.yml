@@ -17,5 +17,5 @@ jobs:
       - uses: actions/first-interaction@3c71ce730280171fd1cfb57c00c774f8998586f7
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          issue-message: "Hello! Thank you for opening your first issue in KibaTV. We'll get back to you soon!"
-          pr-message: "Welcome! Thank you for your first contribution to KibaTV. We'll review your PR as soon as possible."
+          issue-message: "Hello! Thank you for opening your first issue in KibaOS. We'll get back to you soon!"
+          pr-message: "Welcome! Thank you for your first contribution to KibaOS. We'll review your PR as soon as possible."

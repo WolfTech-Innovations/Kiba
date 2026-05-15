@@ -1,7 +1,7 @@
-# KibaTV Wiki
+# KibaOS Wiki
 
 <p align="center">
-  <img src="branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
+  <img src="branding/kibatv_banner.png" alt="KibaOS Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -12,9 +12,7 @@
   <img src="https://img.shields.io/badge/Status-Stable-success?style=for-the-badge" alt="Status">
 </p>
 
-Welcome to the official **KibaTV Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaTV.
-
----
+Welcome to the official **KibaOS Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaOS.
 
 ## Table of Contents
 
@@ -38,11 +36,9 @@ Welcome to the official **KibaTV Wiki**. This document provides an exhaustive de
 - [Community & Support](#-community--support)
 - [License](#-license)
 
----
-
 ## 📖 Extended Documentation
 
-For more specific details on the various components of KibaTV, please refer to the following documents:
+For more specific details on the various components of KibaOS, please refer to the following documents:
 
 - [**Architecture Deep-Dive**](./docs/architecture.md)
 - [**UX & Visual Design**](./docs/ux-design.md)
@@ -52,13 +48,11 @@ For more specific details on the various components of KibaTV, please refer to t
 - [**Contributing Guidelines**](./docs/contributing.md)
 - [**Frequently Asked Questions**](./docs/faq.md)
 
----
-
 ## 🏗️ Architecture & Core Components
 
 ### Base System
 
-KibaTV is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
+KibaOS is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
 
 - **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
 - **Init System:** **Systemd**.
@@ -74,13 +68,11 @@ The system undergoes aggressive footprint reduction during the build process:
 - **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-bigscreen` + `plasma-workspace` combination.
 - **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
 
----
-
 ## 🎨 User Experience (UX) & Design
 
 ### Visual Identity
 
-KibaTV follows the **Dracula** color palette for system-wide visual consistency.
+KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
 | Component               | Choice               |
 | ----------------------- | -------------------- |
@@ -113,13 +105,11 @@ KibaTV follows the **Dracula** color palette for system-wide visual consistency.
 - **Plymouth:** Custom "kibatv-spinner" theme with a Dracula-themed progress bar and logo.
 - **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
 
----
-
 ## 📦 Software Management
 
 ### KibaStore
 
-KibaTV features **KibaStore**, which is a native build of **Bazaar**. It serves as a user-friendly frontend for managing **Flatpaks** without the overhead of heavy software centers.
+KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves as a user-friendly frontend for managing **Flatpaks** without the overhead of heavy software centers.
 
 ### Repositories & Packages
 
@@ -127,22 +117,18 @@ KibaTV features **KibaStore**, which is a native build of **Bazaar**. It serves 
 - **Flatpak:** Integrated by default with the **Flathub** remote.
 - **Nala:** Configured as the primary package manager frontend with system-wide aliases (`apt` -> `nala`).
 
----
-
 ## 🛡️ Security & Compliance
 
 ### California AADC (AB 2273)
 
-KibaTV includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
+KibaOS includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
 
 - **Implementation:** A Python-based view module in the installer.
 - **Privacy:** Data is stored **locally only** at `/etc/kibatv/age-verify` and is never transmitted to external servers.
 
----
-
 ## 🚀 Build Infrastructure
 
-KibaTV uses a highly automated CI/CD pipeline.
+KibaOS uses a highly automated CI/CD pipeline.
 
 ### Build Pipeline
 
@@ -155,8 +141,6 @@ KibaTV uses a highly automated CI/CD pipeline.
 
 - **Compression:** The SquashFS filesystem is repacked with **Zstd** (compression level 19) for maximum space efficiency and decompression speed.
 - **Initramfs:** Configured with `zstd -19` for faster boot times.
-
----
 
 ## 🛠️ Build Locally
 
@@ -175,8 +159,6 @@ docker run --rm --privileged \
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.
 
----
-
 ## 🤝 Community & Support
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
@@ -184,11 +166,9 @@ docker run --rm --privileged \
 - **Organization:** [WolfTech Innovations](https://github.com/WolfTech-Innovations)
 - **Acknowledgments:** [Community & FOSS](./ACKNOWLEDGMENTS.md)
 
----
-
 ## ⚖️ License
 
-KibaTV is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
+KibaOS is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
 
 > [!NOTE]
-> KibaTV is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
+> KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.

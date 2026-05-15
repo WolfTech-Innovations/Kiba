@@ -28,8 +28,6 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
   </a>
 </p>
 
----
-
 ## Table of Contents
 
 - [Documentation](#documentation)
@@ -50,11 +48,7 @@ KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with 
 - [License](#license)
 - [About](#about)
 
----
-
 The goal of KibaOS is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
-
----
 
 ## Documentation
 
@@ -68,8 +62,6 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
----
-
 ## Features
 
 - **Debian Base:** Built on **Debian 13 Trixie** (supported until 2030).
@@ -80,8 +72,6 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
 - **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
 - **Performance:** No bloat — only what you need is installed.
-
----
 
 ## Quick Start
 
@@ -98,7 +88,7 @@ SHA256 checksums are provided alongside each release. Always verify your downloa
 
 On Linux:
 
-````bash
+```bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
 ```bash
 
@@ -134,8 +124,6 @@ Post-install, update your system:
 ```bash
 sudo apt update && sudo apt upgrade -y
 ```bash
-
----
 
 ## Technical Details
 
@@ -181,8 +169,6 @@ The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Br
 | **Disk**  | 20 GB                  | **SSD** recommended |
 | **GPU**   | **OpenGL 2.0** support | Dedicated GPU       |
 
----
-
 ## Build System
 
 <p align="left">
@@ -214,8 +200,6 @@ docker run --rm --privileged \
 > [!NOTE]
 > The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
 
----
-
 ## Project Structure
 
 ```text
@@ -229,22 +213,15 @@ Kiba/
 └── README.md                  # Project documentation
 ```bash
 
----
-
 ## Contributing
 
 Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
-
----
 
 ## License
 
 KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
 
----
-
 ## About
 
 KibaOS is a **WolfTech Innovations** project.
 [Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)
-````

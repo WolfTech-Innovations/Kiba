@@ -1,7 +1,7 @@
 # UX & Visual Design
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaOS Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -10,11 +10,7 @@
   <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
----
-
-KibaTV is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
-
----
+KibaOS is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
 
 ## Table of Contents
 
@@ -28,7 +24,7 @@ KibaTV is built with a focus on "modern simplicity." This document details the v
   - [System-wide Aliases](#system-wide-aliases)
 - [Boot Branding](#boot-branding)
   - [Interface Components](#interface-components)
-  - [Typography](#interface-components)
+  - [Typography](#typography)
 - [Desktop Experience (Plasma Bigscreen)](#desktop-experience-plasma-bigscreen)
   - [Window Management Polish](#window-management-polish)
   - [Desktop Layout](#desktop-layout)
@@ -37,23 +33,21 @@ KibaTV is built with a focus on "modern simplicity." This document details the v
   - [Shell Configuration (Zsh)](#shell-configuration-zsh)
 - [Related Reading](#related-reading)
 
----
-
 ## Visual Identity
 
-The KibaTV aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
+The KibaOS aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
 
 ### Color Palette
 
-| Color            | Hex                 | Role                                                     |
-| :--------------- | :------------------ | :------------------------------------------------------- |
+| Color            | Hex                | Role                                                     |
+| :--------------- | :----------------- | :------------------------------------------------------- |
 | **Background**   | `\#`\hex 0x282a36`` | Primary window and desktop background                    |
-| **Current Line** | `\#`\hex #44475a``  | Highlight and secondary background                       |
-| **Foreground**   | `\#`\#f8f8f2``      | Primary text color                                       |
-| **Comment**      | `\#`\#6272a4``      | Secondary text and disabled elements                     |
-| **Purple**       | `\#`\#bd93f9``      | Accent color, selection background, and primary branding |
-| **Pink**         | `\#`\#ff79c6``      | Selection foreground and highlights                      |
-| **Green**        | `\#`\#50fa7b``      | Success states and active terminal elements              |
+| **Current Line** | `\#`\hex #44475a`` | Highlight and secondary background                       |
+| **Foreground**   | `\#`\#f8f8f2``     | Primary text color                                       |
+| **Comment**      | `\#`\#6272a4``     | Secondary text and disabled elements                     |
+| **Purple**       | `\#`\#bd93f9``     | Accent color, selection background, and primary branding |
+| **Pink**         | `\#`\#ff79c6``     | Selection foreground and highlights                      |
+| **Green**        | `\#`\#50fa7b``     | Success states and active terminal elements              |
 
 ### Look and Feel
 
@@ -72,7 +66,7 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 
 ## Shell Experience
 
-KibaTV provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
+KibaOS provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
 
 ### Starship Prompt
 
@@ -121,11 +115,9 @@ The branding experience starts from the moment the system boots:
   - **System UI:** **Inter** (11pt) — A modern sans-serif designed for screens.
   - **Monospace:** **JetBrains Mono** (11pt) — Optimized for code and terminal legibility.
 
----
-
 ## Desktop Experience (Plasma Bigscreen)
 
-KibaTV leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
@@ -138,11 +130,9 @@ KibaTV leverages the power of **Plasma Bigscreen** but configures it for a strea
 - **Minimalist Panel:** Contains the application launcher, task manager, system tray, and clock.
 - **Clean Desktop:** No icons by default, keeping the workspace clutter-free.
 
----
-
 ## The Modern Terminal
 
-KibaTV provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
+KibaOS provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
 
 ### Modern Alternative Comparison
 
@@ -165,8 +155,6 @@ KibaTV provides one of the most powerful terminal experiences of any distributio
 - **Autosuggestions:** Fish-like autosuggestions as you type.
 - **Syntax Highlighting:** Real-time highlighting of commands and arguments.
 - **FZF Integration:** Fuzzy finding for command history and file navigation.
-
----
 
 ## Related Reading
 

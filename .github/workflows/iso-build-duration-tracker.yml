@@ -14,8 +14,4 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Log Duration
-        shell: bash
-        env:
-          UPDATED_AT: ${{ github.event.workflow_run.updated_at }}
-          STARTED_AT: ${{ github.event.workflow_run.run_started_at }}
-        run: echo "Build took $UPDATED_AT - $STARTED_AT"
+        run: echo "Build took ${{ github.event.workflow_run.updated_at }} - ${{ github.event.workflow_run.run_started_at }}"

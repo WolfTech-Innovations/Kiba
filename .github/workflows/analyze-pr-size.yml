@@ -14,5 +14,5 @@ jobs:
       - name: Size
         shell: bash
         env:
-          ADDITIONS: ${{ github.event.pull_request.additions }}
-        run: echo "PR Size additions: $ADDITIONS"
+          PR_ADDITIONS: ${{ github.event.pull_request.additions }}
+        run: echo "PR Size additions: $PR_ADDITIONS"

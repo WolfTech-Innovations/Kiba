@@ -1,30 +1,26 @@
 # Frequently Asked Questions (FAQ)
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaOS Banner" width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Helpful-blue?style=for-the-badge" alt="Helpful">
 </p>
 
----
-
 ## General Questions
 
-### What is KibaTV
+### What is KibaOS
 
-KibaTV is a modern, lightweight Linux distribution built on **Debian 13 (Trixie)** with **Plasma Bigscreen** and the **CachyOS kernel**. It is designed to be simple, beautiful, and ready to use out-of-the-box.
+KibaOS is a modern, lightweight Linux distribution built on **Debian 13 (Trixie)** with **Plasma Bigscreen** and the **CachyOS kernel**. It is designed to be simple, beautiful, and ready to use out-of-the-box.
 
 ### Why "Kiba"
 
 Kiba (牙) means "Fang" in Japanese. The name reflects our goal of creating a sharp, lean, and powerful system that cuts through the bloat of modern computing.
 
-### Who is KibaTV for
+### Who is KibaOS for
 
-KibaTV is designed for beginners who want a beautiful and fast system, as well as power users who appreciate a pre-configured, modern terminal experience and a performance-optimized kernel.
-
----
+KibaOS is designed for beginners who want a beautiful and fast system, as well as power users who appreciate a pre-configured, modern terminal experience and a performance-optimized kernel.
 
 ## Technical Questions
 
@@ -36,15 +32,13 @@ We use **Debian Trixie** to provide users with modern software like Plasma Bigsc
 
 It is a performance-optimized Linux kernel that uses the **BORE scheduler**. It is specifically tuned for desktop responsiveness, making the system feel much snappier under load compared to the stock Debian kernel.
 
-### How do I update KibaTV
+### How do I update KibaOS
 
 You can update through **KibaStore** (graphical) or simply by typing **`update`** in the terminal. This is a pre-configured alias that runs `sudo nala update && sudo nala upgrade`.
 
 ### Can I change the theme
 
-Absolutely! While KibaTV comes pre-configured with the **Dracula** theme, it is a standard Plasma Bigscreen system. You can change the global theme, icons, and colors in **System Settings**.
-
----
+Absolutely! While KibaOS comes pre-configured with the **Dracula** theme, it is a standard Plasma Bigscreen system. You can change the global theme, icons, and colors in **System Settings**.
 
 ## Software Questions
 
@@ -58,9 +52,7 @@ We chose **Ungoogled Chromium** as the default browser because it provides a fam
 
 ### Can I install standard `.deb` packages
 
-Yes! Since KibaTV is based on Debian, you can install any compatible `.deb` file using **Nala** (`sudo nala install ./file.deb`) or standard `dpkg`.
-
----
+Yes! Since KibaOS is based on Debian, you can install any compatible `.deb` file using **Nala** (`sudo nala install ./file.deb`) or standard `dpkg`.
 
 ## Troubleshooting
 
@@ -70,9 +62,7 @@ In the live session, the installer is pinned to the desktop and the taskbar. If 
 
 ### My Wi-Fi isn't working
 
-KibaTV includes the `non-free-firmware` repository by default to support most modern wireless cards. If your card isn't detected, you may need to install a specific driver via `nala`.
-
----
+KibaOS includes the `non-free-firmware` repository by default to support most modern wireless cards. If your card isn't detected, you may need to install a specific driver via `nala`.
 
 ## Related Reading
 
