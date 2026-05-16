@@ -25,7 +25,10 @@ jobs:
       - name: Check CLA
         run: |
           # Verify that the user has signed the CLA or included a specific keyword
-          BODY="${{ github.event.pull_request.body }}"
+          BODY=$(cat << 'CLA_BODY_EOF'
+          ${{ github.event.pull_request.body }}
+          CLA_BODY_EOF
+          )
           if echo "$BODY" | grep -qi "I acknowledge the KibaOS CLA"; then
             echo "CLA Acknowledged."
           else
