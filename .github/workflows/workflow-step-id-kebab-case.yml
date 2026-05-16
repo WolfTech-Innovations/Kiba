@@ -12,17 +12,44 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
       - name: Verify kebab-case IDs
         run: |
-          set -euo pipefail
-          for file in .github/workflows/*.yml; do
-            # Safely fetch step IDs using yq
-            ids=$(yq '.jobs[].steps[] | select(has("id")) | .id' "$file" || echo "")
-            for id in $ids; do
-              if [[ ! "$id" =~ ^[a-z0-9-]+$ ]]; then
-                echo "Error: Step ID '$id' in $file is not kebab-case."
-                exit 1
-              fi
-            done
-          done
-          echo "All step IDs follow kebab-case."
+          # Optimized: Use a single-pass Python script for high-performance semantic YAML parsing
+          python3 << 'EOF'
+          import yaml
+          import os
+          import sys
+          import re
+          try:
+              from yaml import CSafeLoader as Loader
+          except ImportError:
+              from yaml import SafeLoader as Loader
+
+          all_passed = True
+          workflow_dir = ".github/workflows"
+          files = [os.path.join(workflow_dir, f) for f in os.listdir(workflow_dir) if f.endswith(".yml") or f.endswith(".yaml")]
+
+          for f in sorted(files):
+              try:
+                  with open(f, "r", encoding="utf-8") as stream:
+                      data = yaml.load(stream, Loader=Loader)
+                      if not data or "jobs" not in data or not isinstance(data["jobs"], dict):
+                          continue
+                      for job_id, job in data["jobs"].items():
+                          if not isinstance(job, dict) or "steps" not in job or not isinstance(job["steps"], list):
+                              continue
+                          for step in job["steps"]:
+                              if isinstance(step, dict) and "id" in step:
+                                  step_id = str(step["id"])
+                                  if not re.match(r"^[a-z0-9-]+$", step_id):
+                                      print(f"Error: Step ID \"{step_id}\" in {f} is not kebab-case.")
+                                      all_passed = False
+              except Exception:
+                  continue
+
+          if not all_passed:
+              sys.exit(1)
+          print("All step IDs follow kebab-case.")
+          EOF
