@@ -15,14 +15,11 @@ jobs:
       - name: Verify kebab-case IDs
         run: |
           set -euo pipefail
-          for file in .github/workflows/*.yml; do
-            # Safely fetch step IDs using yq
-            ids=$(yq '.jobs[].steps[] | select(has("id")) | .id' "$file" || echo "")
-            for id in $ids; do
-              if [[ ! "$id" =~ ^[a-z0-9-]+$ ]]; then
-                echo "Error: Step ID '$id' in $file is not kebab-case."
-                exit 1
-              fi
-            done
-          done
+          # Optimized: Process all files in a single yq call to reduce overhead
+          bad_ids=$(yq '.jobs[].steps[] | select(has("id")) | .id' .github/workflows/*.yml | grep -vE "^[a-z0-9-]+$" || true)
+          if [ -n "$bad_ids" ]; then
+            echo "Error: Found step IDs that are not kebab-case:"
+            echo "$bad_ids"
+            exit 1
+          fi
           echo "All step IDs follow kebab-case."
