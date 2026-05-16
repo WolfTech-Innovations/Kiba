@@ -308,6 +308,7 @@ jobs:
           plasma-pa
           dolphin
           konsole
+          kde-spectacle
           ark
           qt6-svg-plugins
           desktop-file-utils
@@ -1026,6 +1027,9 @@ jobs:
 
           [chromium.desktop]
           _launch=Meta+B,none,Chromium
+
+          [org.kde.spectacle.desktop]
+          _launch=Print,none,Spectacle
           KGLOBAL
 
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
@@ -1276,6 +1280,7 @@ jobs:
               "utilities-terminal" "terminal" "🖥️ Open Terminal" "Productivity tip: Use Meta+T to launch" \
               "system-file-manager" "files" "📂 File Manager" "Productivity tip: Use Meta+E to browse" \
               "preferences-system" "settings" "⚙️ System Settings" "Configure your desktop and hardware" \
+              "org.kde.spectacle" "screenshot" "📸 Screen Capture" "Productivity tip: Use Print to capture" \
               "dialog-information" "info" "ℹ️ System Information" "View technical system details" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
@@ -1309,6 +1314,10 @@ jobs:
                 systemsettings &
                 break
                 ;;
+              "screenshot")
+                spectacle &
+                break
+                ;;
               "info")
                 (fastfetch | zenity --text-info --title="KibaOS System Information" --font="Monospace 10" --width=600 --height=500) &
                 ;;
@@ -1327,6 +1336,7 @@ jobs:
                   "user-desktop" "✨ Show Desktop" "Meta + D" \
                   "view-split-left-right" "↔️ Tile Window" "Meta + Arrows" \
                   "system-file-manager" "📂 File Manager" "Meta + E" \
+                  "org.kde.spectacle" "📸 Screen Capture" "Print" \
                   "system-lock-screen" "🔒 Lock Screen" "Meta + L" \
                   "view-list-icons" "↕️ Task Manager" "Meta + 1-9" \
                   --hide-column=1 --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
