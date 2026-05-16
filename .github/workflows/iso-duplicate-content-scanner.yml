@@ -23,7 +23,7 @@ jobs:
           ISO_FILE=$(ls *.iso | head -1)
           [ -z "$ISO_FILE" ] && echo "No ISO found" && exit 0
 
-          sudo apt-get update && sudo apt-get install -y squashfs-tools
+          sudo apt update && sudo apt install -y squashfs-tools
 
           # Extract the squashfs from the ISO (usually in live/filesystem.squashfs)
           mkdir -p iso_mnt

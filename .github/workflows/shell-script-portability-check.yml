@@ -26,7 +26,7 @@ jobs:
           persist-credentials: false
       - name: Dash Syntax Check
         run: |
-          sudo apt-get update && sudo apt-get install -y dash
+          sudo apt update && sudo apt install -y dash
           for f in $(find . -name "*.sh"); do
             echo "Checking $f with dash..."
             dash -n "$f"

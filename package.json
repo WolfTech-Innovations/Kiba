@@ -1,7 +1,10 @@
 {
-  "name": "kibatv-automation",
+  "name": "kibaos-automation",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "devDependencies": {
     "@commitlint/cli": "^21.0.1",
     "@commitlint/config-conventional": "^21.0.1",

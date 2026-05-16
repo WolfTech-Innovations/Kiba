@@ -30,10 +30,10 @@ jobs:
           persist-credentials: false
       - name: Enforce Naming
         run: |
-          # Ensure KibaTV is not used in place of KibaOS
-          if grep -rq "KibaTV" docs/ README.md WIKI.md; then
-            echo "Error: Legacy term 'KibaTV' found. Please use 'KibaOS'."
-            grep -rn "KibaTV" docs/ README.md WIKI.md
+          # Ensure KibaOS is not used in place of KibaOS
+          if grep -rq "KibaOS" docs/ README.md WIKI.md; then
+            echo "Error: Legacy term 'KibaOS' found. Please use 'KibaOS'."
+            grep -rn "KibaOS" docs/ README.md WIKI.md
             exit 1
           fi
           echo "Glossary check passed."

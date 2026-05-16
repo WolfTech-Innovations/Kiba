@@ -2,7 +2,7 @@ name: CI Workflow Efficiency Audit
 
 on:
   workflow_run:
-    workflows: ["KibaTV Build"]
+    workflows: ["KibaOS Build"]
     types: [completed]
 
 jobs:
@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: Report Duration
         run: |
-          echo "KibaTV Build completed."
+          echo "KibaOS Build completed."
