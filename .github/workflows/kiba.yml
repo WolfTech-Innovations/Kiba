@@ -298,6 +298,7 @@ jobs:
           plasma-desktop
           plasma-workspace
           plasma-workspace-wallpapers
+          kde-spectacle
           plasma-discover
           plasma-discover-backend-flatpak
 
@@ -1026,6 +1027,9 @@ jobs:
 
           [chromium.desktop]
           _launch=Meta+B,none,Chromium
+
+          [org.kde.spectacle.desktop]
+          _launch=Print,none,Spectacle
           KGLOBAL
 
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
@@ -1276,6 +1280,7 @@ jobs:
               "utilities-terminal" "terminal" "🖥️ Open Terminal" "Productivity tip: Use Meta+T to launch" \
               "system-file-manager" "files" "📂 File Manager" "Productivity tip: Use Meta+E to browse" \
               "preferences-system" "settings" "⚙️ System Settings" "Configure your desktop and hardware" \
+              "org.kde.spectacle" "screenshot" "📸 Screen Capture" "Productivity tip: Use Print to capture" \
               "dialog-information" "info" "ℹ️ System Information" "View technical system details" \
               "input-keyboard" "shortcuts" "⌨️ Keyboard Shortcuts" "View useful desktop shortcuts" \
               "help-browser" "wiki" "✨ Online Wiki" "Read the technical documentation" \
@@ -1307,6 +1312,10 @@ jobs:
                 ;;
               "settings")
                 systemsettings &
+                break
+                ;;
+              "screenshot")
+                spectacle &
                 break
                 ;;
               "info")

@@ -14,3 +14,8 @@
 
 **Learning:** In list-heavy Zenity dialogs (like keyboard shortcut help), prepending descriptive emojis to action labels significantly improves visual anchor points and scannability for users. This reduces the cognitive load required to find specific information compared to plain text lists.
 **Action:** Always prepend appropriate, high-contrast emojis to action labels in multi-column Zenity lists.
+
+## 2024-05-24 - [Shortcut Discoverability in Onboarding]
+
+**Learning:** Mapping standard hardware keys (like Print Screen) to expected utilities is only half the battle; surfacing these shortcuts within the primary onboarding tool (kiba-welcome) as "Productivity Tips" significantly increases user awareness and reduces the reliance on external documentation for basic OS functions.
+**Action:** When adding new global shortcuts, always include a corresponding "Productivity tip" in the `kiba-welcome` menu to ensure immediate discoverability.
