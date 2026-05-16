@@ -20,8 +20,8 @@ jobs:
       - name: Verify Case Statements
         run: |
           sed -n "/cat > \/usr\/local\/bin\/kiba-welcome << 'WELCOME'/,/WELCOME/p" .github/workflows/kiba.yml | grep -v "WELCOME" > kiba-welcome
-          [ -s kiba-welcome ] || (echo "kiba-welcome not found" && exit 1)
-          TAGS=$(grep -oP '"\K[^"]+(?=" "[^"]+" ".*")' kiba-welcome | sort -u)
+          [ -s kiba-welcome ] || { echo "kiba-welcome not found"; false; }
+          TAGS=$(grep -oP '"[^"]+" "\K[^"]+(?=" "[^"]+")' kiba-welcome | sort -u)
           for tag in $TAGS; do
-            grep -q "\"$tag\")" kiba-welcome || (echo "Missing case for tag: $tag" && exit 1)
+            grep -q "\"$tag\")" kiba-welcome || { echo "Missing case for tag: $tag"; false; }
           done

@@ -20,7 +20,7 @@ jobs:
           MISSING_FILES=""
           # Only check scripts and configs
           for f in $(find . -maxdepth 2 -name "*.sh" -o -name "*.py" -o -name "*.js" | grep -v ".github"); do
-            if ! grep -qE "MIT License|License: MIT" "$f"; then
+            if ! grep -q "MIT License" "$f"; then
               MISSING_FILES="$MISSING_FILES\n- $f"
             fi
           done

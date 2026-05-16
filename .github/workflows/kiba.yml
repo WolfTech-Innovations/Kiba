@@ -1025,11 +1025,11 @@ jobs:
           [org.kde.krunner.desktop]
           _launch=Meta+S,none,KRunner
 
-          [chromium.desktop]
-          _launch=Meta+B,none,Chromium
-
           [org.kde.spectacle.desktop]
           _launch=Print,none,Spectacle
+
+          [chromium.desktop]
+          _launch=Meta+B,none,Chromium
           KGLOBAL
 
           # ── kwinrc — compositing, glass, rounded corners ───────────────────────
@@ -1310,12 +1310,12 @@ jobs:
                 dolphin &
                 break
                 ;;
-              "settings")
-                systemsettings &
-                break
-                ;;
               "screenshot")
                 spectacle &
+                break
+                ;;
+              "settings")
+                systemsettings &
                 break
                 ;;
               "info")

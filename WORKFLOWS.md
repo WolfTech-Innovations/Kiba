@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Sat May 16 08:57:22 UTC 2026
+Generated on Thu May 14 11:00:01 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -14,34 +14,21 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Analyze Build Success Trend | `.github/workflows/analyze-build-success-trend.yml` |
 | Analyze PR ISO Impact | `.github/workflows/analyze-pr-iso-impact.yml` |
 | Analyze PR Size | `.github/workflows/analyze-pr-size.yml` |
-| APT Security Policy Enforcer | `.github/workflows/apt-security-policy-enforcer.yml` |
 | APT Source Validator | `.github/workflows/apt-source-validator.yml` |
 | ARIA Label Audit | `.github/workflows/aria-label-audit.yml` |
 | Artifact Retention Policy | `.github/workflows/artifact-retention-policy.yml` |
 | Audit Action Pinning | `.github/workflows/audit-action-pinning.yml` |
-| Audit Breezerc Opacity Percentage | `.github/workflows/audit-breezerc-opacity-percentage.yml` |
 | Audit Build Reproducibility | `.github/workflows/audit-build-reproducibility.yml` |
-| Audit Calamares Branding Desc Format | `.github/workflows/audit-calamares-branding-desc-format.yml` |
 | Audit Calamares Branding Integrity | `.github/workflows/audit-calamares-branding-integrity.yml` |
-| Audit Calamares Module YAML Syntax | `.github/workflows/audit-calamares-module-yaml-syntax.yml` |
 | Audit Desktop UX Standards | `.github/workflows/audit-desktop-ux-standards.yml` |
 | Audit Dracula Palette Consistency | `.github/workflows/audit-dracula-palette-consistency.yml` |
-| Audit Embedded Chromium JSON | `.github/workflows/audit-embedded-chromium-json.yml` |
-| Audit Embedded Konsole Colorscheme | `.github/workflows/audit-embedded-konsole-colorscheme.yml` |
-| Audit Embedded KSplash QML Syntax | `.github/workflows/audit-embedded-ksplash-qml-syntax.yml` |
-| Audit Embedded Starship TOML | `.github/workflows/audit-embedded-starship-toml.yml` |
-| Audit Embedded Zshrc Syntax Check | `.github/workflows/audit-embedded-zshrc-syntax-check.yml` |
 | Audit Font Standardization | `.github/workflows/audit-font-standardization.yml` |
-| Audit Kernel Version Freshness | `.github/workflows/audit-kernel-version-freshness.yml` |
-| Audit Kiba Welcome Case Matching | `.github/workflows/audit-kiba-welcome-case-matching.yml` |
 | Audit Kiba Welcome Discovery Loop | `.github/workflows/audit-kiba-welcome-discovery-loop.yml` |
-| Audit Kiba Welcome Zenity Label Length | `.github/workflows/audit-kiba-welcome-zenity-label-length.yml` |
 | Audit ksplashrc Theme | `.github/workflows/audit-ksplashrc-theme.yml` |
-| Audit KWinRC Shadow Color Hex | `.github/workflows/audit-kwinrc-shadow-color-hex.yml` |
 | Audit Markdown Fenced Code Blocks | `.github/workflows/audit-markdown-fenced-code-blocks-strict.yml` |
 | Audit Markdown Header Punctuation | `.github/workflows/audit-markdown-header-punctuation.yml` |
 | Audit Markdown Inclusive Language | `.github/workflows/audit-markdown-inclusive-language.yml` |
-| Audit Markdown KibaOS Consistency | `.github/workflows/audit-markdown-kibatv-consistency.yml` |
+| Audit Markdown KibaTV Consistency | `.github/workflows/audit-markdown-kibatv-consistency.yml` |
 | Audit Markdown Link Relative Repo | `.github/workflows/audit-markdown-link-relative-repo.yml` |
 | Audit Markdown Link Title Quotes | `.github/workflows/audit-markdown-link-title-quotes.yml` |
 | Audit Markdown List Capitalization | `.github/workflows/audit-markdown-list-capitalization.yml` |
@@ -54,9 +41,7 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Audit mksquashfs Zstd Level | `.github/workflows/audit-mksquashfs-zstd-15.yml` |
 | Audit Package Engines Field | `.github/workflows/audit-package-engines-field.yml` |
 | Audit Package Private Enforcement | `.github/workflows/audit-package-private-enforcement.yml` |
-| Audit Plymouth Script Braces | `.github/workflows/audit-plymouth-script-braces.yml` |
 | Audit Plymouth Splash Compliance | `.github/workflows/audit-plymouth-splash-compliance.yml` |
-| Audit Post-Install Shellcheck Strict | `.github/workflows/audit-post-install-shellcheck-strict.yml` |
 | Audit Python Abstract Base Class | `.github/workflows/audit-python-abstract-base-class.yml` |
 | Audit Python Argparse Usage | `.github/workflows/audit-python-argparse-usage.yml` |
 | Audit Python Assert Is Not Tuple | `.github/workflows/audit-python-assert-is-not-tuple.yml` |
@@ -94,7 +79,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Audit Repo README TOC Required | `.github/workflows/audit-repo-readme-toc-required.yml` |
 | Audit Repo Snake Case Scripts | `.github/workflows/audit-repo-snake-case-scripts.yml` |
 | Audit Repo Svg Metadata | `.github/workflows/audit-repo-svg-metadata.yml` |
-| Audit SDDM Conf.d Syntax | `.github/workflows/audit-sddm-conf-d-syntax.yml` |
 | Audit Security Policy | `.github/workflows/audit-security-policy.yml` |
 | Audit Shell License MIT | `.github/workflows/audit-sh-license-mit.yml` |
 | Audit Shebang Consistency | `.github/workflows/audit-shebang-consistency.yml` |
@@ -122,7 +106,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Audit Shell Tool Modernization | `.github/workflows/audit-shell-tool-modernization.yml` |
 | Audit Shell Unquoted Heredoc Delimiter | `.github/workflows/audit-shell-unquoted-heredoc-delimiter.yml` |
 | Audit Shell Variable Quoting Strict | `.github/workflows/audit-shell-variable-quoting-strict.yml` |
-| Audit Shortcut Meta Key Enforcement | `.github/workflows/audit-shortcut-meta-key-enforcement.yml` |
 | Audit WF Artifact Ret | `.github/workflows/audit-wf-artifact-ret.yml` |
 | Audit WF Cache Hash | `.github/workflows/audit-wf-cache-hash.yml` |
 | Audit Checkout Persist Credentials | `.github/workflows/audit-wf-checkout-persist-credentials.yml` |
@@ -144,24 +127,19 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Audit WF Step Case | `.github/workflows/audit-wf-step-case.yml` |
 | Audit Workflow Step Timeout Enforcement | `.github/workflows/audit-wf-step-timeout-enforcement.yml` |
 | Audit WF Timeout Val | `.github/workflows/audit-wf-timeout-val.yml` |
-| Audit Workflow Concurrency Group Collisions | `.github/workflows/audit-workflow-concurrency-group-collisions.yml` |
 | Audit Workflow Concurrency | `.github/workflows/audit-workflow-concurrency.yml` |
 | Audit Workflow Container Tag Pinning | `.github/workflows/audit-workflow-container-tag-pinning.yml` |
 | Audit Workflow Permissions | `.github/workflows/audit-workflow-contents-write-permissions.yml` |
-| Audit Workflow Dispatch Input Descriptions | `.github/workflows/audit-workflow-dispatch-input-descriptions.yml` |
 | Audit Workflow Env Naming | `.github/workflows/audit-workflow-env-naming.yml` |
-| Audit Workflow Env Variable Shadowing | `.github/workflows/audit-workflow-env-variable-shadowing.yml` |
 | Audit Workflow Hardcoded IPs | `.github/workflows/audit-workflow-hardcoded-ips.yml` |
 | Audit Workflow Input Defaults | `.github/workflows/audit-workflow-input-defaults.yml` |
 | Audit Workflow Job ID Naming | `.github/workflows/audit-workflow-job-id-naming.yml` |
-| Audit Workflow Job Needs Circularity | `.github/workflows/audit-workflow-job-needs-circularity.yml` |
 | Audit Workflow Job Timeout Standard | `.github/workflows/audit-workflow-job-timeout-standard.yml` |
 | Audit Workflow No Duplicate Step Ids | `.github/workflows/audit-workflow-no-duplicate-step-ids.yml` |
 | Audit Workflow No Secrets In Run Name | `.github/workflows/audit-workflow-no-secrets-in-run-name.yml` |
 | Audit Workflow Permissions | `.github/workflows/audit-workflow-permissions.yml` |
 | Audit Workflow Push Branch Filter | `.github/workflows/audit-workflow-push-branch-filter.yml` |
 | Audit Workflow Restrict Permissions | `.github/workflows/audit-workflow-restrict-permissions.yml` |
-| Audit Workflow Run Step Injection | `.github/workflows/audit-workflow-run-step-injection.yml` |
 | Audit Workflow Shell Specification | `.github/workflows/audit-workflow-shell-specification.yml` |
 | Audit Workflow Step Name Length | `.github/workflows/audit-workflow-step-name-length.yml` |
 | Audit Workflow Step Naming | `.github/workflows/audit-workflow-step-naming.yml` |
@@ -181,9 +159,7 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Automated Repo Health Report | `.github/workflows/automated-repo-health-report.yml` |
 | Bandit | `.github/workflows/bandit.yml` |
 | Branch Name Enforcer | `.github/workflows/branch-name-enforcer.yml` |
-| Branding Asset Specification Validator | `.github/workflows/branding-asset-specification-validator.yml` |
 | Branding Assets Validator | `.github/workflows/branding-assets-validator.yml` |
-| Branding Contrast Accessibility Audit | `.github/workflows/branding-contrast-accessibility-audit.yml` |
 | Branding File Existence Check | `.github/workflows/branding-file-existence-check.yml` |
 | Branding Path Verificator | `.github/workflows/branding-path-verificator.yml` |
 | Broken Link Checker | `.github/workflows/broken-link-checker.yml` |
@@ -294,8 +270,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Check Zshrc Performance | `.github/workflows/check-zshrc-performance-v3.yml` |
 | Check Zshrc Performance | `.github/workflows/check-zshrc-performance.yml` |
 | Chromium Policy JSON Linter | `.github/workflows/chromium-policy-json-linter.yml` |
-| CI Cache Efficiency Audit | `.github/workflows/ci-cache-efficiency-audit.yml` |
-| CI Cost Efficiency Report | `.github/workflows/ci-cost-efficiency-report.yml` |
 | CI Performance Heatmap | `.github/workflows/ci-performance-heatmap.yml` |
 | CI Workflow Efficiency Audit | `.github/workflows/ci-workflow-efficiency-audit.yml` |
 | Close Inactive PRs | `.github/workflows/close-inactive-prs.yml` |
@@ -307,14 +281,12 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Commit Message Length Checker | `.github/workflows/commit-message-length-checker.yml` |
 | Commit Message Sign-off Checker | `.github/workflows/commit-message-signoff-checker.yml` |
 | Commit Scope Validator | `.github/workflows/commit-scope-validator.yml` |
-| Community Monthly Leaderboard | `.github/workflows/community-monthly-leaderboard.yml` |
 | Community Sentiment Analysis | `.github/workflows/community-sentiment-analysis.yml` |
 | Community Management | `.github/workflows/community.yml` |
 | Contributing Guide Alignment | `.github/workflows/contributing-guide-alignment.yml` |
 | Contributing Guide Validator | `.github/workflows/contributing-guide-validator.yml` |
 | Contributor Attribution Enforcer | `.github/workflows/contributor-attribution-enforcer.yml` |
 | Contributor License Agreement Check | `.github/workflows/contributor-license-agreement-check.yml` |
-| Contributor Milestone Celebration | `.github/workflows/contributor-milestone-celebration.yml` |
 | Contributors List Manager | `.github/workflows/contributors-list-manager.yml` |
 | Curl Secure Flags Enforcer | `.github/workflows/curl-secure-flags-enforcer.yml` |
 | Dead Script Scanner | `.github/workflows/dead-script-scanner.yml` |
@@ -323,7 +295,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Dependency Vulnerability Monitor | `.github/workflows/dependency-vulnerability-monitor.yml` |
 | Deprecated Commands Check | `.github/workflows/deprecated-commands-check.yml` |
 | Desktop Entry Validator | `.github/workflows/desktop-entry-validator.yml` |
-| Detect Duplicate Package Intent | `.github/workflows/detect-duplicate-package-intent.yml` |
 | Doc Spelling Common Mistakes | `.github/workflows/doc-spelling-common-mistakes.yml` |
 | Doc Trailing Whitespace Enforcer | `.github/workflows/doc-trailing-whitespace-enforcer.yml` |
 | Docker Test | `.github/workflows/docker-test.yml` |
@@ -334,17 +305,13 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Docs Consistent Newline Before Headers | `.github/workflows/docs-consistent-newline-before-headers.yml` |
 | Repo CRLF Style Audit | `.github/workflows/docs-crlf-style-audit.yml` |
 | Docs External Link HTTPS Enforcer | `.github/workflows/docs-external-link-https-enforcer.yml` |
-| Docs External Link Quality Scan | `.github/workflows/docs-external-link-quality-scan.yml` |
 | Docs Header Capitalization | `.github/workflows/docs-header-capitalization.yml` |
 | Docs Image Alt Text Checker | `.github/workflows/docs-image-alt-text-checker.yml` |
-| Docs Jargon Dictionary Check | `.github/workflows/docs-jargon-dictionary-check.yml` |
 | Docs Metadata Checker | `.github/workflows/docs-metadata-checker.yml` |
-| Docs Navigation Sitemap Sync | `.github/workflows/docs-navigation-sitemap-sync.yml` |
 | Docs No Broken Image Links | `.github/workflows/docs-no-broken-image-links.yml` |
 | Docs No Broken Internal Anchors | `.github/workflows/docs-no-broken-internal-anchors.yml` |
 | Docs No Long Lines in Tables | `.github/workflows/docs-no-long-lines-in-tables.yml` |
 | Docs No Placeholder Text | `.github/workflows/docs-no-placeholder-text.yml` |
-| Docs Readability Audit | `.github/workflows/docs-readability-audit.yml` |
 | Docs Related Reading Audit | `.github/workflows/docs-related-reading-audit.yml` |
 | Docs Security Policy Check | `.github/workflows/docs-security-policy-check.yml` |
 | Docs Sentence Spacing Audit | `.github/workflows/docs-sentence-spacing-audit.yml` |
@@ -366,40 +333,29 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Ensure Notes Gitkeep | `.github/workflows/ensure-notes-gitkeep.yml` |
 | Environment Variable Leak Check | `.github/workflows/environment-variable-leak-check.yml` |
 | First PR Congratulator | `.github/workflows/first-pr-congratulator.yml` |
-| First PR Mentor Matching | `.github/workflows/first-pr-mentor-matching.yml` |
 | First PR Welcome Guide | `.github/workflows/first-pr-welcome-guide.yml` |
 | Flatpak Repo Monitor | `.github/workflows/flatpak-repo-monitor.yml` |
-| Generate Monthly Contributor Spotlight | `.github/workflows/generate-monthly-contributor-spotlight.yml` |
 | GitHub Actions Cache hashFiles Audit | `.github/workflows/github-actions-cache-hashfiles-audit.yml` |
 | GH Actions Deprecated Commands | `.github/workflows/github-actions-deprecated-commands.yml` |
 | GitHub Actions Output Description Audit | `.github/workflows/github-actions-output-description-audit.yml` |
 | GitHub Actions Security Linter | `.github/workflows/github-actions-security-linter.yml` |
-| GitHub Secrets Age Monitor | `.github/workflows/github-secrets-age-monitor.yml` |
 | Gitleaks | `.github/workflows/gitleaks.yml` |
 | Glossary Term Consistency | `.github/workflows/glossary-term-consistency.yml` |
 | Greetings | `.github/workflows/greetings.yml` |
 | Grep Vulnerability Scanner | `.github/workflows/grep-vulnerability-scanner.yml` |
-| GRUB Syntax Audit | `.github/workflows/grub-syntax-audit.yml` |
 | Heredoc Quoted Terminator Check | `.github/workflows/heredoc-quoted-terminator-check.yml` |
 | Hook Syntax Validator | `.github/workflows/hook-syntax-validator.yml` |
 | Integrity Manifest Generator | `.github/workflows/integrity-manifest-generator.yml` |
-| ISO Boot Time Benchmark | `.github/workflows/iso-boot-time-benchmark.yml` |
 | ISO Build Duration Tracker | `.github/workflows/iso-build-duration-tracker.yml` |
 | ISO Build Footprint Tracker | `.github/workflows/iso-build-footprint-tracker.yml` |
-| ISO Duplicate Content Scanner | `.github/workflows/iso-duplicate-content-scanner.yml` |
-| ISO Entropy Blob Detection | `.github/workflows/iso-entropy-blob-detection.yml` |
-| ISO Hardware Support Manifest | `.github/workflows/iso-hardware-support-manifest.yml` |
-| ISO Initramfs Inventory Report | `.github/workflows/iso-initramfs-inventory-report.yml` |
 | ISO Manifest Sync | `.github/workflows/iso-manifest-sync.yml` |
 | ISO Metadata | `.github/workflows/iso-metadata.yml` |
-| ISO Package Drift Report | `.github/workflows/iso-package-drift-report.yml` |
 | ISO Reproducibility Audit | `.github/workflows/iso-reproducibility-audit.yml` |
 | ISO Size Threshold Alert | `.github/workflows/iso-size-threshold-alert.yml` |
 | Issue Closing Pattern Checker | `.github/workflows/issue-closing-pattern-checker.yml` |
 | Issue Component Labeler | `.github/workflows/issue-component-labeler.yml` |
 | Issue Duplicate Checker | `.github/workflows/issue-duplicate-checker.yml` |
 | Issue Escalation Policy | `.github/workflows/issue-escalation-policy.yml` |
-| Issue Hotness Priority Sync | `.github/workflows/issue-hotness-priority-sync.yml` |
 | Issue Milestone Presence Check | `.github/workflows/issue-milestone-presence-check.yml` |
 | Issue Milestone Reminder | `.github/workflows/issue-milestone-reminder.yml` |
 | Issue Necro-Posting Prevention | `.github/workflows/issue-necro-posting-prevention.yml` |
@@ -449,7 +405,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Mermaid Diagram Syntax Check | `.github/workflows/mermaid-diagram-syntax-check.yml` |
 | Mermaid Syntax Enhancer | `.github/workflows/mermaid-syntax-enhancer.yml` |
 | Metadata Consistency Report | `.github/workflows/metadata-consistency-report.yml` |
-| Milestone Burndown Visualizer | `.github/workflows/milestone-burndown-visualizer.yml` |
 | Milestone Due Monitor | `.github/workflows/milestone-due-monitor.yml` |
 | Mktemp Assignment Validator | `.github/workflows/mktemp-assignment-validator.yml` |
 | Monitor Ant Themes | `.github/workflows/monitor-ant-themes.yml` |
@@ -465,7 +420,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Package List Duplicate Detector | `.github/workflows/package-list-duplicate-detector.yml` |
 | Plasma Theme Metadata Checker | `.github/workflows/plasma-theme-metadata-checker.yml` |
 | Plymouth Script Linter | `.github/workflows/plymouth-script-linter.yml` |
-| Plymouth Script Validator | `.github/workflows/plymouth-script-validator.yml` |
 | pnpm Integrity Check | `.github/workflows/pnpm-integrity-check.yml` |
 | POSIX Local Declaration Checker | `.github/workflows/posix-local-declaration-checker.yml` |
 | PR Milestone Checker | `.github/workflows/pr-assigned-milestone-checker.yml` |
@@ -473,7 +427,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | PR Check for Merge Commits | `.github/workflows/pr-check-for-merge-commits.yml` |
 | PR Co-author Syntax Validator | `.github/workflows/pr-co-author-syntax-validator.yml` |
 | PR Conflict Notifier | `.github/workflows/pr-conflict-notifier.yml` |
-| PR Conflict Resolution Assistant | `.github/workflows/pr-conflict-resolution-assistant.yml` |
 | PR Conventional Commits Title Validator | `.github/workflows/pr-conventional-commits-title-validator.yml` |
 | PR Description Length Check | `.github/workflows/pr-description-length-check.yml` |
 | PR Description Quality Enforcer | `.github/workflows/pr-description-quality-enforcer.yml` |
@@ -504,7 +457,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | README Contribution Check | `.github/workflows/readme-contribution-section-check.yml` |
 | README Docs Link Validator | `.github/workflows/readme-link-to-docs-validator.yml` |
 | README Title Centering Check | `.github/workflows/readme-title-centering-check.yml` |
-| Release Draft Content Sync | `.github/workflows/release-draft-content-sync.yml` |
 | Release Drafter | `.github/workflows/release-drafter.yml` |
 | Release Notes Autodraft | `.github/workflows/release-notes-autodraft.yml` |
 | Release Notes Naming Validator | `.github/workflows/release-notes-naming-validator.yml` |
@@ -561,39 +513,28 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | ShellCheck | `.github/workflows/shellcheck.yml` |
 | Size Labeler | `.github/workflows/size-labeler.yml` |
 | Source Check | `.github/workflows/source-check.yml` |
-| Source File License Audit | `.github/workflows/source-file-license-audit.yml` |
 | Spell Check | `.github/workflows/spell-check.yml` |
 | Stale Closer | `.github/workflows/stale-closer.yml` |
 | Stale Issue Cleanup Notifier | `.github/workflows/stale-issue-cleanup-notifier.yml` |
 | Stale Issue Soft Closer | `.github/workflows/stale-issue-soft-closer.yml` |
 | Starship Init Quoted Eval | `.github/workflows/starship-init-quoted-eval.yml` |
 | Step Security | `.github/workflows/step-security.yml` |
-| Suggest Acknowledgment Updates | `.github/workflows/suggest-acknowledgment-updates.yml` |
-| Systemd Hardening Scorecard | `.github/workflows/systemd-hardening-scorecard.yml` |
 | TODO Checker | `.github/workflows/todo-checker.yml` |
 | TODO Comment Tracker | `.github/workflows/todo-comment-tracker.yml` |
-| TODO Persistence Tracking | `.github/workflows/todo-persistence-tracking.yml` |
-| Track Debian Trixie CVE Alerts | `.github/workflows/track-debian-trixie-cve-alerts.yml` |
 | Track ISO Size Growth | `.github/workflows/track-iso-size-growth.yml` |
 | Trivy | `.github/workflows/trivy.yml` |
 | Trusted Auto-Approve | `.github/workflows/trusted-auto-approve.yml` |
 | Unused Asset Cleanup | `.github/workflows/unused-asset-cleanup.yml` |
-| Update Contributors from PRs | `.github/workflows/update-contributors-from-prs.yml` |
-| Update Roadmap from Milestones | `.github/workflows/update-roadmap-from-milestones.yml` |
-| Validate Flathub Remote Status | `.github/workflows/validate-flathub-remote-status.yml` |
 | Validate Release Notes Naming | `.github/workflows/validate-release-notes-naming-convention.yml` |
 | VCS Branch Hygiene | `.github/workflows/vcs-branch-hygiene.yml` |
 | Verify Acknowledgments Git History | `.github/workflows/verify-acknowledgments-git-history.yml` |
 | Verify APT Repo GPG Signed Strict | `.github/workflows/verify-apt-repo-gpg-signed-strict.yml` |
 | Verify Build Parallelism | `.github/workflows/verify-build-parallelism.yml` |
-| Verify README Hero Accessibility | `.github/workflows/verify-readme-hero-accessibility.yml` |
-| Visualize Workflow Trigger Dependencies | `.github/workflows/visualize-workflow-trigger-dependencies.yml` |
 | Weekly Repo Activity Summary | `.github/workflows/weekly-repo-activity-summary.yml` |
 | Wiki Link Integrity | `.github/workflows/wiki-link-integrity.yml` |
 | Workflow Action Version Consistency | `.github/workflows/workflow-action-version-consistency.yml` |
 | Workflow Concurrency Audit | `.github/workflows/workflow-concurrency-audit.yml` |
 | Workflow Deprecated Runners Audit | `.github/workflows/workflow-deprecated-runners-audit.yml` |
-| Workflow Dispatch Input Audit | `.github/workflows/workflow-dispatch-input-audit.yml` |
 | Workflow Dispatch Input Description Check | `.github/workflows/workflow-dispatch-input-description-check.yml` |
 | Workflow Documentation Generator | `.github/workflows/workflow-documentation-generator.yml` |
 | Workflow Env Naming Convention | `.github/workflows/workflow-env-naming-convention.yml` |
@@ -608,7 +549,6 @@ Generated on Sat May 16 08:57:22 UTC 2026
 | Workflow Redundancy Audit | `.github/workflows/workflow-redundancy-audit.yml` |
 | Workflow Run Cleanup | `.github/workflows/workflow-run-cleanup.yml` |
 | Workflow Secret Usage Audit | `.github/workflows/workflow-secret-usage-audit.yml` |
-| Workflow Semantic Redundancy Check | `.github/workflows/workflow-semantic-redundancy-check.yml` |
 | Workflow Shell Spec Check | `.github/workflows/workflow-shell-specification-check.yml` |
 | Workflow Step ID Kebab Case | `.github/workflows/workflow-step-id-kebab-case.yml` |
 | Workflow Step ID No Duplicates | `.github/workflows/workflow-step-id-no-duplicates.yml` |
