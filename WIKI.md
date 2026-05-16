@@ -170,7 +170,7 @@ docker run --rm --privileged \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
-```
+```text
 
 > [!IMPORTANT]
 > Ensure you have at least 15 GB of free space and a working internet connection.

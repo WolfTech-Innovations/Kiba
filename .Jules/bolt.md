@@ -1,3 +1,6 @@
+# MIT License
+
 ## 2025-05-15 - Batching yq commands vs Python overhead
-**Learning:** Auditing a large number of YAML files (600+) using a shell loop with `yq` is extremely slow (~100s) due to process startup overhead. However, replacing it with a Python script in CI introduces a `pip install PyYAML` overhead (~1.5s). Batching all files in a single `yq` call (e.g., `yq '.query' .github/workflows/*.yml`) is the most efficient approach (~180ms) as `yq` is pre-installed on GitHub runners.
+
+**Learning:** Auditing a large number of YAML files (600+) using a shell loop with `yq` is extremely slow (~100s) due to process startup overhead. Batching all files in a single `yq` call (e.g., `yq '.query' .github/workflows/*.yml`) is the most efficient approach (~180ms) as `yq` is pre-installed on GitHub runners.
 **Action:** Always prefer batching file arguments for pre-installed tools like `yq` or `grep` before reaching for embedded scripts with external dependencies.

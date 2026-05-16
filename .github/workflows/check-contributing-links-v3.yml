@@ -1,11 +1,11 @@
 name: Check Contributing Links
 on:
   push:
-paths:
-- CONTRIBUTING.md
+    paths:
+      - CONTRIBUTING.md
   pull_request:
-paths:
-- CONTRIBUTING.md
+    paths:
+      - CONTRIBUTING.md
 jobs:
   audit:
     permissions:

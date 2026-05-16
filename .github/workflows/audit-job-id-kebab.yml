@@ -1,4 +1,4 @@
-name: Workflow Job ID Kebab Case
+name: kebab-job-audit
 on:
   push:
     paths:
@@ -6,23 +6,23 @@ on:
   pull_request:
     paths:
       - '.github/workflows/*.yml'
+permissions:
+  contents: read
 jobs:
-  audit:
+  run-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout repository
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Verify job IDs are kebab-case
+      - name: Run Job ID Audit
         run: |
           set -euo pipefail
-          # Optimized: Process all files in a single yq call to reduce overhead
-          bad_jobs=$(yq '.jobs | keys | .[]' .github/workflows/*.yml | grep -vE "^[a-z0-9-]+$" || true)
+          bad_jobs=$(yq '.jobs | keys | .[]' .github/workflows/*.yml 2>/dev/null | grep -vE "^[a-z0-9-]+$" || true)
           if [ -n "$bad_jobs" ]; then
             echo "Error: Found job IDs that are not kebab-case:"
             echo "$bad_jobs"
             exit 1
           fi
-          echo "All job IDs follow kebab-case."

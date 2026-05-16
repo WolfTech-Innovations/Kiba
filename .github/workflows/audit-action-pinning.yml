@@ -14,4 +14,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check
-        run: grep "uses: actions/" .github/workflows/*.yml | grep -v "@v" || echo "Pinned"
+        run: 'grep "uses: actions/" .github/workflows/*.yml | grep -v "@v" || echo Pinned'

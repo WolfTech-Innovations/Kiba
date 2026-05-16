@@ -36,7 +36,7 @@ This document provides a technical overview of the KibaTV architectural stack, f
 
 ---
 
-## System Stack
+## System-Stack
 
 ```mermaid
 graph TD
@@ -47,7 +47,7 @@ graph TD
     E --> F[Wayland / X11]
     F --> G[Plasma Bigscreen]
     G --> H[KibaTV UX]
-```
+```text
 
 ---
 
