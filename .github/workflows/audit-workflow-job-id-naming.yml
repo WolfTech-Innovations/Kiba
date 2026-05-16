@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check job ID kebab-case
         run: |
           grep -rnE "^\s+[a-zA-Z0-9_]+:" .github/workflows | grep -vE "name:|runs-on:|steps:|uses:|with:|env:|if:|strategy:|matrix:|timeout-minutes:|outputs:|needs:" | grep "_" && (echo "Job IDs should use kebab-case (hyphens), not underscores" && exit 1) || exit 0

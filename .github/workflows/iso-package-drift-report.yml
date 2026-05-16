@@ -11,13 +11,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout Base
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           ref: ${{ github.base_ref }}
           path: base
 
       - name: Checkout Head
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           path: head
 

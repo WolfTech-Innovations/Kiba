@@ -1,7 +1,7 @@
 # UX & Visual Design
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaOS Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 
 ---
 
-KibaTV is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
+KibaOS is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
 
 ---
 
@@ -41,7 +41,7 @@ KibaTV is built with a focus on "modern simplicity." This document details the v
 
 ## Visual Identity
 
-The KibaTV aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
+The KibaOS aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
 
 ### Color Palette
 
@@ -72,7 +72,7 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 
 ## Shell Experience
 
-KibaTV provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
+KibaOS provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
 
 ### Starship Prompt
 
@@ -125,7 +125,7 @@ The branding experience starts from the moment the system boots:
 
 ## Desktop Experience (Plasma Bigscreen)
 
-KibaTV leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
@@ -142,7 +142,7 @@ KibaTV leverages the power of **Plasma Bigscreen** but configures it for a strea
 
 ## The Modern Terminal
 
-KibaTV provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
+KibaOS provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
 
 ### Modern Alternative Comparison
 

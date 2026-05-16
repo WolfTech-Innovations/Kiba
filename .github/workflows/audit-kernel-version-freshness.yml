@@ -13,7 +13,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check Kernel Freshness
         run: |
           LATEST=$(curl -s https://api.github.com/repos/psygreg/linux-psycachy/releases/latest | jq -r .tag_name)

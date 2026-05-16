@@ -1,14 +1,18 @@
-name: Analyze PR Size
+name: analyze-pr-size
 on:
   pull_request:
 permissions:
+  contents: read
   pull-requests: write
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
-  analyze-size:
+  analyze:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     steps:
-      - name: Size
-        run: echo "PR Size additions ${{ github.event.pull_request.additions }}"
+      - name: size
+        run: |
+          ADDITIONS="${{ github.event.pull_request.additions }}"
+          echo "PR Size additions: $ADDITIONS"

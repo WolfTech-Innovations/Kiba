@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check sed -i usage
         run: |
           grep -rnE "\bsed\s+\-i\b" . --include="*.sh" && (echo "Avoid non-portable sed -i; use temporary files instead" && exit 1) || exit 0

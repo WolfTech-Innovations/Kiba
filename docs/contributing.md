@@ -1,7 +1,7 @@
-# Contributing to KibaTV
+# Contributing to KibaOS
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Banner" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaOS Banner" width="100%">
 </p>
 
 <p align="center">
@@ -11,13 +11,13 @@
 
 ---
 
-First of all, thank you for your interest in contributing to KibaTV! We welcome contributions from developers, designers, and documentation enthusiasts.
+First of all, thank you for your interest in contributing to KibaOS! We welcome contributions from developers, designers, and documentation enthusiasts.
 
 ---
 
 ## Developer Quick Start
 
-To begin contributing to the KibaTV build system or customization hooks, follow these steps:
+To begin contributing to the KibaOS build system or customization hooks, follow these steps:
 
 1. **Fork the Repo:** Create your own fork of [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba).
 2. **Setup Environment:** Ensure you have **Docker** installed on a Linux host.
@@ -27,6 +27,7 @@ To begin contributing to the KibaTV build system or customization hooks, follow 
    git clone [https://github.com/YOUR_USERNAME/Kiba](https://github.com/YOUR_USERNAME/Kiba)
    cd Kiba
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
+
 ```bash
 
 ---
@@ -44,7 +45,7 @@ If you find a bug, please open an issue on our [GitHub repository](https://githu
 
 ### Suggesting Features
 
-We are always looking for ways to improve KibaTV. If you have an idea for a new feature, please open an issue and describe:
+We are always looking for ways to improve KibaOS. If you have an idea for a new feature, please open an issue and describe:
 
 - The problem your feature would solve.
 - How the feature would work.
@@ -66,7 +67,7 @@ If you're ready to contribute code or documentation:
 
 ### Suggesting Features (Community)
 
-We love new ideas! Please open an issue to discuss significant features before implementation. This ensures they align with the KibaTV philosophy of "modern simplicity."
+We love new ideas! Please open an issue to discuss significant features before implementation. This ensures they align with the KibaOS philosophy of "modern simplicity."
 
 ### Submitting Pull Requests (Process)
 
@@ -103,7 +104,7 @@ We use automated workflows to help manage the project:
 
 ## License
 
-By contributing to KibaTV, you agree that your contributions will be licensed under the **MIT License**.
+By contributing to KibaOS, you agree that your contributions will be licensed under the **MIT License**.
 
 ---
 

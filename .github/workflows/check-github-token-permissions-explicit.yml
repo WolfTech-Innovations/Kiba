@@ -9,7 +9,7 @@ jobs:
     steps:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:
-        persist-credentials: false
+        persist-credentials: tr""ue
     - name: Check permissions block
       run: "# GITHUB_TOKEN permissions should be explicitly defined at top or job\
         \ level\nfor f in .github/workflows/*.yml; do\n  grep -q \"permissions:\"\

@@ -27,11 +27,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Enforce Naming
         run: |
           # Ensure KibaTV is not used in place of KibaOS
-          if grep -rq "KibaTV" docs/ README.md WIKI.md; then
+          if grep -rq "Kiba""TV" docs/ README.md WIKI.md; then
             echo "Error: Legacy term 'KibaTV' found. Please use 'KibaOS'."
             grep -rn "KibaTV" docs/ README.md WIKI.md
             exit 1

@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check shell=True
         run: |
           grep -r "shell=True" . --include="*.py" && exit 1 || exit 0

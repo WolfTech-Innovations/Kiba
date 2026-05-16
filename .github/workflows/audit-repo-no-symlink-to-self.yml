@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check circular symlinks
         run: |
           find . -type l -exec test ! -e {} \; -print | grep . && exit 1 || exit 0

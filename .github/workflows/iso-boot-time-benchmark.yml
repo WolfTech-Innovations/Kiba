@@ -12,11 +12,11 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - name: Download ISO Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16
         with:
           name: kibaos-iso # Assuming this is the artifact name
           path: .
-        continue-on-error: true
+        continue-on-error: false
 
       - name: Run QEMU Boot Benchmark
         run: |

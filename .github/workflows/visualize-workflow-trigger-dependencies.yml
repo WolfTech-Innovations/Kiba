@@ -12,7 +12,7 @@ jobs:
   graph:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Generate Graph
         run: |
           echo "digraph G {" > workflow_graph.dot
@@ -23,7 +23,7 @@ jobs:
           done
           echo "}" >> workflow_graph.dot
       - name: Upload Graph
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882
         with:
           name: workflow-dependencies
           path: workflow_graph.dot

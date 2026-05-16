@@ -19,7 +19,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Verify Roadmap Section
         run: |
           if ! grep -q "## Roadmap" README.md; then

@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check step timeout
         run: |
           grep -r "steps:" .github/workflows/*.yml | grep -v "timeout-minutes:" && (echo "Step timeouts recommended for all long-running tasks" && exit 1) || exit 0

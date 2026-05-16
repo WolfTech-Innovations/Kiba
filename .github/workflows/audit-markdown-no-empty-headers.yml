@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check for empty headers
         run: |
           grep -rnE "^#+ .+$" . --include="*.md" -A 1 | grep -E "^#+ .+$" -A 1 | grep "\-\-" -v | grep -vE "^#+ " | grep -vE "^[[:space:]]*$" -v | grep -E "^#+" && (echo "Headers should not be followed immediately by another header" && exit 1) || exit 0

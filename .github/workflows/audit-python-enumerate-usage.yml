@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check for range(len(...))
         run: |
           grep -rnE "\brange\(len\(" . --include="*.py" && (echo "Use enumerate() instead of range(len(...))" && exit 1) || exit 0

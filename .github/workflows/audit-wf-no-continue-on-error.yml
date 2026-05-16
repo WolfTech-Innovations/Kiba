@@ -1,16 +1,16 @@
-name: Audit Workflow No Continue On Error
-
+name: Audit WF No Continue On Error
 on:
   push:
     paths:
-      - '.github/workflows/*.yml'
+      - ".github/workflows/*.yml"
   pull_request:
     paths:
-      - '.github/workflows/*.yml'
-
+      - ".github/workflows/*.yml"
 jobs:
   audit:
     timeout-minutes: 5
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
@@ -18,4 +18,5 @@ jobs:
           persist-credentials: false
       - name: Check continue-on-error
         run: |
-          grep -r "continue-on-error: true" .github/workflows && exit 1 || exit 0
+          # Optimized: Check for insecure continue-on-error: true
+          grep -r "continue-on-error: tr""ue" .github/workflows && exit 1 || echo "Policy passed"

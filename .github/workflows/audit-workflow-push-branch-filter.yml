@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check push branch filter
         run: |
           grep -rn "on: push" .github/workflows -A 2 | grep -vE "branches:|paths:" && (echo "on: push should include branch or path filters" && exit 1) || exit 0

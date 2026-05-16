@@ -1,11 +1,11 @@
 name: Check Shell Script Lint
 on:
   push:
-    paths:
-      - '**/*.sh'
+paths:
+- '**/*.sh'
   pull_request:
-    paths:
-      - '**/*.sh'
+paths:
+- '**/*.sh'
 jobs:
   lint:
     permissions:

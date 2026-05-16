@@ -100,6 +100,7 @@ On Linux:
 
 ```bash
 sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
+
 ```bash
 
 > [!IMPORTANT]
@@ -133,6 +134,7 @@ Post-install, update your system:
 
 ```bash
 sudo apt update && sudo apt upgrade -y
+
 ```bash
 
 ---
@@ -209,6 +211,7 @@ docker run --rm --privileged \
   -e RUN_NUM=local \
   debian:trixie \
   /w/build.sh
+
 ```bash
 
 > [!NOTE]
@@ -227,6 +230,7 @@ Kiba/
 │   └── kibaos_banner.png      # KibaOS brand assets
 ├── docs/                      # In-depth documentation
 └── README.md                  # Project documentation
+
 ```bash
 
 ---

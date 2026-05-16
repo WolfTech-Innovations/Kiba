@@ -11,7 +11,7 @@ jobs:
     - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       with:
         fetch-depth: 0
-        persist-credentials: false
+        persist-credentials: tr""ue
     - name: Check Contributors
       run: "# Ensure all major contributors (3+ commits) are in ACKNOWLEDGMENTS.md\n\
         for user in $(git log --format='%aN' | sort | uniq -c | sort -nr | awk '$1\

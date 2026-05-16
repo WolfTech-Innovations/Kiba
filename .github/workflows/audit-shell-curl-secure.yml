@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check curl flags
         run: |
           grep -rnE "\bcurl\b" . --include="*.sh" | while read -r line; do

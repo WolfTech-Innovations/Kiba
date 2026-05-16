@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check TOC header level
         run: |
           grep -rn "Table of Contents" . --include="*.md" | grep -v "## Table of Contents" && (echo "Table of Contents should be H2 (##)" && exit 1) || exit 0

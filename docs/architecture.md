@@ -1,7 +1,7 @@
 # Architecture Deep-Dive
 
 <p align="center">
-  <img src="../branding/kibatv_banner.png" alt="KibaTV Logo: A minimalist dark blue geometric emblem" width="100%">
+  <img src="../branding/kibatv_banner.png" alt="KibaOS Logo: A minimalist dark blue geometric emblem" width="100%">
 </p>
 
 <p align="center">
@@ -10,11 +10,7 @@
   <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
 </p>
 
----
-
-This document provides a technical overview of the KibaTV architectural stack, from the base system to the final user-facing components.
-
----
+This document provides a technical overview of the KibaOS architectural stack, from the base system to the final user-facing components.
 
 ## Table of Contents
 
@@ -34,9 +30,7 @@ This document provides a technical overview of the KibaTV architectural stack, f
   - [Bootloader](#bootloader)
 - [Related Reading](#related-reading)
 
----
-
-## System-Stack
+## System Stack
 
 ```mermaid
 graph TD
@@ -46,16 +40,15 @@ graph TD
     D --> E[Systemd Init]
     E --> F[Wayland / X11]
     F --> G[Plasma Bigscreen]
-    G --> H[KibaTV UX]
-```text
+    G --> H[KibaOS UX]
 
----
+```
 
 ## Core Foundation
 
 ### Debian 13 (Trixie)
 
-KibaTV is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
+KibaOS is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
 
 ### CachyOS Kernel
 
@@ -73,11 +66,9 @@ We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `
 - **Init System:** **Systemd** provides reliable service orchestration.
 - **Display Server:** **Wayland** is the default for its security and modern features, with **X11** (via XWayland) ensuring compatibility with legacy applications.
 
----
-
 ## Extreme Minimization
 
-KibaTV follows a strict "No Bloat" policy. We use aggressive strategies to keep the ISO size small and the runtime environment lean.
+KibaOS follows a strict "No Bloat" policy. We use aggressive strategies to keep the ISO size small and the runtime environment lean.
 
 ### Documentation & Help
 
@@ -93,8 +84,6 @@ We only keep **`en`** and **`en_US`** locales. All other translations are remove
 ### Dependency Pruning
 
 We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-bigscreen` and `plasma-workspace` and manually add only the essential KDE components required for a functional desktop.
-
----
 
 ## Filesystem & Boot Performance
 
@@ -119,7 +108,7 @@ _Note: Critical shell integration scripts (like those for `fzf`) are preserved b
 
 ### Locale Optimization
 
-To save space, KibaTV limits system locales to only `en` and `en_US`. All other locale data is purged from `/usr/share/locale`.
+To save space, KibaOS limits system locales to only `en` and `en_US`. All other locale data is purged from `/usr/share/locale`.
 
 ### Dependency Pruning (Optimized)
 
@@ -132,12 +121,10 @@ Configured for maximum compression using **`zstd -19`** in **`/etc/initramfs-too
 
 ### Bootloader
 
-KibaTV uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
+KibaOS uses **GRUB** (`grub-pc` and `grub-efi`) as the primary bootloader.
 
 - **Hybrid Support:** Works on both BIOS (Legacy) and UEFI systems.
-- **Branded Menu:** A custom binary hook patches `grub.cfg` to provide user-friendly, branded menu entries like _"Start KibaTV"_ and _"Install KibaTV"_.
-
----
+- **Branded Menu:** A custom binary hook patches `grub.cfg` to provide user-friendly, branded menu entries like _"Start KibaOS"_ and _"Install KibaOS"_.
 
 ## Related Reading
 

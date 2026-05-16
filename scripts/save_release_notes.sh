@@ -1,3 +1,13 @@
+#
+# MIT License
+# Copyright (c) 2026 WolfTech-Innovations
+#
+#
+# Copyright (c) 2026 WolfTech-Innovations
+#
+# This source code is licensed under the MIT license found in the
+# LICENSE file in the root directory of this source tree.
+#
 #!/bin/bash
 # License: MIT
 #
@@ -23,14 +33,16 @@
 
 set -euo pipefail
 
-trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
+trap 'printf "Interrupted. Cleaning up...
+" >&2' INT TERM
 
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
   if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
-    printf "Usage: %s [release_id]\n" "$0" >&2
+    printf "Usage: %s [release_id]
+" "$0" >&2
   fi
 
   local release_id; release_id="${1:-${RELEASE_ID:-}}"
@@ -38,17 +50,20 @@ save_release_notes() {
   local repo; repo="${GITHUB_REPOSITORY:-}"
 
   if [ -z "$release_id" ]; then
-    printf "Error: RELEASE_ID environment variable or argument is required.\n" >&2
+    printf "Error: RELEASE_ID environment variable or argument is required.
+" >&2
     return 1
   fi
 
   if [ -z "$github_token" ]; then
-    printf "Error: GH_TOKEN environment variable is required.\n" >&2
+    printf "Error: GH_TOKEN environment variable is required.
+" >&2
     return 1
   fi
 
   if [ -z "$repo" ]; then
-    printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
+    printf "Error: GITHUB_REPOSITORY environment variable is required.
+" >&2
     return 1
   fi
 
@@ -91,9 +106,11 @@ EOV
 
   # 4. Handle empty release notes
   if [ -z "$body" ] || [ "$body" = "null" ]; then
-    printf "No release notes provided for this release.\n" > "$filename"
+    printf "No release notes provided for this release.
+" > "$filename"
   else
-    printf "%s\n" "$body" > "$filename"
+    printf "%s
+" "$body" > "$filename"
   fi
 
   # 5. Git operations
@@ -106,7 +123,8 @@ EOV
     git pull --rebase origin main
     git push origin main
   else
-    printf "No changes to commit\n"
+    printf "No changes to commit
+"
   fi
 }
 

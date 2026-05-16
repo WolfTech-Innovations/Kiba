@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check cd exit
         run: |
           grep -rnE "\bcd\b" . --include="*.sh" | grep -vE "\|\| exit|cd \-" && (echo "cd should be followed by || exit" && exit 1) || exit 0

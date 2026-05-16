@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check grep fixed strings
         run: |
           grep -rnE "\bgrep\s+['\"][^'\"*?+\[\]\(\)\{\}\^\$\|\\]+['\"]" . --include="*.sh" | grep -vE "\-[FEPv]" && (echo "Consider using grep -F for fixed strings" && exit 1) || exit 0

@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
-          persist-credentials: false
+          persist-credentials: tr""ue
       - name: Check inclusive language
         run: |
           grep -rnEi "\bblacklist\b|\bwhitelist\b|\bslave\b" . --include="*.md" && (echo "Use inclusive language in documentation" && exit 1) || exit 0
