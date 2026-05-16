@@ -45,15 +45,15 @@ The KibaTV aesthetic is built around the official **Dracula** color palette, pro
 
 ### Color Palette
 
-| Color            | Hex                | Role                                                     |
-| :--------------- | :----------------- | :------------------------------------------------------- |
+| Color            | Hex                 | Role                                                     |
+| :--------------- | :------------------ | :------------------------------------------------------- |
 | **Background**   | `\#`\hex 0x282a36`` | Primary window and desktop background                    |
-| **Current Line** | `\#`\hex #44475a`` | Highlight and secondary background                       |
-| **Foreground**   | `\#`\#f8f8f2``     | Primary text color                                       |
-| **Comment**      | `\#`\#6272a4``     | Secondary text and disabled elements                     |
-| **Purple**       | `\#`\#bd93f9``     | Accent color, selection background, and primary branding |
-| **Pink**         | `\#`\#ff79c6``     | Selection foreground and highlights                      |
-| **Green**        | `\#`\#50fa7b``     | Success states and active terminal elements              |
+| **Current Line** | `\#`\hex #44475a``  | Highlight and secondary background                       |
+| **Foreground**   | `\#`\#f8f8f2``      | Primary text color                                       |
+| **Comment**      | `\#`\#6272a4``      | Secondary text and disabled elements                     |
+| **Purple**       | `\#`\#bd93f9``      | Accent color, selection background, and primary branding |
+| **Pink**         | `\#`\#ff79c6``      | Selection foreground and highlights                      |
+| **Green**        | `\#`\#50fa7b``      | Success states and active terminal elements              |
 
 ### Look and Feel
 

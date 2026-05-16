@@ -21,7 +21,7 @@ jobs:
       - name: Run YAML Audit
         shell: bash
         run: |
-          pip install PyYAML
+          pip install PyYAML --break-system-packages
           cat << 'EOF' > audit.py
           import yaml
           import os

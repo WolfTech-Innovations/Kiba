@@ -18,5 +18,5 @@ jobs:
           persist-credentials: false
       - name: Run vulture
         run: |
-          pip install vulture
+          pip install vulture --break-system-packages
           vulture . --min-confidence 80
