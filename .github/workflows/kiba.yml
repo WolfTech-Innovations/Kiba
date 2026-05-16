@@ -302,7 +302,7 @@ jobs:
           plasma-discover-backend-flatpak
 
           sddm
-          sddm-theme-debian-breeze
+          sddm-theme-breeze
           systemsettings
           plasma-nm
           plasma-pa
@@ -531,7 +531,7 @@ jobs:
           # KibaOS: use nala as the default package manager frontend
           if command -v nala >/dev/null 2>&1; then
             alias apt='nala'
-            alias apt-get='nala'
+            alias apt='nala'
           fi
           NALA_ALIAS
           chmod +x /etc/profile.d/nala-alias.sh
@@ -609,7 +609,7 @@ jobs:
           # ── Nala/apt aliases ────────────────────────────────────
           if command -v nala >/dev/null 2>&1; then
             alias apt='nala'
-            alias apt-get='nala'
+            alias apt='nala'
             alias install='sudo nala install'
             alias remove='sudo nala remove'
             alias update='sudo nala update && sudo nala upgrade -y'
@@ -1366,7 +1366,7 @@ jobs:
           welcomeExpandingLogo: true
           slideshowAPI: 2
           strings:
-            productName: "KibaOS"
+            productName: "KibaTV"
             shortProductName: "KibaOS"
             version: "1.8"
             shortVersion: "1.8"
@@ -1702,7 +1702,7 @@ jobs:
           # KibaOS: nala as package manager frontend
           command -v nala >/dev/null 2>&1 && {
             alias apt='nala'
-            alias apt-get='nala'
+            alias apt='nala'
           }
           NALABASH
             fi

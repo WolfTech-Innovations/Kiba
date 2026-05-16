@@ -15,6 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install Bandit
-        run: pip install bandit
+        run: pip install bandit --break-system-packages
       - name: Run Bandit
         run: bandit -r . -ll

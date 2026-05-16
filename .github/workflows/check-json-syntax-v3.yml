@@ -1,21 +1,23 @@
 name: Check JSON Syntax
 on:
   push:
-paths:
-- '**/*.json'
+    paths:
+      - '**/*.json'
   pull_request:
-paths:
-- '**/*.json'
+    paths:
+      - '**/*.json'
 jobs:
   check:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      with:
-        persist-credentials: false
-    - name: Validate JSON
-      run: for f in $(find . -name "*.json" -not -path "*/node_modules/*"); do python3
-        -m json.tool "$f" > /dev/null || exit 1; done
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Validate JSON
+        run: |
+          for f in $(find . -name "*.json" -not -path "*/node_modules/*"); do
+            python3 -m json.tool "$f" > /dev/null || exit 1
+          done
     timeout-minutes: 5

@@ -23,7 +23,7 @@ jobs:
           ISO_FILE=$(ls *.iso | head -1)
           [ -z "$ISO_FILE" ] && echo "No ISO found" && exit 0
 
-          sudo apt-get update && sudo apt-get install -y p7zip-full
+          sudo apt update && sudo apt install -y p7zip-full
 
           mkdir -p iso_content
           7z x "$ISO_FILE" -oiso_content live/initrd.img*

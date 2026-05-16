@@ -9,6 +9,8 @@ concurrency:
 jobs:
   analyze-size:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Size
-        run: echo "PR Size additions: ${{ github.event.pull_request.additions }}"
+        run: |
+          echo "PR Size additions: ${{ github.event.pull_request.additions }}"

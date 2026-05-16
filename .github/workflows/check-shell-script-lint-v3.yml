@@ -16,7 +16,7 @@ jobs:
       with:
         persist-credentials: false
     - name: Run ShellCheck
-      run: 'sudo apt-get update && sudo apt-get install -y shellcheck
+      run: 'sudo apt update && sudo apt install -y shellcheck
 
         shellcheck scripts/*.sh'
     timeout-minutes: 5
