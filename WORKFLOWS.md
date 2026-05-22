@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Fri May 22 01:12:46 UTC 2026
+Generated on Fri May 22 01:22:54 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -424,7 +424,7 @@ Generated on Fri May 22 01:12:46 UTC 2026
 | Kiba Welcome Emoji Label Check | `.github/workflows/kiba-welcome-emoji-label-check.yml` |
 | Kiba Welcome Shortcut Ads | `.github/workflows/kiba-welcome-shortcut-advertisement.yml` |
 | Kiba Welcome Window Icon Audit | `.github/workflows/kiba-welcome-window-icon-audit.yml` |
-|  | `.github/workflows/kiba.yml` |
+| KibaOS Build | `.github/workflows/kiba.yml` |
 | License Check | `.github/workflows/license-check.yml` |
 | License Existence Audit | `.github/workflows/license-existence-audit.yml` |
 | License Header Enforcer | `.github/workflows/license-header-enforcer.yml` |
