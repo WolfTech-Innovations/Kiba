@@ -17,7 +17,7 @@ To the thousands of developers, designers, and contributors worldwide who dedica
 We acknowledge the many FOSS projects that KibaOS integrates and builds upon, including but not limited to:
 
 - **Arch Linux Project**: For the robust and stable base system.
-- **Cutefish Team**: For the powerful and beautiful Cutefish desktop environment.
+- **KDE Community**: For the powerful and beautiful Plasma desktop environment.
 - **Dracula Theme**: For the iconic color palette.
 - **CachyOS**: For the performance-optimized kernel.
 - **Live-Build**: For the infrastructure used to generate our ISO images.

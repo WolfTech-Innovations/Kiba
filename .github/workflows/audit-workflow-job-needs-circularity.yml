@@ -16,7 +16,7 @@ jobs:
       - name: Check Needs
         run: |
           grep -r "needs:" .github/workflows/ | while read -r line; do
-            JOB=$(echo "$line" | grep -oP '^[[]]+\K[^:]+')
+            JOB=$(echo "$line" | grep -oP '^[[:space:]]+\K[^:]+')
             DEPENDENCY=$(echo "$line" | cut -d: -f2 | xargs)
             [ "$JOB" == "$DEPENDENCY" ] && (echo "Circular dependency in $line" && exit 1) || true
           done

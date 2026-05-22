@@ -71,7 +71,7 @@ The system undergoes aggressive footprint reduction during the build process:
 
 - **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
 - **Locale Optimization:** Only `en` and `en_US` locales are preserved.
-- **Dependency Pruning:** Meta-packages like `cutefish-meta` are avoided in favor of a minimal `cutefish` + `cutefish-core` combination.
+- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-bigscreen` + `plasma-workspace` combination.
 - **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
 
 ---
@@ -136,7 +136,7 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 KibaOS includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
 
 - **Implementation:** A Python-based view module in the installer.
-- **Privacy:** Data is stored **locally only** at `/etc/kibaos/age-verify` and is never transmitted to external servers.
+- **Privacy:** Data is stored **locally only** at `/etc/kibatv/age-verify` and is never transmitted to external servers.
 
 ---
 

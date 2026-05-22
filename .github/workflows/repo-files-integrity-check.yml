@@ -17,7 +17,7 @@ jobs:
           ESSENTIAL_FILES="README.md LICENSE WIKI.md ACKNOWLEDGMENTS.md package.json"
           for file in $ESSENTIAL_FILES; do
             if [ ! -s "$file" ]; then
-              echo "::Critical file $file is missing or empty!"
+              echo "::error::Critical file $file is missing or empty!"
               exit 1
             fi
           done

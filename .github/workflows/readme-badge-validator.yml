@@ -16,4 +16,4 @@ jobs:
         run: |
           grep -q "img.shields.io/github/actions/workflow/status" README.md || { echo "Missing Build Status badge"; exit 1; }
           grep -q "img.shields.io/badge/License-MIT" README.md || { echo "Missing License badge"; exit 1; }
-          grep -q "img.shields.io/badge/Arch Linux-Rolling" README.md || { echo "Missing Arch Linux version badge"; exit 1; }
+          grep -q "img.shields.io/badge/Debian-13" README.md || { echo "Missing Debian version badge"; exit 1; }

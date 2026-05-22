@@ -47,10 +47,9 @@ jobs:
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
-          linux
-          linux-firmware
           linux-cachyos
           linux-cachyos-headers
+          linux-firmware
           mkinitcpio
           grub
           efibootmgr
@@ -159,6 +158,16 @@ jobs:
           dont-chroot: false
           CALA_SETTINGS
 
+          cat > airootfs/etc/calamares/modules/welcome_fullscreen.conf << 'CALA_WELCOME'
+          ---
+          showSupportUrl: false
+          showKnownIssuesUrl: false
+          showReleaseNotesUrl: false
+          requirements:
+            requiredStorageGiB: 20
+            requiredRamGiB: 2
+          CALA_WELCOME
+
           # Cloud Integration Service
           mkdir -p airootfs/etc/skel/.config/autostart
           cat > airootfs/etc/skel/.config/autostart/nextcloud.desktop << 'CLOUD'
@@ -248,6 +257,17 @@ jobs:
           done
           WELCOME
           chmod +x airootfs/usr/local/bin/kiba-welcome
+
+          # System identity
+          mkdir -p airootfs/etc
+          cat > airootfs/etc/os-release << 'EOF'
+          NAME="KibaOS"
+          ID=kibaos
+          ID_LIKE=arch
+          VERSION_ID="rolling"
+          PRETTY_NAME="KibaOS (Arch Linux base)"
+          HOME_URL="https://github.com/WolfTech-Innovations/Kiba"
+          EOF
 
           # Finalize and Build
           cd ..

@@ -19,7 +19,7 @@ jobs:
           while read -r file; do
             # Heuristic: Find assignments inside functions that aren't preceded by local/readonly/export
             # We ignore common false positives like return codes ($?) or standard variables
-            if ! awk '/^[a-zA-Z0-9_]+\(\)/ {in_func=1; next} /^}/ {in_func=0} in_func && /^[[]]+[a-zA-Z0-9_]+=/ && !/local|readonly|export|unset/ && !/^[[]]+(IFS|OPTIND|OPTARG)=/ { print FILENAME ":" NR ": " $0; exit 1 }' "$file"; then
+            if ! awk '/^[a-zA-Z0-9_]+\(\)/ {in_func=1; next} /^}/ {in_func=0} in_func && /^[[:space:]]+[a-zA-Z0-9_]+=/ && !/local|readonly|export|unset/ && !/^[[:space:]]+(IFS|OPTIND|OPTARG)=/ { print FILENAME ":" NR ": " $0; exit 1 }' "$file"; then
                echo "Warning: Potential non-local variable assignment in function in $file"
                # We demote this to a warning for now to avoid blocking PRs on false positives
             fi

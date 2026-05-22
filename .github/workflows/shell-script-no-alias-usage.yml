@@ -15,4 +15,4 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Check for alias usage
         run: |
-          grep -rnE "^[[]]*alias[[]]+" . --include="*.sh" && { echo "alias usage found in shell scripts; use functions instead"; exit 1; } || echo "No alias usage found"
+          grep -rnE "^[[:space:]]*alias[[:space:]]+" . --include="*.sh" && { echo "alias usage found in shell scripts; use functions instead"; exit 1; } || echo "No alias usage found"

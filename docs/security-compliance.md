@@ -30,7 +30,7 @@ To comply with the California Age-Appropriate Design Code Act, KibaOS features a
 
 In accordance with KibaOS's privacy-first philosophy:
 
-- **Local Storage Only:** The selected age group is stored exclusively on the user's local machine at `/etc/kibaos/age-verify`.
+- **Local Storage Only:** The selected age group is stored exclusively on the user's local machine at `/etc/kibatv/age-verify`.
 - **No Transmission:** This data is **never** transmitted to WolfTech Innovations or any other external servers.
 - **Purpose:** This local record ensures the system can provide an age-appropriate experience as mandated by law without compromising user anonymity.
 
@@ -43,7 +43,7 @@ In accordance with KibaOS's privacy-first philosophy:
 In strict adherence to our privacy goals:
 
 - **No Transmission:** Your age selection is **never** sent to WolfTech Innovations or any third party.
-- **Local Record:** Data is stored exclusively at **`/etc/kibaos/age-verify`**.
+- **Local Record:** Data is stored exclusively at **`/etc/kibatv/age-verify`**.
 - **User Control:** You can delete or modify this file at any time after installation.
 
 ---

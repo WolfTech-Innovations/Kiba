@@ -1,4 +1,4 @@
-name: Package List Distro Purity
+name: Kiba Welcome Emoji Label Check
 
 on:
   push:
@@ -16,6 +16,6 @@ jobs:
       - name: Checkout Code
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-      - name: Package List Distro Purity
+      - name: Kiba Welcome Emoji Label Check
         run: |
-          grep -E "<<.*PACKAGES" .github/workflows/kiba.yml -A 100 | grep -E "pacman|yum|apk" && { echo "Error: non-debian package"; false; } || true
+          grep -q "kiba-welcome" .github/workflows/kiba.yml && ! grep -q "[🚀🌐🛍️🖥️📂⚙️⌨️✨]" .github/workflows/kiba.yml && { echo "Warning: missing emojis"; } || true

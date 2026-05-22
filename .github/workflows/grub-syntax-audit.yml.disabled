@@ -20,12 +20,12 @@ jobs:
           if [ -s grub_patches.sh ]; then
              echo "Verified: Build script contains GRUB branding logic." >> $GITHUB_STEP_SUMMARY
              # Mock a grub.cfg to test the patches
-             echo "menuentry 'Arch Linux Live' { linux /vmlinuz }" > mock_grub.cfg
+             echo "menuentry 'Debian Live' { linux /vmlinuz }" > mock_grub.cfg
              bash grub_patches.sh mock_grub.cfg
              if grep -q "KibaOS" mock_grub.cfg; then
                 echo "-  Branding patches apply correctly to mock config." >> $GITHUB_STEP_SUMMARY
              else
-                echo "-  Branding patches failed to transform 'Arch Linux Live'." >> $GITHUB_STEP_SUMMARY
+                echo "-  Branding patches failed to transform 'Debian Live'." >> $GITHUB_STEP_SUMMARY
              fi
           else
              echo "-  No GRUB branding logic found in build script." >> $GITHUB_STEP_SUMMARY

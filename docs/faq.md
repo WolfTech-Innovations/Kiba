@@ -38,7 +38,7 @@ It is a performance-optimized Linux kernel that uses the **BORE scheduler**. It 
 
 ### How do I update KibaOS
 
-You can update through **KibaStore** (graphical) or simply by typing **`update`** in the terminal. This is a pre-configured alias that runs `sudo pacman -Syu && sudo pacman -Syu`.
+You can update through **KibaStore** (graphical) or simply by typing **`update`** in the terminal. This is a pre-configured alias that runs `sudo pacman -Syu`.
 
 ### Can I change the theme
 

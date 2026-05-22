@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check indented blocks
         run: |
-          grep -Er "^[[]]{4}[^[]*-]" . --include="*.md" && exit 1 || exit 0
+          grep -Er "^[[:space:]]{4}[^[:space:]*-]" . --include="*.md" && exit 1 || exit 0
