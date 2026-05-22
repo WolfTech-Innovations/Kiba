@@ -6,7 +6,7 @@ KibaOS is currently in active development. We support the latest release on the 
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x     | :white_check_mark: |
+| 1.x     | Supported |
 
 ## Reporting a Vulnerability
 

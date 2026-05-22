@@ -27,7 +27,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: context.payload.issue.number,
-                  body: `🔍 Possible duplicate of #${issue.number}. Please check if this issue has already been reported.`
+                  body: `Possible duplicate of #${issue.number}. Please check if this issue has already been reported.`
                 });
                 break;
               }

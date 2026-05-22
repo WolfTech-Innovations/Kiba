@@ -1,4 +1,4 @@
-name: Audit Kiba Welcome Discovery Loop
+name: Audit mksquashfs Zstd Level
 
 on:
   push:
@@ -16,6 +16,6 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Check Discovery Loop
+      - name: Check mksquashfs zstd 15
         run: |
-          grep "&" .github/workflows/kiba.yml | grep "zenity" || (echo "Informational actions in Zenity menus should be backgrounded" && exit 1)
+          grep "mksquashfs" .github/workflows/kiba.yml | grep "zstd" | grep -q "15" || (echo "Incorrect zstd level" && exit 1)

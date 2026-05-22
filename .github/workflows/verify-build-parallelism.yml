@@ -3,10 +3,10 @@ name: Verify Build Parallelism
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Verify Build Parallelism
         run: |
-          grep -E "make |cmake --build" scripts/kibatv_build.sh | grep -vE "\-j|\-\-parallel" && { echo "Error: missing -j flag"; false; } || true
+          grep -E "make |cmake --build" .github/workflows/kiba.yml | grep -vE "\-j|\-\-parallel" && { echo "Error: missing -j flag"; false; } || true

@@ -26,7 +26,7 @@ To begin contributing to the KibaOS build system or customization hooks, follow 
    ```bash
    git clone https://github.com/YOUR_USERNAME/Kiba
    cd Kiba
-   docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local debian:trixie /w/build.sh
+   docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local archlinux:latest /w/build.sh
    ```
 
 ---

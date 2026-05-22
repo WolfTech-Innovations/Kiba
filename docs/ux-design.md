@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=kde" alt="Desktop">
+  <img src="https://img.shields.io/badge/Desktop-Cutefish-22a7f0?style=for-the-badge&logo=cutefish" alt="Desktop">
   <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
@@ -29,7 +29,7 @@ KibaOS is built with a focus on "modern simplicity." This document details the v
 - [Boot Branding](#boot-branding)
   - [Interface Components](#interface-components)
   - [Typography](#typography)
-- [Desktop Experience (Plasma Bigscreen)](#desktop-experience-plasma-bigscreen)
+- [Desktop Experience (Cutefish OS)](#desktop-experience-cutefish-os)
   - [Window Management Polish](#window-management-polish)
   - [Desktop Layout](#desktop-layout)
 - [The Modern Terminal](#the-modern-terminal)
@@ -57,9 +57,9 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 ### Look and Feel
 
-- **Desktop Environment:** Plasma Bigscreen.
+- **Desktop Environment:** Cutefish OS.
 - **Global Theme:** A customized version of **Ant-Dark**.
-- **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
+- **Color Scheme:** **Dracula**, applied system-wide to Cutefish widgets, window decorations, and applications.
 - **Icons:** **Kora** icon theme for a colorful and modern look.
 - **Cursors:** **Vimix** cursor theme.
 - **Fonts:** **Inter** for the system UI and **JetBrains Mono** for monospace/terminal text.
@@ -68,7 +68,7 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 - **Rounded Corners:** KWin is configured to provide 16px rounded corners for all windows.
 - **Glass Effects:** Blur and contrast effects are enabled for an elegant, translucent look.
-- **Floating Panel:** The Plasma panel is configured to be floating and rounded by default.
+- **Floating Panel:** The Cutefish panel is configured to be floating and rounded by default.
 
 ## Shell Experience
 
@@ -82,7 +82,7 @@ The **Starship** cross-shell prompt is pre-installed and configured with a minim
 
 We prefer modern, faster alternatives to classic Unix commands:
 
-- **`nala`**: A beautiful and feature-rich frontend for `apt`.
+- **`pacman`**: A beautiful and feature-rich frontend for `pacman`.
 - **`eza`**: A modern replacement for `ls` with icons and color-coding.
 - **`bat`**: A `cat` clone with syntax highlighting and Git integration.
 - **`fastfetch`**: A fast and highly customizable system information tool.
@@ -95,11 +95,11 @@ We prefer modern, faster alternatives to classic Unix commands:
 
 Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
 
-- `apt` -> `nala`
+- `pacman` -> `pacman`
 - `ls` -> `eza`
 - `cat` -> `bat`
 - `grep` -> `ripgrep`
-- `update` -> `sudo nala update && sudo nala upgrade -y`
+- `update` -> `sudo pacman -Syu && sudo pacman -Syu -y`
 - `edit` -> `micro` (System default editor)
 - `please` -> `sudo`
 - `cls` -> `clear`
@@ -123,9 +123,9 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-## Desktop Experience (Plasma Bigscreen)
+## Desktop Experience (Cutefish OS)
 
-KibaOS leverages the power of **Plasma Bigscreen** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of **Cutefish OS** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
@@ -155,7 +155,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `apt`           | **`nala`**           | Parallel downloads and clear transaction history. |
+| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 

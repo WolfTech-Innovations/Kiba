@@ -3,10 +3,10 @@ name: Audit Qt6 Tools Pinning
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Audit Qt6 Tools Pinning
         run: |
-          grep -q "qt6-base-dev-tools" scripts/kibatv_build.sh && ! grep -q "qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1" scripts/kibatv_build.sh && { echo "Error: wrong version"; false; } || true
+          grep -q "qt6-base-dev-tools" .github/workflows/kiba.yml && ! grep -q "qt6-base-dev-tools=6.8.2+dfsg-9+deb13u1" .github/workflows/kiba.yml && { echo "Error: wrong version"; false; } || true

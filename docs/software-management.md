@@ -25,7 +25,7 @@ The primary graphical interface for managing software in KibaOS is **KibaStore**
 Unlike other distributions that ship heavy, generic software centers, KibaStore is:
 
 - **Built from Source:** Compiled during the ISO build process using `meson` and `ninja`.
-- **Lightweight:** Designed specifically to manage **Flatpaks** without the overhead of the full GNOME or KDE software suites.
+- **Lightweight:** Designed specifically to manage **Flatpaks** without the overhead of the full GNOME, KDE, or Cutefish software suites.
 - **Modern UI:** Built with **GTK4** and **Libadwaita**, providing a sleek and responsive user interface.
 
 ### Flatpak Integration
@@ -40,7 +40,7 @@ KibaStore comes pre-configured with the **Flathub** remote. This gives you insta
 
 ## Terminal Package Management (Nala)
 
-For those who prefer the command line, KibaOS defaults to **Nala** — a modern frontend for `apt` that makes package management beautiful and safer.
+For those who prefer the command line, KibaOS defaults to **Nala** — a modern frontend for `pacman` that makes package management beautiful and safer.
 
 ### Why Nala
 
@@ -52,15 +52,15 @@ For those who prefer the command line, KibaOS defaults to **Nala** — a modern 
 
 | Task                     | Command                                                        |
 | :----------------------- | :------------------------------------------------------------- |
-| **Update system**        | `update` _(Alias for `sudo nala update && sudo nala upgrade`)_ |
+| **Update system**        | `update` _(Alias for `sudo pacman -Syu && sudo pacman -Syu`)_ |
 | **Search for a package** | `search <name>`                                                |
 | **Install a package**    | `install <name>`                                               |
 | **Remove a package**     | `remove <name>`                                                |
-| **View history**         | `nala history`                                                 |
-| **Undo an operation**    | `sudo nala history undo <ID>`                                  |
+| **View history**         | `pacman history`                                                 |
+| **Undo an operation**    | `sudo pacman history undo <ID>`                                  |
 
 > [!NOTE]
-> For maximum convenience, `apt` and `apt-get` are system-wide aliases for `nala`. You can continue using your muscle memory while enjoying Nala's features.
+> For maximum convenience, `pacman` and `pacman-get` are system-wide aliases for `pacman`. You can continue using your muscle memory while enjoying Nala's features.
 
 ---
 

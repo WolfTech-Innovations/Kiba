@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture">
-  <img src="https://img.shields.io/badge/Base-Debian-D70A53?style=for-the-badge&logo=debian" alt="Base">
+  <img src="https://img.shields.io/badge/Base-Arch Linux-1793D1?style=for-the-badge&logo=archlinux" alt="Base">
   <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
 </p>
 
@@ -20,7 +20,7 @@ This document provides a technical overview of the KibaOS architectural stack, f
 
 - [System Stack](#system-stack)
 - [Core Foundation](#core-foundation)
-  - [Debian 13 (Trixie)](#debian-13-trixie)
+  - [Arch Linux base (Rolling)](#arch-linux-base-rolling)
   - [CachyOS Kernel](#cachyos-kernel)
   - [Init & Display](#init--display)
 - [Extreme Minimization](#extreme-minimization)
@@ -42,10 +42,10 @@ This document provides a technical overview of the KibaOS architectural stack, f
 graph TD
     A[Hardware / VM] --> B[GRUB Bootloader]
     B --> C[CachyOS Kernel]
-    C --> D[Debian 13 Trixie Base]
+    C --> D[Arch Linux Rolling Base]
     D --> E[Systemd Init]
     E --> F[Wayland / X11]
-    F --> G[Plasma Bigscreen]
+    F --> G[Cutefish OS]
     G --> H[KibaOS UX]
 ```
 
@@ -53,20 +53,22 @@ graph TD
 
 ## Core Foundation
 
-### Debian 13 (Trixie)
+### Arch Linux base (Rolling) & Immutable Architecture
 
-KibaOS is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
+KibaOS features a read-only root filesystem to ensure system integrity and prevent accidental modifications. Changes are persisted via OverlayFS in specific user directories.
+
+KibaOS is built upon the **Arch Linux base (Rolling)** testing branch. This allows us to offer cutting-edge software packages (like Cutefish OS) while inheriting the robust package management and security infrastructure of Arch Linux.
 
 ### CachyOS Kernel
 
-We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
+We replace the stock Arch Linux kernel with the **CachyOS Kernel** (integrated via `linux-cachyos`).
 
 - **BORE Scheduler:** Optimized for desktop responsiveness.
 - **Improved Performance:** Built with modern compiler optimizations.
 - **Gaming Ready:** Includes patches for improved wine/proton performance.
 
 > [!IMPORTANT]
-> To maintain a clean system, we explicitly purge the stock `linux-image-amd64` and `linux-headers-amd64` meta-packages during the build process to ensure only the optimized CachyOS kernel remains.
+> To maintain a clean system, we explicitly purge the stock `linux` and `linux-headers` meta-packages during the build process to ensure only the optimized CachyOS kernel remains.
 
 ### Init & Display
 
@@ -92,7 +94,7 @@ We only keep **`en`** and **`en_US`** locales. All other translations are remove
 
 ### Dependency Pruning
 
-We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-bigscreen` and `plasma-workspace` and manually add only the essential KDE components required for a functional desktop.
+We avoid meta-packages like `cutefish-meta`. Instead, we install `cutefish` and `cutefish-core` and manually add only the essential components required for a functional desktop.
 
 ---
 
@@ -123,7 +125,7 @@ To save space, KibaOS limits system locales to only `en` and `en_US`. All other 
 
 ### Dependency Pruning (Optimized)
 
-We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-bigscreen` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
+We avoid heavy meta-packages. For example, instead of `cutefish-meta`, we install a hand-picked minimal set including `cutefish` and `cutefish-core`, adding only the necessary components for a functional and beautiful desktop.
 
 ### Binary Compression
 

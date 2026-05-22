@@ -318,7 +318,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Contributors List Manager | `.github/workflows/contributors-list-manager.yml` |
 | Curl Secure Flags Enforcer | `.github/workflows/curl-secure-flags-enforcer.yml` |
 | Dead Script Scanner | `.github/workflows/dead-script-scanner.yml` |
-| Debian Trixie Mirror Check | `.github/workflows/debian-trixie-mirror-check.yml` |
 | Dependabot Auto-Approve | `.github/workflows/dependabot-auto-approve.yml` |
 | Dependency Vulnerability Monitor | `.github/workflows/dependency-vulnerability-monitor.yml` |
 | Deprecated Commands Check | `.github/workflows/deprecated-commands-check.yml` |
@@ -455,7 +454,7 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Monitor Ant Themes | `.github/workflows/monitor-ant-themes.yml` |
 | Monitor CachyOS Kernel | `.github/workflows/monitor-cachyos-kernel.yml` |
 | Monitor Kora Icons | `.github/workflows/monitor-kora-icons.yml` |
-| Monitor Nala | `.github/workflows/monitor-nala.yml` |
+| Monitor Nala | `.github/workflows/monitor-pacman.yml` |
 | Monitor Starship | `.github/workflows/monitor-starship.yml` |
 | Monitor Vimix Cursors | `.github/workflows/monitor-vimix-cursors.yml` |
 | Notify SourceForge Release | `.github/workflows/notify-release-sourceforge-upload.yml` |
@@ -573,7 +572,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | TODO Checker | `.github/workflows/todo-checker.yml` |
 | TODO Comment Tracker | `.github/workflows/todo-comment-tracker.yml` |
 | TODO Persistence Tracking | `.github/workflows/todo-persistence-tracking.yml` |
-| Track Debian Trixie CVE Alerts | `.github/workflows/track-debian-trixie-cve-alerts.yml` |
 | Track ISO Size Growth | `.github/workflows/track-iso-size-growth.yml` |
 | Trivy | `.github/workflows/trivy.yml` |
 | Trusted Auto-Approve | `.github/workflows/trusted-auto-approve.yml` |

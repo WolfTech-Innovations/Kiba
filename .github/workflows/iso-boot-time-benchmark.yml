@@ -44,7 +44,7 @@ jobs:
           echo "- Total execution time (to timeout/exit): ${ELAPSED}ms" >> $GITHUB_STEP_SUMMARY
 
           if grep -q "Welcome to KibaOS" boot_log.txt; then
-             echo "- :white_check_mark: Reached Welcome Screen" >> $GITHUB_STEP_SUMMARY
+             echo "-  Reached Welcome Screen" >> $GITHUB_STEP_SUMMARY
           else
-             echo "- :warning: Welcome Screen marker not found in serial output" >> $GITHUB_STEP_SUMMARY
+             echo "-  Welcome Screen marker not found in serial output" >> $GITHUB_STEP_SUMMARY
           fi

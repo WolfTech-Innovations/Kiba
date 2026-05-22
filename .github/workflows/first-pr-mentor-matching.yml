@@ -22,6 +22,6 @@ jobs:
             MENTORS=("WolfTech-Innovations" "maintainer-one" "maintainer-two")
             SELECTED_MENTOR=${MENTORS[$RANDOM % ${#MENTORS[@]}]}
 
-            gh pr comment ${{ github.event.pull_request.number }} --body "Welcome @$USER! Since this is your first PR, I've assigned @$SELECTED_MENTOR as your mentor to help you with the review process. :sparkles:"
+            gh pr comment ${{ github.event.pull_request.number }} --body "Welcome @$USER! Since this is your first PR, I've assigned @$SELECTED_MENTOR as your mentor to help you with the review process. "
             gh pr edit ${{ github.event.pull_request.number }} --add-reviewer "$SELECTED_MENTOR"
           fi

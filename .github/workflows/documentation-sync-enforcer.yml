@@ -15,4 +15,4 @@ jobs:
       - name: Verify Requirements Sync
         run: |
           echo "Checked synchronization of system requirements."
-          grep "Debian 13" README.md && grep "Debian 13" WIKI.md
+          grep "Arch Linux" README.md && grep "Arch Linux" WIKI.md

@@ -19,11 +19,11 @@ jobs:
           UNSAFE=$(grep -r "github.event.inputs" .github/workflows/*.yml | grep "run:" || true)
 
           if [ -n "$UNSAFE" ]; then
-             echo ":warning: Potential shell injection risk! Inputs should be mapped to environment variables instead of expanded directly in 'run' blocks:" >> $GITHUB_STEP_SUMMARY
+             echo " Potential shell injection risk! Inputs should be mapped to environment variables instead of expanded directly in 'run' blocks:" >> $GITHUB_STEP_SUMMARY
              echo '```yaml' >> $GITHUB_STEP_SUMMARY
              echo "$UNSAFE" >> $GITHUB_STEP_SUMMARY
              echo '```' >> $GITHUB_STEP_SUMMARY
              exit 1
           else
-             echo ":white_check_mark: No direct input expansions found in 'run' blocks." >> $GITHUB_STEP_SUMMARY
+             echo " No direct input expansions found in 'run' blocks." >> $GITHUB_STEP_SUMMARY
           fi

@@ -17,7 +17,7 @@ jobs:
           set -euo pipefail
           for file in .github/workflows/*.yml; do
             filename=$(basename "$file" .yml)
-            workflowname=$(yq '.name' "$file" | tr '[:upper:]' '[:lower:]' | tr ' ' '-')
+            workflowname=$(yq '.name' "$file" | tr '[]' '[]' | tr ' ' '-')
             if [[ "$filename" != "$workflowname" ]]; then
               echo "Warning: Filename $filename.yml does not strictly match workflow name '$workflowname'"
             fi

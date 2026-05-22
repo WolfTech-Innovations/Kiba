@@ -3,10 +3,10 @@ name: Zenity Literal Newline Checker
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Zenity Literal Newline Checker
         run: |
-          grep -E "zenity.*--text" scripts/kibatv_build.sh | grep -q "\\n" && { echo "Warning: \n in Zenity"; } || true
+          grep -E "zenity.*--text" .github/workflows/kiba.yml | grep -q "\\n" && { echo "Warning: \n in Zenity"; } || true

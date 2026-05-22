@@ -35,8 +35,8 @@ graph LR
 ## Infrastructure
 
 - **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`) manages the build lifecycle.
-- **Environment:** Builds run inside a **Debian Trixie** Docker container to ensure environment consistency.
-- **Backend:** **live-build (lb)** is used to assemble the Debian-based live system.
+- **Environment:** Builds run inside a **Arch Linux Rolling** Docker container to ensure environment consistency.
+- **Backend:** **live-build (lb)** is used to assemble the Arch Linux-based live system.
 
 ---
 
@@ -56,7 +56,7 @@ _Executed inside the temporary system environment._
 | **`0055-bazaar-native.hook.chroot`**        | Builds **KibaStore** (Bazaar) from source and configures the desktop entry.        |
 | **`0056-ungoogled-chromium.hook.chroot`**   | Integrates Ungoogled Chromium via an OBS repository.                               |
 | **`0090-extreme-minimization.hook.chroot`** | Purges documentation, help files, and non-English locales.                         |
-| **`0100-customize.hook.chroot`**            | Applies Dracula theme, Plasma settings, shell aliases, and system identity.        |
+| **`0100-customize.hook.chroot`**            | Applies Dracula theme, Cutefish settings, shell aliases, and system identity.        |
 | **`0110-calamares-branding.hook.chroot`**   | Configures the Calamares installer with KibaOS branding and the age-verify module. |
 
 ### Binary Hooks
@@ -88,7 +88,7 @@ cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
-  debian:trixie \
+  archlinux:latest \
   /w/build.sh
 ```bash
 

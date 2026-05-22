@@ -25,8 +25,8 @@ jobs:
           done
 
           if [ -n "$FAILURES" ]; then
-            echo ":warning: The following external links are currently unreachable:" >> $GITHUB_STEP_SUMMARY
+            echo " The following external links are currently unreachable:" >> $GITHUB_STEP_SUMMARY
             echo -e "$FAILURES" >> $GITHUB_STEP_SUMMARY
           else
-            echo ":white_check_mark: All external documentation links are healthy." >> $GITHUB_STEP_SUMMARY
+            echo " All external documentation links are healthy." >> $GITHUB_STEP_SUMMARY
           fi

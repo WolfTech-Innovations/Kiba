@@ -14,4 +14,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Scan
-        run: grep "apt install" .github/workflows/kiba.yml | sort | uniq -c
+        run: grep "pacman -S" .github/workflows/kiba.yml | sort | uniq -c

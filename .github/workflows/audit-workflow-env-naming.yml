@@ -21,4 +21,4 @@ jobs:
       - name: Check environment variable naming
         run: |
           # Robust check for lowercase env vars in workflows
-          grep -rnE "^[[:space:]]+[a-z_][a-z0-9_]*:" .github/workflows/ | grep -B1 "env:" && (echo "Workflow environment variables should be UPPER_CASE" && exit 1) || exit 0
+          grep -rnE "^[[]]+[a-z_][a-z0-9_]*:" .github/workflows/ | grep -B1 "env:" && (echo "Workflow environment variables should be UPPER_CASE" && exit 1) || exit 0

@@ -15,7 +15,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "### :trophy: KibaOS Monthly Leaderboard ($(date +%B %Y))" >> $GITHUB_STEP_SUMMARY
+          echo "###  KibaOS Monthly Leaderboard ($(date +%B %Y))" >> $GITHUB_STEP_SUMMARY
           echo "A huge thank you to everyone who contributed this month!" >> $GITHUB_STEP_SUMMARY
 
           echo "| Contributor | Merged PRs |" >> $GITHUB_STEP_SUMMARY
@@ -27,4 +27,4 @@ jobs:
           done
 
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Keep up the great work! :rocket:" >> $GITHUB_STEP_SUMMARY
+          echo "Keep up the great work! " >> $GITHUB_STEP_SUMMARY

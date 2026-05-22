@@ -9,8 +9,8 @@
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Debian-13%20Trixie-D70A53?style=for-the-badge&logo=debian&logoColor=white" alt="Debian Version">
-  <img src="https://img.shields.io/badge/KDE-Plasma%206-22a7f0?style=for-the-badge&logo=kde&logoColor=white" alt="KDE Version">
+  <img src="https://img.shields.io/badge/Arch Linux-Rolling-1793D1?style=for-the-badge&logo=archlinux&logoColor=white" alt="Arch Linux Version">
+  <img src="https://img.shields.io/badge/Cutefish%20OS-22a7f0?style=for-the-badge&logo=cutefish&logoColor=white" alt="Cutefish Version">
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Debian 13 (Trixie)** with **KDE Plasma 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish OS 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -72,8 +72,9 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 
 ## Features
 
-- **Debian Base:** Built on **Debian 13 Trixie** (supported until 2030).
-- **Modern Desktop:** **KDE Plasma 6.3** with **Wayland** as the default session.
+- **Arch Linux Base:** Built on **Arch Linux Rolling** with an **Immutable Root Filesystem** for maximum stability and security.
+- **Deep Cloud Integration:** System-level integration with Nextcloud and Bazaar for seamless file and setting synchronization. Built on **Arch Linux Rolling** (supported until 2030).
+- **Modern Desktop:** **Cutefish OS 6.3** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
 - **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
@@ -132,7 +133,7 @@ The **Calamares** installer guides you through:
 Post-install, update your system:
 
 ```bash
-sudo apt update && sudo apt upgrade -y
+sudo pacman -Syu
 ```
 
 ---
@@ -154,8 +155,8 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 **Useful Aliases:**
 
 - `ll` -> `ls -lah`
-- `update` -> `sudo nala update && sudo nala upgrade -y`
-- `install` -> `sudo nala install`
+- `update` -> `sudo pacman -Syu`
+- `install` -> `sudo pacman -S`
 
 ### Theme
 
@@ -170,7 +171,7 @@ KibaOS ships the **Dracula** color scheme system-wide using the official palette
 | Pink       | `#ff79c6` | Selection    |
 | Green      | `#50fa7b` | Success      |
 
-The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
 
 ### System Requirements
 
@@ -191,7 +192,7 @@ The scheme is applied to **KDE Plasma**, **Konsole**, **KWin** decorations, **Br
   <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
 </p>
 
-KibaOS is built using **live-build** inside a **Debian Trixie** **Docker** container via **GitHub Actions**.
+KibaOS is built using **live-build** inside a **Arch Linux Rolling** **Docker** container via **GitHub Actions**.
 
 - **Orchestration:** `.github/workflows/kiba.yml`
 - **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
@@ -207,7 +208,7 @@ cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
-  debian:trixie \
+  archlinux:latest \
   /w/build.sh
 ```
 

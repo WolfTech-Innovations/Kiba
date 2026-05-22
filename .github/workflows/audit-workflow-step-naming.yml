@@ -21,4 +21,4 @@ jobs:
       - name: Check step naming
         run: |
           # Robust check for step names starting with lowercase, ignoring indented content
-          grep -rn "^[[:space:]]*- name: [a-z]" .github/workflows/ && (echo "Workflow step names should be Capitalized" && exit 1) || exit 0
+          grep -rn "^[[]]*- name: [a-z]" .github/workflows/ && (echo "Workflow step names should be Capitalized" && exit 1) || exit 0

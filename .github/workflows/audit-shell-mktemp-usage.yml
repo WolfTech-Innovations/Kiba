@@ -18,4 +18,4 @@ jobs:
           persist-credentials: false
       - name: Check for hardcoded /tmp
         run: |
-          grep -rnE "\b/tmp/.[^[:space:]]*" . --include="*.sh" | grep -vE "\bmktemp\b" && (echo "Use mktemp instead of hardcoded /tmp paths" && exit 1) || exit 0
+          grep -rnE "\b/tmp/.[^[]]*" . --include="*.sh" | grep -vE "\bmktemp\b" && (echo "Use mktemp instead of hardcoded /tmp paths" && exit 1) || exit 0
