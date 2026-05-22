@@ -20,14 +20,18 @@ jobs:
           # Install archiso and deps
           pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
 
-          # Install yay for AUR support
+          # Create a non-root user for AUR builds
+          useradd -m -s /bin/bash aurbuild
+          echo "aurbuild ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/aurbuild
+
+          # Install yay for AUR support as non-root user
           cd /tmp
-          git clone https://aur.archlinux.org/yay.git
+          sudo -u aurbuild git clone https://aur.archlinux.org/yay.git
           cd yay
-          makepkg -si --noconfirm
-          cd /w
+          sudo -u aurbuild makepkg -si --noconfirm
           cd /w
           ISO="kibaos-v${RUN_NUM}"
+
 
           echo "=== Configuring archiso profile ==="
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
