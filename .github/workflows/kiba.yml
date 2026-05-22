@@ -293,10 +293,10 @@ jobs:
               "install")    sudo calamares & break ;;
               "browser")    chromium & break ;;
               "store")      discover & break ;;
-              "terminal")   konsole & break ;;
-              "files")      peony & break ;;
-              "settings")   ukui-control-center & break ;;
-              "screenshot") spectacle & break ;;
+              "terminal")   cutefish-terminal & break ;;
+              "files")      cutefish-filemanager & break ;;
+              "settings")   cutefish-settings & break ;;
+              "screenshot") cutefish-screenshot & break ;;
               "info")
                 (fastfetch | zenity --text-info --title="KibaOS System Information") &
                 ;;
