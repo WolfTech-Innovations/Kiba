@@ -14,7 +14,7 @@
 
 ### What is KibaOS
 
-KibaOS is a modern, lightweight Linux distribution built on **Debian 13 (Trixie)** with **Plasma Bigscreen** and the **CachyOS kernel**. It is designed to be simple, beautiful, and ready to use out-of-the-box.
+KibaOS is a modern, lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish OS** and the **CachyOS kernel**. It is designed to be simple, beautiful, and ready to use out-of-the-box.
 
 ### Why "Kiba"
 
@@ -28,21 +28,21 @@ KibaOS is designed for beginners who want a beautiful and fast system, as well a
 
 ## Technical Questions
 
-### Why Debian Trixie (Testing)
+### Why Arch Linux Rolling (Testing)
 
-We use **Debian Trixie** to provide users with modern software like Plasma Bigscreen and the latest toolchains, while still benefiting from Debian's legendary stability and massive package repository.
+We use **Arch Linux Rolling** to provide users with modern software like Cutefish OS and the latest toolchains, while still benefiting from Arch Linux's legendary stability and massive package repository.
 
 ### What is the CachyOS Kernel
 
-It is a performance-optimized Linux kernel that uses the **BORE scheduler**. It is specifically tuned for desktop responsiveness, making the system feel much snappier under load compared to the stock Debian kernel.
+It is a performance-optimized Linux kernel that uses the **BORE scheduler**. It is specifically tuned for desktop responsiveness, making the system feel much snappier under load compared to the stock Arch Linux kernel.
 
 ### How do I update KibaOS
 
-You can update through **KibaStore** (graphical) or simply by typing **`update`** in the terminal. This is a pre-configured alias that runs `sudo nala update && sudo nala upgrade`.
+You can update through **KibaStore** (graphical) or simply by typing **`update`** in the terminal. This is a pre-configured alias that runs `sudo pacman -Syu`.
 
 ### Can I change the theme
 
-Absolutely! While KibaOS comes pre-configured with the **Dracula** theme, it is a standard Plasma Bigscreen system. You can change the global theme, icons, and colors in **System Settings**.
+Absolutely! While KibaOS comes pre-configured with the **Dracula** theme, it is a standard Cutefish OS system. You can change the global theme, icons, and colors in **System Settings**.
 
 ---
 
@@ -58,7 +58,7 @@ We chose **Ungoogled Chromium** as the default browser because it provides a fam
 
 ### Can I install standard `.deb` packages
 
-Yes! Since KibaOS is based on Debian, you can install any compatible `.deb` file using **Nala** (`sudo nala install ./file.deb`) or standard `dpkg`.
+Yes! Since KibaOS is based on Arch Linux, you can install any compatible `.deb` file using **Nala** (`sudo pacman -S ./file.deb`) or standard `dpkg`.
 
 ---
 
@@ -70,7 +70,7 @@ In the live session, the installer is pinned to the desktop and the taskbar. If 
 
 ### My Wi-Fi isn't working
 
-KibaOS includes the `non-free-firmware` repository by default to support most modern wireless cards. If your card isn't detected, you may need to install a specific driver via `nala`.
+KibaOS includes the `non-free-firmware` repository by default to support most modern wireless cards. If your card isn't detected, you may need to install a specific driver via `pacman`.
 
 ---
 

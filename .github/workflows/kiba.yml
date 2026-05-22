@@ -18,107 +18,41 @@ jobs:
           #!/bin/bash
           set -ex
 
-          # Install build deps + archiso + yay (still needed for calamares-git)
-          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
-            cmake extra-cmake-modules qt5-base qt5-quickcontrols2 qt5-declarative qt5-tools \
-            qt5-x11extras qt5-sensors kwindowsystem kwin kdecoration kconfig kguiaddons \
-            kcoreaddons kconfigwidgets kwayland kio networkmanager-qt modemmanager-qt \
-            polkit polkit-qt5 pkgconf libqtxdg libdbusmenu-qt5 libxcb \
-            xorg-server-devel xf86-input-libinput xf86-input-synaptics \
-            libxcb-icccm4 libxcb-ewmh libxcb-randr libxcb-xfixes libxcb-damage \
-            libxcb-composite libxcb-shm libxcb-util libxcb-image \
-            libsm libxtst libpulse libxcursor taglib freetype2 fontconfig \
-            sddm ninja
-
-          # Non-root user for AUR builds (calamares-git)
-          useradd -m -s /bin/bash aurbuild
-          echo "aurbuild ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/aurbuild
-
-          # Install yay for calamares-git
-          cd /tmp
-          sudo -u aurbuild git clone https://aur.archlinux.org/yay.git
-          cd yay && sudo -u aurbuild makepkg -si --noconfirm
-
-          # 1. Build Cutefish DE from source (in order — deps first)
-          mkdir -p /tmp/cutefish && cd /tmp/cutefish
-
-          build_cutefish() {
-            local repo=$1
-            git clone --depth=1 https://github.com/cutefishos/${repo}.git
-            cd ${repo}
-            mkdir -p build && cd build
-            cmake -DCMAKE_INSTALL_PREFIX=/usr ..
-            make -j$(nproc)
-            make install
-            cd /tmp/cutefish
-          }
-
-          build_cutefish libcutefish
-          build_cutefish fishui
-          build_cutefish kwin-plugins
-          build_cutefish core
-          build_cutefish icons
-          build_cutefish launcher
-          build_cutefish filemanager
-          build_cutefish settings
-          build_cutefish screenlocker
-          build_cutefish terminal
-          build_cutefish calculator
-          build_cutefish screenshot
-          build_cutefish statusbar
-          build_cutefish wallpapers
-
-          # Package all installed cutefish files into a local pacman package
-          mkdir -p /tmp/cutefish-pkg/pkg/cutefish
-          # Collect everything cutefish installed into /usr
-          # We'll tar it up and create a fake package for pacman to track
-          # Instead: just copy the installed files into the airootfs directly later (step 9)
-
-          # 2. Build calamares-git from AUR
-          cd /w
-          sudo -u aurbuild yay -S --noconfirm calamares-git
-          mkdir -p /tmp/aur-pkgs
-          find /home/aurbuild/.cache/yay -name "*.pkg.tar.zst" -exec cp {} /tmp/aur-pkgs/ \;
-          repo-add /tmp/aur-pkgs/aur-local.db.tar.zst /tmp/aur-pkgs/*.pkg.tar.zst
+          # Install archiso and deps
+          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
 
-          # 2. Create profile FIRST (fixes ordering bug from original)
+          echo "=== Configuring archiso profile ==="
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
           cd kiba-profile
 
-          # 3. Write full pacman.conf — guarantees core/extra present + injects local AUR repo
-          cat > pacman.conf << 'PACMAN_CONF'
-          [options]
-          HoldPkg = pacman glibc
-          Architecture = auto
-          ParallelDownloads = 5
-          SigLevel = Required DatabaseOptional
-          LocalFileSigLevel = Optional
+          # Add Repositories
+          cat >> pacman.conf << 'REPOS'
+          [arch-cutefish]
+          SigLevel = Optional TrustAll
+          Server = https://github.com/arch-cutefish/repo/releases/download/x86_64
 
-          [aur-local]
-          SigLevel = Never
-          Server = file:///tmp/aur-pkgs
+          [cachyos]
+          SigLevel = Optional TrustAll
+          Server = https://mirror.cachyos.org/repo/$arch/$repo
+          REPOS
 
-          [core]
-          Include = /etc/pacman.d/mirrorlist
+          # Import CachyOS key
+          pacman-key --recv-keys F3B607488DB35C47
+          pacman-key --lsign-key F3B607488DB35C47
 
-          [extra]
-          Include = /etc/pacman.d/mirrorlist
-          PACMAN_CONF
-
-          # 4. Packages — cutefish runtime deps (DE itself copied into airootfs in step 9)
+          # Update packages list
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
-          linux
+          linux-cachyos
+          linux-cachyos-headers
           linux-firmware
           mkinitcpio
           grub
           efibootmgr
-          syslinux
-          memtest86+
           networkmanager
           git
           wget
@@ -141,47 +75,30 @@ jobs:
           nano
           fzf
           yt-dlp
-          xorg-server
-          xorg-xinit
-          sddm
-          qt5-base
-          qt5-quickcontrols2
-          qt5-declarative
-          qt5-x11extras
-          qt5-sensors
-          kwindowsystem
-          kwin
-          kdecoration
-          kconfig
-          kguiaddons
-          kcoreaddons
-          kconfigwidgets
-          kwayland
-          kio
-          networkmanager-qt
-          modemmanager-qt
-          polkit
-          polkit-qt5
-          libqtxdg
-          libdbusmenu-qt5
-          libxcb
-          libsm
-          libxtst
-          libpulse
-          libxcursor
-          taglib
-          freetype2
-          fontconfig
-          calamares-git
+          calamares
           inter-font
           ttf-jetbrains-mono
           noto-fonts-emoji
+          cutefish-core
+          cutefish-dock
+          cutefish-launcher
+          cutefish-statusbar
+          cutefish-settings
+          cutefish-icons
+          cutefish-wallpapers
+          cutefish-filemanager
+          cutefish-terminal
+          cutefish-screenshot
+          cutefish-calculator
           discover
           flatpak
-          xdg-desktop-portal
+          xdg-desktop-portal-kde
+          xdg-desktop-portal-gtk
           chromium
           vlc
           gparted
+          kate
+          dolphin
           konsole
           spectacle
           ark
@@ -193,20 +110,15 @@ jobs:
           erofs-utils
           PACKAGES
 
-          # 5. Enable lightdm on the live image
-          mkdir -p airootfs/etc/systemd/system/multi-user.target.wants
-          ln -sf /usr/lib/systemd/system/lightdm.service \
-            airootfs/etc/systemd/system/multi-user.target.wants/lightdm.service
+          # Immutability configuration
+          mkdir -p airootfs/etc
+          cat > airootfs/etc/fstab << 'FSTAB'
+          LABEL=KIBAOS_ROOT / erofs defaults,ro 0 0
+          tmpfs /etc tmpfs defaults,noatime,mode=755 0 0
+          tmpfs /var tmpfs defaults,noatime,mode=755 0 0
+          FSTAB
 
-          # 6. mkinitcpio for live env
-          cat > airootfs/etc/mkinitcpio.conf << 'MKINIT'
-          MODULES=(erofs)
-          BINARIES=()
-          FILES=()
-          HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_kms block filesystems keyboard)
-          MKINIT
-
-          # 7. Calamares config
+          # OOBE Fullscreen Setup
           mkdir -p airootfs/etc/calamares/modules
           cat > airootfs/etc/calamares/settings.conf << 'CALA_SETTINGS'
           ---
@@ -256,47 +168,75 @@ jobs:
             requiredRamGiB: 2
           CALA_WELCOME
 
-          # 8. Nextcloud autostart
+          # Cloud Integration Service
           mkdir -p airootfs/etc/skel/.config/autostart
           cat > airootfs/etc/skel/.config/autostart/nextcloud.desktop << 'CLOUD'
           [Desktop Entry]
           Type=Application
-          Name=Nextcloud Sync
+          Name=Cloud Sync
           Exec=nextcloud --background
           CLOUD
 
-          # 9. Welcome script
+          # Spotlight search binding
+          mkdir -p airootfs/etc/skel/.config/cutefishos
+          cat > airootfs/etc/skel/.config/cutefishos/launcher.conf << 'LAUNCHER'
+          [General]
+          hotkey=Meta+Space
+          LAUNCHER
+
+          # Clean Welcome Script (No Emojis)
           mkdir -p airootfs/usr/local/bin
           cat > airootfs/usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
-              --text="Welcome to KibaOS! What would you like to do?" \
+              --text="Welcome to KibaOS. What would you like to do?" \
               --column="Tag" --column="Action" --column="Description" \
-              "install"    "Install KibaOS"     "Install the system permanently to your disk" \
-              "browser"    "Web Browser"         "Browse the internet" \
-              "store"      "Software Center"     "Discover and install new applications" \
-              "terminal"   "Open Terminal"       "Use Meta+T to launch" \
-              "files"      "File Manager"        "Use Meta+E to browse" \
-              "settings"   "System Settings"     "Configure your desktop and hardware" \
-              "screenshot" "Screen Capture"      "Use Print to capture" \
-              "info"       "System Information"  "View technical system details" \
-              "shortcuts"  "Keyboard Shortcuts"  "View useful desktop shortcuts" \
-              "wiki"       "Online Wiki"         "Read the technical documentation" \
+              "install" "Install KibaOS" "Install the system permanently to your disk" \
+              "browser" "Web Browser" "Browse the internet" \
+              "store" "Software Center" "Discover and install new applications" \
+              "terminal" "Open Terminal" "Use Meta+T to launch" \
+              "files" "File Manager" "Use Meta+E to browse" \
+              "settings" "System Settings" "Configure your desktop and hardware" \
+              "screenshot" "Screen Capture" "Use Print to capture" \
+              "info" "System Information" "View technical system details" \
+              "shortcuts" "Keyboard Shortcuts" "View useful desktop shortcuts" \
+              "wiki" "Online Wiki" "Read the technical documentation" \
               --hide-column=1 --print-column=1 \
               --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
 
             [ -z "$CHOICE" ] && break
 
             case "$CHOICE" in
-              "install")    sudo calamares & break ;;
-              "browser")    chromium & break ;;
-              "store")      discover & break ;;
-              "terminal")   cutefish-terminal & break ;;
-              "files")      cutefish-filemanager & break ;;
-              "settings")   cutefish-settings & break ;;
-              "screenshot") cutefish-screenshot & break ;;
+              "install")
+                sudo calamares &
+                break
+                ;;
+              "browser")
+                chromium &
+                break
+                ;;
+              "store")
+                discover &
+                break
+                ;;
+              "terminal")
+                konsole &
+                break
+                ;;
+              "files")
+                dolphin &
+                break
+                ;;
+              "settings")
+                cutefish-settings &
+                break
+                ;;
+              "screenshot")
+                spectacle &
+                break
+                ;;
               "info")
                 (fastfetch | zenity --text-info --title="KibaOS System Information") &
                 ;;
@@ -304,9 +244,9 @@ jobs:
                 (zenity --list --title="KibaOS Shortcuts" \
                   --column="Action" --column="Shortcut" \
                   "Application Menu" "Meta" \
-                  "Terminal"         "Meta + T" \
-                  "Search"           "Meta + Space" \
-                  "File Manager"     "Meta + E" \
+                  "Terminal" "Meta + T" \
+                  "Search" "Meta + Space" \
+                  "File Manager" "Meta + E" \
                   --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
                 ;;
               "wiki")
@@ -316,7 +256,18 @@ jobs:
           WELCOME
           chmod +x airootfs/usr/local/bin/kiba-welcome
 
-          # 10. Build
+          # System identity
+          mkdir -p airootfs/etc
+          cat > airootfs/etc/os-release << 'EOF'
+          NAME="KibaOS"
+          ID=kibaos
+          ID_LIKE=arch
+          VERSION_ID="rolling"
+          PRETTY_NAME="KibaOS (Arch Linux base)"
+          HOME_URL="https://github.com/WolfTech-Innovations/Kiba"
+          EOF
+
+          # Finalize and Build
           cd ..
           mkarchiso -v -w work -o out kiba-profile/
 

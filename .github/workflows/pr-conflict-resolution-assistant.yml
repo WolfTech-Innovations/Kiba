@@ -18,7 +18,7 @@ jobs:
           MERGEABLE=$(gh pr view ${{ github.event.pull_request.number }} --json mergeable --jq .mergeable)
 
           if [ "$MERGEABLE" == "CONFLICTING" ]; then
-            gh pr comment ${{ github.event.pull_request.number }} --body "## :warning: Merge Conflict Detected
+            gh pr comment ${{ github.event.pull_request.number }} --body "##  Merge Conflict Detected
 
             It looks like this PR has conflicts with the base branch. Here is how you can resolve them:
 

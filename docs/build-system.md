@@ -35,8 +35,8 @@ graph LR
 ## Infrastructure
 
 - **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`) manages the build lifecycle.
-- **Environment:** Builds run inside a **Debian Trixie** Docker container to ensure environment consistency.
-- **Backend:** **live-build (lb)** is used to assemble the Debian-based live system.
+- **Environment:** Builds run inside a **Arch Linux Rolling** Docker container to ensure environment consistency.
+- **Backend:** **live-build (lb)** is used to assemble the Arch Linux-based live system.
 
 ---
 
@@ -88,7 +88,7 @@ cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
-  debian:trixie \
+  archlinux:latest \
   /w/build.sh
 ```bash
 

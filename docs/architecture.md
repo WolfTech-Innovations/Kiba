@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture">
-  <img src="https://img.shields.io/badge/Base-Debian-D70A53?style=for-the-badge&logo=debian" alt="Base">
+  <img src="https://img.shields.io/badge/Base-Arch Linux-1793D1?style=for-the-badge&logo=archlinux" alt="Base">
   <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
 </p>
 
@@ -20,7 +20,7 @@ This document provides a technical overview of the KibaOS architectural stack, f
 
 - [System Stack](#system-stack)
 - [Core Foundation](#core-foundation)
-  - [Debian 13 (Trixie)](#debian-13-trixie)
+  - [Arch Linux base (Rolling)](#debian-13-trixie)
   - [CachyOS Kernel](#cachyos-kernel)
   - [Init & Display](#init--display)
 - [Extreme Minimization](#extreme-minimization)
@@ -42,10 +42,10 @@ This document provides a technical overview of the KibaOS architectural stack, f
 graph TD
     A[Hardware / VM] --> B[GRUB Bootloader]
     B --> C[CachyOS Kernel]
-    C --> D[Debian 13 Trixie Base]
+    C --> D[Arch Linux Rolling Base]
     D --> E[Systemd Init]
     E --> F[Wayland / X11]
-    F --> G[Plasma Bigscreen]
+    F --> G[Cutefish OS]
     G --> H[KibaOS UX]
 ```
 
@@ -53,13 +53,13 @@ graph TD
 
 ## Core Foundation
 
-### Debian 13 (Trixie)
+### Arch Linux base (Rolling)
 
-KibaOS is built upon the **Debian 13 (Trixie)** testing branch. This allows us to offer cutting-edge software packages (like Plasma Bigscreen) while inheriting the robust package management and security infrastructure of Debian.
+KibaOS is built upon the **Arch Linux base (Rolling)** testing branch. This allows us to offer cutting-edge software packages (like Cutefish OS) while inheriting the robust package management and security infrastructure of Arch Linux.
 
 ### CachyOS Kernel
 
-We replace the stock Debian kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
+We replace the stock Arch Linux kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
 
 - **BORE Scheduler:** Optimized for desktop responsiveness.
 - **Improved Performance:** Built with modern compiler optimizations.

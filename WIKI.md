@@ -54,11 +54,11 @@ For more specific details on the various components of KibaOS, please refer to t
 
 ---
 
-## 🏗️ Architecture & Core Components
+## Architecture & Core Components
 
 ### Base System
 
-KibaOS is built upon the **Debian 13 (Trixie)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
+KibaOS is built upon the **Arch Linux base (Rolling)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
 
 - **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
 - **Init System:** **Systemd**.
@@ -84,7 +84,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
 | Component               | Choice               |
 | ----------------------- | -------------------- |
-| **Desktop Environment** | **Plasma Bigscreen** |
+| **Desktop Environment** | **Cutefish OS** |
 | **Global Theme**        | **Ant-Dark**         |
 | **Color Scheme**        | **Dracula**          |
 | **Icon Theme**          | **Kora**             |
@@ -99,7 +99,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 - **Prompt:** **Starship** (Pre-configured with a minimalist Dracula theme).
 - **Plugins:** Autosuggestions and Syntax Highlighting are enabled by default.
 - **Modern CLI Tools:**
-  - `nala` (Beautiful frontend for `apt`)
+  - `pacman` (Beautiful frontend for `pacman`)
   - `eza` (Modern `ls` replacement)
   - `bat` (Syntax-highlighting `cat`)
   - `fastfetch` (System information)
@@ -125,11 +125,11 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 
 - **Ungoogled Chromium:** Provided via OBS (Open Build Service) repository.
 - **Flatpak:** Integrated by default with the **Flathub** remote.
-- **Nala:** Configured as the primary package manager frontend with system-wide aliases (`apt` -> `nala`).
+- **Nala:** Configured as the primary package manager frontend with system-wide aliases (`pacman` -> `pacman`).
 
 ---
 
-## 🛡️ Security & Compliance
+## Security & Compliance
 
 ### California AADC (AB 2273)
 
@@ -140,14 +140,14 @@ KibaOS includes a custom **Age Verification** module within the **Calamares** in
 
 ---
 
-## 🚀 Build Infrastructure
+## Build Infrastructure
 
 KibaOS uses a highly automated CI/CD pipeline.
 
 ### Build Pipeline
 
 1. **Tooling:** Built using **live-build** (lb).
-2. **Environment:** **Docker** container running **Debian Trixie**.
+2. **Environment:** **Docker** container running **Arch Linux Rolling**.
 3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
 4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
 
@@ -158,7 +158,7 @@ KibaOS uses a highly automated CI/CD pipeline.
 
 ---
 
-## 🛠️ Build Locally
+## Build Locally
 
 To reproduce the build environment on your own machine:
 
@@ -168,7 +168,7 @@ cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
   -e RUN_NUM=local \
-  debian:trixie \
+  archlinux:latest \
   /w/build.sh
 ```
 
@@ -186,7 +186,7 @@ docker run --rm --privileged \
 
 ---
 
-## ⚖️ License
+## License
 
 KibaOS is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
 

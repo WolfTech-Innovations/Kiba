@@ -21,18 +21,18 @@ jobs:
           FAIL=0
           for repo in $REPOS; do
             if [[ "$repo" == http://* ]]; then
-              echo "- :x: Insecure HTTP repository found: $repo" >> $GITHUB_STEP_SUMMARY
+              echo "-  Insecure HTTP repository found: $repo" >> $GITHUB_STEP_SUMMARY
               FAIL=1
             else
-              echo "- :white_check_mark: Secure HTTPS repository: $repo" >> $GITHUB_STEP_SUMMARY
+              echo "-  Secure HTTPS repository: $repo" >> $GITHUB_STEP_SUMMARY
             fi
           done
 
           # Check for signed-by requirement in build hooks
           if grep -q "signed-by" .github/workflows/kiba.yml; then
-            echo "- :white_check_mark: 'signed-by' pattern found for GPG keys." >> $GITHUB_STEP_SUMMARY
+            echo "-  'signed-by' pattern found for GPG keys." >> $GITHUB_STEP_SUMMARY
           else
-            echo "- :warning: 'signed-by' not found. Ensure GPG keys are pinned to specific repositories." >> $GITHUB_STEP_SUMMARY
+            echo "-  'signed-by' not found. Ensure GPG keys are pinned to specific repositories." >> $GITHUB_STEP_SUMMARY
           fi
 
           [ $FAIL -eq 1 ] && exit 1 || exit 0

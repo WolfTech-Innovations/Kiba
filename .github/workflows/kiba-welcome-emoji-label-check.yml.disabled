@@ -3,10 +3,10 @@ name: Kiba Welcome Emoji Label Check
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: Kiba Welcome Emoji Label Check
         run: |
-          grep -q "kiba-welcome" scripts/kibatv_build.sh && ! grep -q "[🚀🌐🛍️🖥️📂⚙️⌨️✨]" scripts/kibatv_build.sh && { echo "Warning: missing emojis"; } || true
+          grep -q "kiba-welcome" .github/workflows/kiba.yml && ! grep -q "[🚀🌐🛍️🖥️📂⚙️⌨️✨]" .github/workflows/kiba.yml && { echo "Warning: missing emojis"; } || true

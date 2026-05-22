@@ -14,7 +14,7 @@ jobs:
       - name: Scan for Unofficial Terms
         run: |
           # Define official terms
-          OFFICIAL="KibaOS KibaStore Nala Dracula Trixie Wayland"
+          OFFICIAL="KibaOS KibaStore Nala Dracula Rolling Wayland"
 
           echo "### Documentation Jargon Audit" >> $GITHUB_STEP_SUMMARY
 

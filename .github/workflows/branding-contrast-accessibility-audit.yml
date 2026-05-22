@@ -28,7 +28,7 @@ jobs:
 
           for c in $COLORS; do
              # Simple logic: light colors on dark background generally pass AA
-             echo "| <span style='color:$c'>█</span> | $c | :white_check_mark: PASS AA |" >> $GITHUB_STEP_SUMMARY
+             echo "| <span style='color:$c'>█</span> | $c |  PASS AA |" >> $GITHUB_STEP_SUMMARY
           done
 
           echo "> [!NOTE] This audit verifies hex code visibility for documentation standards." >> $GITHUB_STEP_SUMMARY

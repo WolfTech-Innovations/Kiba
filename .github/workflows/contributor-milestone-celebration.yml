@@ -19,9 +19,9 @@ jobs:
           PR_COUNT=$(gh pr list --state merged --author "$USER" --limit 100 --json number --jq '. | length')
 
           case "$PR_COUNT" in
-            1) MSG="Congratulations on your first merged PR to KibaOS! :tada:" ;;
-            5) MSG="That's 5 merged PRs! You're becoming a KibaOS pro. :rocket:" ;;
-            10) MSG="10 merged PRs! Thank you for your incredible dedication to the project. :star2:" ;;
+            1) MSG="Congratulations on your first merged PR to KibaOS! " ;;
+            5) MSG="That's 5 merged PRs! You're becoming a KibaOS pro. " ;;
+            10) MSG="10 merged PRs! Thank you for your incredible dedication to the project. " ;;
             *) exit 0 ;;
           esac
 

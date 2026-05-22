@@ -34,7 +34,7 @@ jobs:
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   issue_number: pr.number,
-                  body: `⚠️ Conflict detected! This PR is no longer mergeable with ${pull.base.ref}. Please rebase.`
+                  body: `Conflict detected! This PR is no longer mergeable with ${pull.base.ref}. Please rebase.`
                 });
               }
             }

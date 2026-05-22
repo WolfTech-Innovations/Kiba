@@ -9,8 +9,8 @@
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Arch Linux-Rolling-1793D1?style=for-the-badge&logo=archlinux&logoColor=white" alt="Arch Linux Version">
-  <img src="https://img.shields.io/badge/Cutefish%20OS-22a7f0?style=for-the-badge&logo=cutefish&logoColor=white" alt="Cutefish Version">
+  <img src="https://img.shields.io/badge/Arch Linux-13%20Rolling-1793D1?style=for-the-badge&logo=archlinux&logoColor=white" alt="Arch Linux Version">
+  <img src="https://img.shields.io/badge/Cutefish%20OS-22a7f0?style=for-the-badge&logo=cutefish&logoColor=white" alt="Cutefish OS Version">
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish DE** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish OS 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -65,6 +65,7 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaOS.
+- [**Manual Compilation**](./docs/manual-compilation.md): Building the Cutefish DE from source.
 - [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
@@ -72,8 +73,8 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 
 ## Features
 
-- **Arch Linux Base:** Built on **Arch Linux Rolling** with an **Immutable Root Filesystem** for maximum stability and security.
-- **Deep Cloud Integration:** System-level integration with Nextcloud and Bazaar for seamless file and setting synchronization. Built on **Arch Linux Rolling** (supported until 2030).
+- **Arch Linux Base:** Built on **Arch Linux Rolling** with an **Immutable Architecture**.
+- **Deep Cloud Integration:** System-wide file and setting sync powered by Cloud Services. Built on **Arch Linux Rolling** (supported until 2030).
 - **Modern Desktop:** **Cutefish OS 6.3** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
@@ -133,7 +134,7 @@ The **Calamares** installer guides you through:
 Post-install, update your system:
 
 ```bash
-sudo pacman update && sudo pacman upgrade -y
+sudo pacman -Syu
 ```
 
 ---
@@ -155,8 +156,8 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 **Useful Aliases:**
 
 - `ll` -> `ls -lah`
-- `update` -> `sudo pacman update && sudo pacman upgrade -y`
-- `install` -> `sudo pacman install`
+- `update` -> `sudo pacman -Syu`
+- `install` -> `sudo pacman -S`
 
 ### Theme
 

@@ -3,10 +3,10 @@ name: CMake Backslash Continuation
 on:
   push:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
   pull_request:
     paths:
-      - "scripts/kibatv_build.sh"
+      - ".github/workflows/kiba.yml"
 
 jobs:
   audit:
@@ -18,4 +18,4 @@ jobs:
 
       - name: CMake Backslash Continuation
         run: |
-          grep -n "cmake" scripts/kibatv_build.sh | grep -v "\\\\" | grep -v "cmake \." | grep -v "cmake \.\." && { echo "Warning: potential missing backslash"; } || true
+          grep -n "cmake" .github/workflows/kiba.yml | grep -v "\\\\" | grep -v "cmake \." | grep -v "cmake \.\." && { echo "Warning: potential missing backslash"; } || true
