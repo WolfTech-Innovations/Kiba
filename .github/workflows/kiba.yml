@@ -17,10 +17,15 @@ jobs:
           cat > build.sh << 'BUILD_SCRIPT_EOF'
           #!/bin/bash
           set -ex
-
           # Install archiso and deps
           pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
 
+          # Install yay for AUR support
+          cd /tmp
+          git clone https://aur.archlinux.org/yay.git
+          cd yay
+          makepkg -si --noconfirm
+          cd /w
           cd /w
           ISO="kibaos-v${RUN_NUM}"
 
@@ -40,6 +45,7 @@ jobs:
           grub
           efibootmgr
           syslinux
+          memtest86+
           networkmanager
           git
           wget
