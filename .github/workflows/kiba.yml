@@ -44,8 +44,25 @@ jobs:
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
           cd kiba-profile
 
-          # 3. Inject local AUR repo into profile pacman.conf (after cp, so file exists)
-          sed -i '1s/^/[aur-local]\nSigLevel = Never\nServer = file:\/\/\/tmp\/aur-pkgs\n\n/' pacman.conf
+          # 3. Write full pacman.conf — guarantees core/extra present + injects local AUR repo
+          cat > pacman.conf << 'PACMAN_CONF'
+          [options]
+          HoldPkg = pacman glibc
+          Architecture = auto
+          ParallelDownloads = 5
+          SigLevel = Required DatabaseOptional
+          LocalFileSigLevel = Optional
+
+          [aur-local]
+          SigLevel = Never
+          Server = file:///tmp/aur-pkgs
+
+          [core]
+          Include = /etc/pacman.d/mirrorlist
+
+          [extra]
+          Include = /etc/pacman.d/mirrorlist
+          PACMAN_CONF
 
           # 4. Packages — explicit UKUI components (no group metapackage), calamares-git from local AUR repo
           cat > packages.x86_64 << 'PACKAGES'
