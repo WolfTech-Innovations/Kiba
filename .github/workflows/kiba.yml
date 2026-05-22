@@ -6,7 +6,7 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
@@ -18,27 +18,71 @@ jobs:
           #!/bin/bash
           set -ex
 
-          # Install archiso, deps, and yay for AUR (calamares-git)
-          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
+          # Install build deps + archiso + yay (still needed for calamares-git)
+          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
+            cmake extra-cmake-modules qt5-base qt5-quickcontrols2 qt5-declarative qt5-tools \
+            qt5-x11extras qt5-sensors kwindowsystem kwin kdecoration kconfig kguiaddons \
+            kcoreaddons kconfigwidgets kwayland kio networkmanager-qt modemmanager-qt \
+            polkit polkit-qt5 pkgconf libqtxdg libdbusmenu-qt5 libxcb \
+            xorg-server-devel xf86-input-libinput xf86-input-synaptics \
+            libxcb-icccm4 libxcb-ewmh libxcb-randr libxcb-xfixes libxcb-damage \
+            libxcb-composite libxcb-shm libxcb-util libxcb-image \
+            libsm libxtst libpulse libxcursor taglib freetype2 fontconfig \
+            sddm ninja
 
-          # Non-root user for AUR builds
+          # Non-root user for AUR builds (calamares-git)
           useradd -m -s /bin/bash aurbuild
           echo "aurbuild ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/aurbuild
 
-          # Install yay
+          # Install yay for calamares-git
           cd /tmp
           sudo -u aurbuild git clone https://aur.archlinux.org/yay.git
           cd yay && sudo -u aurbuild makepkg -si --noconfirm
-          cd /w
 
-          cd /w
-          ISO="kibaos-v${RUN_NUM}"
+          # 1. Build Cutefish DE from source (in order — deps first)
+          mkdir -p /tmp/cutefish && cd /tmp/cutefish
 
-          # 1. Build calamares-git from AUR
+          build_cutefish() {
+            local repo=$1
+            git clone --depth=1 https://github.com/cutefishos/${repo}.git
+            cd ${repo}
+            mkdir -p build && cd build
+            cmake -DCMAKE_INSTALL_PREFIX=/usr ..
+            make -j$(nproc)
+            make install
+            cd /tmp/cutefish
+          }
+
+          build_cutefish libcutefish
+          build_cutefish fishui
+          build_cutefish kwin-plugins
+          build_cutefish core
+          build_cutefish icons
+          build_cutefish launcher
+          build_cutefish filemanager
+          build_cutefish settings
+          build_cutefish screenlocker
+          build_cutefish terminal
+          build_cutefish calculator
+          build_cutefish screenshot
+          build_cutefish statusbar
+          build_cutefish wallpapers
+
+          # Package all installed cutefish files into a local pacman package
+          mkdir -p /tmp/cutefish-pkg/pkg/cutefish
+          # Collect everything cutefish installed into /usr
+          # We'll tar it up and create a fake package for pacman to track
+          # Instead: just copy the installed files into the airootfs directly later (step 9)
+
+          # 2. Build calamares-git from AUR
+          cd /w
           sudo -u aurbuild yay -S --noconfirm calamares-git
           mkdir -p /tmp/aur-pkgs
           find /home/aurbuild/.cache/yay -name "*.pkg.tar.zst" -exec cp {} /tmp/aur-pkgs/ \;
           repo-add /tmp/aur-pkgs/aur-local.db.tar.zst /tmp/aur-pkgs/*.pkg.tar.zst
+
+          cd /w
+          ISO="kibaos-v${RUN_NUM}"
 
           # 2. Create profile FIRST (fixes ordering bug from original)
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
@@ -64,7 +108,7 @@ jobs:
           Include = /etc/pacman.d/mirrorlist
           PACMAN_CONF
 
-          # 4. Packages — explicit UKUI components (no group metapackage), calamares-git from local AUR repo
+          # 4. Packages — cutefish runtime deps (DE itself copied into airootfs in step 9)
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
@@ -99,24 +143,35 @@ jobs:
           yt-dlp
           xorg-server
           xorg-xinit
-          lightdm
-          ukui-greeter
-          ukwm
-          ukui-session-manager
-          ukui-settings-daemon
-          ukui-panel
-          ukui-menu
-          ukui-menus
-          ukui-interface
-          ukui-control-center
-          ukui-screensaver
-          ukui-notification-daemon
-          ukui-power-manager
-          ukui-window-switch
-          ukui-themes
-          ukui-wallpapers
-          qt5-ukui-platformtheme
-          peony
+          sddm
+          qt5-base
+          qt5-quickcontrols2
+          qt5-declarative
+          qt5-x11extras
+          qt5-sensors
+          kwindowsystem
+          kwin
+          kdecoration
+          kconfig
+          kguiaddons
+          kcoreaddons
+          kconfigwidgets
+          kwayland
+          kio
+          networkmanager-qt
+          modemmanager-qt
+          polkit
+          polkit-qt5
+          libqtxdg
+          libdbusmenu-qt5
+          libxcb
+          libsm
+          libxtst
+          libpulse
+          libxcursor
+          taglib
+          freetype2
+          fontconfig
           calamares-git
           inter-font
           ttf-jetbrains-mono
