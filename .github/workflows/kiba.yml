@@ -32,7 +32,20 @@ jobs:
           cd /w
           ISO="kibaos-v${RUN_NUM}"
 
+          # 1. Build AUR packages as non-root
+          sudo -u aurbuild bash -c '
+          cd /tmp && git clone https://aur.archlinux.org/calamares-git.git && cd calamares-git && makepkg -s --noconfirm
+          cd /tmp && git clone https://aur.archlinux.org/cutefish-meta.git && cd cutefish-meta && makepkg -s --noconfirm
+          # ... etc for each cutefish-* dep
+          '
 
+         # 2. Collect and create the repo — must be named "custom"
+         mkdir -p /tmp/custom
+         find /tmp -name "*.pkg.tar.zst" -exec cp {} /tmp/custom/ \;
+         repo-add /tmp/custom/custom.db.tar.zst /tmp/custom/*.pkg.tar.zst
+
+          # 3. Add to the profile's pacman.conf (BEFORE other repos for priority)
+          sed -i '1s/^/[custom]\nSigLevel = Never\nServer = file:\/\/\/tmp\/custom\n\n/' kiba-profile/pacman.conf
           echo "=== Configuring archiso profile ==="
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
           cd kiba-profile
