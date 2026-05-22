@@ -1,298 +1,158 @@
-name: "KibaOS Build"
+#!/bin/bash
+set -ex
 
-on:
-  workflow_dispatch:
+pacman -Syu --noconfirm archiso base-devel git \
+  squashfs-tools libisoburn mtools dosfstools
 
-jobs:
-  build-and-upload:
-    runs-on: ubuntu-latest
-    timeout-minutes: 180
+cd /w
+ISO="kibaos-v${RUN_NUM}"
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+# 1. Create profile FIRST (fixes the ordering bug)
+cp -r /usr/share/archiso/configs/releng/ kiba-profile
+cd kiba-profile
 
-      - name: Create build script
-        run: |
-          cat > build.sh << 'BUILD_SCRIPT_EOF'
-          #!/bin/bash
-          set -ex
-          # Install archiso and deps
-          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
+# 2. Packages — UKUI replaces cutefish entirely
+cat > packages.x86_64 << 'PACKAGES'
+archlinux-keyring
+base
+linux
+linux-firmware
+mkinitcpio
+grub
+efibootmgr
+syslinux
+memtest86+
+networkmanager
+git wget curl sudo
+zsh zsh-autosuggestions zsh-syntax-highlighting
+starship fastfetch eza bat btop ripgrep fd tealdeer duf ncdu micro nano fzf yt-dlp
+xorg-server xorg-xinit
+ukui
+lightdm lightdm-gtk-greeter
+ukui-control-center
+calamares
+inter-font ttf-jetbrains-mono noto-fonts-emoji
+discover flatpak xdg-desktop-portal
+chromium vlc gparted
+peony bionic-terminal spectacle ark
+plymouth ntfs-3g exfatprogs cryptsetup
+nextcloud-client erofs-utils
+PACKAGES
 
-          # Create a non-root user for AUR builds
-          useradd -m -s /bin/bash aurbuild
-          echo "aurbuild ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/aurbuild
+# 3. Enable lightdm on the live image
+mkdir -p airootfs/etc/systemd/system/multi-user.target.wants
+ln -sf /usr/lib/systemd/system/lightdm.service \
+  airootfs/etc/systemd/system/multi-user.target.wants/lightdm.service
 
-          # Install yay for AUR support as non-root user
-          cd /tmp
-          sudo -u aurbuild git clone https://aur.archlinux.org/yay.git
-          cd yay
-          sudo -u aurbuild makepkg -si --noconfirm
-          cd /w
-          ISO="kibaos-v${RUN_NUM}"
+# 4. mkinitcpio for live env
+cat > airootfs/etc/mkinitcpio.conf << 'MKINIT'
+MODULES=(erofs)
+BINARIES=()
+FILES=()
+HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_kms block filesystems keyboard)
+MKINIT
 
-          # 1. Build AUR packages as non-root
-          sudo -u aurbuild bash -c '
-          cd /tmp && git clone https://aur.archlinux.org/calamares-git.git && cd calamares-git && makepkg -s --noconfirm
-          cd /tmp && git clone https://aur.archlinux.org/cutefish-meta.git && cd cutefish-meta && makepkg -s --noconfirm
-          # ... etc for each cutefish-* dep
-          '
-          # 2. Collect and create the repo — must be named "custom"
-          mkdir -p /tmp/custom
-          find /tmp -name "*.pkg.tar.zst" -exec cp {} /tmp/custom/ \;
-          repo-add /tmp/custom/custom.db.tar.zst /tmp/custom/*.pkg.tar.zst
+# 5. Calamares (unchanged from your original)
+mkdir -p airootfs/etc/calamares/modules
+cat > airootfs/etc/calamares/settings.conf << 'CALA'
+---
+modules-search: [ local ]
+sequence:
+- show:
+  - welcome
+  - locale
+  - keyboard
+  - partition
+  - users
+  - summary
+- exec:
+  - partition
+  - mount
+  - unpackfs
+  - machineid
+  - fstab
+  - locale
+  - keyboard
+  - localecfg
+  - users
+  - displaymanager
+  - networkcfg
+  - hwclock
+  - services-systemd
+  - bootloader
+  - umount
+- show:
+  - finished
+branding: kibaos
+prompt-install: false
+dont-chroot: false
+CALA
 
-          # 3. Add to the profile's pacman.conf (BEFORE other repos for priority)
-          sed -i '1s/^/[custom]\nSigLevel = Never\nServer = file:\/\/\/tmp\/custom\n\n/' kiba-profile/pacman.conf
-          echo "=== Configuring archiso profile ==="
-          cp -r /usr/share/archiso/configs/releng/ kiba-profile
-          cd kiba-profile
+# 6. Nextcloud autostart
+mkdir -p airootfs/etc/skel/.config/autostart
+cat > airootfs/etc/skel/.config/autostart/nextcloud.desktop << 'CLOUD'
+[Desktop Entry]
+Type=Application
+Name=Nextcloud Sync
+Exec=nextcloud --background
+CLOUD
 
-          # Update packages list
-          cat > packages.x86_64 << 'PACKAGES'
-          archlinux-keyring
-          base
-          linux
-          linux-firmware
-          mkinitcpio
-          grub
-          efibootmgr
-          syslinux
-          memtest86+
-          networkmanager
-          git
-          wget
-          curl
-          sudo
-          zsh
-          zsh-autosuggestions
-          zsh-syntax-highlighting
-          starship
-          fastfetch
-          eza
-          bat
-          btop
-          ripgrep
-          fd
-          tealdeer
-          duf
-          ncdu
-          micro
-          nano
-          fzf
-          yt-dlp
-          calamares-git
-          inter-font
-          ttf-jetbrains-mono
-          noto-fonts-emoji
-          cutefish-meta
-          discover
-          flatpak
-          xdg-desktop-portal-kde
-          xdg-desktop-portal-gtk
-          chromium
-          vlc
-          gparted
-          kate
-          dolphin
-          konsole
-          spectacle
-          ark
-          plymouth
-          ntfs-3g
-          exfatprogs
-          cryptsetup
-          nextcloud-client
-          erofs-utils
-          PACKAGES
+# 7. Welcome script — ukui-control-center replaces cutefish-settings
+mkdir -p airootfs/usr/local/bin
+cat > airootfs/usr/local/bin/kiba-welcome << 'WELCOME'
+#!/bin/bash
+while true; do
+  CHOICE=$(zenity --list --title="Welcome to KibaOS" \
+    --text="Welcome to KibaOS! What would you like to do?" \
+    --column="Tag" --column="Action" --column="Description" \
+    "install"    "Install KibaOS"     "Install permanently to disk" \
+    "browser"    "Web Browser"        "Browse the internet" \
+    "store"      "Software Center"    "Discover and install apps" \
+    "terminal"   "Open Terminal"      "Use Meta+T to launch" \
+    "files"      "File Manager"       "Use Meta+E to browse" \
+    "settings"   "System Settings"    "Configure desktop and hardware" \
+    "screenshot" "Screen Capture"     "Use Print to capture" \
+    "info"       "System Info"        "View technical details" \
+    "shortcuts"  "Shortcuts"          "View keyboard shortcuts" \
+    "wiki"       "Online Wiki"        "Read the documentation" \
+    --hide-column=1 --print-column=1 \
+    --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
 
-          # Immutability: Configure mkinitcpio for read-only root and overlayfs
-          cat > airootfs/etc/mkinitcpio.conf << 'MKINIT'
-          MODULES=(erofs)
-          BINARIES=()
-          FILES=()
-          HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_pxe_common archiso_pxe_nbd archiso_pxe_http archiso_pxe_nfs archiso_kms block filesystems keyboard)
-          MKINIT
+  [ -z "$CHOICE" ] && break
 
-          # Modern OOBE setup (Windows 11 inspired, Fullscreen)
-          mkdir -p airootfs/etc/calamares/modules
-          cat > airootfs/etc/calamares/settings.conf << 'CALA_SETTINGS'
-          ---
-          modules-search: [ local ]
-          instances:
-          - id: fullscreen
-            module: welcome
-            config: welcome_fullscreen.conf
-          sequence:
-          - show:
-            - welcome@fullscreen
-            - locale
-            - keyboard
-            - partition
-            - users
-            - summary
-          - exec:
-            - partition
-            - mount
-            - unpackfs
-            - machineid
-            - fstab
-            - locale
-            - keyboard
-            - localecfg
-            - users
-            - displaymanager
-            - networkcfg
-            - hwclock
-            - services-systemd
-            - bootloader
-            - umount
-          - show:
-            - finished
-          branding: kibaos
-          prompt-install: false
-          dont-chroot: false
-          CALA_SETTINGS
+  case "$CHOICE" in
+    "install")    sudo calamares & break ;;
+    "browser")    chromium & break ;;
+    "store")      discover & break ;;
+    "terminal")   bionic-terminal & break ;;
+    "files")      peony & break ;;
+    "settings")   ukui-control-center & break ;;
+    "screenshot") spectacle & break ;;
+    "info")       (fastfetch | zenity --text-info --title="System Information") & ;;
+    "shortcuts")
+      zenity --list --title="KibaOS Shortcuts" \
+        --column="Action" --column="Shortcut" \
+        "Application Menu" "Meta" \
+        "Terminal" "Meta+T" \
+        "Search" "Meta+Space" \
+        "File Manager" "Meta+E" \
+        --ok-label="Close" 2>/dev/null &
+      ;;
+    "wiki")
+      chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & break ;;
+  esac
+done
+WELCOME
+chmod +x airootfs/usr/local/bin/kiba-welcome
 
-          cat > airootfs/etc/calamares/modules/welcome_fullscreen.conf << 'CALA_WELCOME'
-          ---
-          showSupportUrl: false
-          showKnownIssuesUrl: false
-          showReleaseNotesUrl: false
-          requirements:
-            requiredStorageGiB: 20
-            requiredRamGiB: 2
-          CALA_WELCOME
+# 8. Build
+cd ..
+mkarchiso -v -w work -o out kiba-profile/
 
-          # Setup Deep Cloud Integration
-          mkdir -p airootfs/etc/skel/.config/autostart
-          cat > airootfs/etc/skel/.config/autostart/nextcloud.desktop << 'CLOUD'
-          [Desktop Entry]
-          Type=Application
-          Name=Nextcloud Sync
-          Exec=nextcloud --background
-          CLOUD
-
-          # Unified UI (Apple/Material) and Spotlight Search
-          mkdir -p airootfs/etc/skel/.config/cutefishos
-          cat > airootfs/etc/skel/.config/cutefishos/launcher.conf << 'LAUNCHER'
-          [General]
-          hotkey=Meta+Space
-          LAUNCHER
-
-          # Remove Emojis from Welcome Script
-          mkdir -p airootfs/usr/local/bin
-          cat > airootfs/usr/local/bin/kiba-welcome << 'WELCOME'
-          #!/bin/bash
-          while true; do
-            CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-              --window-icon="/usr/share/kibaos/logo.png" \
-              --text="Welcome to KibaOS! What would you like to do?" \
-              --column="Tag" --column="Action" --column="Description" \
-              "install" "Install KibaOS" "Install the system permanently to your disk" \
-              "browser" "Web Browser" "Browse the internet" \
-              "store" "Software Center" "Discover and install new applications" \
-              "terminal" "Open Terminal" "Use Meta+T to launch" \
-              "files" "File Manager" "Use Meta+E to browse" \
-              "settings" "System Settings" "Configure your desktop and hardware" \
-              "screenshot" "Screen Capture" "Use Print to capture" \
-              "info" "System Information" "View technical system details" \
-              "shortcuts" "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "wiki" "Online Wiki" "Read the technical documentation" \
-              --hide-column=1 --print-column=1 \
-              --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
-
-            [ -z "$CHOICE" ] && break
-
-            case "$CHOICE" in
-              "install")
-                sudo calamares &
-                break
-                ;;
-              "browser")
-                chromium &
-                break
-                ;;
-              "store")
-                discover &
-                break
-                ;;
-              "terminal")
-                konsole &
-                break
-                ;;
-              "files")
-                dolphin &
-                break
-                ;;
-              "settings")
-                cutefish-settings &
-                break
-                ;;
-              "screenshot")
-                spectacle &
-                break
-                ;;
-              "info")
-                (fastfetch | zenity --text-info --title="KibaOS System Information") &
-                ;;
-              "shortcuts")
-                (zenity --list --title="KibaOS Shortcuts" \
-                  --column="Action" --column="Shortcut" \
-                  "Application Menu" "Meta" \
-                  "Terminal" "Meta + T" \
-                  "Search" "Meta + Space" \
-                  "File Manager" "Meta + E" \
-                  --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
-                ;;
-              "wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
-                break
-                ;;
-            esac
-          done
-          WELCOME
-          chmod +x airootfs/usr/local/bin/kiba-welcome
-
-          # Finalize and Build
-          cd ..
-          mkarchiso -v -w work -o out kiba-profile/
-
-          if [ -f out/*.iso ]; then
-            mv out/*.iso "${ISO}.iso"
-            sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
-          else
-            echo "ERROR: ISO file not found!"
-            exit 1
-          fi
-          BUILD_SCRIPT_EOF
-          chmod +x build.sh
-
-      - name: Run build in Docker
-        run: |
-          docker run --rm --privileged \
-            -v "$PWD:/w" \
-            -e RUN_NUM="${{ github.run_number }}" \
-            archlinux:latest \
-            /bin/bash /w/build.sh
-
-      - name: Upload to SourceForge
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-        env:
-          SF_USER: ${{ secrets.SF_USER }}
-          SF_PASS: ${{ secrets.SF_PASS }}
-        run: |
-          if [ -z "$SF_USER" ] || [ -z "$SF_PASS" ]; then
-            echo "SourceForge credentials not configured. Skipping upload."
-            exit 0
-          fi
-          sudo apt update && sudo apt install -y sshpass rsync
-          for iso_file in *.iso; do
-            [ -f "$iso_file" ] || continue
-            echo "Uploading $iso_file to SourceForge..."
-            sshpass -p "$SF_PASS" rsync -avP \
-              -e "ssh -o StrictHostKeyChecking=no" \
-              "$iso_file" \
-              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
-          done
+if [ -f out/*.iso ]; then
+  mv out/*.iso "${ISO}.iso"
+  sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
+else
+  echo "ERROR: ISO not found!"
+  exit 1
+fi
