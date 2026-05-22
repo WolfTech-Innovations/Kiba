@@ -18,17 +18,37 @@ jobs:
           #!/bin/bash
           set -ex
 
-          # Install archiso and deps (no AUR/yay needed anymore)
+          # Install archiso, deps, and yay for AUR (calamares-git)
           pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
+
+          # Non-root user for AUR builds
+          useradd -m -s /bin/bash aurbuild
+          echo "aurbuild ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/aurbuild
+
+          # Install yay
+          cd /tmp
+          sudo -u aurbuild git clone https://aur.archlinux.org/yay.git
+          cd yay && sudo -u aurbuild makepkg -si --noconfirm
+          cd /w
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
 
-          # 1. Create profile FIRST (fixes ordering bug from original)
+          # 1. Build calamares-git from AUR
+          sudo -u aurbuild yay -S --noconfirm calamares-git
+          mkdir -p /tmp/aur-pkgs
+          find /home/aurbuild/.cache/yay -name "*.pkg.tar.zst" -exec cp {} /tmp/aur-pkgs/ \;
+          repo-add /tmp/aur-pkgs/aur-local.db.tar.zst /tmp/aur-pkgs/*.pkg.tar.zst
+
+          # 2. Create profile FIRST (fixes ordering bug from original)
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
           cd kiba-profile
 
-          # 2. Packages — UKUI replaces cutefish entirely (official repos, no AUR)
+          # 3. Inject local AUR repo into profile pacman.conf (after cp, so file exists)
+          sed -i '1s/^/[aur-local]\nSigLevel = Never\nServer = file:\/\/\/tmp\/aur-pkgs\n\n/' kiba-profile/pacman.conf
+          sed -i '1s/^/[aur-local]\nSigLevel = Never\nServer = file:\/\/\/tmp\/aur-pkgs\n\n/' kiba-profile/pacman.conf
+
+          # 4. Packages — explicit UKUI components (no group metapackage), calamares-git from local AUR repo
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
@@ -63,11 +83,25 @@ jobs:
           yt-dlp
           xorg-server
           xorg-xinit
-          ukui
           lightdm
-          lightdm-gtk-greeter
+          ukui-greeter
+          ukwm
+          ukui-session-manager
+          ukui-settings-daemon
+          ukui-panel
+          ukui-menu
+          ukui-menus
+          ukui-interface
           ukui-control-center
-          calamares
+          ukui-screensaver
+          ukui-notification-daemon
+          ukui-power-manager
+          ukui-window-switch
+          ukui-themes
+          ukui-wallpapers
+          qt5-ukui-platformtheme
+          peony
+          calamares-git
           inter-font
           ttf-jetbrains-mono
           noto-fonts-emoji
@@ -77,8 +111,7 @@ jobs:
           chromium
           vlc
           gparted
-          peony
-          bionic-terminal
+          konsole
           spectacle
           ark
           plymouth
@@ -89,12 +122,12 @@ jobs:
           erofs-utils
           PACKAGES
 
-          # 3. Enable lightdm on the live image
+          # 5. Enable lightdm on the live image
           mkdir -p airootfs/etc/systemd/system/multi-user.target.wants
           ln -sf /usr/lib/systemd/system/lightdm.service \
             airootfs/etc/systemd/system/multi-user.target.wants/lightdm.service
 
-          # 4. mkinitcpio for live env
+          # 6. mkinitcpio for live env
           cat > airootfs/etc/mkinitcpio.conf << 'MKINIT'
           MODULES=(erofs)
           BINARIES=()
@@ -102,7 +135,7 @@ jobs:
           HOOKS=(base udev memdisk archiso_shutdown archiso archiso_loop_mnt archiso_kms block filesystems keyboard)
           MKINIT
 
-          # 5. Calamares config
+          # 7. Calamares config
           mkdir -p airootfs/etc/calamares/modules
           cat > airootfs/etc/calamares/settings.conf << 'CALA_SETTINGS'
           ---
@@ -152,7 +185,7 @@ jobs:
             requiredRamGiB: 2
           CALA_WELCOME
 
-          # 6. Nextcloud autostart
+          # 8. Nextcloud autostart
           mkdir -p airootfs/etc/skel/.config/autostart
           cat > airootfs/etc/skel/.config/autostart/nextcloud.desktop << 'CLOUD'
           [Desktop Entry]
@@ -161,7 +194,7 @@ jobs:
           Exec=nextcloud --background
           CLOUD
 
-          # 7. Welcome script
+          # 9. Welcome script
           mkdir -p airootfs/usr/local/bin
           cat > airootfs/usr/local/bin/kiba-welcome << 'WELCOME'
           #!/bin/bash
@@ -189,7 +222,7 @@ jobs:
               "install")    sudo calamares & break ;;
               "browser")    chromium & break ;;
               "store")      discover & break ;;
-              "terminal")   bionic-terminal & break ;;
+              "terminal")   konsole & break ;;
               "files")      peony & break ;;
               "settings")   ukui-control-center & break ;;
               "screenshot") spectacle & break ;;
@@ -212,7 +245,7 @@ jobs:
           WELCOME
           chmod +x airootfs/usr/local/bin/kiba-welcome
 
-          # 8. Build
+          # 10. Build
           cd ..
           mkarchiso -v -w work -o out kiba-profile/
 
