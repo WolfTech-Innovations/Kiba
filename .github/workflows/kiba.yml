@@ -6,7 +6,7 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
@@ -250,9 +250,7 @@ jobs:
                   --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
                 ;;
               "wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
-                break
-                ;;
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & break ;;
             esac
           done
           WELCOME
