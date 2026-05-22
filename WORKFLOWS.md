@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Thu May 21 18:06:51 UTC 2026
+Generated on Fri May 22 02:57:30 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -36,7 +36,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Audit Kiba Welcome Case Matching | `.github/workflows/audit-kiba-welcome-case-matching.yml` |
 | Audit Kiba Welcome Discovery Loop | `.github/workflows/audit-kiba-welcome-discovery-loop.yml` |
 | Audit Kiba Welcome Zenity Label Length | `.github/workflows/audit-kiba-welcome-zenity-label-length.yml` |
-| Audit ksplashrc Theme | `.github/workflows/audit-ksplashrc-theme.yml` |
 | Audit KWinRC Shadow Color Hex | `.github/workflows/audit-kwinrc-shadow-color-hex.yml` |
 | Audit Markdown Fenced Code Blocks | `.github/workflows/audit-markdown-fenced-code-blocks-strict.yml` |
 | Audit Markdown Header Punctuation | `.github/workflows/audit-markdown-header-punctuation.yml` |
@@ -51,7 +50,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Audit Markdown No Tabs | `.github/workflows/audit-markdown-no-tabs.yml` |
 | Audit Markdown Ordered List Consistency | `.github/workflows/audit-markdown-ordered-list-consistency.yml` |
 | Audit Markdown Table Of Contents Header | `.github/workflows/audit-markdown-table-of-contents-header.yml` |
-| Audit mksquashfs Zstd Level | `.github/workflows/audit-mksquashfs-zstd-15.yml` |
 | Audit Package Engines Field | `.github/workflows/audit-package-engines-field.yml` |
 | Audit Package Private Enforcement | `.github/workflows/audit-package-private-enforcement.yml` |
 | Audit Plymouth Script Braces | `.github/workflows/audit-plymouth-script-braces.yml` |
@@ -193,7 +191,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check Acknowledgments Content | `.github/workflows/check-acknowledgments-content.yml` |
 | Check Action Caching | `.github/workflows/check-action-caching-v3.yml` |
 | Check Action Pinning | `.github/workflows/check-action-pinning-v3.yml` |
-| Check apt Preferences | `.github/workflows/check-apt-preferences.yml` |
 | Check Architecture Headers | `.github/workflows/check-architecture-headers-audit.yml` |
 | Check Audio Configs | `.github/workflows/check-audio-configs.yml` |
 | Check Bash Completion Syntax | `.github/workflows/check-bash-completion-syntax.yml` |
@@ -420,7 +417,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | KDE Config Schema Validator | `.github/workflows/kde-config-schema-validator.yml` |
 | KDE Plasma Monitor | `.github/workflows/kde-plasma-monitor.yml` |
 | Kernel Endpoint Monitor | `.github/workflows/kernel-endpoint-monitor.yml` |
-| Kiba Welcome Emoji Label Check | `.github/workflows/kiba-welcome-emoji-label-check.yml` |
 | Kiba Welcome Shortcut Ads | `.github/workflows/kiba-welcome-shortcut-advertisement.yml` |
 | Kiba Welcome Window Icon Audit | `.github/workflows/kiba-welcome-window-icon-audit.yml` |
 | KibaOS Build | `.github/workflows/kiba.yml` |
@@ -454,7 +450,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Monitor Ant Themes | `.github/workflows/monitor-ant-themes.yml` |
 | Monitor CachyOS Kernel | `.github/workflows/monitor-cachyos-kernel.yml` |
 | Monitor Kora Icons | `.github/workflows/monitor-kora-icons.yml` |
-| Monitor Nala | `.github/workflows/monitor-pacman.yml` |
 | Monitor Starship | `.github/workflows/monitor-starship.yml` |
 | Monitor Vimix Cursors | `.github/workflows/monitor-vimix-cursors.yml` |
 | Notify SourceForge Release | `.github/workflows/notify-release-sourceforge-upload.yml` |
