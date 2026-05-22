@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Thu May 21 18:06:51 UTC 2026
+Generated on Fri May 22 05:11:26 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -19,25 +19,15 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | ARIA Label Audit | `.github/workflows/aria-label-audit.yml` |
 | Artifact Retention Policy | `.github/workflows/artifact-retention-policy.yml` |
 | Audit Action Pinning | `.github/workflows/audit-action-pinning.yml` |
-| Audit Breezerc Opacity Percentage | `.github/workflows/audit-breezerc-opacity-percentage.yml` |
 | Audit Build Reproducibility | `.github/workflows/audit-build-reproducibility.yml` |
 | Audit Calamares Branding Desc Format | `.github/workflows/audit-calamares-branding-desc-format.yml` |
 | Audit Calamares Branding Integrity | `.github/workflows/audit-calamares-branding-integrity.yml` |
 | Audit Calamares Module YAML Syntax | `.github/workflows/audit-calamares-module-yaml-syntax.yml` |
 | Audit Desktop UX Standards | `.github/workflows/audit-desktop-ux-standards.yml` |
-| Audit Dracula Palette Consistency | `.github/workflows/audit-dracula-palette-consistency.yml` |
-| Audit Embedded Chromium JSON | `.github/workflows/audit-embedded-chromium-json.yml` |
-| Audit Embedded Konsole Colorscheme | `.github/workflows/audit-embedded-konsole-colorscheme.yml` |
-| Audit Embedded KSplash QML Syntax | `.github/workflows/audit-embedded-ksplash-qml-syntax.yml` |
-| Audit Embedded Starship TOML | `.github/workflows/audit-embedded-starship-toml.yml` |
-| Audit Embedded Zshrc Syntax Check | `.github/workflows/audit-embedded-zshrc-syntax-check.yml` |
 | Audit Font Standardization | `.github/workflows/audit-font-standardization.yml` |
-| Audit Kernel Version Freshness | `.github/workflows/audit-kernel-version-freshness.yml` |
 | Audit Kiba Welcome Case Matching | `.github/workflows/audit-kiba-welcome-case-matching.yml` |
 | Audit Kiba Welcome Discovery Loop | `.github/workflows/audit-kiba-welcome-discovery-loop.yml` |
 | Audit Kiba Welcome Zenity Label Length | `.github/workflows/audit-kiba-welcome-zenity-label-length.yml` |
-| Audit ksplashrc Theme | `.github/workflows/audit-ksplashrc-theme.yml` |
-| Audit KWinRC Shadow Color Hex | `.github/workflows/audit-kwinrc-shadow-color-hex.yml` |
 | Audit Markdown Fenced Code Blocks | `.github/workflows/audit-markdown-fenced-code-blocks-strict.yml` |
 | Audit Markdown Header Punctuation | `.github/workflows/audit-markdown-header-punctuation.yml` |
 | Audit Markdown Inclusive Language | `.github/workflows/audit-markdown-inclusive-language.yml` |
@@ -54,8 +44,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Audit mksquashfs Zstd Level | `.github/workflows/audit-mksquashfs-zstd-15.yml` |
 | Audit Package Engines Field | `.github/workflows/audit-package-engines-field.yml` |
 | Audit Package Private Enforcement | `.github/workflows/audit-package-private-enforcement.yml` |
-| Audit Plymouth Script Braces | `.github/workflows/audit-plymouth-script-braces.yml` |
-| Audit Plymouth Splash Compliance | `.github/workflows/audit-plymouth-splash-compliance.yml` |
 | Audit Post-Install Shellcheck Strict | `.github/workflows/audit-post-install-shellcheck-strict.yml` |
 | Audit Python Abstract Base Class | `.github/workflows/audit-python-abstract-base-class.yml` |
 | Audit Python Argparse Usage | `.github/workflows/audit-python-argparse-usage.yml` |
@@ -82,7 +70,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Audit Python Type Annotations | `.github/workflows/audit-python-type-annotations.yml` |
 | Audit Python Unused Import Vulture | `.github/workflows/audit-python-unused-import-vulture.yml` |
 | Audit Python YAML Explicit On Key | `.github/workflows/audit-python-yaml-explicit-on-key.yml` |
-| Audit Qt6 Tools Pinning | `.github/workflows/audit-qt6-tools-version-pinning.yml` |
 | Audit Repo Dot Env Forbidden | `.github/workflows/audit-repo-dot-env-forbidden.yml` |
 | Audit Repo Forbidden Filenames | `.github/workflows/audit-repo-forbidden-filenames-case-insensitive.yml` |
 | Audit Repo Labels | `.github/workflows/audit-repo-labels.yml` |
@@ -94,7 +81,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Audit Repo README TOC Required | `.github/workflows/audit-repo-readme-toc-required.yml` |
 | Audit Repo Snake Case Scripts | `.github/workflows/audit-repo-snake-case-scripts.yml` |
 | Audit Repo Svg Metadata | `.github/workflows/audit-repo-svg-metadata.yml` |
-| Audit SDDM Conf.d Syntax | `.github/workflows/audit-sddm-conf-d-syntax.yml` |
 | Audit Security Policy | `.github/workflows/audit-security-policy.yml` |
 | Audit Shell License MIT | `.github/workflows/audit-sh-license-mit.yml` |
 | Audit Shebang Consistency | `.github/workflows/audit-shebang-consistency.yml` |
@@ -193,11 +179,8 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check Acknowledgments Content | `.github/workflows/check-acknowledgments-content.yml` |
 | Check Action Caching | `.github/workflows/check-action-caching-v3.yml` |
 | Check Action Pinning | `.github/workflows/check-action-pinning-v3.yml` |
-| Check apt Preferences | `.github/workflows/check-apt-preferences.yml` |
 | Check Architecture Headers | `.github/workflows/check-architecture-headers-audit.yml` |
-| Check Audio Configs | `.github/workflows/check-audio-configs.yml` |
 | Check Bash Completion Syntax | `.github/workflows/check-bash-completion-syntax.yml` |
-| Check binfmt.d | `.github/workflows/check-binfmt-d.yml` |
 | Check Branch Naming | `.github/workflows/check-branch-naming-v3.yml` |
 | Check Branding Banner PNG | `.github/workflows/check-branding-banner-png.yml` |
 | Check Branding Colors | `.github/workflows/check-branding-colors-v3.yml` |
@@ -216,7 +199,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check dconf Defaults | `.github/workflows/check-dconf-defaults.yml` |
 | Check Docs MD Links | `.github/workflows/check-docs-md-links.yml` |
 | Check Docs Terminology | `.github/workflows/check-docs-terminology-v3.yml` |
-| Check dracut.conf | `.github/workflows/check-dracut-conf.yml` |
 | Check environment.d | `.github/workflows/check-environment-d.yml` |
 | Check EOF Newline | `.github/workflows/check-eof-newline-v3.yml` |
 | Check etc skel | `.github/workflows/check-etc-skel.yml` |
@@ -230,7 +212,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check gsettings Overrides | `.github/workflows/check-gsettings-overrides.yml` |
 | Check Hostname Config | `.github/workflows/check-hostname-config.yml` |
 | Check Icon Theme Index | `.github/workflows/check-icon-theme-index.yml` |
-| Check initramfs Hooks | `.github/workflows/check-initramfs-hooks.yml` |
 | Check Issue Template Quality | `.github/workflows/check-issue-template-quality-v3.yml` |
 | Check Journal Bolt File | `.github/workflows/check-journal-bolt-file.yml` |
 | Check Journal Sentinel File | `.github/workflows/check-journal-sentinel-file.yml` |
@@ -246,14 +227,12 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check NetworkManager Config | `.github/workflows/check-network-manager.yml` |
 | Check No Log Files | `.github/workflows/check-no-log-files-repo-wide.yml` |
 | Check Notes Naming | `.github/workflows/check-notes-naming-convention.yml` |
-| Check os-release Syntax | `.github/workflows/check-os-release-syntax.yml` |
 | Check Package Author Field | `.github/workflows/check-package-author-field.yml` |
 | Check package.json Description | `.github/workflows/check-package-json-description.yml` |
 | Check package.json License Field | `.github/workflows/check-package-json-license-field.yml` |
 | Check package.json Repository Field | `.github/workflows/check-package-json-repository-field.yml` |
 | Check package.json Scripts Order | `.github/workflows/check-package-json-scripts-order.yml` |
 | Check Package License Field | `.github/workflows/check-package-license-field.yml` |
-| Check PAM Configs | `.github/workflows/check-pam-configs.yml` |
 | Check Plasma Applet Metadata | `.github/workflows/check-plasma-applet-metadata.yml` |
 | Check PNPM Lock Sync | `.github/workflows/check-pnpm-lock-sync-check.yml` |
 | Check Pull Request Size | `.github/workflows/check-pull-request-size-v3.yml` |
@@ -273,14 +252,11 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check Splash QML Animation | `.github/workflows/check-splash-qml-animation.yml` |
 | Check SSHD Config | `.github/workflows/check-sshd-config.yml` |
 | Check sudoers Snippets | `.github/workflows/check-sudoers-snippets.yml` |
-| Check sysctl Snippets | `.github/workflows/check-sysctl-snippets.yml` |
 | Check systemd Generators | `.github/workflows/check-systemd-generators.yml` |
 | Check Timezone Config | `.github/workflows/check-timezone-config.yml` |
-| Check tmpfiles Snippets | `.github/workflows/check-tmpfiles-snippets.yml` |
 | Check TODO Format | `.github/workflows/check-todo-format-strict-audit.yml` |
 | Check TODO Format | `.github/workflows/check-todo-format-v3.yml` |
 | Check TODO Priority Enforcement | `.github/workflows/check-todo-priority-enforcement.yml` |
-| Check udev Rules Syntax | `.github/workflows/check-udev-rules-syntax.yml` |
 | Check Wayland Configs | `.github/workflows/check-wayland-configs.yml` |
 | Check Wiki Overview Presence | `.github/workflows/check-wiki-overview-presence.yml` |
 | Check Workflow Cancel In Progress | `.github/workflows/check-workflow-cancel-in-progress-v3.yml` |
@@ -289,7 +265,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Check Workflow Strategy Fail Fast | `.github/workflows/check-workflow-strategy-fail-fast-v3.yml` |
 | Check Workflow Timeout Minutes Standard | `.github/workflows/check-workflow-timeout-minutes-standard.yml` |
 | Check Workflow Timeout | `.github/workflows/check-workflow-timeout-v3.yml` |
-| Check X11 Snippets | `.github/workflows/check-x11-snippets.yml` |
 | Check Zsh Completion Syntax | `.github/workflows/check-zsh-completion-syntax.yml` |
 | Check Zshrc Performance | `.github/workflows/check-zshrc-performance-v3.yml` |
 | Check Zshrc Performance | `.github/workflows/check-zshrc-performance.yml` |
@@ -318,7 +293,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Contributors List Manager | `.github/workflows/contributors-list-manager.yml` |
 | Curl Secure Flags Enforcer | `.github/workflows/curl-secure-flags-enforcer.yml` |
 | Dead Script Scanner | `.github/workflows/dead-script-scanner.yml` |
-| Debian Trixie Mirror Check | `.github/workflows/debian-trixie-mirror-check.yml` |
 | Dependabot Auto-Approve | `.github/workflows/dependabot-auto-approve.yml` |
 | Dependency Vulnerability Monitor | `.github/workflows/dependency-vulnerability-monitor.yml` |
 | Deprecated Commands Check | `.github/workflows/deprecated-commands-check.yml` |
@@ -379,7 +353,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Glossary Term Consistency | `.github/workflows/glossary-term-consistency.yml` |
 | Greetings | `.github/workflows/greetings.yml` |
 | Grep Vulnerability Scanner | `.github/workflows/grep-vulnerability-scanner.yml` |
-| GRUB Syntax Audit | `.github/workflows/grub-syntax-audit.yml` |
 | Heredoc Quoted Terminator Check | `.github/workflows/heredoc-quoted-terminator-check.yml` |
 | Hook Syntax Validator | `.github/workflows/hook-syntax-validator.yml` |
 | Integrity Manifest Generator | `.github/workflows/integrity-manifest-generator.yml` |
@@ -390,7 +363,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | ISO Entropy Blob Detection | `.github/workflows/iso-entropy-blob-detection.yml` |
 | ISO Hardware Support Manifest | `.github/workflows/iso-hardware-support-manifest.yml` |
 | ISO Initramfs Inventory Report | `.github/workflows/iso-initramfs-inventory-report.yml` |
-| ISO Manifest Sync | `.github/workflows/iso-manifest-sync.yml` |
 | ISO Metadata | `.github/workflows/iso-metadata.yml` |
 | ISO Package Drift Report | `.github/workflows/iso-package-drift-report.yml` |
 | ISO Reproducibility Audit | `.github/workflows/iso-reproducibility-audit.yml` |
@@ -421,7 +393,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | KDE Config Schema Validator | `.github/workflows/kde-config-schema-validator.yml` |
 | KDE Plasma Monitor | `.github/workflows/kde-plasma-monitor.yml` |
 | Kernel Endpoint Monitor | `.github/workflows/kernel-endpoint-monitor.yml` |
-| Kiba Welcome Emoji Label Check | `.github/workflows/kiba-welcome-emoji-label-check.yml` |
 | Kiba Welcome Shortcut Ads | `.github/workflows/kiba-welcome-shortcut-advertisement.yml` |
 | Kiba Welcome Window Icon Audit | `.github/workflows/kiba-welcome-window-icon-audit.yml` |
 | KibaOS Build | `.github/workflows/kiba.yml` |
@@ -455,7 +426,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Monitor Ant Themes | `.github/workflows/monitor-ant-themes.yml` |
 | Monitor CachyOS Kernel | `.github/workflows/monitor-cachyos-kernel.yml` |
 | Monitor Kora Icons | `.github/workflows/monitor-kora-icons.yml` |
-| Monitor Nala | `.github/workflows/monitor-pacman.yml` |
 | Monitor Starship | `.github/workflows/monitor-starship.yml` |
 | Monitor Vimix Cursors | `.github/workflows/monitor-vimix-cursors.yml` |
 | Notify SourceForge Release | `.github/workflows/notify-release-sourceforge-upload.yml` |
@@ -529,8 +499,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | Scan PR Secrets Proactive | `.github/workflows/scan-pr-secrets-proactive.yml` |
 | Scan Repo Vulnerabilities | `.github/workflows/scan-repo-vulnerabilities.yml` |
 | Scorecard supply-chain security | `.github/workflows/scorecards.yml` |
-| SDDM Autologin User Sync | `.github/workflows/sddm-autologin-user-sync-check.yml` |
-| SDDM Session Package Check | `.github/workflows/sddm-session-package-check.yml` |
 | Secret Exposure Log Scanner | `.github/workflows/secret-exposure-log-scanner.yml` |
 | Secure APT Keyring Paths | `.github/workflows/secure-apt-keyring-paths.yml` |
 | Semgrep | `.github/workflows/semgrep.yml` |
@@ -573,7 +541,6 @@ Generated on Thu May 21 18:06:51 UTC 2026
 | TODO Checker | `.github/workflows/todo-checker.yml` |
 | TODO Comment Tracker | `.github/workflows/todo-comment-tracker.yml` |
 | TODO Persistence Tracking | `.github/workflows/todo-persistence-tracking.yml` |
-| Track Debian Trixie CVE Alerts | `.github/workflows/track-debian-trixie-cve-alerts.yml` |
 | Track ISO Size Growth | `.github/workflows/track-iso-size-growth.yml` |
 | Trivy | `.github/workflows/trivy.yml` |
 | Trusted Auto-Approve | `.github/workflows/trusted-auto-approve.yml` |
