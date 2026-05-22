@@ -45,8 +45,7 @@ jobs:
           cd kiba-profile
 
           # 3. Inject local AUR repo into profile pacman.conf (after cp, so file exists)
-          sed -i '1s/^/[aur-local]\nSigLevel = Never\nServer = file:\/\/\/tmp\/aur-pkgs\n\n/' kiba-profile/pacman.conf
-          sed -i '1s/^/[aur-local]\nSigLevel = Never\nServer = file:\/\/\/tmp\/aur-pkgs\n\n/' kiba-profile/pacman.conf
+          sed -i '1s/^/[aur-local]\nSigLevel = Never\nServer = file:\/\/\/tmp\/aur-pkgs\n\n/' pacman.conf
 
           # 4. Packages — explicit UKUI components (no group metapackage), calamares-git from local AUR repo
           cat > packages.x86_64 << 'PACKAGES'
