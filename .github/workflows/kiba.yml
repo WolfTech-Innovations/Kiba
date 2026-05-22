@@ -39,6 +39,7 @@ jobs:
           mkinitcpio
           grub
           efibootmgr
+          syslinux
           networkmanager
           git
           wget
