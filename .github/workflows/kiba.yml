@@ -38,11 +38,10 @@ jobs:
           cd /tmp && git clone https://aur.archlinux.org/cutefish-meta.git && cd cutefish-meta && makepkg -s --noconfirm
           # ... etc for each cutefish-* dep
           '
-
-         # 2. Collect and create the repo — must be named "custom"
-         mkdir -p /tmp/custom
-         find /tmp -name "*.pkg.tar.zst" -exec cp {} /tmp/custom/ \;
-         repo-add /tmp/custom/custom.db.tar.zst /tmp/custom/*.pkg.tar.zst
+          # 2. Collect and create the repo — must be named "custom"
+          mkdir -p /tmp/custom
+          find /tmp -name "*.pkg.tar.zst" -exec cp {} /tmp/custom/ \;
+          repo-add /tmp/custom/custom.db.tar.zst /tmp/custom/*.pkg.tar.zst
 
           # 3. Add to the profile's pacman.conf (BEFORE other repos for priority)
           sed -i '1s/^/[custom]\nSigLevel = Never\nServer = file:\/\/\/tmp\/custom\n\n/' kiba-profile/pacman.conf
