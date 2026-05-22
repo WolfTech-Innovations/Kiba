@@ -43,8 +43,6 @@ jobs:
           base
           linux
           linux-firmware
-          linux-cachyos
-          linux-cachyos-headers
           mkinitcpio
           grub
           efibootmgr
@@ -72,11 +70,11 @@ jobs:
           nano
           fzf
           yt-dlp
-          calamares
+          calamares-git
           inter-font
           ttf-jetbrains-mono
           noto-fonts-emoji
-          cutefish
+          cutefish-meta
           discover
           flatpak
           xdg-desktop-portal-kde
