@@ -233,7 +233,6 @@ ntfs-3g
 exfatprogs
 cryptsetup
 nextcloud-client
-erofs-utils
 sddm
 kwin
 qt5-base
@@ -256,13 +255,6 @@ appmenu-gtk-module
 systemsettings
 PACKAGES
 
-# ── Immutable root (erofs + tmpfs overlays) ───────────────────────────────
-mkdir -p "${AIROOTFS}/etc"
-cat > "${AIROOTFS}/etc/fstab" << 'FSTAB'
-LABEL=KIBAOS_ROOT / erofs defaults,ro 0 0
-tmpfs /etc tmpfs defaults,noatime,mode=755 0 0
-tmpfs /var tmpfs defaults,noatime,mode=755 0 0
-FSTAB
 
 # ── SDDM autologin for live session ──────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/sddm.conf.d"
