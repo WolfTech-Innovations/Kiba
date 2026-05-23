@@ -102,6 +102,20 @@ jobs:
           # 2. fishui — GUI framework; needs kwindowsystem5, qt5-declarative, qt5-graphicaleffects, qt5-quickcontrols2, qt5-svg
           build_cutefish_repo fishui fishui
 
+          # 3a. KF5 BluezQt fork — Cutefish bundles its own KF5 build because Arch dropped bluez-qt5.
+          #     Build and install to staging BEFORE core/dock, which need KF5BluezQt.
+          git clone --depth 1 https://github.com/cutefishos-ubuntu/bluez-qt.git bluez-qt-kf5
+          cd bluez-qt-kf5
+          mkdir -p build && cd build
+          cmake -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
+                -DBUILD_TESTING=OFF \
+                -GNinja ..
+          ninja
+          DESTDIR="${STAGING}" ninja install
+          DESTDIR="${AIROOTFS}" ninja install
+          cd ../..
+
           # 3. Core components — all need fishui + libcutefish
           #    core:       kidletime5, kwin-x11, libxcb, libxcursor, libxtst, polkit-qt5
           #    dock:       fishui, libcutefish, kwindowsystem5
@@ -113,19 +127,8 @@ jobs:
             build_cutefish_repo "${REPO}" "${REPO}"
           done
 
-          # settings: patch out bluetooth submodule before building
-          git clone --depth 1 https://github.com/cutefishos/settings.git settings
-          cd settings
-          sed -i '/add_subdirectory(bluez)/d'      CMakeLists.txt
-          sed -i '/add_subdirectory(bluetooth)/d'  CMakeLists.txt
-          mkdir -p build && cd build
-          cmake -DCMAKE_INSTALL_PREFIX=/usr \
-                -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
-                -GNinja ..
-          ninja
-          DESTDIR="${STAGING}" ninja install
-          DESTDIR="${AIROOTFS}" ninja install
-          cd ../..
+          # settings: now buildable — KF5BluezQt is provided by the fork above
+          build_cutefish_repo settings settings
 
           # 4. Apps — fishui + libcutefish
           for REPO in terminal filemanager calculator screenshot; do
