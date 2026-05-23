@@ -1,9 +1,6 @@
 #!/bin/bash
 set -ex
 
-# Force C++17 globally — ICU 78 headers require it, cutefish CMakeLists hardcodes gnu++11
-export CXXFLAGS="-std=gnu++17"
-
 # ── Install ALL deps inside the container ────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
@@ -77,34 +74,8 @@ build_cutefish_repo() {
   sed -i '/src\/vpn\/vpn\.cpp/d' CMakeLists.txt
   sed -i '/src\/vpn\/nm-.*\.h/d' CMakeLists.txt
 
-  # Force C++17 in every CMakeLists.txt — cutefish repos hardcode CXX_STANDARD 11
-  # which overrides -DCMAKE_CXX_STANDARD at the cmake invocation level.
-  # Patch all three forms: set_property CXX_STANDARD, set(CMAKE_CXX_STANDARD), target_compile_features
-  find . -name "CMakeLists.txt" | xargs -r sed -i \
-    -e 's/CXX_STANDARD 11/CXX_STANDARD 17/g' \
-    -e 's/CXX_STANDARD 14/CXX_STANDARD 17/g' \
-    -e 's/set(CMAKE_CXX_STANDARD 11)/set(CMAKE_CXX_STANDARD 17)/g' \
-    -e 's/set(CMAKE_CXX_STANDARD 14)/set(CMAKE_CXX_STANDARD 17)/g' \
-    -e 's/cxx_std_11/cxx_std_17/g' \
-    -e 's/cxx_std_14/cxx_std_17/g'
 
-  # cutefish-settings/language.cpp pulls in ICU (libicuuc) but the CMakeLists never
-  # links it, and the multi-line target_link_libraries block is too awkward to patch
-  # reliably with sed. Language/locale switching is cosmetic for KibaOS v1 — strip it.
-  if [ -f src/language.cpp ]; then
-    rm -f src/language.cpp src/language.h
-    sed -i '/language\.cpp/d' CMakeLists.txt
-    sed -i '/language\.h/d'   CMakeLists.txt
-    sed -i '/Language/d'      CMakeLists.txt
-    # Strip #include "language.h" and any Language object usage from all .cpp/.h files
-    find . \( -name "*.cpp" -o -name "*.h" \) | xargs -r sed -i \
-      -e '/#include.*language\.h/d' \
-      -e '/Language /d' \
-      -e '/m_language/d' \
-      -e '/new Language/d'
-    # Remove the QML import that references the now-gone C++ type
-    find . -name "*.qml" | xargs -r sed -i '/Language\|language/d'
-  fi
+
 
   find . -name "CMakeLists.txt" | while read f; do
     if grep -q 'qt5_create_translation(QM_FILES \${TS_FILES})' "$f" 2>/dev/null; then
@@ -127,12 +98,8 @@ CHOTKEYS_PATCH
   fi
 
   mkdir build && cd build
-  CXXFLAGS="-std=gnu++17" \
   cmake -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
-        -DCMAKE_CXX_STANDARD=17 \
-        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
-        -DCMAKE_CXX_FLAGS="-std=gnu++17" \
         -GNinja ..
   ninja
   DESTDIR="${STAGING}" ninja install
@@ -147,7 +114,7 @@ build_cutefish_repo libcutefish libcutefish
 build_cutefish_repo fishui fishui
 
 # 3. Core components
-for REPO in core dock launcher statusbar settings; do
+for REPO in core dock launcher statusbar; do
   build_cutefish_repo "${REPO}" "${REPO}"
 done
 
@@ -232,6 +199,7 @@ libxcb
 libpulse
 bluez
 appmenu-gtk-module
+systemsettings
 PACKAGES
 
 # ── Immutable root (erofs + tmpfs overlays) ───────────────────────────────
