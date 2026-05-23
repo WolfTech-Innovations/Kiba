@@ -19,10 +19,11 @@ jobs:
           set -ex
 
           pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
-                  cmake extra-cmake-modules ninja qt5-base qt5-declarative qt5-quickcontrols2 qt5-tools qt5-svg \
-                  kwindowsystem wayland dbus pam polkit pkgconf \
-                  polkit-qt5 xorg-server-devel xf86-input-libinput xf86-input-synaptics \
-                  libxcb libxcursor libxtst libpulse libkscreen libstatgrab
+                 cmake extra-cmake-modules ninja \
+                 qt5-base qt5-declarative qt5-svg qt5-quickcontrols2 qt5-graphicaleffects qt5-location qt5-x11extras qt5-tools qt5-quickcontrols qt5-multimedia qt5-sensors qt5-websockets \
+                 kcoreaddons kconfig ki18n kiconthemes kdbusaddons kservice kwindowsystem \
+                 libxcb xcb-util xcb-util-wm xcb-util-keysyms xcb-util-image xcb-util-renderutil libxkbcommon xorgproto libxcursor libxtst libpulse \
+                 dbus pam polkit polkit-qt5 gsettings-desktop-schemas networkmanager
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
