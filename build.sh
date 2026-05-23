@@ -32,7 +32,11 @@ pacman -S --noconfirm --needed \
   bluez \
   fontconfig freetype2 icu \
   \
-  appmenu-gtk-module
+  appmenu-gtk-module \
+  \
+  kpmcore boost boost-libs yaml-cpp libpwquality \
+  python python-yaml python-jsonschema \
+  qt5-xmlpatterns kparts5
 
 # ── Setup ────────────────────────────────────────────────────────────────
 WORKDIR="/w"
@@ -158,6 +162,27 @@ done
 # ── Back to workdir (should already be here, but be explicit) ─────────────
 cd "${WORKDIR}"
 
+
+# ── Compile Calamares (not in Arch repos, must build from source) ─────────
+echo "=== Compiling Calamares ==="
+cd "${SRCDIR}"
+git clone --depth 1 https://codeberg.org/Calamares/calamares.git calamares
+cd "${SRCDIR}/calamares"
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_INSTALL_PREFIX=/usr \
+      -DWITH_PYTHONQT=OFF \
+      -DWITH_PYTHON=ON \
+      -DWITH_KF5DBus=ON \
+      -DSKIP_MODULES="webview interactiveterminal initramfs \
+                      initramfscfg dracut dracutlukscfg \
+                      dummyprocess dummypython dummycpp \
+                      dummypythonqt services-openrc" \
+      -GNinja ..
+ninja
+DESTDIR="${AIROOTFS}" ninja install
+cd "${WORKDIR}"
+
 # ── Package list ─────────────────────────────────────────────────────────
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
@@ -191,7 +216,7 @@ micro
 nano
 fzf
 yt-dlp
-calamares
+
 inter-font
 ttf-jetbrains-mono
 noto-fonts-emoji
