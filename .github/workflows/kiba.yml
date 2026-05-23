@@ -38,9 +38,12 @@ jobs:
           Server = https://mirror.cachyos.org/repo/$arch/$repo
           REPOS
 
-          # Import CachyOS key
-          pacman-key --recv-keys F3B607488DB35C47
-          pacman-key --lsign-key F3B607488DB35C47
+          # Import CachyOS key (try multiple keyservers for CI reliability)
+          pacman-key --recv-keys F3B607488DB35C47 --keyserver hkps://keyserver.ubuntu.com \
+            || pacman-key --recv-keys F3B607488DB35C47 --keyserver hkps://keys.openpgp.org \
+            || pacman-key --recv-keys F3B607488DB35C47 --keyserver hkp://pgp.mit.edu \
+            || echo "WARNING: Key fetch failed, relying on SigLevel=Optional TrustAll"
+          pacman-key --lsign-key F3B607488DB35C47 || true
 
           # Manual Compilation of Cutefish DE
           echo "=== Compiling Cutefish DE ==="
