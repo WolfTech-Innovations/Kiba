@@ -97,6 +97,8 @@ CHOTKEYS_PATCH
   mkdir build && cd build
   cmake -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
+        -DCMAKE_CXX_STANDARD=17 \
+        -DCMAKE_CXX_STANDARD_REQUIRED=ON \
         -GNinja ..
   ninja
   DESTDIR="${STAGING}" ninja install
