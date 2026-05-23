@@ -32,11 +32,10 @@ jobs:
             qt5-base qt5-declarative qt5-svg qt5-quickcontrols2 \
             qt5-graphicaleffects qt5-x11extras qt5-tools \
             qt5-quickcontrols qt5-multimedia qt5-wayland \
-            qt5-sensors \
             \
             kwindowsystem5 kidletime5 kcoreaddons5 kconfig5 \
             ki18n5 kiconthemes5 kdbusaddons5 kservice5 \
-            kio5 solid5 libkscreen5 \
+            kio5 solid5 \
             kwin \
             \
             libxcb xcb-util xcb-util-wm xcb-util-keysyms \
@@ -69,15 +68,15 @@ jobs:
           #   3. core, dock, launcher, statusbar, settings, apps
           #   4. wallpapers, icons
           #
-          # Several KF5 libraries were dropped from Arch when KDE moved to KF6:
-          #   KF5BluezQt, KF5NetworkManagerQt, KF5ModemManagerQt
+          # Several KF5/Qt5 libs were dropped from Arch as Qt5/Plasma5 wound down:
+          #   KF5BluezQt, KF5NetworkManagerQt, KF5ModemManagerQt, KF5Screen, qt5-sensors
           # The cutefish repos have C++ subdirs and source files that depend on
           # these. Affected repos and what needs stripping:
-          #   libcutefish: add_subdirectory(bluez), add_subdirectory(networkmanagement)
+          #   libcutefish: add_subdirectory(bluez, networkmanagement, screen)
           #   settings:    find_package + target_link_libraries + src/vpn/vpn.cpp
           #   dock/others: add_subdirectory(bluetooth) or add_subdirectory(bluez)
           # build_cutefish_repo applies all sed fixes globally — no-ops where not needed.
-          # At runtime, bluez and networkmanager are QML-only deps, no C++ headers needed.
+          # At runtime, bluez/networkmanager/screen are QML-only deps, no C++ headers needed.
 
           echo "=== Compiling Cutefish DE ==="
           mkdir -p src && cd src
@@ -89,27 +88,31 @@ jobs:
             cd "${REPO}"
 
             # Drop KF5 subdirs and find_package calls for libraries that no longer
-            # exist on Arch (dropped when KDE Frameworks moved to KF6):
+            # exist on Arch (dropped as Qt5/Plasma5 support wound down):
             #   - KF5BluezQt      → bluez/bluetooth subdirs
             #   - KF5NetworkManagerQt + KF5ModemManagerQt → networkmanagement subdir
+            #   - KF5Screen + qt5-sensors → screen subdir (libkscreen5 also gone)
             #
             # Applied globally — safe no-ops for repos that don't have these.
             # Matches the approach used by official Arch cutefish-* PKGBUILDs.
 
-            # Strip C++ subdirs that need dead KF5 libs
-            sed -i '/add_subdirectory(bluetooth)/d'      CMakeLists.txt
-            sed -i '/add_subdirectory(bluez)/d'          CMakeLists.txt
+            # Strip C++ subdirs that need dead KF5/Qt5 libs
+            sed -i '/add_subdirectory(bluetooth)/d'         CMakeLists.txt
+            sed -i '/add_subdirectory(bluez)/d'             CMakeLists.txt
             sed -i '/add_subdirectory(networkmanagement)/d' CMakeLists.txt
+            sed -i '/add_subdirectory(screen)/d'            CMakeLists.txt
 
             # Strip top-level find_package calls for the same dead libs
             sed -i '/find_package(KF5BluezQt/d'          CMakeLists.txt
             sed -i '/find_package(KF5NetworkManagerQt/d' CMakeLists.txt
             sed -i '/find_package(KF5ModemManagerQt/d'   CMakeLists.txt
+            sed -i '/find_package(KF5Screen/d'           CMakeLists.txt
 
             # Strip their target_link_libraries entries
             sed -i '/KF5::BluezQt/d'          CMakeLists.txt
             sed -i '/KF5::NetworkManagerQt/d' CMakeLists.txt
             sed -i '/KF5::ModemManagerQt/d'   CMakeLists.txt
+            sed -i '/KF5::Screen/d'           CMakeLists.txt
 
             # settings/src/vpn/vpn.cpp includes <NetworkManagerQt/...> headers
             # directly — strip it and its headers from SRCS so it won't be compiled.
