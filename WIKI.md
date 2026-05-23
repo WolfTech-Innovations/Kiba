@@ -1,4 +1,4 @@
-# KibaOS Wiki
+# Overview
 
 <p align="center">
   <img src="branding/kibaos_banner.png" alt="KibaOS Logo: A minimalist dark blue geometric emblem" width="100%">
@@ -18,29 +18,29 @@ Welcome to the official **KibaOS Wiki**. This document provides an exhaustive de
 
 ## Table of Contents
 
-- [Extended Documentation](#-extended-documentation)
-- [Architecture & Core Components](#-architecture--core-components)
+- [Extended Documentation](#extended-documentation)
+- [Architecture & Core Components](#architecture--core-components)
   - [Base System](#base-system)
   - [Extreme Minimization](#extreme-minimization)
-- [User Experience (UX) & Design](#-user-experience-ux--design)
+- [User Experience (UX) & Design](#user-experience-ux--design)
   - [Visual Identity](#visual-identity)
   - [Shell Experience](#shell-experience)
   - [Boot & Branding](#boot--branding)
-- [Software Management](#-software-management)
+- [Software Management](#software-management)
   - [KibaStore](#kibastore)
   - [Repositories & Packages](#repositories--packages)
-- [Security & Compliance](#-security--compliance)
+- [Security & Compliance](#security--compliance)
   - [California AADC (AB 2273)](#california-aadc-ab-2273)
-- [Build Infrastructure](#-build-infrastructure)
+- [Build Infrastructure](#build-infrastructure)
   - [Build Pipeline](#build-pipeline)
   - [Image Optimization](#image-optimization)
-- [Build Locally](#-build-locally)
-- [Community & Support](#-community--support)
-- [License](#-license)
+- [Build Locally](#build-locally)
+- [Community & Support](#community--support)
+- [License](#license)
 
 ---
 
-## 📖 Extended Documentation
+## Extended Documentation
 
 For more specific details on the various components of KibaOS, please refer to the following documents:
 
@@ -76,21 +76,21 @@ The system undergoes aggressive footprint reduction during the build process:
 
 ---
 
-## 🎨 User Experience (UX) & Design
+## User Experience (UX) & Design
 
 ### Visual Identity
 
 KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component               | Choice               |
-| ----------------------- | -------------------- |
-| **Desktop Environment** | **Cutefish OS** |
-| **Global Theme**        | **Ant-Dark**         |
-| **Color Scheme**        | **Dracula**          |
-| **Icon Theme**          | **Kora**             |
-| **Cursor Theme**        | **Vimix**            |
-| **System Font**         | **Inter**            |
-| **Monospace Font**      | **JetBrains Mono**   |
+| Component               | Choice             |
+| ----------------------- | ------------------ |
+| **Desktop Environment** | **Cutefish OS**    |
+| **Global Theme**        | **Ant-Dark**       |
+| **Color Scheme**        | **Dracula**        |
+| **Icon Theme**          | **Kora**           |
+| **Cursor Theme**        | **Vimix**          |
+| **System Font**         | **Inter**          |
+| **Monospace Font**      | **JetBrains Mono** |
 
 ### Shell Experience
 
@@ -115,7 +115,7 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
 ---
 
-## 📦 Software Management
+## Software Management
 
 ### KibaStore
 
@@ -177,7 +177,7 @@ docker run --rm --privileged \
 
 ---
 
-## 🤝 Community & Support
+## Community & Support
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
