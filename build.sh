@@ -72,6 +72,7 @@ file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/gshadow"]="0:0:400"
   ["/usr/local/bin/kiba-welcome"]="0:0:755"
+  ["/usr/share/xsessions/cutefish-xsession.desktop"]="0:0:777"
   ["/root"]="0:0:750"
 )
 PROFILEDEF
@@ -268,12 +269,14 @@ vlc
 gparted
 spectacle
 ark
-plymouth
 ntfs-3g
 exfatprogs
 cryptsetup
 nextcloud-client
 sddm
+xorg-server
+xorg-xinit
+xf86-video-vesa
 kwin
 qt5-base
 qt5-declarative
@@ -289,6 +292,14 @@ polkit-qt5
 libxcursor
 libxtst
 libxcb
+xcb-util
+xcb-util-cursor
+xcb-util-image
+xcb-util-keysyms
+xcb-util-renderutil
+xcb-util-wm
+xcb-util-xrm
+libxkbcommon-x11
 libpulse
 bluez
 appmenu-gtk-module
@@ -342,7 +353,7 @@ mkdir -p "${AIROOTFS}/etc/sddm.conf.d"
 cat > "${AIROOTFS}/etc/sddm.conf.d/autologin.conf" << 'SDDM'
 [Autologin]
 User=liveuser
-Session=cutefish
+Session=cutefish-xsession
 SDDM
 
 # ── Calamares OOBE config ─────────────────────────────────────────────────
@@ -504,6 +515,27 @@ cat > /etc/hosts << 'HOSTS'
 127.0.1.1   kibaos.localdomain kibaos
 HOSTS
 
+# SDDM system user
+groupadd -r sddm || true
+useradd -r -g sddm -d /var/lib/sddm -s /usr/bin/nologin -c "SDDM Greeter" sddm || true
+mkdir -p /var/lib/sddm
+chown sddm:sddm /var/lib/sddm
+chmod 700 /var/lib/sddm
+
+# Create utmp (systemd 256+ no longer creates this, but SDDM still wants it)
+touch /run/utmp
+mkdir -p /var/log
+touch /var/log/btmp
+touch /var/log/wtmp
+
+# Ensure basic groups exist
+groupadd -r users 2>/dev/null || true
+groupadd -r wheel 2>/dev/null || true
+groupadd -r audio 2>/dev/null || true
+groupadd -r video 2>/dev/null || true
+groupadd -r input 2>/dev/null || true
+groupadd -r network 2>/dev/null || true
+
 # Volatile journal (saves RAM on live ISO)
 sed -i 's/#Storage=auto/Storage=volatile/' /etc/systemd/journald.conf
 
@@ -532,13 +564,16 @@ chown 1000:1000 /home/liveuser/.config/autostart/kiba-welcome.desktop
 
 # Trust cutefish DE session
 mkdir -p /usr/share/wayland-sessions
-cat > /usr/share/xsessions/cutefish.desktop << 'SESSION'
+mkdir -p /usr/share/xsessions
+cat > /usr/share/xsessions/cutefish-xsession.desktop << 'SESSION'
 [Desktop Entry]
 Name=Cutefish
 Comment=KibaOS Desktop
-Exec=startcutefish
+Exec=cutefish-session
+TryExec=cutefish-session
 Type=Application
 SESSION
+chmod 777 /usr/share/xsessions/cutefish-xsession.desktop
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
