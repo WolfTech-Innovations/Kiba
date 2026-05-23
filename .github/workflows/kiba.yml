@@ -135,7 +135,20 @@ jobs:
               fi
             done
 
-            mkdir -p build && cd build
+            # chotkeys/application.cpp is missing the definition of onReleased(QKeySequence)
+            # which is declared as a slot and connected in the constructor — linker fails.
+            # Fix: append a no-op stub. The released signal is never acted on upstream anyway.
+            if [ -f chotkeys/application.cpp ]; then
+              cat >> chotkeys/application.cpp << 'CHOTKEYS_PATCH'
+
+void Application::onReleased(QKeySequence keySeq)
+{
+    Q_UNUSED(keySeq)
+}
+CHOTKEYS_PATCH
+            fi
+
+
             cmake -DCMAKE_INSTALL_PREFIX=/usr \
                   -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
                   -GNinja ..
