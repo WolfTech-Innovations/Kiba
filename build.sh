@@ -74,18 +74,50 @@ build_cutefish_repo() {
   sed -i '/src\/vpn\/vpn\.cpp/d' CMakeLists.txt
   sed -i '/src\/vpn\/nm-.*\.h/d' CMakeLists.txt
 
-
-
-
+  # ── Fix MOC/translation dependency cycle ──────────────────────────────
+  # qt5_create_translation runs lupdate (scans C++ sources = needs MOC'd
+  # files) AND lrelease, creating a circular dep:
+  #   mocs_compilation → translations → lupdate stamp → mocs_compilation
+  #
+  # Fix strategy per CMakeLists.txt:
+  #   • If .ts files exist alongside it → swap to qt5_add_translation
+  #     (lrelease-only, no source scanning, no cycle)
+  #   • If no .ts files exist           → drop the translation target entirely
   find . -name "CMakeLists.txt" | while read f; do
-    if grep -q 'qt5_create_translation(QM_FILES \${TS_FILES})' "$f" 2>/dev/null; then
-      if grep -q 'src/.*\.cpp' "$f" 2>/dev/null; then
-        sed -i 's|qt5_create_translation(QM_FILES \${TS_FILES})|qt5_create_translation(QM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src ${TS_FILES})|g' "$f"
+    DIR=$(dirname "$f")
+
+    # Check whether any .ts files are reachable from this CMakeLists
+    TS_COUNT=$(find "$DIR" -maxdepth 2 -name "*.ts" 2>/dev/null | wc -l)
+
+    if grep -q 'qt5_create_translation' "$f" 2>/dev/null; then
+      if [ "$TS_COUNT" -gt 0 ]; then
+        # Safe swap: drop source-dir arg(s), keep only the .ts file list.
+        # Pattern handles the expanded forms we added earlier too.
+        sed -i \
+          's/qt5_create_translation(\(QM_FILES\)[^)]*\(\${[A-Z_]*TS_FILES}\))/qt5_add_translation(\1 \2)/g' \
+          "$f"
+        # Fallback for any remaining qt5_create_translation calls
+        sed -i \
+          's/qt5_create_translation(/qt5_add_translation(/g' \
+          "$f"
+        # qt5_add_translation does not accept a source directory argument;
+        # strip any bare directory token left before ${*TS_FILES}
+        sed -i \
+          's/qt5_add_translation(\(QM_FILES\) \${CMAKE_CURRENT_SOURCE_DIR}[^ ]* /qt5_add_translation(\1 /g' \
+          "$f"
+        sed -i \
+          's/qt5_add_translation(\(QM_FILES\) \${CMAKE_CURRENT_SOURCE_DIR} /qt5_add_translation(\1 /g' \
+          "$f"
       else
-        sed -i 's|qt5_create_translation(QM_FILES \${TS_FILES})|qt5_create_translation(QM_FILES ${CMAKE_CURRENT_SOURCE_DIR} ${TS_FILES})|g' "$f"
+        # No .ts files → nuke the translation block entirely
+        sed -i '/qt5_create_translation/d' "$f"
+        sed -i '/qt5_add_translation/d'    "$f"
+        sed -i '/QM_FILES/d'               "$f"
+        sed -i '/install.*\.qm/d'          "$f"
       fi
     fi
   done
+  # ── End translation cycle fix ──────────────────────────────────────────
 
   if [ -f chotkeys/application.cpp ]; then
     cat >> chotkeys/application.cpp << 'CHOTKEYS_PATCH'
