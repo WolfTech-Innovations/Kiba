@@ -335,7 +335,7 @@ while true; do
     files)      cutefish-filemanager & break ;;
     screenshot) cutefish-screenshot & break ;;
     info)
-      (fastfetch | zenity --text-info --title="KibaOS System Information") &
+      (fastfetch --logo none --pipe true --no-color-blocks | zenity --text-info --title="KibaOS System Information" --width=450 --height=500) &
       ;;
     shortcuts)
       (zenity --list --title="KibaOS Shortcuts" \
@@ -344,7 +344,8 @@ while true; do
         "Terminal"         "Meta + T" \
         "Search"           "Meta + Space" \
         "File Manager"     "Meta + E" \
-        --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
+        "Screen Capture"   "Print" \
+        --width=450 --height=500 --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
       ;;
     wiki)
       chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & break
