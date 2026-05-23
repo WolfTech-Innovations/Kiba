@@ -20,7 +20,14 @@ jobs:
 
           # ── Install ALL deps inside the container ────────────────────────────────
           # (pacman runs here, inside archlinux:latest, NOT on the host runner)
-          pacman -Syu --noconfirm
+
+          # archlinux:latest ships with a stale/empty DB and an uninitialised
+          # keyring. Fix both before any install — this is why packages like
+          # bluez-qt5 and bluedevil appear "not found" even though they exist.
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syy --noconfirm   # -yy forces full DB refresh regardless of timestamps
+          pacman -Su  --noconfirm   # apply pending upgrades before adding new packages
 
           pacman -S --noconfirm --needed \
             archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
@@ -44,7 +51,7 @@ jobs:
             \
             dbus pam polkit polkit-qt5 \
             gsettings-desktop-schemas networkmanager \
-            bluedevil \
+            bluez bluez-qt5 bluedevil \
             fontconfig freetype2 icu \
             \
             appmenu-gtk-module
@@ -100,7 +107,7 @@ jobs:
           #    dock:       fishui, libcutefish, kwindowsystem5
           #    launcher:   fishui, libcutefish, kwindowsystem5
           #    statusbar:  fishui, libcutefish, kwindowsystem5
-          #    settings:   fishui, libcutefish, bluedevil, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
+          #    settings:   fishui, libcutefish, bluedevil, bluez-qt5, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
           for REPO in core dock launcher statusbar settings; do
             build_cutefish_repo "${REPO}" "${REPO}"
           done
@@ -184,7 +191,8 @@ jobs:
           libxtst
           libxcb
           libpulse
-          bluedevil
+          bluez
+          bluez-qt5
           networkmanager
           appmenu-gtk-module
           PACKAGES
