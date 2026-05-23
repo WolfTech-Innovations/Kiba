@@ -141,7 +141,7 @@ build_cutefish_repo libcutefish libcutefish
 build_cutefish_repo fishui fishui
 
 # 3. Core components
-for REPO in core dock launcher statusbar; do
+for REPO in core dock launcher statusbar settings; do
   build_cutefish_repo "${REPO}" "${REPO}"
 done
 
@@ -316,7 +316,7 @@ while true; do
     store)      flatpak run org.kde.discover & break ;;
     terminal)   cutefish-terminal & break ;;
     files)      cutefish-filemanager & break ;;
-    settings)   cutefish-settings & break ;;
+    settings)   systemsettings5 & break ;;
     screenshot) cutefish-screenshot & break ;;
     info)
       (fastfetch | zenity --text-info --title="KibaOS System Information") &
