@@ -96,6 +96,12 @@ build_cutefish_repo() {
     sed -i '/language\.cpp/d' CMakeLists.txt
     sed -i '/language\.h/d'   CMakeLists.txt
     sed -i '/Language/d'      CMakeLists.txt
+    # Strip #include "language.h" and any Language object usage from all .cpp/.h files
+    find . \( -name "*.cpp" -o -name "*.h" \) | xargs -r sed -i \
+      -e '/#include.*language\.h/d' \
+      -e '/Language /d' \
+      -e '/m_language/d' \
+      -e '/new Language/d'
     # Remove the QML import that references the now-gone C++ type
     find . -name "*.qml" | xargs -r sed -i '/Language\|language/d'
   fi
