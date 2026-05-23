@@ -68,13 +68,15 @@ jobs:
           #   3. core, dock, launcher, statusbar, settings, apps
           #   4. wallpapers, icons
           #
-          # The bluetooth/bluez C++ subdirs in several repos require KF5BluezQt
-          # headers which no longer exist on Arch (bluez-qt5 is KF6-only there).
-          # Official Arch cutefish-settings PKGBUILD strips these subdirs via sed
-          # before building. We apply the same fix globally inside build_cutefish_repo
-          # so it's a no-op for repos that don't have them, and silently fixes
-          # settings, dock, and any other repo that does.
-          # bluez-qt at runtime is QML-only — no C++ build dep needed.
+          # Several KF5 libraries were dropped from Arch when KDE moved to KF6:
+          #   KF5BluezQt, KF5NetworkManagerQt, KF5ModemManagerQt
+          # The cutefish repos have C++ subdirs and source files that depend on
+          # these. Affected repos and what needs stripping:
+          #   libcutefish: add_subdirectory(bluez), add_subdirectory(networkmanagement)
+          #   settings:    find_package + target_link_libraries + src/vpn/vpn.cpp
+          #   dock/others: add_subdirectory(bluetooth) or add_subdirectory(bluez)
+          # build_cutefish_repo applies all sed fixes globally — no-ops where not needed.
+          # At runtime, bluez and networkmanager are QML-only deps, no C++ headers needed.
 
           echo "=== Compiling Cutefish DE ==="
           mkdir -p src && cd src
@@ -85,12 +87,34 @@ jobs:
             git clone --depth 1 "https://github.com/cutefishos/${GITHUB_NAME}.git" "${REPO}"
             cd "${REPO}"
 
-            # Drop bluetooth C++ subdirs — KF5BluezQt headers gone from Arch repos.
-            # Also drop ModemManagerQt which has the same problem.
-            # These are safe no-ops for repos that don't have these subdirs.
-            sed -i '/add_subdirectory(bluetooth)/d' CMakeLists.txt
-            sed -i '/add_subdirectory(bluez)/d'     CMakeLists.txt
-            sed -i '/ModemManagerQt/d'              CMakeLists.txt
+            # Drop KF5 subdirs and find_package calls for libraries that no longer
+            # exist on Arch (dropped when KDE Frameworks moved to KF6):
+            #   - KF5BluezQt      → bluez/bluetooth subdirs
+            #   - KF5NetworkManagerQt + KF5ModemManagerQt → networkmanagement subdir
+            #
+            # Applied globally — safe no-ops for repos that don't have these.
+            # Matches the approach used by official Arch cutefish-* PKGBUILDs.
+
+            # Strip C++ subdirs that need dead KF5 libs
+            sed -i '/add_subdirectory(bluetooth)/d'      CMakeLists.txt
+            sed -i '/add_subdirectory(bluez)/d'          CMakeLists.txt
+            sed -i '/add_subdirectory(networkmanagement)/d' CMakeLists.txt
+
+            # Strip top-level find_package calls for the same dead libs
+            sed -i '/find_package(KF5BluezQt/d'          CMakeLists.txt
+            sed -i '/find_package(KF5NetworkManagerQt/d' CMakeLists.txt
+            sed -i '/find_package(KF5ModemManagerQt/d'   CMakeLists.txt
+
+            # Strip their target_link_libraries entries
+            sed -i '/KF5::BluezQt/d'          CMakeLists.txt
+            sed -i '/KF5::NetworkManagerQt/d' CMakeLists.txt
+            sed -i '/KF5::ModemManagerQt/d'   CMakeLists.txt
+
+            # settings/src/vpn/vpn.cpp includes <NetworkManagerQt/...> headers
+            # directly — strip it and its headers from SRCS so it won't be compiled.
+            # networkproxy.cpp is fine (uses only Qt/DBus, no NM headers).
+            sed -i '/src\/vpn\/vpn\.cpp/d'           CMakeLists.txt
+            sed -i '/src\/vpn\/nm-.*\.h/d'           CMakeLists.txt
 
             mkdir -p build && cd build
             cmake -DCMAKE_INSTALL_PREFIX=/usr \
