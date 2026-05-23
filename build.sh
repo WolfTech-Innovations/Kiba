@@ -53,6 +53,45 @@ cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 mkdir -p "${SRCDIR}"
 
+# ── profiledef.sh — ISO branding & metadata ───────────────────────────────
+cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
+#!/usr/bin/env bash
+iso_name="kibaos"
+iso_label="KIBAOS"
+iso_publisher="WolfTech Innovations <https://github.com/WolfTech-Innovations>"
+iso_application="KibaOS Live/Installation Medium"
+iso_version="$(date +%Y.%m)"
+install_dir="arch"
+buildmodes=('iso')
+bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito' 'uefi-ia32.systemd-boot.esp' 'uefi-x64.systemd-boot.esp')
+arch="x86_64"
+pacman_conf="pacman.conf"
+airootfs_image_type="squashfs"
+airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1M' '-Xdict-size' '1M')
+file_permissions=(
+  ["/etc/shadow"]="0:0:400"
+  ["/etc/gshadow"]="0:0:400"
+  ["/usr/local/bin/kiba-welcome"]="0:0:755"
+  ["/root"]="0:0:750"
+)
+PROFILEDEF
+chmod +x "${PROFILE}/profiledef.sh"
+
+# ── /etc/os-release — distro identity ────────────────────────────────────
+mkdir -p "${AIROOTFS}/etc"
+cat > "${AIROOTFS}/etc/os-release" << 'OSRELEASE'
+NAME="KibaOS"
+PRETTY_NAME="KibaOS"
+ID=kibaos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="1;36"
+HOME_URL="https://github.com/WolfTech-Innovations/Kiba"
+DOCUMENTATION_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md"
+SUPPORT_URL="https://github.com/WolfTech-Innovations/Kiba/issues"
+LOGO=kibaos
+OSRELEASE
+
 # ── Compile Cutefish DE ──────────────────────────────────────────────────
 echo "=== Compiling Cutefish DE ==="
 
@@ -192,6 +231,7 @@ linux
 linux-headers
 linux-firmware
 mkinitcpio
+mkinitcpio-archiso
 grub
 efibootmgr
 networkmanager
@@ -255,6 +295,47 @@ appmenu-gtk-module
 systemsettings
 PACKAGES
 
+
+# ── Fix initramfs hooks (archiso live boot requires archiso hook, no autodetect) ──
+mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
+cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
+HOOKS=(base udev memdisk archiso block filesystems)
+INITRAMFS
+
+# Correct preset so mkinitcpio builds the archiso image, not a standard one
+mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+PRESETS=('archiso')
+ALL_kver='/boot/vmlinuz-linux'
+archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
+archiso_image='/boot/initramfs-linux.img'
+PRESET
+
+# ── Rebrand boot menu (systemd-boot) ─────────────────────────────────────
+# Loader config
+mkdir -p "${AIROOTFS}/loader"
+cat > "${PROFILE}/efiboot/loader/loader.conf" << 'LOADER'
+default kibaos.conf
+timeout 5
+console-mode max
+editor no
+LOADER
+
+# Boot entry — reuse archiso's kernel/initramfs paths, just rename the title
+mkdir -p "${PROFILE}/efiboot/loader/entries"
+cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
+title   KibaOS
+linux   /arch/boot/x86_64/vmlinuz-linux
+initrd  /arch/boot/x86_64/initramfs-linux.img
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G
+ENTRY
+
+# Also patch syslinux label for BIOS boot
+SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
+if [ -f "${SYSLINUX_CFG}" ]; then
+  sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
+  sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
+fi
 
 # ── SDDM autologin for live session ──────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/sddm.conf.d"
@@ -353,6 +434,113 @@ while true; do
 done
 WELCOME
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
+
+# ── liveuser account ─────────────────────────────────────────────────────
+# passwd / shadow / group entries for the passwordless live user
+mkdir -p "${AIROOTFS}/etc"
+
+# Append liveuser to passwd (uid 1000, home /home/liveuser, shell zsh)
+grep -q '^liveuser:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
+  echo 'liveuser:x:1000:1000:KibaOS Live User:/home/liveuser:/usr/bin/zsh' \
+  >> "${AIROOTFS}/etc/passwd"
+
+grep -q '^liveuser:' "${AIROOTFS}/etc/group" 2>/dev/null || \
+  echo 'liveuser:x:1000:liveuser' >> "${AIROOTFS}/etc/group"
+
+# Empty password hash = no password required for live session
+grep -q '^liveuser:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
+  echo 'liveuser::19000:0:99999:7:::' >> "${AIROOTFS}/etc/shadow"
+
+mkdir -p "${AIROOTFS}/home/liveuser"
+
+# sudo without password for live session
+mkdir -p "${AIROOTFS}/etc/sudoers.d"
+echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > "${AIROOTFS}/etc/sudoers.d/liveuser"
+
+# ── systemd service symlinks (equivalent of systemctl enable) ─────────────
+WANTS="${AIROOTFS}/etc/systemd/system"
+
+# graphical.target as default
+mkdir -p "${WANTS}/default.target.wants"
+mkdir -p "${WANTS}"
+ln -sf /usr/lib/systemd/system/graphical.target \
+       "${WANTS}/default.target"
+
+# SDDM display manager
+ln -sf /usr/lib/systemd/system/sddm.service \
+       "${WANTS}/display-manager.service"
+
+# NetworkManager
+mkdir -p "${WANTS}/multi-user.target.wants"
+ln -sf /usr/lib/systemd/system/NetworkManager.service \
+       "${WANTS}/multi-user.target.wants/NetworkManager.service"
+ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
+       "${WANTS}/dbus-org.freedesktop.nm-dispatcher.service"
+
+# Bluetooth
+ln -sf /usr/lib/systemd/system/bluetooth.service \
+       "${WANTS}/multi-user.target.wants/bluetooth.service"
+
+# pacman keyring init (needed on live ISO)
+ln -sf /usr/lib/systemd/system/pacman-init.service \
+       "${WANTS}/multi-user.target.wants/pacman-init.service"
+
+# ── customize_airootfs.sh — runs inside chroot at build time ─────────────
+mkdir -p "${AIROOTFS}/root"
+cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
+#!/usr/bin/env bash
+set -e
+
+# Locale
+sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
+locale-gen
+echo 'LANG=en_US.UTF-8' > /etc/locale.conf
+
+# Hostname
+echo 'kibaos' > /etc/hostname
+cat > /etc/hosts << 'HOSTS'
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   kibaos.localdomain kibaos
+HOSTS
+
+# Volatile journal (saves RAM on live ISO)
+sed -i 's/#Storage=auto/Storage=volatile/' /etc/systemd/journald.conf
+
+# Don't suspend on lid close in live session
+sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
+sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
+
+# zsh for root in live session
+chsh -s /usr/bin/zsh root
+
+# liveuser home skeleton
+cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
+chown -R 1000:1000 /home/liveuser
+chmod 700 /home/liveuser
+
+# Autostart kiba-welcome for liveuser on login
+mkdir -p /home/liveuser/.config/autostart
+cat > /home/liveuser/.config/autostart/kiba-welcome.desktop << 'DESK'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Welcome
+Exec=/usr/local/bin/kiba-welcome
+X-GNOME-Autostart-enabled=true
+DESK
+chown 1000:1000 /home/liveuser/.config/autostart/kiba-welcome.desktop
+
+# Trust cutefish DE session
+mkdir -p /usr/share/wayland-sessions
+cat > /usr/share/xsessions/cutefish.desktop << 'SESSION'
+[Desktop Entry]
+Name=Cutefish
+Comment=KibaOS Desktop
+Exec=startcutefish
+Type=Application
+SESSION
+CUSTOMIZE
+chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
 # ── Build the ISO ─────────────────────────────────────────────────────────
 cd "${WORKDIR}"
