@@ -88,16 +88,12 @@ build_cutefish_repo() {
     -e 's/cxx_std_11/cxx_std_17/g' \
     -e 's/cxx_std_14/cxx_std_17/g'
 
-  # Append ICU link libraries to the root CMakeLists if it has target_link_libraries
-  # but doesn't already link icuuc. Fixes cutefish-settings language.cpp -> libicuuc.
+  # Inject icuuc icui18n into every existing target_link_libraries call that doesn't
+  # already have it. Appending a new call would mix keyword/plain signatures and break
+  # cmake. Instead we sed icuuc onto the end of the closing paren of each existing call.
+  # Fixes cutefish-settings language.cpp -> libicuuc DSO missing error.
   if grep -q 'target_link_libraries' CMakeLists.txt && ! grep -q 'icuuc' CMakeLists.txt; then
-    # Extract the first target name from target_link_libraries and append icuuc/icui18n
-    TARGET_NAME=$(grep -m1 'target_link_libraries' CMakeLists.txt | sed 's/target_link_libraries(\s*//;s/[[:space:]].*//')
-    if [ -n "$TARGET_NAME" ]; then
-      echo "" >> CMakeLists.txt
-      echo "# KibaOS patch: link ICU for C++17 icu_78 headers" >> CMakeLists.txt
-      echo "target_link_libraries(${TARGET_NAME} PRIVATE icuuc icui18n)" >> CMakeLists.txt
-    fi
+    sed -i '/target_link_libraries/{/icuuc/!s/)$/ icuuc icui18n)/}' CMakeLists.txt
   fi
 
   find . -name "CMakeLists.txt" | while read f; do
