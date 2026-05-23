@@ -32,10 +32,11 @@ jobs:
             qt5-base qt5-declarative qt5-svg qt5-quickcontrols2 \
             qt5-graphicaleffects qt5-x11extras qt5-tools \
             qt5-quickcontrols qt5-multimedia qt5-wayland \
+            qt5-sensors \
             \
-            kwindowsystem5 kidletime5 \
-            kcoreaddons kconfig ki18n kiconthemes \
-            kdbusaddons kservice \
+            kwindowsystem5 kidletime5 kcoreaddons5 kconfig5 \
+            ki18n5 kiconthemes5 kdbusaddons5 kservice5 \
+            kio5 solid5 libkscreen5 \
             kwin \
             \
             libxcb xcb-util xcb-util-wm xcb-util-keysyms \
