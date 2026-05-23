@@ -120,6 +120,21 @@ jobs:
             sed -i '/src\/vpn\/vpn\.cpp/d'           CMakeLists.txt
             sed -i '/src\/vpn\/nm-.*\.h/d'           CMakeLists.txt
 
+            # Fix qt5_create_translation missing source dir argument — apply to ALL
+            # CMakeLists.txt files recursively (core has subdirs with the same bug).
+            # Repos with sources under src/: pass ${CMAKE_CURRENT_SOURCE_DIR}/src
+            # Repos with sources at root: pass ${CMAKE_CURRENT_SOURCE_DIR}
+            find . -name "CMakeLists.txt" | while read f; do
+              if grep -q 'qt5_create_translation(QM_FILES \${TS_FILES})' "$f" 2>/dev/null; then
+                dir=$(dirname "$f")
+                if grep -q 'src/.*\.cpp' "$f" 2>/dev/null; then
+                  sed -i 's|qt5_create_translation(QM_FILES \${TS_FILES})|qt5_create_translation(QM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src ${TS_FILES})|g' "$f"
+                else
+                  sed -i 's|qt5_create_translation(QM_FILES \${TS_FILES})|qt5_create_translation(QM_FILES ${CMAKE_CURRENT_SOURCE_DIR} ${TS_FILES})|g' "$f"
+                fi
+              fi
+            done
+
             mkdir -p build && cd build
             cmake -DCMAKE_INSTALL_PREFIX=/usr \
                   -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
