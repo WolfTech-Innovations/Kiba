@@ -14,8 +14,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Add Contributor
+        env:
+          PR_USER: ${{ github.event.pull_request.user.login }}
         run: |
-          USER="${{ github.event.pull_request.user.login }}"
+          USER="$PR_USER"
           grep -q "$USER" ACKNOWLEDGMENTS.md || {
             echo "- $USER" >> ACKNOWLEDGMENTS.md
             git config user.name "KibaBot"
