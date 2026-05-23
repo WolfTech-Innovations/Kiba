@@ -25,7 +25,15 @@ KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)*
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
+## Star History
 
+<a href="https://www.star-history.com/?repos=WolfTech-Innovations%2FKiba&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=WolfTech-Innovations/Kiba&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=WolfTech-Innovations/Kiba&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=WolfTech-Innovations/Kiba&type=date&legend=top-left" />
+ </picture>
+</a>
 ---
 
 ## Table of Contents
@@ -142,7 +150,6 @@ sudo pacman -Syu
 ### Shell
 
 <img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
-<img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=flat-square" alt="Kernel: CachyOS">
 
 KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
 
