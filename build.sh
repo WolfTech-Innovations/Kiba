@@ -94,13 +94,14 @@ void Application::onReleased(QKeySequence keySeq)
 CHOTKEYS_PATCH
   fi
 
+  mkdir build && cd build
   cmake -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
         -GNinja ..
   ninja
   DESTDIR="${STAGING}" ninja install
   DESTDIR="${AIROOTFS}" ninja install
-  cd ../..
+  cd ../../..
 }
 
 # 1. libcutefish
