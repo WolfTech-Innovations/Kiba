@@ -23,7 +23,7 @@ jobs:
 
           # archlinux:latest ships with a stale/empty DB and an uninitialised
           # keyring. Fix both before any install — this is why packages like
-          # bluez-qt5 was dropped from Arch repos — the current package is bluez-qt. "not found" even though they exist.
+          # bluez-qt5 was dropped from Arch repos (KF5 build gone, only KF6 bluez-qt remains).
           pacman-key --init
           pacman-key --populate archlinux
           pacman -Syy --noconfirm   # -yy forces full DB refresh regardless of timestamps
@@ -51,7 +51,7 @@ jobs:
             \
             dbus pam polkit polkit-qt5 \
             gsettings-desktop-schemas networkmanager \
-            bluez bluez-qt \
+            bluez \
             fontconfig freetype2 icu \
             \
             appmenu-gtk-module
@@ -107,10 +107,25 @@ jobs:
           #    dock:       fishui, libcutefish, kwindowsystem5
           #    launcher:   fishui, libcutefish, kwindowsystem5
           #    statusbar:  fishui, libcutefish, kwindowsystem5
-          #    settings:   fishui, libcutefish, bluez-qt, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
-          for REPO in core dock launcher statusbar settings; do
+          #    settings:   fishui, libcutefish, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
+          #    (bluetooth submodule skipped: needs KF5BluezQt, dropped from Arch; bluez-qt is KF6-only)
+          for REPO in core dock launcher statusbar; do
             build_cutefish_repo "${REPO}" "${REPO}"
           done
+
+          # settings: patch out bluetooth submodule before building
+          git clone --depth 1 https://github.com/cutefishos/settings.git settings
+          cd settings
+          sed -i '/add_subdirectory(bluez)/d'      CMakeLists.txt
+          sed -i '/add_subdirectory(bluetooth)/d'  CMakeLists.txt
+          mkdir -p build && cd build
+          cmake -DCMAKE_INSTALL_PREFIX=/usr \
+                -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
+                -GNinja ..
+          ninja
+          DESTDIR="${STAGING}" ninja install
+          DESTDIR="${AIROOTFS}" ninja install
+          cd ../..
 
           # 4. Apps — fishui + libcutefish
           for REPO in terminal filemanager calculator screenshot; do
@@ -192,7 +207,6 @@ jobs:
           libxcb
           libpulse
           bluez
-          bluez-qt
           networkmanager
           appmenu-gtk-module
           PACKAGES
