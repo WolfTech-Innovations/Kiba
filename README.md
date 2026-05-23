@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish OS 6** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish DE** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -71,9 +71,9 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 
 ## Features
 
-- **Arch Linux Base:** Built on **Arch Linux Rolling** with an **Immutable Architecture**.
+- **Arch Linux Base:** Built on **Arch Linux Rolling**
 - **Deep Cloud Integration:** System-wide file and setting sync powered by Cloud Services. Built on **Arch Linux Rolling** (supported until 2030).
-- **Modern Desktop:** **Cutefish OS 6.3** with **Wayland** as the default session.
+- **Modern Desktop:** **Cutefish DE** with **Wayland** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
 - **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
