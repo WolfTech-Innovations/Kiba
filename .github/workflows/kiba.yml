@@ -44,7 +44,7 @@ jobs:
             \
             dbus pam polkit polkit-qt5 \
             gsettings-desktop-schemas networkmanager \
-            bluedevil bluez-qt5 \
+            bluedevil \
             fontconfig freetype2 icu \
             \
             appmenu-gtk-module
@@ -100,7 +100,7 @@ jobs:
           #    dock:       fishui, libcutefish, kwindowsystem5
           #    launcher:   fishui, libcutefish, kwindowsystem5
           #    statusbar:  fishui, libcutefish, kwindowsystem5
-          #    settings:   fishui, libcutefish, bluedevil, bluez-qt5, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
+          #    settings:   fishui, libcutefish, bluedevil, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
           for REPO in core dock launcher statusbar settings; do
             build_cutefish_repo "${REPO}" "${REPO}"
           done
@@ -185,7 +185,6 @@ jobs:
           libxcb
           libpulse
           bluedevil
-          bluez-qt5
           networkmanager
           appmenu-gtk-module
           PACKAGES
