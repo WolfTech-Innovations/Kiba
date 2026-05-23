@@ -161,6 +161,7 @@ cd "${WORKDIR}"
 # ── Package list ─────────────────────────────────────────────────────────
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
+syslinux
 base
 linux
 linux-headers
