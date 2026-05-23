@@ -31,19 +31,7 @@ jobs:
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
           cd kiba-profile
 
-          # Add CachyOS repository
-          cat >> pacman.conf << 'REPOS'
-          [cachyos]
-          SigLevel = Optional TrustAll
-          Server = https://mirror.cachyos.org/repo/$arch/$repo
-          REPOS
 
-          # Import CachyOS key (try multiple keyservers for CI reliability)
-          pacman-key --recv-keys F3B607488DB35C47 --keyserver hkps://keyserver.ubuntu.com \
-            || pacman-key --recv-keys F3B607488DB35C47 --keyserver hkps://keys.openpgp.org \
-            || pacman-key --recv-keys F3B607488DB35C47 --keyserver hkp://pgp.mit.edu \
-            || echo "WARNING: Key fetch failed, relying on SigLevel=Optional TrustAll"
-          pacman-key --lsign-key F3B607488DB35C47 || true
 
           # Manual Compilation of Cutefish DE
           echo "=== Compiling Cutefish DE ==="
@@ -63,8 +51,8 @@ jobs:
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
-          linux-cachyos
-          linux-cachyos-headers
+          linux
+          linux-headers
           linux-firmware
           mkinitcpio
           grub
