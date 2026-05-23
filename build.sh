@@ -88,12 +88,16 @@ build_cutefish_repo() {
     -e 's/cxx_std_11/cxx_std_17/g' \
     -e 's/cxx_std_14/cxx_std_17/g'
 
-  # Inject icuuc icui18n into every existing target_link_libraries call that doesn't
-  # already have it. Appending a new call would mix keyword/plain signatures and break
-  # cmake. Instead we sed icuuc onto the end of the closing paren of each existing call.
-  # Fixes cutefish-settings language.cpp -> libicuuc DSO missing error.
-  if grep -q 'target_link_libraries' CMakeLists.txt && ! grep -q 'icuuc' CMakeLists.txt; then
-    sed -i '/target_link_libraries/{/icuuc/!s/)$/ icuuc icui18n)/}' CMakeLists.txt
+  # cutefish-settings/language.cpp pulls in ICU (libicuuc) but the CMakeLists never
+  # links it, and the multi-line target_link_libraries block is too awkward to patch
+  # reliably with sed. Language/locale switching is cosmetic for KibaOS v1 — strip it.
+  if [ -f src/language.cpp ]; then
+    rm -f src/language.cpp src/language.h
+    sed -i '/language\.cpp/d' CMakeLists.txt
+    sed -i '/language\.h/d'   CMakeLists.txt
+    sed -i '/Language/d'      CMakeLists.txt
+    # Remove the QML import that references the now-gone C++ type
+    find . -name "*.qml" | xargs -r sed -i '/Language\|language/d'
   fi
 
   find . -name "CMakeLists.txt" | while read f; do
