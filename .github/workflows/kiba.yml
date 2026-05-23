@@ -23,7 +23,7 @@ jobs:
 
           # archlinux:latest ships with a stale/empty DB and an uninitialised
           # keyring. Fix both before any install — this is why packages like
-          # bluez-qt5 and bluedevil appear "not found" even though they exist.
+          # bluez-qt5 was dropped from Arch repos — the current package is bluez-qt. "not found" even though they exist.
           pacman-key --init
           pacman-key --populate archlinux
           pacman -Syy --noconfirm   # -yy forces full DB refresh regardless of timestamps
@@ -51,7 +51,7 @@ jobs:
             \
             dbus pam polkit polkit-qt5 \
             gsettings-desktop-schemas networkmanager \
-            bluez bluez-qt5 bluedevil \
+            bluez bluez-qt \
             fontconfig freetype2 icu \
             \
             appmenu-gtk-module
@@ -107,7 +107,7 @@ jobs:
           #    dock:       fishui, libcutefish, kwindowsystem5
           #    launcher:   fishui, libcutefish, kwindowsystem5
           #    statusbar:  fishui, libcutefish, kwindowsystem5
-          #    settings:   fishui, libcutefish, bluedevil, bluez-qt5, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
+          #    settings:   fishui, libcutefish, bluez-qt, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
           for REPO in core dock launcher statusbar settings; do
             build_cutefish_repo "${REPO}" "${REPO}"
           done
@@ -192,7 +192,7 @@ jobs:
           libxcb
           libpulse
           bluez
-          bluez-qt5
+          bluez-qt
           networkmanager
           appmenu-gtk-module
           PACKAGES
