@@ -6,7 +6,7 @@ on:
 jobs:
   build-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 180
 
     steps:
       - name: Checkout repository
@@ -18,8 +18,11 @@ jobs:
           #!/bin/bash
           set -ex
 
-          # Install archiso and deps
-          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools
+          # Install archiso and build deps
+          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
+            cmake extra-cmake-modules ninja qt5-base qt5-quickcontrols2 qt5-x11extras qt5-tools qt5-svg \
+            kwindowsystem polkit-qt5 xorg-server-devel xf86-input-libinput xf86-input-synaptics \
+            libxcb libxcursor libxtst libpulse libkscreen libstatgrab
 
           cd /w
           ISO="kibaos-v${RUN_NUM}"
@@ -28,12 +31,8 @@ jobs:
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
           cd kiba-profile
 
-          # Add Repositories
+          # Add CachyOS repository
           cat >> pacman.conf << 'REPOS'
-          [arch-cutefish]
-          SigLevel = Optional TrustAll
-          Server = https://github.com/arch-cutefish/repo/releases/download/x86_64
-
           [cachyos]
           SigLevel = Optional TrustAll
           Server = https://mirror.cachyos.org/repo/$arch/$repo
@@ -43,7 +42,21 @@ jobs:
           pacman-key --recv-keys F3B607488DB35C47
           pacman-key --lsign-key F3B607488DB35C47
 
-          # Update packages list
+          # Manual Compilation of Cutefish DE
+          echo "=== Compiling Cutefish DE ==="
+          mkdir -p src && cd src
+          for REPO in fishui libcutefish core dock launcher statusbar settings wallpapers icons terminal filemanager calculator screenshot; do
+            git clone --depth 1 https://github.com/cutefishos/${REPO}.git
+            cd ${REPO}
+            mkdir build && cd build
+            cmake -DCMAKE_INSTALL_PREFIX=/usr -GNinja ..
+            ninja
+            DESTDIR=../../../../airootfs ninja install
+            cd ../..
+          done
+          cd ..
+
+          # Update packages list (only base and necessary system tools)
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
@@ -79,17 +92,6 @@ jobs:
           inter-font
           ttf-jetbrains-mono
           noto-fonts-emoji
-          cutefish-core
-          cutefish-dock
-          cutefish-launcher
-          cutefish-statusbar
-          cutefish-settings
-          cutefish-icons
-          cutefish-wallpapers
-          cutefish-filemanager
-          cutefish-terminal
-          cutefish-screenshot
-          cutefish-calculator
           discover
           flatpak
           xdg-desktop-portal-kde
@@ -110,7 +112,7 @@ jobs:
           erofs-utils
           PACKAGES
 
-          # Immutability configuration
+          # Immutable Architecture: Read-only root with OverlayFS for /etc and /var
           mkdir -p airootfs/etc
           cat > airootfs/etc/fstab << 'FSTAB'
           LABEL=KIBAOS_ROOT / erofs defaults,ro 0 0
@@ -118,7 +120,7 @@ jobs:
           tmpfs /var tmpfs defaults,noatime,mode=755 0 0
           FSTAB
 
-          # OOBE Fullscreen Setup
+          # OOBE Setup
           mkdir -p airootfs/etc/calamares/modules
           cat > airootfs/etc/calamares/settings.conf << 'CALA_SETTINGS'
           ---
@@ -157,32 +159,6 @@ jobs:
           prompt-install: false
           dont-chroot: false
           CALA_SETTINGS
-
-          cat > airootfs/etc/calamares/modules/welcome_fullscreen.conf << 'CALA_WELCOME'
-          ---
-          showSupportUrl: false
-          showKnownIssuesUrl: false
-          showReleaseNotesUrl: false
-          requirements:
-            requiredStorageGiB: 20
-            requiredRamGiB: 2
-          CALA_WELCOME
-
-          # Cloud Integration Service
-          mkdir -p airootfs/etc/skel/.config/autostart
-          cat > airootfs/etc/skel/.config/autostart/nextcloud.desktop << 'CLOUD'
-          [Desktop Entry]
-          Type=Application
-          Name=Cloud Sync
-          Exec=nextcloud --background
-          CLOUD
-
-          # Spotlight search binding
-          mkdir -p airootfs/etc/skel/.config/cutefishos
-          cat > airootfs/etc/skel/.config/cutefishos/launcher.conf << 'LAUNCHER'
-          [General]
-          hotkey=Meta+Space
-          LAUNCHER
 
           # Clean Welcome Script (No Emojis)
           mkdir -p airootfs/usr/local/bin
@@ -250,22 +226,13 @@ jobs:
                   --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
                 ;;
               "wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & break ;;
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
+                break
+                ;;
             esac
           done
           WELCOME
           chmod +x airootfs/usr/local/bin/kiba-welcome
-
-          # System identity
-          mkdir -p airootfs/etc
-          cat > airootfs/etc/os-release << 'EOF'
-          NAME="KibaOS"
-          ID=kibaos
-          ID_LIKE=arch
-          VERSION_ID="rolling"
-          PRETTY_NAME="KibaOS (Arch Linux base)"
-          HOME_URL="https://github.com/WolfTech-Innovations/Kiba"
-          EOF
 
           # Finalize and Build
           cd ..
