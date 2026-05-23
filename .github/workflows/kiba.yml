@@ -18,37 +18,106 @@ jobs:
           #!/bin/bash
           set -ex
 
-          pacman -Syu --noconfirm archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
-                 cmake extra-cmake-modules ninja \
-                 qt5-base qt5-declarative qt5-svg qt5-quickcontrols2 qt5-graphicaleffects qt5-x11extras qt5-tools qt5-quickcontrols qt5-multimedia \
-                 kcoreaddons kconfig ki18n kiconthemes kdbusaddons kservice kwindowsystem \
-                 libxcb xcb-util xcb-util-wm xcb-util-keysyms xcb-util-image xcb-util-renderutil libxkbcommon xorgproto libxcursor libxtst libpulse \
-                 dbus pam polkit polkit-qt5 gsettings-desktop-schemas networkmanager
+          # ── Install ALL deps inside the container ────────────────────────────────
+          # (pacman runs here, inside archlinux:latest, NOT on the host runner)
+          pacman -Syu --noconfirm
 
+          pacman -S --noconfirm --needed \
+            archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
+            \
+            cmake extra-cmake-modules ninja \
+            \
+            qt5-base qt5-declarative qt5-svg qt5-quickcontrols2 \
+            qt5-graphicaleffects qt5-x11extras qt5-tools \
+            qt5-quickcontrols qt5-multimedia qt5-wayland \
+            \
+            kwindowsystem5 kidletime5 \
+            kcoreaddons kconfig ki18n kiconthemes \
+            kdbusaddons kservice \
+            kwin \
+            \
+            libxcb xcb-util xcb-util-wm xcb-util-keysyms \
+            xcb-util-image xcb-util-renderutil \
+            libxkbcommon xorgproto libxcursor libxtst \
+            libpulse \
+            xorg-server-devel xf86-input-libinput xf86-input-synaptics \
+            \
+            dbus pam polkit polkit-qt5 \
+            gsettings-desktop-schemas networkmanager \
+            bluedevil bluez-qt5 \
+            fontconfig freetype2 icu \
+            \
+            appmenu-gtk-module
+
+          # ── Setup ────────────────────────────────────────────────────────────────
           cd /w
           ISO="kibaos-v${RUN_NUM}"
+          STAGING="/tmp/cutefish-staging"   # install here so later repos can find earlier ones
+          AIROOTFS="/w/kiba-profile/airootfs"
 
           echo "=== Configuring archiso profile ==="
           cp -r /usr/share/archiso/configs/releng/ kiba-profile
-          cd kiba-profile
+          mkdir -p "${AIROOTFS}"
 
+          # ── Compile Cutefish DE ──────────────────────────────────────────────────
+          # Build order matters:
+          #   1. libcutefish  (no cutefish deps)
+          #   2. fishui       (needs kwindowsystem5, qt5-*)
+          #   3. core, dock, launcher, statusbar, settings  (need fishui + libcutefish)
+          #   4. terminal, filemanager, calculator, screenshot, wallpapers, icons
+          #
+          # Strategy: install each component to $STAGING so the next cmake can find it,
+          # then also install into airootfs so it ends up in the ISO.
 
-
-          # Manual Compilation of Cutefish DE
           echo "=== Compiling Cutefish DE ==="
           mkdir -p src && cd src
-          for REPO in fishui libcutefish core dock launcher statusbar settings wallpapers icons terminal filemanager calculator screenshot; do
-            git clone --depth 1 https://github.com/cutefishos/${REPO}.git
-            cd ${REPO}
-            mkdir build && cd build
-            cmake -DCMAKE_INSTALL_PREFIX=/usr -GNinja ..
-            ninja
-            DESTDIR=../../../../airootfs ninja install
-            cd ../..
-          done
-          cd ..
 
-          # Update packages list (only base and necessary system tools)
+          build_cutefish_repo() {
+            local REPO=$1
+            local GITHUB_NAME=${2:-$REPO}   # github repo name if different from local dir
+            git clone --depth 1 "https://github.com/cutefishos/${GITHUB_NAME}.git" "${REPO}"
+            cd "${REPO}"
+            mkdir -p build && cd build
+            cmake -DCMAKE_INSTALL_PREFIX=/usr \
+                  -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
+                  -GNinja ..
+            ninja
+            # Install to staging so subsequent builds can find headers/libs
+            DESTDIR="${STAGING}" ninja install
+            # Also install into airootfs for the ISO
+            DESTDIR="${AIROOTFS}" ninja install
+            cd ../..
+          }
+
+          # 1. libcutefish — system library, no cutefish deps
+          build_cutefish_repo libcutefish libcutefish
+
+          # 2. fishui — GUI framework; needs kwindowsystem5, qt5-declarative, qt5-graphicaleffects, qt5-quickcontrols2, qt5-svg
+          build_cutefish_repo fishui fishui
+
+          # 3. Core components — all need fishui + libcutefish
+          #    core:       kidletime5, kwin-x11, libxcb, libxcursor, libxtst, polkit-qt5
+          #    dock:       fishui, libcutefish, kwindowsystem5
+          #    launcher:   fishui, libcutefish, kwindowsystem5
+          #    statusbar:  fishui, libcutefish, kwindowsystem5
+          #    settings:   fishui, libcutefish, bluedevil, bluez-qt5, fontconfig, freetype2, icu, libxcursor, qt5-quickcontrols
+          for REPO in core dock launcher statusbar settings; do
+            build_cutefish_repo "${REPO}" "${REPO}"
+          done
+
+          # 4. Apps — fishui + libcutefish
+          for REPO in terminal filemanager calculator screenshot; do
+            build_cutefish_repo "${REPO}" "${REPO}"
+          done
+
+          # 5. Wallpapers & icons — no compilation, just file installs
+          for REPO in wallpapers icons; do
+            build_cutefish_repo "${REPO}" "${REPO}"
+          done
+
+          cd ..  # back to kiba-profile
+
+          # ── Package list ─────────────────────────────────────────────────────────
           cat > packages.x86_64 << 'PACKAGES'
           archlinux-keyring
           base
@@ -84,16 +153,12 @@ jobs:
           inter-font
           ttf-jetbrains-mono
           noto-fonts-emoji
-          discover
           flatpak
           xdg-desktop-portal-kde
           xdg-desktop-portal-gtk
           chromium
           vlc
           gparted
-          kate
-          dolphin
-          konsole
           spectacle
           ark
           plymouth
@@ -102,19 +167,48 @@ jobs:
           cryptsetup
           nextcloud-client
           erofs-utils
+          sddm
+          kwin
+          qt5-base
+          qt5-declarative
+          qt5-svg
+          qt5-quickcontrols2
+          qt5-graphicaleffects
+          qt5-x11extras
+          qt5-quickcontrols
+          qt5-multimedia
+          kwindowsystem5
+          kidletime5
+          polkit-qt5
+          libxcursor
+          libxtst
+          libxcb
+          libpulse
+          bluedevil
+          bluez-qt5
+          networkmanager
+          appmenu-gtk-module
           PACKAGES
 
-          # Immutable Architecture: Read-only root with OverlayFS for /etc and /var
-          mkdir -p airootfs/etc
-          cat > airootfs/etc/fstab << 'FSTAB'
+          # ── Immutable root (erofs + tmpfs overlays) ───────────────────────────────
+          mkdir -p "${AIROOTFS}/etc"
+          cat > "${AIROOTFS}/etc/fstab" << 'FSTAB'
           LABEL=KIBAOS_ROOT / erofs defaults,ro 0 0
           tmpfs /etc tmpfs defaults,noatime,mode=755 0 0
           tmpfs /var tmpfs defaults,noatime,mode=755 0 0
           FSTAB
 
-          # OOBE Setup
-          mkdir -p airootfs/etc/calamares/modules
-          cat > airootfs/etc/calamares/settings.conf << 'CALA_SETTINGS'
+          # ── SDDM autologin for live session ──────────────────────────────────────
+          mkdir -p "${AIROOTFS}/etc/sddm.conf.d"
+          cat > "${AIROOTFS}/etc/sddm.conf.d/autologin.conf" << 'SDDM'
+          [Autologin]
+          User=liveuser
+          Session=cutefish
+          SDDM
+
+          # ── Calamares OOBE config ─────────────────────────────────────────────────
+          mkdir -p "${AIROOTFS}/etc/calamares/modules"
+          cat > "${AIROOTFS}/etc/calamares/settings.conf" << 'CALA_SETTINGS'
           ---
           modules-search: [ local ]
           instances:
@@ -152,85 +246,63 @@ jobs:
           dont-chroot: false
           CALA_SETTINGS
 
-          # Clean Welcome Script (No Emojis)
-          mkdir -p airootfs/usr/local/bin
-          cat > airootfs/usr/local/bin/kiba-welcome << 'WELCOME'
+          # ── Welcome script ────────────────────────────────────────────────────────
+          mkdir -p "${AIROOTFS}/usr/local/bin"
+          cat > "${AIROOTFS}/usr/local/bin/kiba-welcome" << 'WELCOME'
           #!/bin/bash
           while true; do
             CHOICE=$(zenity --list --title="Welcome to KibaOS" \
               --window-icon="/usr/share/kibaos/logo.png" \
               --text="Welcome to KibaOS. What would you like to do?" \
               --column="Tag" --column="Action" --column="Description" \
-              "install" "Install KibaOS" "Install the system permanently to your disk" \
-              "browser" "Web Browser" "Browse the internet" \
-              "store" "Software Center" "Discover and install new applications" \
-              "terminal" "Open Terminal" "Use Meta+T to launch" \
-              "files" "File Manager" "Use Meta+E to browse" \
-              "settings" "System Settings" "Configure your desktop and hardware" \
-              "screenshot" "Screen Capture" "Use Print to capture" \
-              "info" "System Information" "View technical system details" \
-              "shortcuts" "Keyboard Shortcuts" "View useful desktop shortcuts" \
-              "wiki" "Online Wiki" "Read the technical documentation" \
+              "install"    "Install KibaOS"      "Install the system permanently to your disk" \
+              "browser"    "Web Browser"          "Browse the internet" \
+              "store"      "Software Center"      "Discover and install new applications" \
+              "terminal"   "Open Terminal"        "Use Meta+T to launch" \
+              "files"      "File Manager"         "Use Meta+E to browse" \
+              "settings"   "System Settings"      "Configure your desktop and hardware" \
+              "screenshot" "Screen Capture"       "Use Print to capture" \
+              "info"       "System Information"   "View technical system details" \
+              "shortcuts"  "Keyboard Shortcuts"   "View useful desktop shortcuts" \
+              "wiki"       "Online Wiki"          "Read the technical documentation" \
               --hide-column=1 --print-column=1 \
               --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
 
             [ -z "$CHOICE" ] && break
 
             case "$CHOICE" in
-              "install")
-                sudo calamares &
-                break
-                ;;
-              "browser")
-                chromium &
-                break
-                ;;
-              "store")
-                discover &
-                break
-                ;;
-              "terminal")
-                konsole &
-                break
-                ;;
-              "files")
-                dolphin &
-                break
-                ;;
-              "settings")
-                cutefish-settings &
-                break
-                ;;
-              "screenshot")
-                spectacle &
-                break
-                ;;
-              "info")
+              install)    sudo calamares & break ;;
+              browser)    chromium & break ;;
+              store)      flatpak run org.kde.discover & break ;;
+              terminal)   cutefish-terminal & break ;;
+              files)      cutefish-filemanager & break ;;
+              settings)   cutefish-settings & break ;;
+              screenshot) cutefish-screenshot & break ;;
+              info)
                 (fastfetch | zenity --text-info --title="KibaOS System Information") &
                 ;;
-              "shortcuts")
+              shortcuts)
                 (zenity --list --title="KibaOS Shortcuts" \
                   --column="Action" --column="Shortcut" \
                   "Application Menu" "Meta" \
-                  "Terminal" "Meta + T" \
-                  "Search" "Meta + Space" \
-                  "File Manager" "Meta + E" \
+                  "Terminal"         "Meta + T" \
+                  "Search"           "Meta + Space" \
+                  "File Manager"     "Meta + E" \
                   --ok-label="Close" --cancel-label="Close" 2>/dev/null) &
                 ;;
-              "wiki")
-                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" &
-                break
+              wiki)
+                chromium "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & break
                 ;;
             esac
           done
           WELCOME
-          chmod +x airootfs/usr/local/bin/kiba-welcome
+          chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
 
-          # Finalize and Build
-          cd ..
+          # ── Build the ISO ─────────────────────────────────────────────────────────
+          cd /w
           mkarchiso -v -w work -o out kiba-profile/
 
-          if [ -f out/*.iso ]; then
+          if ls out/*.iso 1>/dev/null 2>&1; then
             mv out/*.iso "${ISO}.iso"
             sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
           else
@@ -258,7 +330,7 @@ jobs:
             echo "SourceForge credentials not configured. Skipping upload."
             exit 0
           fi
-          sudo apt update && sudo apt install -y sshpass rsync
+          sudo apt-get update && sudo apt-get install -y sshpass rsync
           for iso_file in *.iso; do
             [ -f "$iso_file" ] || continue
             echo "Uploading $iso_file to SourceForge..."
