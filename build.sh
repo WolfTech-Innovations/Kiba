@@ -35,24 +35,32 @@ pacman -S --noconfirm --needed \
   appmenu-gtk-module
 
 # ── Setup ────────────────────────────────────────────────────────────────
-cd /w
+WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
 STAGING="/tmp/cutefish-staging"
-AIROOTFS="/w/kiba-profile/airootfs"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+SRCDIR="${WORKDIR}/src"
+
+cd "${WORKDIR}"
 
 echo "=== Configuring archiso profile ==="
-cp -r /usr/share/archiso/configs/releng/ kiba-profile
+cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
+mkdir -p "${SRCDIR}"
 
 # ── Compile Cutefish DE ──────────────────────────────────────────────────
 echo "=== Compiling Cutefish DE ==="
-mkdir -p src && cd src
 
 build_cutefish_repo() {
   local REPO=$1
   local GITHUB_NAME=${2:-$REPO}
+
+  # Always operate relative to SRCDIR so cd chains can't escape
+  cd "${SRCDIR}"
+
   git clone --depth 1 "https://github.com/cutefishos/${GITHUB_NAME}.git" "${REPO}"
-  cd "${REPO}"
+  cd "${SRCDIR}/${REPO}"
 
   # Drop KF5 subdirs and find_package calls for libraries that no longer
   # exist on Arch (dropped as Qt5/Plasma5 support wound down)
@@ -80,43 +88,29 @@ build_cutefish_repo() {
   #   mocs_compilation → translations → lupdate stamp → mocs_compilation
   #
   # Fix strategy per CMakeLists.txt:
-  #   • If .ts files exist alongside it → swap to qt5_add_translation
-  #     (lrelease-only, no source scanning, no cycle)
-  #   • If no .ts files exist           → drop the translation target entirely
-  find . -name "CMakeLists.txt" | while read f; do
+  #   • If .ts files exist → swap to qt5_add_translation (lrelease-only)
+  #   • If no .ts files   → drop the translation target entirely
+  while IFS= read -r f; do
     DIR=$(dirname "$f")
-
-    # Check whether any .ts files are reachable from this CMakeLists
     TS_COUNT=$(find "$DIR" -maxdepth 2 -name "*.ts" 2>/dev/null | wc -l)
 
     if grep -q 'qt5_create_translation' "$f" 2>/dev/null; then
       if [ "$TS_COUNT" -gt 0 ]; then
-        # Safe swap: drop source-dir arg(s), keep only the .ts file list.
-        # Pattern handles the expanded forms we added earlier too.
         sed -i \
           's/qt5_create_translation(\(QM_FILES\)[^)]*\(\${[A-Z_]*TS_FILES}\))/qt5_add_translation(\1 \2)/g' \
           "$f"
-        # Fallback for any remaining qt5_create_translation calls
+        sed -i 's/qt5_create_translation(/qt5_add_translation(/g' "$f"
         sed -i \
-          's/qt5_create_translation(/qt5_add_translation(/g' \
-          "$f"
-        # qt5_add_translation does not accept a source directory argument;
-        # strip any bare directory token left before ${*TS_FILES}
-        sed -i \
-          's/qt5_add_translation(\(QM_FILES\) \${CMAKE_CURRENT_SOURCE_DIR}[^ ]* /qt5_add_translation(\1 /g' \
-          "$f"
-        sed -i \
-          's/qt5_add_translation(\(QM_FILES\) \${CMAKE_CURRENT_SOURCE_DIR} /qt5_add_translation(\1 /g' \
+          's/qt5_add_translation(\(QM_FILES\) \${CMAKE_CURRENT_SOURCE_DIR}[^ )]*  */qt5_add_translation(\1 /g' \
           "$f"
       else
-        # No .ts files → nuke the translation block entirely
         sed -i '/qt5_create_translation/d' "$f"
         sed -i '/qt5_add_translation/d'    "$f"
         sed -i '/QM_FILES/d'               "$f"
         sed -i '/install.*\.qm/d'          "$f"
       fi
     fi
-  done
+  done < <(find . -name "CMakeLists.txt")
   # ── End translation cycle fix ──────────────────────────────────────────
 
   if [ -f chotkeys/application.cpp ]; then
@@ -134,9 +128,10 @@ CHOTKEYS_PATCH
         -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
         -GNinja ..
   ninja
-  DESTDIR="${STAGING}" ninja install
+  DESTDIR="${STAGING}"  ninja install
   DESTDIR="${AIROOTFS}" ninja install
-  cd ../../..
+  # Return to a known location — never rely on relative cd chains
+  cd "${WORKDIR}"
 }
 
 # 1. libcutefish
@@ -160,10 +155,11 @@ for REPO in wallpapers icons; do
   build_cutefish_repo "${REPO}" "${REPO}"
 done
 
-cd ..  # back to /w
+# ── Back to workdir (should already be here, but be explicit) ─────────────
+cd "${WORKDIR}"
 
 # ── Package list ─────────────────────────────────────────────────────────
-cat > kiba-profile/packages.x86_64 << 'PACKAGES'
+cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 base
 linux
@@ -343,8 +339,8 @@ WELCOME
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
 
 # ── Build the ISO ─────────────────────────────────────────────────────────
-cd /w
-mkarchiso -v -w work -o out kiba-profile/
+cd "${WORKDIR}"
+mkarchiso -v -w work -o out "${PROFILE}/"
 
 if ls out/*.iso 1>/dev/null 2>&1; then
   mv out/*.iso "${ISO}.iso"
