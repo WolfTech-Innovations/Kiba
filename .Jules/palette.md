@@ -18,3 +18,7 @@
 ## 2025-05-25 - [Cohesive Tool Integration Pattern]
 **Learning:** Integrating new utilities into KibaOS requires a multi-layered approach to ensure discoverability and accessibility: adding the package to the build list, configuring a standard global shortcut (e.g., Print for screenshots), and advertising the feature via the `kiba-welcome` launcher and the shortcuts help dialog. This "Full-Stack UX" approach ensures users can find and use the feature regardless of their preferred workflow (menu-driven vs. keyboard-driven).
 **Action:** When adding new desktop utilities, always update the package list, `kglobalshortcutsrc`, `kiba-welcome` actions, and the `kiba-welcome` shortcuts help list simultaneously.
+
+## 2025-05-30 - [Zenity Dialog Dimension Standardization]
+**Learning:** In a Zenity-driven desktop environment like KibaOS, maintaining consistent window dimensions (450x500) across all sub-dialogs (System Info, Shortcuts, etc.) is critical for visual rhythm and preventing unexpected layout shifts. This provides a more professional and predictable user experience.
+**Action:** Always apply `--width=450 --height=500` to all Zenity dialogs triggered from the primary launcher to maintain a unified UI signature.

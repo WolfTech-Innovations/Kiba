@@ -335,10 +335,12 @@ while true; do
     files)      cutefish-filemanager & break ;;
     screenshot) cutefish-screenshot & break ;;
     info)
-      (fastfetch | zenity --text-info --title="KibaOS System Information") &
+      (fastfetch | zenity --text-info --title="KibaOS System Information" \
+        --width=450 --height=500) &
       ;;
     shortcuts)
       (zenity --list --title="KibaOS Shortcuts" \
+        --width=450 --height=500 \
         --column="Action" --column="Shortcut" \
         "Application Menu" "Meta" \
         "Terminal"         "Meta + T" \
