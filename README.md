@@ -8,7 +8,7 @@
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
   <img src="https://img.shields.io/badge/Arch Linux-13%20Rolling-1793D1?style=for-the-badge&logo=archlinux&logoColor=white" alt="Arch Linux Version">
-  <img src="https://img.shields.io/badge/Cutefish%20OS-22a7f0?style=for-the-badge&logo=cutefish&logoColor=white" alt="Cutefish OS Version">
+  <img src="https://img.shields.io/badge/Kiba%20OS-22a7f0?style=for-the-badge&logo=cutefish&logoColor=white" alt="KibaOS Version">
 </p>
 
 <p align="center">
