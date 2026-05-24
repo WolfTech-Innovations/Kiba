@@ -841,7 +841,7 @@ while true; do
     "shortcuts"     "Keyboard Shortcuts"    "View useful desktop shortcuts" \
     "wiki"          "Online Wiki"           "Read the technical documentation" \
     --hide-column=1 --print-column=1 \
-    --width=450 --height=580 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
+    --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
 
   [ -z "$CHOICE" ] && break
 
@@ -854,8 +854,9 @@ while true; do
     files)          cutefish-filemanager & break ;;
     screenshot)     cutefish-screenshot & break ;;
     accessibility)  kiba-access & ;;
-    info)           (fastfetch | zenity --text-info \
-                      --title="KibaOS System Information") & ;;
+    info)           (fastfetch --logo none --pipe true --no-color-blocks | zenity --text-info \
+                      --title="KibaOS System Information" \
+                      --width=450 --height=500) & ;;
     shortcuts)
       zenity --list --title="KibaOS Shortcuts" \
         --column="Action" --column="Shortcut" \
@@ -863,8 +864,10 @@ while true; do
         "Terminal"          "Meta + T" \
         "Search"            "Meta + Space" \
         "File Manager"      "Meta + E" \
+        "Screen Capture"    "Print" \
         "Accessibility"     "Statusbar icon or kiba-access" \
         "Apply theme"       "kiba-set theme dark|light" \
+        --width=450 --height=500 \
         --ok-label="Close" --cancel-label="Close" 2>/dev/null &
       ;;
     wiki)

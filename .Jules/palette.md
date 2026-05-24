@@ -18,3 +18,8 @@
 ## 2025-05-25 - [Cohesive Tool Integration Pattern]
 **Learning:** Integrating new utilities into KibaOS requires a multi-layered approach to ensure discoverability and accessibility: adding the package to the build list, configuring a standard global shortcut (e.g., Print for screenshots), and advertising the feature via the `kiba-welcome` launcher and the shortcuts help dialog. This "Full-Stack UX" approach ensures users can find and use the feature regardless of their preferred workflow (menu-driven vs. keyboard-driven).
 **Action:** When adding new desktop utilities, always update the package list, `kglobalshortcutsrc`, `kiba-welcome` actions, and the `kiba-welcome` shortcuts help list simultaneously.
+
+## 2026-06-12 - [Professional Aesthetic via Emoji Prohibition]
+
+**Learning:** The use of emojis in system strings and UI components is strictly forbidden to preserve the project's professional 'unibody' design aesthetic. This supersedes previous guidelines about using emojis for visual scannability.
+**Action:** Always avoid the use of literal emojis or GitHub emoji codes in repository workflows and user-facing system strings.
