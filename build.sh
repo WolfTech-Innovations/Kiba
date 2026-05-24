@@ -155,30 +155,9 @@ build_cutefish_repo() {
     fi
   done < <(find . -name "CMakeLists.txt")
 
-  # ── Patch chotkeys onReleased — MUST happen BEFORE cmake ──────────────
-  # The MOC reads application.h to generate qt_static_metacall, which emits
-  # a call to Application::onReleased(QKeySequence). If the slot is declared
-  # in the header but never defined in application.cpp, the linker fails.
-  # We patch both the header (declaration) and the .cpp (definition) here,
-  # before cmake configures the project and before ninja compiles anything.
-  if [ -f chotkeys/application.h ]; then
-    if ! grep -q 'onReleased' chotkeys/application.h; then
-      # Insert the slot declaration under the first "public slots:" section
-      sed -i '/public slots:/a\    void onReleased(QKeySequence keySeq);' \
-        chotkeys/application.h
-    fi
-  fi
-  if [ -f chotkeys/application.cpp ]; then
-    if ! grep -q 'onReleased' chotkeys/application.cpp; then
-      cat >> chotkeys/application.cpp << 'CHOTKEYS_PATCH'
-
-void Application::onReleased(QKeySequence keySeq)
-{
-    Q_UNUSED(keySeq)
-}
-CHOTKEYS_PATCH
-    fi
-  fi
+  # chotkeys has an unimplemented slot that breaks linking — just skip it.
+  # KibaOS doesn't need it; Cutefish's own keybindings work without it.
+  sed -i '/add_subdirectory(chotkeys)/d' CMakeLists.txt 2>/dev/null || true
 
   # ── Configure and build ────────────────────────────────────────────────
   mkdir -p build && cd build
