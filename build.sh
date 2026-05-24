@@ -329,9 +329,38 @@ autologin-guest=false
 autologin-user=liveuser
 autologin-user-timeout=0
 autologin-session=cutefish-xsession
+user-session=cutefish-xsession
 session-wrapper=/etc/lightdm/Xsession
 greeter-session=lightdm-gtk-greeter
 LIGHTDM
+
+# ── PAM files for LightDM — baked into squashfs at build time ────────────
+# Writing these here (not just in customize_airootfs.sh) ensures they are
+# present in the squashfs even if the chroot step is skipped or fails early.
+# Without lightdm-autologin PAM file, LightDM returns PAM error 19
+# (Conversation error) on every autologin attempt and falls back to greeter.
+mkdir -p "${AIROOTFS}/etc/pam.d"
+
+cat > "${AIROOTFS}/etc/pam.d/lightdm-autologin" << 'PAMEOF'
+#%PAM-1.0
+auth        requisite   pam_nologin.so
+auth        required    pam_env.so
+auth        required    pam_succeed_if.so user ingroup autologin quiet
+auth        sufficient  pam_succeed_if.so user ingroup autologin
+account     include     system-login
+password    include     system-login
+session     include     system-login
+PAMEOF
+
+cat > "${AIROOTFS}/etc/pam.d/lightdm" << 'PAMEOF2'
+#%PAM-1.0
+auth        requisite   pam_nologin.so
+auth        required    pam_env.so
+auth        required    pam_unix.so
+account     include     system-login
+password    include     system-login
+session     include     system-login
+PAMEOF2
 
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
@@ -934,6 +963,34 @@ chmod 711 /var/lib/lightdm
 groupadd -r autologin 2>/dev/null || true
 gpasswd -a liveuser autologin 2>/dev/null || true
 
+# ── PAM config for LightDM autologin ─────────────────────────────────────
+# Without this file LightDM's autologin PAM conversation returns error 19
+# (Conversation error) and falls back to the greeter every single time.
+# This is the correct Arch Linux PAM stack for passwordless autologin.
+cat > /etc/pam.d/lightdm-autologin << 'PAMEOF'
+#%PAM-1.0
+auth        requisite   pam_nologin.so
+auth        required    pam_env.so
+auth        required    pam_succeed_if.so user ingroup autologin quiet
+auth        sufficient  pam_succeed_if.so user ingroup autologin
+account     include     system-login
+password    include     system-login
+session     include     system-login
+PAMEOF
+
+# Also ensure the base lightdm PAM file exists (some Arch installs omit it)
+if [ ! -f /etc/pam.d/lightdm ]; then
+cat > /etc/pam.d/lightdm << 'PAMEOF2'
+#%PAM-1.0
+auth        requisite   pam_nologin.so
+auth        required    pam_env.so
+auth        required    pam_unix.so
+account     include     system-login
+password    include     system-login
+session     include     system-login
+PAMEOF2
+fi
+
 for g in users wheel audio video input network; do
   groupadd -r "$g" 2>/dev/null || true
 done
@@ -1034,17 +1091,78 @@ Exec=/usr/local/bin/kiba-newelle-setup
 X-GNOME-Autostart-enabled=true
 NEWELLEDESK
 
+# ── Nuke any KDE/Plasma session files that sneak in as transitive deps ───
+# kwin is needed by Cutefish but its presence drags in some KDE autostart
+# .desktop files. Remove them all — cutefish-session is the only session.
+rm -f /usr/share/xsessions/plasma.desktop
+rm -f /usr/share/xsessions/plasmawayland.desktop
+rm -f /usr/share/xsessions/kde-plasma.desktop
+rm -f /usr/share/wayland-sessions/plasma.desktop
+rm -f /usr/share/wayland-sessions/plasmawayland.desktop
+# Kill any KDE autostart entries that polkit-kde or kwin packages install
+find /etc/xdg/autostart -name 'plasma*' -delete 2>/dev/null || true
+find /etc/xdg/autostart -name 'kde*'    -delete 2>/dev/null || true
+find /usr/share/autostart -name 'plasma*' -delete 2>/dev/null || true
+
 chown -R 1000:1000 /home/liveuser/.config
 
-# ── Xsession ──────────────────────────────────────────────────────────────
+# ── Xsession wrapper script ───────────────────────────────────────────────
+# LightDM calls /etc/lightdm/Xsession <session-exec>. We intercept here
+# to ensure kwin_x11 is running before cutefish-session starts, and that
+# no KDE/Plasma autostart garbage gets pulled in.
+mkdir -p /etc/lightdm
+cat > /etc/lightdm/Xsession << 'XSESSION_WRAPPER'
+#!/bin/bash
+# KibaOS session wrapper — called by LightDM as: Xsession cutefish-session
+# Source system/user profile
+[ -f /etc/profile ] && . /etc/profile
+[ -f "$HOME/.profile" ] && . "$HOME/.profile"
+
+# Explicitly block KDE/Plasma session components from autostarting.
+# XDG_CURRENT_DESKTOP must NOT contain KDE or Plasma.
+export XDG_CURRENT_DESKTOP=Cutefish
+export DESKTOP_SESSION=cutefish
+export XDG_SESSION_DESKTOP=cutefish
+
+# Suppress KDE's autostart directories entirely
+export KDE_FULL_SESSION=
+export KDE_SESSION_VERSION=
+
+# D-Bus session (LightDM may already provide one; be idempotent)
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+    eval "$(dbus-launch --sh-syntax --exit-with-session)"
+fi
+
+# Start kwin_x11 compositor first — Cutefish requires it but doesn't
+# self-launch it on Arch (unlike on the upstream CutefishOS Ubuntu base)
+kwin_x11 --replace &
+KWIN_PID=$!
+# Give kwin a moment to claim the compositor slot before cutefish-session
+# starts querying it
+sleep 0.6
+
+# Start kiba-apply settings daemon in background
+/usr/local/bin/kiba-apply &
+
+# Hand off to cutefish-session; when it exits the whole session ends,
+# which causes LightDM to clean up kwin and kiba-apply automatically.
+exec cutefish-session
+XSESSION_WRAPPER
+chmod 755 /etc/lightdm/Xsession
+
+# ── Xsession desktop file ─────────────────────────────────────────────────
+# Type=XSession is required — LightDM will not list Type=Application
+# entries as valid login sessions.
 mkdir -p /usr/share/xsessions
 cat > /usr/share/xsessions/cutefish-xsession.desktop << 'SESSION'
 [Desktop Entry]
-Name=Cutefish
-Comment=KibaOS Desktop
+Name=KibaOS (Cutefish)
+Comment=KibaOS Desktop Environment
 Exec=cutefish-session
 TryExec=cutefish-session
-Type=Application
+Type=XSession
+DesktopNames=Cutefish
+X-LightDM-DesktopName=Cutefish
 SESSION
 chmod 644 /usr/share/xsessions/cutefish-xsession.desktop
 CUSTOMIZE
