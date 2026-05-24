@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Sat May 23 03:05:55 UTC 2026
+Generated on Sun May 24 15:13:43 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -19,22 +19,44 @@ Generated on Sat May 23 03:05:55 UTC 2026
 | ARIA Label Audit | `.github/workflows/aria-label-audit.yml` |
 | Artifact Retention Policy | `.github/workflows/artifact-retention-policy.yml` |
 | Audit Action Pinning | `.github/workflows/audit-action-pinning.yml` |
+| Audit Build JQ Dependency | `.github/workflows/audit-build-jq-dependency.yml` |
 | Audit Build Reproducibility | `.github/workflows/audit-build-reproducibility.yml` |
+| Audit Build Welcome Apps | `.github/workflows/audit-build-welcome-apps.yml` |
+| Audit Build Welcome Break | `.github/workflows/audit-build-welcome-break.yml` |
+| Audit Build Welcome Screenshot Help | `.github/workflows/audit-build-welcome-screenshot-help.yml` |
 | Audit Calamares Branding Desc Format | `.github/workflows/audit-calamares-branding-desc-format.yml` |
 | Audit Calamares Branding Integrity | `.github/workflows/audit-calamares-branding-integrity.yml` |
 | Audit Calamares Module YAML Syntax | `.github/workflows/audit-calamares-module-yaml-syntax.yml` |
 | Audit Desktop UX Standards | `.github/workflows/audit-desktop-ux-standards.yml` |
+| Audit Docs Arch Rolling | `.github/workflows/audit-docs-arch-rolling.yml` |
+| Audit Docs Archiso | `.github/workflows/audit-docs-archiso.yml` |
+| Audit Docs ARIA Labels | `.github/workflows/audit-docs-aria-labels.yml` |
+| Audit Docs Calamares Setup | `.github/workflows/audit-docs-calamares-setup.yml` |
+| Audit Docs Cloud Sync | `.github/workflows/audit-docs-cloud-sync.yml` |
+| Audit Docs Cutefish DE | `.github/workflows/audit-docs-cutefish-de.yml` |
+| Audit Docs Fonts | `.github/workflows/audit-docs-fonts.yml` |
+| Audit Docs Hex Format Check | `.github/workflows/audit-docs-hex-format-check.yml` |
+| Audit Docs Immutable Root | `.github/workflows/audit-docs-immutable-root.yml` |
+| Audit Docs OverlayFS | `.github/workflows/audit-docs-overlayfs.yml` |
+| Audit Docs Spotlight Shortcut | `.github/workflows/audit-docs-spotlight-shortcut.yml` |
+| Audit Docs Unibody UX | `.github/workflows/audit-docs-unibody-ux.yml` |
 | Audit Font Standardization | `.github/workflows/audit-font-standardization.yml` |
 | Audit Kiba Welcome Case Matching | `.github/workflows/audit-kiba-welcome-case-matching.yml` |
 | Audit Kiba Welcome Discovery Loop | `.github/workflows/audit-kiba-welcome-discovery-loop.yml` |
+| Audit Kiba Welcome Fastfetch | `.github/workflows/audit-kiba-welcome-fastfetch.yml` |
+| Audit Kiba Welcome Subshells | `.github/workflows/audit-kiba-welcome-subshells.yml` |
 | Audit Kiba Welcome Zenity Label Length | `.github/workflows/audit-kiba-welcome-zenity-label-length.yml` |
+| Audit Kiba YML SDDM | `.github/workflows/audit-kiba-yml-sddm.yml` |
+| Audit Markdown ATX Headings | `.github/workflows/audit-markdown-atx-headings.yml` |
 | Audit Markdown Fenced Code Blocks | `.github/workflows/audit-markdown-fenced-code-blocks-strict.yml` |
 | Audit Markdown Header Punctuation | `.github/workflows/audit-markdown-header-punctuation.yml` |
 | Audit Markdown Inclusive Language | `.github/workflows/audit-markdown-inclusive-language.yml` |
+| Audit Markdown Internal Docs Link | `.github/workflows/audit-markdown-internal-docs-link.yml` |
 | Audit Markdown KibaOS Consistency | `.github/workflows/audit-markdown-kibatv-consistency.yml` |
 | Audit Markdown Link Relative Repo | `.github/workflows/audit-markdown-link-relative-repo.yml` |
 | Audit Markdown Link Title Quotes | `.github/workflows/audit-markdown-link-title-quotes.yml` |
 | Audit Markdown List Capitalization | `.github/workflows/audit-markdown-list-capitalization.yml` |
+| Audit Markdown List Dash | `.github/workflows/audit-markdown-list-dash.yml` |
 | Audit Markdown No Consecutive Blank Lines | `.github/workflows/audit-markdown-no-consecutive-blank-lines.yml` |
 | Audit Markdown No Empty Headers | `.github/workflows/audit-markdown-no-empty-headers.yml` |
 | Audit Markdown No Fixme | `.github/workflows/audit-markdown-no-fixme.yml` |
@@ -72,12 +94,15 @@ Generated on Sat May 23 03:05:55 UTC 2026
 | Audit Python YAML Explicit On Key | `.github/workflows/audit-python-yaml-explicit-on-key.yml` |
 | Audit Repo Dot Env Forbidden | `.github/workflows/audit-repo-dot-env-forbidden.yml` |
 | Audit Repo Forbidden Filenames | `.github/workflows/audit-repo-forbidden-filenames-case-insensitive.yml` |
+| Audit Repo Hex Colors | `.github/workflows/audit-repo-hex-colors.yml` |
 | Audit Repo Labels | `.github/workflows/audit-repo-labels.yml` |
 | Audit Repo Large File Prevention Strict | `.github/workflows/audit-repo-large-file-prevention-strict.yml` |
 | Audit Repo No Backup Files Hygiene | `.github/workflows/audit-repo-no-backup-files-hygiene.yml` |
+| Audit Repo No Emojis | `.github/workflows/audit-repo-no-emojis.yml` |
 | Audit Repo No Empty Folders | `.github/workflows/audit-repo-no-empty-folders-except-gitkeep.yml` |
 | Audit Repo No Large Binaries Outside Branding | `.github/workflows/audit-repo-no-large-binaries-outside-branding.yml` |
 | Audit Repo No Symlink To Self | `.github/workflows/audit-repo-no-symlink-to-self.yml` |
+| Audit Repo PNPM Exclusive | `.github/workflows/audit-repo-pnpm-exclusive.yml` |
 | Audit Repo README TOC Required | `.github/workflows/audit-repo-readme-toc-required.yml` |
 | Audit Repo Snake Case Scripts | `.github/workflows/audit-repo-snake-case-scripts.yml` |
 | Audit Repo Svg Metadata | `.github/workflows/audit-repo-svg-metadata.yml` |
@@ -99,7 +124,9 @@ Generated on Sat May 23 03:05:55 UTC 2026
 | Audit Shell Read Raw | `.github/workflows/audit-shell-read-raw.yml` |
 | Audit Shell Script Header Description | `.github/workflows/audit-shell-script-header-description.yml` |
 | Audit Shell Script Mktemp Var | `.github/workflows/audit-shell-script-mktemp-var.yml` |
+| Audit Shell Script Pacman Only | `.github/workflows/audit-shell-script-pacman-only.yml` |
 | Audit Shell Script Parameter Validation | `.github/workflows/audit-shell-script-parameter-validation.yml` |
+| Audit Shell Script Pipefail | `.github/workflows/audit-shell-script-pipefail.yml` |
 | Audit Shell Script Readonly Constants | `.github/workflows/audit-shell-script-readonly-constants.yml` |
 | Audit Shell Script Trap Err Cleanup | `.github/workflows/audit-shell-script-trap-err-cleanup.yml` |
 | Audit Shell Sed Portable In Place | `.github/workflows/audit-shell-sed-portable-in-place.yml` |
@@ -130,30 +157,49 @@ Generated on Sat May 23 03:05:55 UTC 2026
 | Audit WF Step Case | `.github/workflows/audit-wf-step-case.yml` |
 | Audit Workflow Step Timeout Enforcement | `.github/workflows/audit-wf-step-timeout-enforcement.yml` |
 | Audit WF Timeout Val | `.github/workflows/audit-wf-timeout-val.yml` |
+| Audit Workflow Bash Pipefail Check | `.github/workflows/audit-workflow-bash-pipefail-check.yml` |
 | Audit Workflow Concurrency Group Collisions | `.github/workflows/audit-workflow-concurrency-group-collisions.yml` |
+| Audit Workflow Concurrency Group Standard | `.github/workflows/audit-workflow-concurrency-group-standard.yml` |
 | Audit Workflow Concurrency | `.github/workflows/audit-workflow-concurrency.yml` |
 | Audit Workflow Container Tag Pinning | `.github/workflows/audit-workflow-container-tag-pinning.yml` |
 | Audit Workflow Permissions | `.github/workflows/audit-workflow-contents-write-permissions.yml` |
 | Audit Workflow Dispatch Input Descriptions | `.github/workflows/audit-workflow-dispatch-input-descriptions.yml` |
+| Audit Workflow Docker Arch Image | `.github/workflows/audit-workflow-docker-arch-image.yml` |
 | Audit Workflow Env Naming | `.github/workflows/audit-workflow-env-naming.yml` |
 | Audit Workflow Env Variable Shadowing | `.github/workflows/audit-workflow-env-variable-shadowing.yml` |
+| Audit Workflow Extension Strict | `.github/workflows/audit-workflow-extension-strict.yml` |
+| Audit Workflow GH Repo Env | `.github/workflows/audit-workflow-gh-repo-env.yml` |
+| Audit Workflow Grep Exclusion Check | `.github/workflows/audit-workflow-grep-exclusion-check.yml` |
+| Audit Workflow Grep Patterns Check | `.github/workflows/audit-workflow-grep-patterns-check.yml` |
 | Audit Workflow Hardcoded IPs | `.github/workflows/audit-workflow-hardcoded-ips.yml` |
+| Audit Workflow Heredoc Quoted | `.github/workflows/audit-workflow-heredoc-quoted.yml` |
 | Audit Workflow Input Defaults | `.github/workflows/audit-workflow-input-defaults.yml` |
 | Audit Workflow Job ID Naming | `.github/workflows/audit-workflow-job-id-naming.yml` |
 | Audit Workflow Job Needs Circularity | `.github/workflows/audit-workflow-job-needs-circularity.yml` |
 | Audit Workflow Job Timeout Standard | `.github/workflows/audit-workflow-job-timeout-standard.yml` |
+| Audit Workflow No StrictHostKeyChecking | `.github/workflows/audit-workflow-no-StrictHostKeyChecking.yml` |
 | Audit Workflow No Duplicate Step Ids | `.github/workflows/audit-workflow-no-duplicate-step-ids.yml` |
 | Audit Workflow No Secrets In Run Name | `.github/workflows/audit-workflow-no-secrets-in-run-name.yml` |
+| Audit Workflow Pacman Repo Config | `.github/workflows/audit-workflow-pacman-repo-config.yml` |
 | Audit Workflow Permissions | `.github/workflows/audit-workflow-permissions.yml` |
+| Audit Workflow Pip Break Packages | `.github/workflows/audit-workflow-pip-break-packages.yml` |
 | Audit Workflow Push Branch Filter | `.github/workflows/audit-workflow-push-branch-filter.yml` |
+| Audit Workflow PyYAML Dependency | `.github/workflows/audit-workflow-pyyaml-dependency.yml` |
 | Audit Workflow Restrict Permissions | `.github/workflows/audit-workflow-restrict-permissions.yml` |
 | Audit Workflow Run Step Injection | `.github/workflows/audit-workflow-run-step-injection.yml` |
 | Audit Workflow Shell Specification | `.github/workflows/audit-workflow-shell-specification.yml` |
+| Audit Workflow Ssh Host Key | `.github/workflows/audit-workflow-ssh-host-key.yml` |
+| Audit Workflow Sshpass Env | `.github/workflows/audit-workflow-sshpass-env.yml` |
 | Audit Workflow Step Name Length | `.github/workflows/audit-workflow-step-name-length.yml` |
 | Audit Workflow Step Naming | `.github/workflows/audit-workflow-step-naming.yml` |
+| Audit Workflow Timeout All Jobs | `.github/workflows/audit-workflow-timeout-all-jobs.yml` |
 | Audit Workflow Timeout Minutes Presence | `.github/workflows/audit-workflow-timeout-minutes-presence.yml` |
+| Audit Workflow Trigger Dependency Check | `.github/workflows/audit-workflow-trigger-dependency-check.yml` |
 | Audit Workflow Unpinned Actions Sha | `.github/workflows/audit-workflow-unpinned-actions-sha.yml` |
+| Audit Workflow Untrusted Context Mapping Check | `.github/workflows/audit-workflow-untrusted-context-mapping-check.yml` |
 | Audit Workflow Unused Outputs | `.github/workflows/audit-workflow-unused-outputs.yml` |
+| Audit Workflow YQ Batching | `.github/workflows/audit-workflow-yq-batching.yml` |
+| Audit Zenity Dimensions Strict | `.github/workflows/audit-zenity-dimensions-strict.yml` |
 | Audit Zenity Standard Dimensions | `.github/workflows/audit-zenity-standard-dimensions.yml` |
 | Audit Zsh Alias Predictability | `.github/workflows/audit-zsh-alias-predictability.yml` |
 | Audit Zsh compinit Age Check | `.github/workflows/audit-zsh-compinit-age-check.yml` |
