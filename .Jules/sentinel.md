@@ -1,0 +1,4 @@
+## 2025-05-15 - [SSH Security Hardening in CI/CD]
+**Vulnerability:** Use of `sshpass -p` which exposes secrets in the process list, and disabling host key verification with `StrictHostKeyChecking=no` which allows Man-in-the-Middle (MITM) attacks.
+**Learning:** Legacy workflow patterns often prioritize "making it work" in automation by bypassing interactive security checks (like host key prompts) and using simple password flags. However, modern CI runners can leak command-line arguments in logs or metadata, and disabling verification is a significant risk when transferring artifacts to external providers like SourceForge.
+**Prevention:** Always use `sshpass -e` (environment variable) or SSH keys. For automated SSH connections, use `ssh-keyscan` to pre-populate the `known_hosts` file instead of disabling verification entirely.

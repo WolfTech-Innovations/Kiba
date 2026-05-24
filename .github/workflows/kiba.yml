@@ -24,18 +24,19 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
         env:
           SF_USER: ${{ secrets.SF_USER }}
-          SF_PASS: ${{ secrets.SF_PASS }}
+          SSHPASS: ${{ secrets.SF_PASS }}
         run: |
-          if [ -z "$SF_USER" ] || [ -z "$SF_PASS" ]; then
+          if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
             echo "SourceForge credentials not configured. Skipping upload."
             exit 0
           fi
           sudo apt-get update && sudo apt-get install -y sshpass rsync
+          mkdir -p ~/.ssh
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
           for iso_file in *.iso; do
             [ -f "$iso_file" ] || continue
             echo "Uploading $iso_file to SourceForge..."
-            sshpass -p "$SF_PASS" rsync -avP \
-              -e "ssh -o StrictHostKeyChecking=no" \
+            sshpass -e rsync -avP \
               "$iso_file" \
               "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
           done
