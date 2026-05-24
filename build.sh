@@ -1,7 +1,7 @@
 #!/bin/bash
 # KibaOS ISO build script
-# Fixed: chotkeys onReleased patch now runs BEFORE cmake (was after ninja — too late),
-#        header patch added alongside .cpp patch, SLiM autologin, Cutefish build patches,
+# Fixed: switched DM from SLiM to XDM, chotkeys skipped entirely,
+#        Cutefish build patches,
 #        Calamares sequence/modules, unpackfs path, package names, mkinitcpio hooks,
 #        liveuser setup, kiba-apply runtime dir, shellprocess users.json path, and more.
 set -ex
@@ -43,7 +43,7 @@ pacman -S --noconfirm --needed \
   python python-yaml python-jsonschema \
   qt5-xmlpatterns kparts5 \
   \
-  slim \
+  xdm \
   \
   xorg-xrandr xorg-xdpyinfo xorg-xwd xorg-xwud \
   imagemagick \
@@ -177,6 +177,14 @@ for REPO in libcutefish fishui core dock launcher statusbar \
   build_cutefish_repo "${REPO}" "${REPO}"
 done
 
+# Sanity check: cutefish-session must have been installed by the core repo.
+if [ ! -f "${AIROOTFS}/usr/bin/cutefish-session" ]; then
+  echo "ERROR: cutefish-session not found in airootfs after build!"
+  echo "       The 'core' repo cmake install may have failed silently."
+  exit 1
+fi
+echo "=== cutefish-session installed OK ===" 
+
 # ── Compile Calamares ──────────────────────────────────────────────────────
 echo "=== Compiling Calamares ==="
 cd "${SRCDIR}"
@@ -225,7 +233,7 @@ gparted
 ntfs-3g
 exfatprogs
 cryptsetup
-slim
+xdm
 zenity
 xorg-server
 xorg-xinit
@@ -310,44 +318,81 @@ if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
 fi
 
-# ── SLiM display manager config ────────────────────────────────────────────
-# SLiM opens a real PAM session, assigns a logind seat, and sets
-# XDG_RUNTIME_DIR before exec-ing login_cmd. auto_login + default_user gives
-# true no-password autologin with zero PAM gymnastics.
-mkdir -p "${AIROOTFS}/etc"
-cat > "${AIROOTFS}/etc/slim.conf" << 'SLIMCONF'
-default_path        /usr/local/bin:/usr/bin:/bin
-default_xserver     /usr/bin/X
-xserver_arguments   -nolisten tcp vt7
-login_cmd           exec /bin/bash -login /usr/local/bin/kiba-session
-halt_cmd            /sbin/halt
-reboot_cmd          /sbin/reboot
-console_cmd         /usr/bin/xterm -C -fg white -bg black +sb -T "Console login" -e /bin/sh -c "/bin/cat /etc/issue; exec /bin/login"
-screenshot_cmd      import -window root /slim.png
-welcome_msg         Welcome to KibaOS
-session_msg         KibaOS
-default_user        liveuser
-auto_login          yes
-current_theme       default
-lockfile            /var/run/slim.lock
-logfile             /var/log/slim.log
-SLIMCONF
+# ── XDM display manager config ─────────────────────────────────────────────
+# XDM manages the X server and calls Xsession for the session.
+# Autologin is handled via DisplayManager_0.autoLogin in xdm-config —
+# no password prompt, no PAM interaction needed for the live session.
+mkdir -p "${AIROOTFS}/etc/X11/xdm"
 
-# ── kiba-session — the X session script, exec'd by SLiM ───────────────────
-# SLiM has already:
-#   - opened a PAM session for liveuser
-#   - set XDG_RUNTIME_DIR=/run/user/1000
-#   - assigned the logind seat
-# We just need to start dbus, kwin, and cutefish.
+# xdm-config: autologin liveuser, disable network chooser.
+cat > "${AIROOTFS}/etc/X11/xdm/xdm-config" << 'XDMCONFIG'
+DisplayManager.errorLogFile:            /var/log/xdm.log
+DisplayManager.pidFile:                 /var/run/xdm.pid
+DisplayManager.keyFile:                 /etc/X11/xdm/xdm-keys
+DisplayManager.servers:                 /etc/X11/xdm/Xservers
+DisplayManager.accessFile:              /etc/X11/xdm/Xaccess
+DisplayManager*resources:               /etc/X11/xdm/Xresources
+DisplayManager*session:                 /etc/X11/xdm/Xsession
+DisplayManager*authComplain:            false
+DisplayManager_0.authorize:             false
+DisplayManager_0.autoLogin:             liveuser
+DisplayManager_0.autoReLogin:           true
+DisplayManager.requestPort:             0
+XDMCONFIG
+
+# Xservers: one local X server on vt7.
+cat > "${AIROOTFS}/etc/X11/xdm/Xservers" << 'XSERVERS'
+:0 local /usr/bin/X :0 vt7 -nolisten tcp
+XSERVERS
+
+# Xaccess: local connections only.
+cat > "${AIROOTFS}/etc/X11/xdm/Xaccess" << 'XACCESS'
+*
+XACCESS
+
+# Xresources: minimal — no login box since we autologin.
+cat > "${AIROOTFS}/etc/X11/xdm/Xresources" << 'XRESOURCES'
+xlogin*login.translations: #override\
+    <Key>Return: set-session-argument() finish-field()
+XRESOURCES
+
+# Xsession: called by XDM after login. Execs ~/.xsession if present,
+# otherwise falls back to kiba-session directly.
+# XDM passes the username as $1 for autologin.
+cat > "${AIROOTFS}/etc/X11/xdm/Xsession" << 'XSESSION'
+#!/bin/bash
+# /etc/X11/xdm/Xsession — run as the logged-in user.
+
+[ -f /etc/profile ]            && source /etc/profile
+[ -f "${HOME}/.profile" ]      && source "${HOME}/.profile" 2>/dev/null || true
+
+# XDM's primary session mechanism: exec ~/.xsession if it exists and is executable.
+if [ -x "${HOME}/.xsession" ]; then
+    exec "${HOME}/.xsession"
+fi
+
+# Fallback: launch kiba-session directly.
+exec /usr/local/bin/kiba-session
+XSESSION
+chmod +x "${AIROOTFS}/etc/X11/xdm/Xsession"
+
+# ── kiba-session — the X session script, exec'd by XDM ────────────────────
+# XDM has started X and called our Xsession wrapper which execs this script.
+# We handle dbus, XDG_RUNTIME_DIR, kwin, and cutefish ourselves.
 mkdir -p "${AIROOTFS}/usr/local/bin"
 cat > "${AIROOTFS}/usr/local/bin/kiba-session" << 'KIBASESSION'
 #!/bin/bash
-# kiba-session — KibaOS X session, launched by SLiM after PAM login.
+# kiba-session — KibaOS X session, exec'd from ~/.xsession by XDM.
 
 export XDG_CURRENT_DESKTOP=Cutefish
 export DESKTOP_SESSION=cutefish
 export XDG_SESSION_DESKTOP=cutefish
 export XDG_SESSION_TYPE=x11
+
+# XDM doesn't run pam_systemd so XDG_RUNTIME_DIR won't exist — create it.
+export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+mkdir -p "${XDG_RUNTIME_DIR}"
+chmod 0700 "${XDG_RUNTIME_DIR}"
 
 # Unset KDE session vars — kwin is present as a dep but we don't want
 # anything assuming this is a Plasma session.
@@ -358,22 +403,20 @@ unset KDE_SESSION_VERSION
 [ -f /etc/profile ]       && source /etc/profile
 [ -f "${HOME}/.profile" ] && source "${HOME}/.profile" 2>/dev/null || true
 
-# D-Bus session bus — SLiM doesn't start one for us.
-# --exit-with-session ensures the bus dies when the session ends.
+# D-Bus session bus — XDM doesn't start one for us.
 if [ -z "${DBUS_SESSION_BUS_ADDRESS}" ]; then
   eval "$(dbus-launch --sh-syntax --exit-with-session)"
 fi
 
-# kwin compositor — must start before cutefish-session or the desktop
-# renders with a black/broken compositor. Give it a moment to settle.
-kwin_x11 --replace &
+# kwin compositor — must start before cutefish-session.
+/usr/bin/kwin_x11 --replace &
 sleep 0.8
 
-# kiba-apply settings daemon (unix socket at /run/user/<uid>/kiba-apply.sock)
+# kiba-apply settings daemon.
 /usr/local/bin/kiba-apply &
 
-# Hand off to cutefish. When this process exits SLiM sees the session end.
-exec cutefish-session
+# Hand off to cutefish. cutefish-session installs to /usr/bin via cmake.
+exec /usr/bin/cutefish-session
 KIBASESSION
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-session"
 
@@ -504,11 +547,11 @@ script:
           echo "=== Settings migrated to ${NEW_HOME} ==="
 SHELLPROC
 
-# displaymanager.conf — tell Calamares to configure SLiM on the installed system.
+# displaymanager.conf — tell Calamares to configure XDM on the installed system.
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
-  - slim
+  - xdm
 defaultDesktopEnvironment:
   executable: "cutefish-session"
   desktopFile: "cutefish-xsession"
@@ -926,7 +969,7 @@ grep -q '^liveuser:' "${AIROOTFS}/etc/passwd"  2>/dev/null || \
   >> "${AIROOTFS}/etc/passwd"
 grep -q '^liveuser:' "${AIROOTFS}/etc/group"   2>/dev/null || \
   echo 'liveuser:x:1000:liveuser'              >> "${AIROOTFS}/etc/group"
-# '!' locks the password — SLiM auto_login bypasses PAM auth so this is fine.
+# '!' locks the password — XDM autoLogin bypasses PAM auth so this is fine.
 grep -q '^liveuser:' "${AIROOTFS}/etc/shadow"  2>/dev/null || \
   echo 'liveuser:!:19000:0:99999:7:::'         >> "${AIROOTFS}/etc/shadow"
 
@@ -940,7 +983,7 @@ WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 
 ln -sf /usr/lib/systemd/system/graphical.target "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/slim.service     "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/xdm.service      "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager.service \
        "${WANTS}/multi-user.target.wants/NetworkManager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
@@ -989,6 +1032,15 @@ chsh -s /usr/bin/zsh root
 
 # ── liveuser home ─────────────────────────────────────────────────────────
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
+
+# ~/.xsession: XDM's actual session entry point.
+# Must be executable; execs kiba-session which does the rest.
+cat > /home/liveuser/.xsession << 'DOTXSESSION'
+#!/bin/bash
+exec /usr/local/bin/kiba-session
+DOTXSESSION
+chmod +x /home/liveuser/.xsession
+
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
