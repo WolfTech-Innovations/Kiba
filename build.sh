@@ -38,7 +38,7 @@ pacman -S --noconfirm --needed \
   python python-yaml python-jsonschema \
   qt5-xmlpatterns kparts5 \
   \
-  greetd greetd-regreet cage \
+  greetd \
   \
   xorg-xrandr xorg-xdpyinfo xorg-xwd xorg-xwud \
   imagemagick \
@@ -78,7 +78,8 @@ file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/gshadow"]="0:0:400"
   ["/usr/local/bin/kiba-welcome"]="0:0:755"
-  ["/usr/local/bin/kiba-launch-session"]="0:0:755"
+  ["/usr/local/bin/kiba-greeter"]="0:0:755"
+  ["/usr/local/bin/kiba-session"]="0:0:755"
   ["/usr/local/bin/kiba-apply"]="0:0:755"
   ["/usr/local/bin/kiba-set"]="0:0:755"
   ["/usr/local/bin/kiba-access"]="0:0:755"
@@ -240,9 +241,8 @@ exfatprogs
 cryptsetup
 nextcloud-client
 greetd
-greetd-regreet
-cage
 xorg-server
+xorg-xinit
 xorg-xrandr
 xorg-xdpyinfo
 xorg-xwd
@@ -317,70 +317,67 @@ if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
 fi
 
-# ── greetd + ReGreet config ───────────────────────────────────────────────
-# ReGreet is a GTK4 greetd greeter. It runs under cage (minimal Wayland
-# compositor). It reads session entries from /usr/share/xsessions/ but
-# launches them via x11_prefix so the Exec= line is run as a direct binary,
-# not through an Xsession wrapper script.
+# ── greetd config ─────────────────────────────────────────────────────────
+# greetd runs as a system service, reads /etc/greetd/config.toml, and
+# executes whatever command is defined as the greeter. We use a dead-simple
+# shell script greeter (kiba-greeter) that just directly starts the session
+# as liveuser — zero PAM autologin group nonsense, zero password prompts.
 mkdir -p "${AIROOTFS}/etc/greetd"
-
-# greetd config: run cage which hosts regreet on vt1
 cat > "${AIROOTFS}/etc/greetd/config.toml" << 'GREETDCONF'
 [terminal]
 vt = 1
 
 [default_session]
-# cage -s: don't allow VT switching away from the greeter
-# regreet reads /etc/greetd/regreet.toml for its own config
-command = "cage -s -- regreet"
+command = "/usr/local/bin/kiba-greeter"
 user = "greeter"
 GREETDCONF
 
-# ReGreet config — dark mode, KibaOS branding, direct X11 binary launch
-mkdir -p "${AIROOTFS}/etc/greetd"
-cat > "${AIROOTFS}/etc/greetd/regreet.toml" << 'REGREETCONF'
-[background]
-path = "/usr/share/cutefish-wallpapers/default.jpg"
-fit = "Cover"
+# kiba-greeter: the custom shell greeter.
+# greetd spawns this as the "greeter" user. It uses greetd's agreety-style
+# login by calling `agreety` with a fixed username — but agreety still asks
+# for a password. Instead we bypass it entirely: greetd supports an
+# "autologin" pattern where the greeter command IS the session command run
+# as the target user. We achieve true no-password autologin by setting
+# default_session.user = liveuser and command = the session startup directly.
+# Rewrite config.toml to do exactly that:
+cat > "${AIROOTFS}/etc/greetd/config.toml" << 'GREETDCONF'
+[terminal]
+vt = 1
 
-[GTK]
-application_prefer_dark_theme = true
-cursor_theme_name = "Adwaita"
-cursor_blink = false
-font_name = "Inter 14"
-icon_theme_name = "cutefish-icons"
-theme_name = "Adwaita"
+[default_session]
+# kiba-greeter runs as liveuser and directly execs the session.
+# No password, no PAM conversation — greetd opens the session on our behalf.
+command = "/usr/local/bin/kiba-greeter"
+user = "liveuser"
+GREETDCONF
 
-[commands]
-reboot  = ["systemctl", "reboot"]
-poweroff = ["systemctl", "poweroff"]
-
-# x11_prefix wraps every X11 session's Exec= binary so regreet starts
-# the X server itself and hands the binary directly to it — no Xsession
-# wrapper script, no xinit shim, no shell indirection.
-# "startx /usr/bin/env" prepends to whatever Exec= is in the .desktop file.
-x11_prefix = ["startx", "/usr/bin/env"]
-
-[appearance]
-greeting_msg = "KibaOS"
-
-[widget.clock]
-format = "%a %b %d  %H:%M"
-resolution = "1s"
-label_width = 200
-REGREETCONF
-
-# kiba-session.desktop — the session entry ReGreet will show.
-# Exec= is the direct binary (cutefish-session), NOT a wrapper script.
-# ReGreet prepends x11_prefix so the actual invocation becomes:
-#   startx /usr/bin/env kiba-launch-session -- :0 vt1
-# where kiba-launch-session sets env then execs cutefish-session.
+# The greeter script — runs as liveuser, sets up env, launches the DE.
 mkdir -p "${AIROOTFS}/usr/local/bin"
-cat > "${AIROOTFS}/usr/local/bin/kiba-launch-session" << 'KIBASESSION'
+cat > "${AIROOTFS}/usr/local/bin/kiba-greeter" << 'KIBAGREETER'
 #!/bin/bash
-# kiba-launch-session — direct session binary called by startx via ReGreet.
-# startx invokes this as the client program inside a fresh X server.
-# No PAM, no Xsession wrapper, no display manager session script.
+# kiba-greeter — KibaOS session launcher, invoked directly by greetd.
+# Runs as liveuser (greetd opens the session without a password challenge).
+
+export XDG_CURRENT_DESKTOP=Cutefish
+export DESKTOP_SESSION=cutefish
+export XDG_SESSION_DESKTOP=cutefish
+export XDG_SESSION_TYPE=x11
+
+# Blank out KDE session vars so nothing KDE autostarts
+export KDE_FULL_SESSION=
+export KDE_SESSION_VERSION=
+
+# Start X server on vt1, display :0, then run our session inside it.
+# xinit handles the X lifecycle: when cutefish-session exits, X exits,
+# greetd sees the process end and can restart the greeter if needed.
+exec xinit /usr/local/bin/kiba-session -- :0 vt1 -nolisten tcp
+KIBAGREETER
+chmod +x "${AIROOTFS}/usr/local/bin/kiba-greeter"
+
+# kiba-session — the actual X session script handed to xinit.
+cat > "${AIROOTFS}/usr/local/bin/kiba-session" << 'KIBASESSION'
+#!/bin/bash
+# kiba-session — runs inside X, called by xinit.
 
 export XDG_CURRENT_DESKTOP=Cutefish
 export DESKTOP_SESSION=cutefish
@@ -389,39 +386,20 @@ export XDG_SESSION_TYPE=x11
 export KDE_FULL_SESSION=
 export KDE_SESSION_VERSION=
 
-# D-Bus session bus for this X session
+# D-Bus session bus
 eval "$(dbus-launch --sh-syntax --exit-with-session)"
 
-# kwin_x11 must start before cutefish-session on Arch
+# Start kwin compositor before cutefish-session (Arch build doesn't self-start it)
 kwin_x11 --replace &
 sleep 0.6
 
-# kiba-apply instant-settings daemon
+# Start kiba-apply settings daemon
 /usr/local/bin/kiba-apply &
 
+# Hand off to cutefish — when this exits X shuts down and greetd restarts
 exec cutefish-session
 KIBASESSION
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-launch-session"
-
-# The xsession desktop entry — Exec= points at our direct launcher binary.
-# ReGreet reads this, prepends x11_prefix = ["startx", "/usr/bin/env"],
-# and spawns: startx /usr/bin/env /usr/local/bin/kiba-launch-session -- :0 vt1
-mkdir -p "${AIROOTFS}/usr/share/xsessions"
-cat > "${AIROOTFS}/usr/share/xsessions/kibaos.desktop" << 'SESSIONDESK'
-[Desktop Entry]
-Name=KibaOS
-Comment=KibaOS Cutefish Desktop
-Exec=/usr/local/bin/kiba-launch-session
-TryExec=/usr/local/bin/kiba-launch-session
-Type=XSession
-DesktopNames=Cutefish
-SESSIONDESK
-
-# ReGreet needs a tmpfiles.d entry to create /var/cache/regreet at boot
-mkdir -p "${AIROOTFS}/usr/lib/tmpfiles.d"
-cat > "${AIROOTFS}/usr/lib/tmpfiles.d/regreet.conf" << 'TMPFILES'
-d /var/cache/regreet 0755 greeter greeter -
-TMPFILES
+chmod +x "${AIROOTFS}/usr/local/bin/kiba-session"
 
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
@@ -535,7 +513,7 @@ displaymanagers:
   - greetd
 defaultDesktopEnvironment:
   executable: "cutefish-session"
-  desktopFile: "kibaos"
+  desktopFile: "cutefish-xsession"
 basicSetup: false
 DMCONF
 
