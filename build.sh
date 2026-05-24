@@ -43,7 +43,7 @@ pacman -S --noconfirm --needed \
   python python-yaml python-jsonschema \
   qt5-xmlpatterns kparts5 \
   \
-  xdm \
+  xorg-xdm \
   \
   xorg-xrandr xorg-xdpyinfo xorg-xwd xorg-xwud \
   imagemagick \
@@ -233,7 +233,7 @@ gparted
 ntfs-3g
 exfatprogs
 cryptsetup
-xdm
+xorg-xdm
 zenity
 xorg-server
 xorg-xinit
