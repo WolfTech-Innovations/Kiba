@@ -1,0 +1,37 @@
+name: Audit Build Welcome Break
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check welcome case break
+        run: |
+          if [ -f "build.sh" ]; then
+            # Improved check: each case branch starting with an app launch should be followed by a break
+            # This is a heuristic but better than the previous one
+            if grep -nE "calamares|chromium|cutefish-" build.sh | while read -r line; do
+               line_num=$(echo $line | cut -d: -f1)
+               if ! sed -n "$((line_num)),$((line_num+2))p" build.sh | grep -q "break"; then
+                 echo "Missing 'break' after app launch on line $line_num"
+                 exit 1
+               fi
+            done; then
+              :
+            else
+              echo "Error: case branches in build.sh should end with 'break'."
+              exit 1
+            fi
+          fi

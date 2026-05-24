@@ -1,0 +1,25 @@
+name: Audit Shell Script Pacman Only
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for forbidden package managers
+        run: |
+          if grep -rnE "\b(apt|nala|apt-get)\b" . --include="*.sh"; then
+            echo "Error: KibaOS has transitioned to Arch Linux. Use pacman instead of apt/nala."
+            exit 1
+          fi

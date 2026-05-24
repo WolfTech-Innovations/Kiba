@@ -1,0 +1,24 @@
+name: Audit Workflow Concurrency Group Standard
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check concurrency group
+        run: |
+          if grep -rn "concurrency:" .github/workflows/ | grep -v "group:"; then
+             echo "Warning: Concurrency groups should follow the standard pattern: group: \${{ github.workflow }}-\${{ github.ref }}"
+          fi

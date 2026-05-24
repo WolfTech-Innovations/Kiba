@@ -1,0 +1,33 @@
+name: Audit Markdown ATX Headings
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Setext headings
+        run: |
+          # Use awk to check if a line of = or - follows a non-empty line (classic Setext)
+          # Exclude lines that are clearly horizontal rules (e.g., preceded by blank line)
+          failed=0
+          while IFS= read -r f; do
+            if awk 'NR>1 && /^([=]+|[-]+)$/ && prev !~ /^$/ && prev !~ /^[ \t]*$/ { exit 1 } { prev=$0 }' "$f"; then
+              :
+            else
+              echo "Error: Setext headings found in $f. Use ATX headings (#)."
+              failed=1
+            fi
+          done < <(find . -name "*.md")
+          exit "$failed"

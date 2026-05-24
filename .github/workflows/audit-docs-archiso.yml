@@ -1,0 +1,38 @@
+name: Audit Docs Archiso
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'WIKI.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'WIKI.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Archiso mention
+        run: |
+          FILES="docs/build-system.md README.md WIKI.md"
+          found=0
+          for f in $FILES; do
+            if [ -f "$f" ]; then
+              if grep -qiE "archiso|mkarchiso" "$f"; then
+                found=1
+              fi
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "Error: Documentation must identify archiso/mkarchiso as the primary build tool."
+            exit 1
+          fi

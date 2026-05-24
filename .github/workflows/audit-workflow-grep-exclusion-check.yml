@@ -1,0 +1,25 @@
+name: Audit Workflow Grep Exclusion Check
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check grep exclusion
+        run: |
+          # Security audit workflows that scan workflows should exclude themselves
+          if grep -l "\.github/workflows/" .github/workflows/*.yml | xargs -r grep -L "grep -v"; then
+             echo "Warning: Security audit workflows scanning .github/workflows/ should explicitly exclude themselves to avoid false positives."
+          fi

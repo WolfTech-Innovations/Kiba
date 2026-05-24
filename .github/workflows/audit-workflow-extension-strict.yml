@@ -1,0 +1,25 @@
+name: Audit Workflow Extension Strict
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for .yaml extension
+        run: |
+          if find .github/workflows/ -name "*.yaml" | grep .; then
+            echo "Error: Use .yml extension exclusively for GitHub Action workflows."
+            exit 1
+          fi
