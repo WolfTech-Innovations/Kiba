@@ -31,11 +31,12 @@ jobs:
             exit 0
           fi
           sudo apt-get update && sudo apt-get install -y sshpass rsync
+          mkdir -p ~/.ssh
+          ssh-keyscan frs.sourceforge.net >> ~/.ssh/known_hosts
           for iso_file in *.iso; do
             [ -f "$iso_file" ] || continue
             echo "Uploading $iso_file to SourceForge..."
-            sshpass -p "$SF_PASS" rsync -avP \
-              -e "ssh -o StrictHostKeyChecking=no" \
+            SSHPASS="$SF_PASS" sshpass -e rsync -avP \
               "$iso_file" \
               "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
           done

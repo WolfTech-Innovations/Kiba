@@ -1,5 +1,6 @@
 #!/bin/bash
 set -ex
+set -o pipefail
 
 # ── Install ALL deps inside the container ────────────────────────────────
 pacman-key --init
@@ -35,7 +36,7 @@ pacman -S --noconfirm --needed \
   appmenu-gtk-module \
   \
   kpmcore boost boost-libs yaml-cpp libpwquality \
-  python python-yaml python-jsonschema \
+  python python-yaml python-jsonschema jq \
   qt5-xmlpatterns kparts5 \
   \
   greetd greetd-regreet cage \
@@ -868,7 +869,7 @@ result = subprocess.run(
      "--column=","--column=Key","--column=Feature",
      "--hide-column=2","--print-column=2",
      "--separator=,",
-     "--width=390","--height=260",
+     "--width=450","--height=500",
      "--ok-label=Apply","--cancel-label=Cancel",
      ] + rows,
     capture_output=True, text=True
@@ -931,7 +932,7 @@ while true; do
     "shortcuts"     "Keyboard Shortcuts"    "View useful desktop shortcuts" \
     "wiki"          "Online Wiki"           "Read the technical documentation" \
     --hide-column=1 --print-column=1 \
-    --width=450 --height=580 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
+    --width=450 --height=500 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
 
   [ -z "$CHOICE" ] && break
 
@@ -944,8 +945,8 @@ while true; do
     files)          cutefish-filemanager & break ;;
     screenshot)     cutefish-screenshot & break ;;
     accessibility)  kiba-access & ;;
-    info)           (fastfetch | zenity --text-info \
-                      --title="KibaOS System Information") & ;;
+    info)           (fastfetch --logo none --pipe true --no-color-blocks | zenity --text-info \
+                      --title="KibaOS System Information" --width=450 --height=500) & ;;
     shortcuts)
       zenity --list --title="KibaOS Shortcuts" \
         --column="Action" --column="Shortcut" \
@@ -955,6 +956,7 @@ while true; do
         "File Manager"      "Meta + E" \
         "Accessibility"     "Statusbar icon or kiba-access" \
         "Apply theme"       "kiba-set theme dark|light" \
+        --width=450 --height=500 \
         --ok-label="Close" --cancel-label="Close" 2>/dev/null &
       ;;
     wiki)
