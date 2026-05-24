@@ -1,0 +1,37 @@
+name: Audit Docs Cutefish DE
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'WIKI.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'WIKI.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Cutefish DE mention
+        run: |
+          found=0
+          for f in docs/manual-compilation.md README.md WIKI.md; do
+            if [ -f "$f" ]; then
+              if grep -qi "Cutefish" "$f"; then
+                found=1
+              fi
+            fi
+          done
+          if [ "$found" -eq 0 ]; then
+            echo "Error: Documentation must mention Cutefish DE."
+            exit 1
+          fi

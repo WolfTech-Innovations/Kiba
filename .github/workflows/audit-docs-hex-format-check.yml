@@ -1,0 +1,29 @@
+name: Audit Docs Hex Format Check
+on:
+  push:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'WIKI.md'
+  pull_request:
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - 'WIKI.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check color hex format in docs
+        run: |
+          if grep -rnEi "0x[0-9a-f]{6}" docs/ *.md; then
+            echo "Error: Documentation must use CSS hex notation (#hex) instead of 0x prefixes."
+            exit 1
+          fi

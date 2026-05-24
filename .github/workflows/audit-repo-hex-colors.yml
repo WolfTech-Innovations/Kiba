@@ -1,0 +1,21 @@
+name: Audit Repo Hex Colors
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check hex color format
+        run: |
+          if grep -rnEi "0x[0-9a-f]{6}" . --exclude-dir=".git"; then
+            echo "Error: Use CSS hex notation (e.g., #282a36) instead of 0x prefixes."
+            exit 1
+          fi

@@ -1,0 +1,27 @@
+name: Audit Zenity Dimensions Strict
+on:
+  push:
+    paths:
+      - '**.sh'
+      - '.github/workflows/kiba.yml'
+  pull_request:
+    paths:
+      - '**.sh'
+      - '.github/workflows/kiba.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Zenity dimensions
+        run: |
+          if grep -rn "zenity" . --include="*.sh" --include="kiba.yml" | grep -vE "\-\-width=450 \-\-height=500"; then
+            echo "Error: Zenity dialogs must use standard dimensions: --width=450 --height=500."
+            exit 1
+          fi
