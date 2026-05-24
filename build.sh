@@ -36,7 +36,9 @@ pacman -S --noconfirm --needed \
   \
   kpmcore boost boost-libs yaml-cpp libpwquality \
   python python-yaml python-jsonschema \
-  qt5-xmlpatterns kparts5
+  qt5-xmlpatterns kparts5 \
+  \
+  lightdm lightdm-gtk-greeter
 
 # ── Setup ────────────────────────────────────────────────────────────────
 WORKDIR="/w"
@@ -100,14 +102,11 @@ build_cutefish_repo() {
   local REPO=$1
   local GITHUB_NAME=${2:-$REPO}
 
-  # Always operate relative to SRCDIR so cd chains can't escape
   cd "${SRCDIR}"
 
   git clone --depth 1 "https://github.com/cutefishos/${GITHUB_NAME}.git" "${REPO}"
   cd "${SRCDIR}/${REPO}"
 
-  # Drop KF5 subdirs and find_package calls for libraries that no longer
-  # exist on Arch (dropped as Qt5/Plasma5 support wound down)
   sed -i '/add_subdirectory(bluetooth)/d'         CMakeLists.txt
   sed -i '/add_subdirectory(bluez)/d'             CMakeLists.txt
   sed -i '/add_subdirectory(networkmanagement)/d' CMakeLists.txt
@@ -126,14 +125,6 @@ build_cutefish_repo() {
   sed -i '/src\/vpn\/vpn\.cpp/d' CMakeLists.txt
   sed -i '/src\/vpn\/nm-.*\.h/d' CMakeLists.txt
 
-  # ── Fix MOC/translation dependency cycle ──────────────────────────────
-  # qt5_create_translation runs lupdate (scans C++ sources = needs MOC'd
-  # files) AND lrelease, creating a circular dep:
-  #   mocs_compilation → translations → lupdate stamp → mocs_compilation
-  #
-  # Fix strategy per CMakeLists.txt:
-  #   • If .ts files exist → swap to qt5_add_translation (lrelease-only)
-  #   • If no .ts files   → drop the translation target entirely
   while IFS= read -r f; do
     DIR=$(dirname "$f")
     TS_COUNT=$(find "$DIR" -maxdepth 2 -name "*.ts" 2>/dev/null | wc -l)
@@ -155,7 +146,6 @@ build_cutefish_repo() {
       fi
     fi
   done < <(find . -name "CMakeLists.txt")
-  # ── End translation cycle fix ──────────────────────────────────────────
 
   if [ -f chotkeys/application.cpp ]; then
     cat >> chotkeys/application.cpp << 'CHOTKEYS_PATCH'
@@ -174,36 +164,16 @@ CHOTKEYS_PATCH
   ninja
   DESTDIR="${STAGING}"  ninja install
   DESTDIR="${AIROOTFS}" ninja install
-  # Return to a known location — never rely on relative cd chains
   cd "${WORKDIR}"
 }
 
-# 1. libcutefish
-build_cutefish_repo libcutefish libcutefish
-
-# 2. fishui
-build_cutefish_repo fishui fishui
-
-# 3. Core components
-for REPO in core dock launcher statusbar; do
+for REPO in libcutefish fishui core dock launcher statusbar \
+            terminal filemanager calculator screenshot \
+            wallpapers icons; do
   build_cutefish_repo "${REPO}" "${REPO}"
 done
 
-# 4. Apps
-for REPO in terminal filemanager calculator screenshot; do
-  build_cutefish_repo "${REPO}" "${REPO}"
-done
-
-# 5. Wallpapers & icons
-for REPO in wallpapers icons; do
-  build_cutefish_repo "${REPO}" "${REPO}"
-done
-
-# ── Back to workdir (should already be here, but be explicit) ─────────────
-cd "${WORKDIR}"
-
-
-# ── Compile Calamares (not in Arch repos, must build from source) ─────────
+# ── Compile Calamares ─────────────────────────────────────────────────────
 echo "=== Compiling Calamares ==="
 cd "${SRCDIR}"
 git clone --depth 1 https://codeberg.org/Calamares/calamares.git calamares
@@ -224,6 +194,7 @@ DESTDIR="${AIROOTFS}" ninja install
 cd "${WORKDIR}"
 
 # ── Package list ─────────────────────────────────────────────────────────
+# NOTE: No sddm, no systemsettings — LightDM handles the display manager.
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
@@ -257,7 +228,6 @@ micro
 nano
 fzf
 yt-dlp
-
 inter-font
 ttf-jetbrains-mono
 noto-fonts-emoji
@@ -273,7 +243,8 @@ ntfs-3g
 exfatprogs
 cryptsetup
 nextcloud-client
-sddm
+lightdm
+lightdm-gtk-greeter
 xorg-server
 xorg-xinit
 xf86-video-vesa
@@ -303,17 +274,14 @@ libxkbcommon-x11
 libpulse
 bluez
 appmenu-gtk-module
-systemsettings
 PACKAGES
 
-
-# ── Fix initramfs hooks (archiso live boot requires archiso hook, no autodetect) ──
+# ── initramfs ─────────────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
 HOOKS=(base udev memdisk archiso block filesystems)
 INITRAMFS
 
-# Correct preset so mkinitcpio builds the archiso image, not a standard one
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
 PRESETS=('archiso')
@@ -322,8 +290,7 @@ archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
 archiso_image='/boot/initramfs-linux.img'
 PRESET
 
-# ── Rebrand boot menu (systemd-boot) ─────────────────────────────────────
-# Loader config
+# ── Boot menu ─────────────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/loader"
 cat > "${PROFILE}/efiboot/loader/loader.conf" << 'LOADER'
 default kibaos.conf
@@ -332,7 +299,6 @@ console-mode max
 editor no
 LOADER
 
-# Boot entry — reuse archiso's kernel/initramfs paths, just rename the title
 mkdir -p "${PROFILE}/efiboot/loader/entries"
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
@@ -341,22 +307,28 @@ initrd  /arch/boot/x86_64/initramfs-linux.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G
 ENTRY
 
-# Also patch syslinux label for BIOS boot
 SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
 fi
 
-# ── SDDM autologin for live session ──────────────────────────────────────
-mkdir -p "${AIROOTFS}/etc/sddm.conf.d"
-cat > "${AIROOTFS}/etc/sddm.conf.d/autologin.conf" << 'SDDM'
-[Autologin]
-User=liveuser
-Session=cutefish-xsession
-SDDM
+# ── LightDM autologin config ──────────────────────────────────────────────
+mkdir -p "${AIROOTFS}/etc/lightdm"
+cat > "${AIROOTFS}/etc/lightdm/lightdm.conf" << 'LIGHTDM'
+[LightDM]
+run-directory=/run/lightdm
 
-# ── Calamares OOBE config ─────────────────────────────────────────────────
+[Seat:*]
+autologin-guest=false
+autologin-user=liveuser
+autologin-user-timeout=0
+autologin-session=cutefish-xsession
+session-wrapper=/etc/lightdm/Xsession
+greeter-session=lightdm-gtk-greeter
+LIGHTDM
+
+# ── Calamares config ─────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
 cat > "${AIROOTFS}/etc/calamares/settings.conf" << 'CALA_SETTINGS'
 ---
@@ -447,10 +419,8 @@ WELCOME
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
 
 # ── liveuser account ─────────────────────────────────────────────────────
-# passwd / shadow / group entries for the passwordless live user
 mkdir -p "${AIROOTFS}/etc"
 
-# Append liveuser to passwd (uid 1000, home /home/liveuser, shell zsh)
 grep -q '^liveuser:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'liveuser:x:1000:1000:KibaOS Live User:/home/liveuser:/usr/bin/zsh' \
   >> "${AIROOTFS}/etc/passwd"
@@ -458,45 +428,42 @@ grep -q '^liveuser:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
 grep -q '^liveuser:' "${AIROOTFS}/etc/group" 2>/dev/null || \
   echo 'liveuser:x:1000:liveuser' >> "${AIROOTFS}/etc/group"
 
-# Empty password hash = no password required for live session
 grep -q '^liveuser:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
   echo 'liveuser::19000:0:99999:7:::' >> "${AIROOTFS}/etc/shadow"
 
+# lightdm requires liveuser in the autologin group
+grep -q '^autologin:' "${AIROOTFS}/etc/group" 2>/dev/null || \
+  echo 'autologin:x:999:liveuser' >> "${AIROOTFS}/etc/group"
+
 mkdir -p "${AIROOTFS}/home/liveuser"
 
-# sudo without password for live session
 mkdir -p "${AIROOTFS}/etc/sudoers.d"
 echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > "${AIROOTFS}/etc/sudoers.d/liveuser"
 
-# ── systemd service symlinks (equivalent of systemctl enable) ─────────────
+# ── systemd service symlinks ─────────────────────────────────────────────
 WANTS="${AIROOTFS}/etc/systemd/system"
 
-# graphical.target as default
 mkdir -p "${WANTS}/default.target.wants"
-mkdir -p "${WANTS}"
 ln -sf /usr/lib/systemd/system/graphical.target \
        "${WANTS}/default.target"
 
-# SDDM display manager
-ln -sf /usr/lib/systemd/system/sddm.service \
+# LightDM as display manager (replaces SDDM)
+ln -sf /usr/lib/systemd/system/lightdm.service \
        "${WANTS}/display-manager.service"
 
-# NetworkManager
 mkdir -p "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/NetworkManager.service \
        "${WANTS}/multi-user.target.wants/NetworkManager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
        "${WANTS}/dbus-org.freedesktop.nm-dispatcher.service"
 
-# Bluetooth
 ln -sf /usr/lib/systemd/system/bluetooth.service \
        "${WANTS}/multi-user.target.wants/bluetooth.service"
 
-# pacman keyring init (needed on live ISO)
 ln -sf /usr/lib/systemd/system/pacman-init.service \
        "${WANTS}/multi-user.target.wants/pacman-init.service"
 
-# ── customize_airootfs.sh — runs inside chroot at build time ─────────────
+# ── customize_airootfs.sh ────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
@@ -515,43 +482,72 @@ cat > /etc/hosts << 'HOSTS'
 127.0.1.1   kibaos.localdomain kibaos
 HOSTS
 
-# SDDM system user
-groupadd -r sddm || true
-useradd -r -g sddm -d /var/lib/sddm -s /usr/bin/nologin -c "SDDM Greeter" sddm || true
-mkdir -p /var/lib/sddm
-chown sddm:sddm /var/lib/sddm
-chmod 700 /var/lib/sddm
+# LightDM system user/group (may not exist yet in chroot)
+groupadd -r lightdm  2>/dev/null || true
+useradd  -r -g lightdm -d /var/lib/lightdm -s /usr/bin/nologin \
+         -c "LightDM Display Manager" lightdm 2>/dev/null || true
+mkdir -p /var/lib/lightdm
+chown lightdm:lightdm /var/lib/lightdm
+chmod 711 /var/lib/lightdm
 
-# Create utmp (systemd 256+ no longer creates this, but SDDM still wants it)
-touch /run/utmp
-mkdir -p /var/log
-touch /var/log/btmp
-touch /var/log/wtmp
+# autologin group (LightDM requires the user be a member)
+groupadd -r autologin 2>/dev/null || true
+gpasswd -a liveuser autologin 2>/dev/null || true
 
-# Ensure basic groups exist
-groupadd -r users 2>/dev/null || true
-groupadd -r wheel 2>/dev/null || true
-groupadd -r audio 2>/dev/null || true
-groupadd -r video 2>/dev/null || true
-groupadd -r input 2>/dev/null || true
-groupadd -r network 2>/dev/null || true
+# Basic groups
+for g in users wheel audio video input network; do
+  groupadd -r "$g" 2>/dev/null || true
+done
 
-# Volatile journal (saves RAM on live ISO)
+# Volatile journal
 sed -i 's/#Storage=auto/Storage=volatile/' /etc/systemd/journald.conf
 
-# Don't suspend on lid close in live session
-sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/' /etc/systemd/logind.conf
-sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
+# No suspend on lid close
+sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/'     /etc/systemd/logind.conf
+sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/'   /etc/systemd/logind.conf
 
-# zsh for root in live session
+# zsh for root
 chsh -s /usr/bin/zsh root
 
-# liveuser home skeleton
+# liveuser home
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
 chown -R 1000:1000 /home/liveuser
 chmod 700 /home/liveuser
 
-# Autostart kiba-welcome for liveuser on login
+# ── Cutefish dark mode via dconf/gsettings ───────────────────────────────
+# Write the dconf keyfile; cutefish-core reads org.cutefish.theme colorScheme
+mkdir -p /home/liveuser/.config/dconf
+install -m 644 /dev/null /home/liveuser/.config/dconf/user
+
+# Use dconf compile so the binary db is ready at first login
+mkdir -p /etc/dconf/profile
+cat > /etc/dconf/profile/user << 'DCONFPROFILE'
+user-db:user
+system-db:kibaos-defaults
+DCONFPROFILE
+
+mkdir -p /etc/dconf/db/kibaos-defaults.d
+cat > /etc/dconf/db/kibaos-defaults.d/01-darkmode << 'DCONFKEYS'
+[org/cutefish/theme]
+colorScheme='dark'
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+gtk-theme='Adwaita-dark'
+DCONFKEYS
+
+dconf update
+# ── End dark mode ─────────────────────────────────────────────────────────
+
+# Also set Cutefish dark preference in Qt/KDE portable config file
+mkdir -p /home/liveuser/.config
+cat > /home/liveuser/.config/cutefishtheme.conf << 'CFTHEME'
+[Theme]
+colorScheme=dark
+CFTHEME
+chown 1000:1000 /home/liveuser/.config/cutefishtheme.conf
+
+# Autostart kiba-welcome
 mkdir -p /home/liveuser/.config/autostart
 cat > /home/liveuser/.config/autostart/kiba-welcome.desktop << 'DESK'
 [Desktop Entry]
@@ -560,10 +556,9 @@ Name=KibaOS Welcome
 Exec=/usr/local/bin/kiba-welcome
 X-GNOME-Autostart-enabled=true
 DESK
-chown 1000:1000 /home/liveuser/.config/autostart/kiba-welcome.desktop
+chown -R 1000:1000 /home/liveuser/.config
 
-# Trust cutefish DE session
-mkdir -p /usr/share/wayland-sessions
+# Xsession for cutefish (used by LightDM autologin-session)
 mkdir -p /usr/share/xsessions
 cat > /usr/share/xsessions/cutefish-xsession.desktop << 'SESSION'
 [Desktop Entry]
@@ -573,7 +568,7 @@ Exec=cutefish-session
 TryExec=cutefish-session
 Type=Application
 SESSION
-chmod 777 /usr/share/xsessions/cutefish-xsession.desktop
+chmod 644 /usr/share/xsessions/cutefish-xsession.desktop
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
