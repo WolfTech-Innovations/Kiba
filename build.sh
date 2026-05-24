@@ -1,8 +1,9 @@
 #!/bin/bash
 # KibaOS ISO build script
-# Fixed: SLiM autologin, Cutefish build patches, Calamares sequence/modules,
-#        unpackfs path, package names, mkinitcpio hooks, liveuser setup,
-#        kiba-apply runtime dir, shellprocess users.json path, and more.
+# Fixed: chotkeys onReleased patch now runs BEFORE cmake (was after ninja — too late),
+#        header patch added alongside .cpp patch, SLiM autologin, Cutefish build patches,
+#        Calamares sequence/modules, unpackfs path, package names, mkinitcpio hooks,
+#        liveuser setup, kiba-apply runtime dir, shellprocess users.json path, and more.
 set -ex
 
 # ── Install ALL deps inside the container ────────────────────────────────
@@ -118,9 +119,8 @@ build_cutefish_repo() {
   git clone --depth 1 "https://github.com/cutefishos/${GITHUB_NAME}.git" "${REPO}"
   cd "${SRCDIR}/${REPO}"
 
-  # Strip optional/broken submodules — do this before cmake so find_package
-  # failures don't abort the whole build. Use || true so a missing pattern
-  # in a particular repo doesn't kill the script.
+  # ── Strip optional/broken submodules ──────────────────────────────────
+  # Do this before cmake so find_package failures don't abort the build.
   sed -i '/add_subdirectory(bluetooth)/d'         CMakeLists.txt 2>/dev/null || true
   sed -i '/add_subdirectory(bluez)/d'             CMakeLists.txt 2>/dev/null || true
   sed -i '/add_subdirectory(networkmanagement)/d' CMakeLists.txt 2>/dev/null || true
@@ -136,8 +136,8 @@ build_cutefish_repo() {
   # VPN modules drag in NetworkManager headers we don't have
   sed -i '/src\/vpn\//d'                          CMakeLists.txt 2>/dev/null || true
 
-  # Fix qt5_create_translation calls: if .ts files exist use qt5_add_translation,
-  # otherwise strip the translation machinery entirely (missing .ts = build error).
+  # ── Fix qt5_create_translation calls ──────────────────────────────────
+  # If .ts files exist use qt5_add_translation; otherwise strip entirely.
   while IFS= read -r f; do
     DIR=$(dirname "$f")
     TS_COUNT=$(find "$DIR" -maxdepth 2 -name "*.ts" 2>/dev/null | wc -l)
@@ -155,7 +155,19 @@ build_cutefish_repo() {
     fi
   done < <(find . -name "CMakeLists.txt")
 
-  # Patch missing onReleased slot in chotkeys if needed
+  # ── Patch chotkeys onReleased — MUST happen BEFORE cmake ──────────────
+  # The MOC reads application.h to generate qt_static_metacall, which emits
+  # a call to Application::onReleased(QKeySequence). If the slot is declared
+  # in the header but never defined in application.cpp, the linker fails.
+  # We patch both the header (declaration) and the .cpp (definition) here,
+  # before cmake configures the project and before ninja compiles anything.
+  if [ -f chotkeys/application.h ]; then
+    if ! grep -q 'onReleased' chotkeys/application.h; then
+      # Insert the slot declaration under the first "public slots:" section
+      sed -i '/public slots:/a\    void onReleased(QKeySequence keySeq);' \
+        chotkeys/application.h
+    fi
+  fi
   if [ -f chotkeys/application.cpp ]; then
     if ! grep -q 'onReleased' chotkeys/application.cpp; then
       cat >> chotkeys/application.cpp << 'CHOTKEYS_PATCH'
@@ -168,6 +180,7 @@ CHOTKEYS_PATCH
     fi
   fi
 
+  # ── Configure and build ────────────────────────────────────────────────
   mkdir -p build && cd build
   cmake -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
@@ -363,7 +376,7 @@ unset KDE_FULL_SESSION
 unset KDE_SESSION_VERSION
 
 # Source user profile (PATH, locale, etc.)
-[ -f /etc/profile ]      && source /etc/profile
+[ -f /etc/profile ]       && source /etc/profile
 [ -f "${HOME}/.profile" ] && source "${HOME}/.profile" 2>/dev/null || true
 
 # D-Bus session bus — SLiM doesn't start one for us.
@@ -431,10 +444,8 @@ dont-chroot: false
 CALA_SETTINGS
 
 # unpackfs.conf
-# The squashfs path changed in archiso: it now lives under
-# /run/archiso/bootmnt/arch/x86_64/airootfs.sfs (releng default).
-# The kernel/initrd are embedded in the squashfs so we don't need to
-# copy vmlinuz separately — Calamares' bootloader module handles that.
+# The squashfs path in archiso releng lives under:
+# /run/archiso/bootmnt/arch/x86_64/airootfs.sfs
 cat > "${AIROOTFS}/etc/calamares/modules/unpackfs.conf" << 'UNPACKFS'
 ---
 unpack:
@@ -444,8 +455,7 @@ unpack:
 UNPACKFS
 
 # shellprocess: migrate liveuser settings to the newly created account.
-# Calamares writes the installer-created username to /etc/calamares/global_storage.json
-# (not users.json — that's a module config, not runtime state).
+# Calamares runtime state is in global_storage.json (not users.json).
 cat > "${AIROOTFS}/etc/calamares/modules/shellprocess@copy-user-settings.conf" << 'SHELLPROC'
 ---
 dontChroot: false
@@ -516,7 +526,6 @@ script:
 SHELLPROC
 
 # displaymanager.conf — tell Calamares to configure SLiM on the installed system.
-# Calamares' SLiM module rewrites /etc/slim.conf with the correct default_user.
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
@@ -528,8 +537,6 @@ basicSetup: false
 DMCONF
 
 # ── kiba-freeze: X11 framebuffer freeze primitive ─────────────────────────
-# Uses xwd (X11 native raw dump, bypasses compositor) + ImageMagick convert
-# + display -window root (X11 Composite overlay) for flicker-free transitions.
 cat > "${AIROOTFS}/usr/local/bin/kiba-freeze" << 'KIBAFREEZE'
 #!/bin/bash
 # kiba-freeze — freeze the X11 framebuffer, print "PID:PNG_PATH" to stdout.
@@ -551,7 +558,6 @@ convert "${TMP}" "${TMP_PNG}" 2>/dev/null
 rm -f "${TMP}"
 
 # Overlay the frozen frame on the root window.
-# -window root paints to the root drawable, above all client windows.
 display -display "${DISPLAY}" -window root "${TMP_PNG}" &
 OVERLAY_PID=$!
 
@@ -563,10 +569,6 @@ KIBAFREEZE
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-freeze"
 
 # ── kiba-apply: instant-apply settings daemon ─────────────────────────────
-# Listens on a Unix socket at /run/user/<uid>/kiba-apply.sock.
-# XDG_RUNTIME_DIR is guaranteed to exist because SLiM opens a PAM session
-# (which triggers pam_systemd → loginctl creates the runtime dir) before
-# exec-ing kiba-session.
 cat > "${AIROOTFS}/usr/local/bin/kiba-apply" << 'KIBAAPPLY'
 #!/usr/bin/env python3
 """
@@ -583,8 +585,6 @@ Supported ops (send as JSON, one line):
 """
 import json, os, signal, socket, subprocess, sys, threading, time
 
-# XDG_RUNTIME_DIR is set by pam_systemd when SLiM opens the session.
-# Fall back to /tmp/kiba-<uid> for resilience.
 UID       = os.getuid()
 SOCK_DIR  = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/kiba-{UID}"
 SOCK_PATH = f"{SOCK_DIR}/kiba-apply.sock"
@@ -932,18 +932,14 @@ WELCOME
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
 
 # ── pacman.conf: NoExtract to skip man/doc/locale at install time ─────────
-# These patterns prevent pacman from ever writing these files into the
-# airootfs during pacstrap — faster build AND smaller squashfs.
 PACMAN_CONF="${PROFILE}/pacman.conf"
 if [ -f "${PACMAN_CONF}" ]; then
-  # Only add if not already present
-  grep -q 'NoExtract' "${PACMAN_CONF}" || sed -i '/^\[options\]/a NoExtract  = usr/share/man/* usr/share/info/* usr/share/doc/*\nNoExtract  = usr/share/locale/* !usr/share/locale/en_US/* !usr/share/locale/en_GB/* !usr/share/locale/locale.alias' "${PACMAN_CONF}"
+  grep -q 'NoExtract' "${PACMAN_CONF}" || \
+    sed -i '/^\[options\]/a NoExtract  = usr/share/man/* usr/share/info/* usr/share/doc/*\nNoExtract  = usr/share/locale/* !usr/share/locale/en_US/* !usr/share/locale/en_GB/* !usr/share/locale/locale.alias' \
+    "${PACMAN_CONF}"
 fi
 
 # ── liveuser account ───────────────────────────────────────────────────────
-# Write minimal passwd/shadow/group entries. customize_airootfs.sh later
-# copies /etc/skel and sets ownership. Blank password in shadow (field 2 empty)
-# means no password is required — correct for a live session.
 mkdir -p "${AIROOTFS}/etc"
 
 grep -q '^liveuser:' "${AIROOTFS}/etc/passwd"  2>/dev/null || \
@@ -951,9 +947,7 @@ grep -q '^liveuser:' "${AIROOTFS}/etc/passwd"  2>/dev/null || \
   >> "${AIROOTFS}/etc/passwd"
 grep -q '^liveuser:' "${AIROOTFS}/etc/group"   2>/dev/null || \
   echo 'liveuser:x:1000:liveuser'              >> "${AIROOTFS}/etc/group"
-# Shadow: empty password (field 2), last-change 0 means must-change-on-first-login
-# is NOT set here — we want passwordless. Use '!' to lock the password entirely
-# (SLiM auto_login bypasses PAM auth so the lock doesn't matter for login).
+# '!' locks the password — SLiM auto_login bypasses PAM auth so this is fine.
 grep -q '^liveuser:' "${AIROOTFS}/etc/shadow"  2>/dev/null || \
   echo 'liveuser:!:19000:0:99999:7:::'         >> "${AIROOTFS}/etc/shadow"
 
@@ -966,9 +960,7 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 
-# graphical.target as the default run level
 ln -sf /usr/lib/systemd/system/graphical.target "${WANTS}/default.target"
-# SLiM as the display manager
 ln -sf /usr/lib/systemd/system/slim.service     "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager.service \
        "${WANTS}/multi-user.target.wants/NetworkManager.service"
@@ -1004,7 +996,6 @@ for g in users wheel audio video input network storage; do
 done
 
 # ── liveuser group membership ─────────────────────────────────────────────
-# Add liveuser to all relevant groups so hardware access works on the live desk.
 for g in users wheel audio video input network storage; do
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
@@ -1069,7 +1060,7 @@ mkdir -p /home/liveuser/.config/systemd/user/graphical-session.target.wants
 ln -sf /usr/lib/systemd/user/kiba-apply.service \
        /home/liveuser/.config/systemd/user/graphical-session.target.wants/kiba-apply.service
 
-# ── Flathub remote (for post-install use; no packages installed into squashfs) ─
+# ── Flathub remote ────────────────────────────────────────────────────────
 flatpak remote-add --system --if-not-exists flathub \
   https://dl.flathub.org/repo/flathub.flatpakrepo 2>/dev/null || true
 
@@ -1085,8 +1076,6 @@ X-GNOME-Autostart-enabled=true
 DESK
 
 # ── Strip stray KDE/Plasma session files ──────────────────────────────────
-# kwin drags in Plasma .desktop files as transitive deps; nuke them so
-# the session picker (and Calamares) only sees cutefish-xsession.
 for f in \
   /usr/share/xsessions/plasma.desktop \
   /usr/share/xsessions/plasmawayland.desktop \
@@ -1095,10 +1084,10 @@ for f in \
   /usr/share/wayland-sessions/plasmawayland.desktop; do
     rm -f "$f"
 done
-find /etc/xdg/autostart   -name 'plasma*' -o -name 'kde*'    -delete 2>/dev/null || true
-find /usr/share/autostart -name 'plasma*' -o -name 'kde*'    -delete 2>/dev/null || true
+find /etc/xdg/autostart   -name 'plasma*' -o -name 'kde*' -delete 2>/dev/null || true
+find /usr/share/autostart -name 'plasma*' -o -name 'kde*' -delete 2>/dev/null || true
 
-# ── xsession desktop file (referenced by Calamares displaymanager module) ─
+# ── xsession desktop file ─────────────────────────────────────────────────
 mkdir -p /usr/share/xsessions
 cat > /usr/share/xsessions/cutefish-xsession.desktop << 'SESSION'
 [Desktop Entry]
@@ -1112,18 +1101,11 @@ SESSION
 chmod 644 /usr/share/xsessions/cutefish-xsession.desktop
 
 # ── Aggressive size reduction ─────────────────────────────────────────────
-# These are all safe to remove from a live/installer ISO:
-
-# 1. Pacman package cache — packages were installed, cache is dead weight.
 rm -rf /var/cache/pacman/pkg/*
-
-# 2. Man pages and info pages — nobody opens a man page on a live ISO.
 rm -rf /usr/share/man/*
 rm -rf /usr/share/info/*
 rm -rf /usr/share/doc/*
 
-# 3. Non-English locale data. We keep en_US and the locale-gen output.
-#    This alone can save 100-200 MB depending on installed packages.
 find /usr/share/locale -mindepth 1 -maxdepth 1 \
   ! -name 'en_US' ! -name 'en_GB' ! -name 'locale.alias' \
   -exec rm -rf {} + 2>/dev/null || true
@@ -1131,42 +1113,27 @@ find /usr/share/i18n/locales -mindepth 1 -maxdepth 1 \
   ! -name 'en_US' ! -name 'en_GB' ! -name 'POSIX' \
   -exec rm -rf {} + 2>/dev/null || true
 
-# 4. Extra Linux firmware blobs we almost certainly don't need on x86_64.
-#    Keep: Intel/AMD GPU, common WiFi (iwlwifi, ath*, rtl*), sound (sof),
-#    USB ethernet, and the base amdgpu/radeon tables.
-#    Remove: arm/mips embedded blobs, old Broadcom, obscure NICs, printers.
 find /usr/lib/firmware -mindepth 1 -maxdepth 1 \
-  ! -name 'i915'      \
-  ! -name 'amdgpu'    \
-  ! -name 'radeon'    \
-  ! -name 'iwlwifi*'  \
-  ! -name 'ath*'      \
-  ! -name 'rtl_nic'   \
-  ! -name 'rtlwifi'   \
-  ! -name 'mt7601u*'  \
-  ! -name 'sof'       \
-  ! -name 'sof-tplg'  \
-  ! -name 'intel'     \
-  ! -name 'qed'       \
+  ! -name 'i915'     \
+  ! -name 'amdgpu'   \
+  ! -name 'radeon'   \
+  ! -name 'iwlwifi*' \
+  ! -name 'ath*'     \
+  ! -name 'rtl_nic'  \
+  ! -name 'rtlwifi'  \
+  ! -name 'mt7601u*' \
+  ! -name 'sof'      \
+  ! -name 'sof-tplg' \
+  ! -name 'intel'    \
+  ! -name 'qed'      \
   -exec rm -rf {} + 2>/dev/null || true
 
-# 5. Python __pycache__ and .pyc files — regenerated on first import anyway.
 find /usr -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
 find /usr -name '*.pyc' -delete 2>/dev/null || true
-
-# 6. Static libraries — not needed at runtime.
 find /usr/lib -name '*.a' -delete 2>/dev/null || true
-
-# 7. Include headers installed by runtime packages (not a build env).
 rm -rf /usr/include/* 2>/dev/null || true
-
-# 8. GTK icon cache files — will be regenerated on first run if needed.
 find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
-
-# 9. Pacman sync databases — not needed after install.
 rm -rf /var/lib/pacman/sync/*
-
-# 10. Temporary build artifacts
 rm -rf /tmp/* /var/tmp/* 2>/dev/null || true
 
 # ── Fix ownership one final time ──────────────────────────────────────────
