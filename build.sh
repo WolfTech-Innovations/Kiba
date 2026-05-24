@@ -38,7 +38,7 @@ pacman -S --noconfirm --needed \
   python python-yaml python-jsonschema \
   qt5-xmlpatterns kparts5 \
   \
-  lightdm lightdm-gtk-greeter \
+  greetd greetd-regreet cage \
   \
   xorg-xrandr xorg-xdpyinfo xorg-xwd xorg-xwud \
   imagemagick \
@@ -78,11 +78,10 @@ file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/gshadow"]="0:0:400"
   ["/usr/local/bin/kiba-welcome"]="0:0:755"
+  ["/usr/local/bin/kiba-launch-session"]="0:0:755"
   ["/usr/local/bin/kiba-apply"]="0:0:755"
   ["/usr/local/bin/kiba-set"]="0:0:755"
   ["/usr/local/bin/kiba-access"]="0:0:755"
-  ["/usr/local/bin/kiba-freeze"]="0:0:755"
-  ["/usr/share/xsessions/cutefish-xsession.desktop"]="0:0:644"
   ["/root"]="0:0:750"
 )
 PROFILEDEF
@@ -240,10 +239,10 @@ ntfs-3g
 exfatprogs
 cryptsetup
 nextcloud-client
-lightdm
-lightdm-gtk-greeter
+greetd
+greetd-regreet
+cage
 xorg-server
-xorg-xinit
 xorg-xrandr
 xorg-xdpyinfo
 xorg-xwd
@@ -318,49 +317,111 @@ if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
 fi
 
-# ── LightDM autologin ──────────────────────────────────────────────────────
-mkdir -p "${AIROOTFS}/etc/lightdm"
-cat > "${AIROOTFS}/etc/lightdm/lightdm.conf" << 'LIGHTDM'
-[LightDM]
-run-directory=/run/lightdm
+# ── greetd + ReGreet config ───────────────────────────────────────────────
+# ReGreet is a GTK4 greetd greeter. It runs under cage (minimal Wayland
+# compositor). It reads session entries from /usr/share/xsessions/ but
+# launches them via x11_prefix so the Exec= line is run as a direct binary,
+# not through an Xsession wrapper script.
+mkdir -p "${AIROOTFS}/etc/greetd"
 
-[Seat:*]
-autologin-guest=false
-autologin-user=liveuser
-autologin-user-timeout=0
-autologin-session=cutefish-xsession
-user-session=cutefish-xsession
-session-wrapper=/etc/lightdm/Xsession
-greeter-session=lightdm-gtk-greeter
-LIGHTDM
+# greetd config: run cage which hosts regreet on vt1
+cat > "${AIROOTFS}/etc/greetd/config.toml" << 'GREETDCONF'
+[terminal]
+vt = 1
 
-# ── PAM files for LightDM — baked into squashfs at build time ────────────
-# Writing these here (not just in customize_airootfs.sh) ensures they are
-# present in the squashfs even if the chroot step is skipped or fails early.
-# Without lightdm-autologin PAM file, LightDM returns PAM error 19
-# (Conversation error) on every autologin attempt and falls back to greeter.
-mkdir -p "${AIROOTFS}/etc/pam.d"
+[default_session]
+# cage -s: don't allow VT switching away from the greeter
+# regreet reads /etc/greetd/regreet.toml for its own config
+command = "cage -s -- regreet"
+user = "greeter"
+GREETDCONF
 
-cat > "${AIROOTFS}/etc/pam.d/lightdm-autologin" << 'PAMEOF'
-#%PAM-1.0
-auth        requisite   pam_nologin.so
-auth        required    pam_env.so
-auth        required    pam_succeed_if.so user ingroup autologin quiet
-auth        sufficient  pam_succeed_if.so user ingroup autologin
-account     include     system-login
-password    include     system-login
-session     include     system-login
-PAMEOF
+# ReGreet config — dark mode, KibaOS branding, direct X11 binary launch
+mkdir -p "${AIROOTFS}/etc/greetd"
+cat > "${AIROOTFS}/etc/greetd/regreet.toml" << 'REGREETCONF'
+[background]
+path = "/usr/share/cutefish-wallpapers/default.jpg"
+fit = "Cover"
 
-cat > "${AIROOTFS}/etc/pam.d/lightdm" << 'PAMEOF2'
-#%PAM-1.0
-auth        requisite   pam_nologin.so
-auth        required    pam_env.so
-auth        required    pam_unix.so
-account     include     system-login
-password    include     system-login
-session     include     system-login
-PAMEOF2
+[GTK]
+application_prefer_dark_theme = true
+cursor_theme_name = "Adwaita"
+cursor_blink = false
+font_name = "Inter 14"
+icon_theme_name = "cutefish-icons"
+theme_name = "Adwaita"
+
+[commands]
+reboot  = ["systemctl", "reboot"]
+poweroff = ["systemctl", "poweroff"]
+
+# x11_prefix wraps every X11 session's Exec= binary so regreet starts
+# the X server itself and hands the binary directly to it — no Xsession
+# wrapper script, no xinit shim, no shell indirection.
+# "startx /usr/bin/env" prepends to whatever Exec= is in the .desktop file.
+x11_prefix = ["startx", "/usr/bin/env"]
+
+[appearance]
+greeting_msg = "KibaOS"
+
+[widget.clock]
+format = "%a %b %d  %H:%M"
+resolution = "1s"
+label_width = 200
+REGREETCONF
+
+# kiba-session.desktop — the session entry ReGreet will show.
+# Exec= is the direct binary (cutefish-session), NOT a wrapper script.
+# ReGreet prepends x11_prefix so the actual invocation becomes:
+#   startx /usr/bin/env kiba-launch-session -- :0 vt1
+# where kiba-launch-session sets env then execs cutefish-session.
+mkdir -p "${AIROOTFS}/usr/local/bin"
+cat > "${AIROOTFS}/usr/local/bin/kiba-launch-session" << 'KIBASESSION'
+#!/bin/bash
+# kiba-launch-session — direct session binary called by startx via ReGreet.
+# startx invokes this as the client program inside a fresh X server.
+# No PAM, no Xsession wrapper, no display manager session script.
+
+export XDG_CURRENT_DESKTOP=Cutefish
+export DESKTOP_SESSION=cutefish
+export XDG_SESSION_DESKTOP=cutefish
+export XDG_SESSION_TYPE=x11
+export KDE_FULL_SESSION=
+export KDE_SESSION_VERSION=
+
+# D-Bus session bus for this X session
+eval "$(dbus-launch --sh-syntax --exit-with-session)"
+
+# kwin_x11 must start before cutefish-session on Arch
+kwin_x11 --replace &
+sleep 0.6
+
+# kiba-apply instant-settings daemon
+/usr/local/bin/kiba-apply &
+
+exec cutefish-session
+KIBASESSION
+chmod +x "${AIROOTFS}/usr/local/bin/kiba-launch-session"
+
+# The xsession desktop entry — Exec= points at our direct launcher binary.
+# ReGreet reads this, prepends x11_prefix = ["startx", "/usr/bin/env"],
+# and spawns: startx /usr/bin/env /usr/local/bin/kiba-launch-session -- :0 vt1
+mkdir -p "${AIROOTFS}/usr/share/xsessions"
+cat > "${AIROOTFS}/usr/share/xsessions/kibaos.desktop" << 'SESSIONDESK'
+[Desktop Entry]
+Name=KibaOS
+Comment=KibaOS Cutefish Desktop
+Exec=/usr/local/bin/kiba-launch-session
+TryExec=/usr/local/bin/kiba-launch-session
+Type=XSession
+DesktopNames=Cutefish
+SESSIONDESK
+
+# ReGreet needs a tmpfiles.d entry to create /var/cache/regreet at boot
+mkdir -p "${AIROOTFS}/usr/lib/tmpfiles.d"
+cat > "${AIROOTFS}/usr/lib/tmpfiles.d/regreet.conf" << 'TMPFILES'
+d /var/cache/regreet 0755 greeter greeter -
+TMPFILES
 
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
@@ -471,10 +532,10 @@ SHELLPROC
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
-  - lightdm
+  - greetd
 defaultDesktopEnvironment:
   executable: "cutefish-session"
-  desktopFile: "cutefish-xsession"
+  desktopFile: "kibaos"
 basicSetup: false
 DMCONF
 
@@ -914,8 +975,6 @@ grep -q '^liveuser:'  "${AIROOTFS}/etc/group"  2>/dev/null || \
   echo 'liveuser:x:1000:liveuser' >> "${AIROOTFS}/etc/group"
 grep -q '^liveuser:'  "${AIROOTFS}/etc/shadow" 2>/dev/null || \
   echo 'liveuser::19000:0:99999:7:::' >> "${AIROOTFS}/etc/shadow"
-grep -q '^autologin:' "${AIROOTFS}/etc/group"  2>/dev/null || \
-  echo 'autologin:x:999:liveuser' >> "${AIROOTFS}/etc/group"
 
 mkdir -p "${AIROOTFS}/home/liveuser"
 mkdir -p "${AIROOTFS}/etc/sudoers.d"
@@ -926,7 +985,7 @@ WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 
 ln -sf /usr/lib/systemd/system/graphical.target "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/lightdm.service  "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/greetd.service  "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager.service \
        "${WANTS}/multi-user.target.wants/NetworkManager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
@@ -953,43 +1012,13 @@ cat > /etc/hosts << 'HOSTS'
 127.0.1.1   kibaos.localdomain kibaos
 HOSTS
 
-groupadd -r lightdm  2>/dev/null || true
-useradd  -r -g lightdm -d /var/lib/lightdm -s /usr/bin/nologin \
-         -c "LightDM Display Manager" lightdm 2>/dev/null || true
-mkdir -p /var/lib/lightdm
-chown lightdm:lightdm /var/lib/lightdm
-chmod 711 /var/lib/lightdm
-
-groupadd -r autologin 2>/dev/null || true
-gpasswd -a liveuser autologin 2>/dev/null || true
-
-# ── PAM config for LightDM autologin ─────────────────────────────────────
-# Without this file LightDM's autologin PAM conversation returns error 19
-# (Conversation error) and falls back to the greeter every single time.
-# This is the correct Arch Linux PAM stack for passwordless autologin.
-cat > /etc/pam.d/lightdm-autologin << 'PAMEOF'
-#%PAM-1.0
-auth        requisite   pam_nologin.so
-auth        required    pam_env.so
-auth        required    pam_succeed_if.so user ingroup autologin quiet
-auth        sufficient  pam_succeed_if.so user ingroup autologin
-account     include     system-login
-password    include     system-login
-session     include     system-login
-PAMEOF
-
-# Also ensure the base lightdm PAM file exists (some Arch installs omit it)
-if [ ! -f /etc/pam.d/lightdm ]; then
-cat > /etc/pam.d/lightdm << 'PAMEOF2'
-#%PAM-1.0
-auth        requisite   pam_nologin.so
-auth        required    pam_env.so
-auth        required    pam_unix.so
-account     include     system-login
-password    include     system-login
-session     include     system-login
-PAMEOF2
-fi
+# ── greetd user (required by greetd service) ─────────────────────────────
+groupadd -r greeter 2>/dev/null || true
+useradd  -r -g greeter -d /var/lib/greeter -s /usr/bin/nologin \
+         -c "greetd greeter user" greeter 2>/dev/null || true
+mkdir -p /var/lib/greeter
+chown greeter:greeter /var/lib/greeter
+chmod 711 /var/lib/greeter
 
 for g in users wheel audio video input network; do
   groupadd -r "$g" 2>/dev/null || true
@@ -1106,53 +1135,7 @@ find /usr/share/autostart -name 'plasma*' -delete 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser/.config
 
-# ── Xsession wrapper script ───────────────────────────────────────────────
-# LightDM calls /etc/lightdm/Xsession <session-exec>. We intercept here
-# to ensure kwin_x11 is running before cutefish-session starts, and that
-# no KDE/Plasma autostart garbage gets pulled in.
-mkdir -p /etc/lightdm
-cat > /etc/lightdm/Xsession << 'XSESSION_WRAPPER'
-#!/bin/bash
-# KibaOS session wrapper — called by LightDM as: Xsession cutefish-session
-# Source system/user profile
-[ -f /etc/profile ] && . /etc/profile
-[ -f "$HOME/.profile" ] && . "$HOME/.profile"
-
-# Explicitly block KDE/Plasma session components from autostarting.
-# XDG_CURRENT_DESKTOP must NOT contain KDE or Plasma.
-export XDG_CURRENT_DESKTOP=Cutefish
-export DESKTOP_SESSION=cutefish
-export XDG_SESSION_DESKTOP=cutefish
-
-# Suppress KDE's autostart directories entirely
-export KDE_FULL_SESSION=
-export KDE_SESSION_VERSION=
-
-# D-Bus session (LightDM may already provide one; be idempotent)
-if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
-    eval "$(dbus-launch --sh-syntax --exit-with-session)"
-fi
-
-# Start kwin_x11 compositor first — Cutefish requires it but doesn't
-# self-launch it on Arch (unlike on the upstream CutefishOS Ubuntu base)
-kwin_x11 --replace &
-KWIN_PID=$!
-# Give kwin a moment to claim the compositor slot before cutefish-session
-# starts querying it
-sleep 0.6
-
-# Start kiba-apply settings daemon in background
-/usr/local/bin/kiba-apply &
-
-# Hand off to cutefish-session; when it exits the whole session ends,
-# which causes LightDM to clean up kwin and kiba-apply automatically.
-exec cutefish-session
-XSESSION_WRAPPER
-chmod 755 /etc/lightdm/Xsession
-
-# ── Xsession desktop file ─────────────────────────────────────────────────
-# Type=XSession is required — LightDM will not list Type=Application
-# entries as valid login sessions.
+# ── xsession desktop file (referenced by Calamares displaymanager module) ─
 mkdir -p /usr/share/xsessions
 cat > /usr/share/xsessions/cutefish-xsession.desktop << 'SESSION'
 [Desktop Entry]
@@ -1162,7 +1145,6 @@ Exec=cutefish-session
 TryExec=cutefish-session
 Type=XSession
 DesktopNames=Cutefish
-X-LightDM-DesktopName=Cutefish
 SESSION
 chmod 644 /usr/share/xsessions/cutefish-xsession.desktop
 CUSTOMIZE
