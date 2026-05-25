@@ -1,0 +1,19 @@
+name: Check Package Json No Dev Deps
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_package_json_no_dev_deps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Discourage devDependencies in production repo
+        run: |
+          if [ -f package.json ]; then jq -e ".devDependencies" package.json && exit 1 || exit 0; fi

@@ -1,0 +1,19 @@
+name: Enforce Shell Pipefail Strict
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  enforce_shell_pipefail_strict:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure set -o pipefail in all scripts
+        run: |
+          find . -name "*.sh" -exec grep -L "pipefail" {} + | grep . && exit 1 || exit 0

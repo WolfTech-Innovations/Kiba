@@ -1,0 +1,19 @@
+name: Shell Func Naming Convention
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shell_func_naming_convention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce snake_case for shell functions
+        run: |
+          grep -r "^[a-zA-Z0-9-]*()" . --include="*.sh" && exit 1 || exit 0

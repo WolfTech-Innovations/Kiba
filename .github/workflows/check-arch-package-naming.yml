@@ -1,0 +1,19 @@
+name: Check Arch Package Naming
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_arch_package_naming:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure Arch package naming conventions
+        run: |
+          if [ -f package_list.txt ]; then grep -rE "[A-Z]" package_list.txt && exit 1 || exit 0; fi

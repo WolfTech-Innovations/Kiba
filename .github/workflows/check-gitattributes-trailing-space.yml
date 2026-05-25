@@ -1,0 +1,19 @@
+name: Check Gitattributes Trailing Space
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_gitattributes_trailing_space:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: No trailing space in .gitattributes
+        run: |
+          grep " $" .gitattributes && exit 1 || exit 0

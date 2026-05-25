@@ -1,0 +1,19 @@
+name: Check Python Assert Used
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_python_assert_used:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Discourage assert in production code
+        run: |
+          grep -r "assert " . --include="*.py" --exclude="test_*" && exit 1 || exit 0
