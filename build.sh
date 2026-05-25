@@ -174,7 +174,7 @@ LABEL kibaos-safe
 SYSLINUX_SAFE
 fi
 
-# ── SDDM config: autologin + KibaOS theme dir ─────────────────────────────
+# ── SDDM config: autologin + KibaOS theme ─────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/sddm.conf.d"
 
 cat > "${AIROOTFS}/etc/sddm.conf.d/kibaos.conf" << 'SDDMCONF'
@@ -195,10 +195,6 @@ ServerArguments=-nolisten tcp
 SDDMCONF
 
 # ── SDDM KibaOS theme ─────────────────────────────────────────────────────
-# Minimal QML theme: full-bleed dark background, centered logo + clock.
-# The logo PNG is fetched and placed by customize_airootfs.sh (same curl
-# call that populates the Calamares branding dir), so at build time we only
-# write the QML/metadata files here.
 mkdir -p "${AIROOTFS}/usr/share/sddm/themes/kibaos"
 
 cat > "${AIROOTFS}/usr/share/sddm/themes/kibaos/metadata.desktop" << 'SDDMMETA'
@@ -227,7 +223,6 @@ Rectangle {
     id: root
     color: "#0d0d0d"
 
-    // ── Background image (optional; falls back to solid color) ────────────
     Image {
         anchors.fill: parent
         source: "background.png"
@@ -236,12 +231,10 @@ Rectangle {
         opacity: 0.35
     }
 
-    // ── Centered card ──────────────────────────────────────────────────────
     ColumnLayout {
         anchors.centerIn: parent
         spacing: 24
 
-        // Logo
         Image {
             Layout.alignment: Qt.AlignHCenter
             source: "logo.png"
@@ -250,7 +243,6 @@ Rectangle {
             smooth: true
         }
 
-        // Distro name
         Text {
             Layout.alignment: Qt.AlignHCenter
             text: "KibaOS"
@@ -260,7 +252,6 @@ Rectangle {
             font.family: "Noto Sans"
         }
 
-        // Clock
         Text {
             id: clock
             Layout.alignment: Qt.AlignHCenter
@@ -274,10 +265,8 @@ Rectangle {
             Component.onCompleted: clock.text = Qt.formatDateTime(new Date(), "hh:mm  —  dddd, MMMM d")
         }
 
-        // Thin divider
         Rectangle { Layout.fillWidth: true; height: 1; color: "#333333"; opacity: 0.8 }
 
-        // Username field
         TextField {
             id: userField
             Layout.alignment: Qt.AlignHCenter
@@ -289,14 +278,13 @@ Rectangle {
             font.pixelSize: 13
             background: Rectangle {
                 color: "#1e1e1e"; radius: 6
-                border.color: userField.activeFocus ? "#0067c0" : "#333333"
+                border.color: userField.activeFocus ? "#1a7fd4" : "#333333"
                 border.width: userField.activeFocus ? 2 : 1
             }
             padding: 10
             Keys.onReturnPressed: passwordField.forceActiveFocus()
         }
 
-        // Password field
         TextField {
             id: passwordField
             Layout.alignment: Qt.AlignHCenter
@@ -308,14 +296,13 @@ Rectangle {
             font.pixelSize: 13
             background: Rectangle {
                 color: "#1e1e1e"; radius: 6
-                border.color: passwordField.activeFocus ? "#0067c0" : "#333333"
+                border.color: passwordField.activeFocus ? "#1a7fd4" : "#333333"
                 border.width: passwordField.activeFocus ? 2 : 1
             }
             padding: 10
             Keys.onReturnPressed: sddm.login(userField.text, passwordField.text, sessionModel.index(sessionBox.currentIndex, 0))
         }
 
-        // Session selector
         ComboBox {
             id: sessionBox
             Layout.alignment: Qt.AlignHCenter
@@ -334,11 +321,10 @@ Rectangle {
             }
         }
 
-        // Login button
         Rectangle {
             Layout.alignment: Qt.AlignHCenter
             width: 280; height: 40
-            color: loginMouse.containsMouse ? "#005ba5" : "#0067c0"
+            color: loginMouse.containsMouse ? "#166bbf" : "#1a7fd4"
             radius: 6
             Behavior on color { ColorAnimation { duration: 120 } }
             Text {
@@ -357,7 +343,6 @@ Rectangle {
             }
         }
 
-        // Error message
         Text {
             id: errorMsg
             Layout.alignment: Qt.AlignHCenter
@@ -366,7 +351,6 @@ Rectangle {
             visible: text !== ""
         }
 
-        // Power row
         RowLayout {
             Layout.alignment: Qt.AlignHCenter
             spacing: 32
@@ -383,7 +367,6 @@ Rectangle {
         }
     }
 
-    // Wire up SDDM signals
     Connections {
         target: sddm
         function onLoginFailed() { errorMsg.text = "Incorrect username or password."; passwordField.clear() }
@@ -399,8 +382,6 @@ SDDMQML
 
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
-
-# ── Calamares branding ────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/usr/share/calamares/branding/kibaos"
 
 cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/branding.desc" << 'BRANDING'
@@ -434,8 +415,8 @@ slideshowAPI: 2
 style:
   sidebarBackground:    "#f3f3f3"
   sidebarText:          "#1a1a1a"
-  sidebarTextSelect:    "#0067c0"
-  sidebarTextHighlight: "#0067c0"
+  sidebarTextSelect:    "#1a7fd4"
+  sidebarTextHighlight: "#1a7fd4"
 
 windowExpanding:  fullscreen
 windowSize:       "1024px,768px"
@@ -446,138 +427,482 @@ navigation: none
 BRANDING
 
 cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
+/* ── KibaOS Installer Theme ──────────────────────────────────────────────
+   Clean, friendly, light UI. No external font dependencies — falls back
+   gracefully to whatever sans-serif the system provides.               */
+
 QWidget {
-    background-color: #f3f3f3;
-    color: #1a1a1a;
-    font-family: "Segoe UI", "Noto Sans", sans-serif;
+    background-color: #f5f5f5;
+    color: #1c1c1c;
+    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
     font-size: 13px;
 }
-QStackedWidget, QFrame#mainContent { background-color: #ffffff; }
-QLabel#labelTitle, QLabel[objectName="labelTitle"] {
-    font-size: 28px; font-weight: 300; color: #1a1a1a;
-    padding-top: 32px; padding-bottom: 8px;
+
+/* Main content area: white card feel */
+QStackedWidget,
+QFrame#mainContent {
+    background-color: #ffffff;
+    border-radius: 8px;
 }
-QLabel { color: #1a1a1a; font-size: 13px; }
-QPushButton#nextButton, QPushButton[objectName="nextButton"] {
-    background-color: #0067c0; color: #ffffff; border: none;
-    border-radius: 4px; padding: 10px 32px; font-size: 13px;
-    font-weight: 500; min-width: 120px;
+
+/* Page title — large, welcoming, not corporate */
+QLabel#labelTitle,
+QLabel[objectName="labelTitle"] {
+    font-size: 26px;
+    font-weight: 400;
+    color: #1c1c1c;
+    padding-top: 28px;
+    padding-bottom: 6px;
 }
-QPushButton#nextButton:hover   { background-color: #005ba5; }
-QPushButton#nextButton:pressed { background-color: #004f8f; }
+
+/* Subtitle / body labels */
+QLabel {
+    color: #3a3a3a;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────── */
+
+/* Primary action (Next / Install) */
+QPushButton#nextButton,
+QPushButton[objectName="nextButton"] {
+    background-color: #1a7fd4;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 36px;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 120px;
+}
+QPushButton#nextButton:hover   { background-color: #166bbf; }
+QPushButton#nextButton:pressed { background-color: #1259a0; }
+QPushButton#nextButton:disabled {
+    background-color: #c8dff5;
+    color: #ffffff;
+}
+
+/* Secondary buttons (Back, Cancel, etc.) */
 QPushButton {
-    background-color: transparent; color: #0067c0;
-    border: 1px solid #d0d0d0; border-radius: 4px;
-    padding: 9px 24px; font-size: 13px; min-width: 90px;
+    background-color: #ffffff;
+    color: #1a7fd4;
+    border: 1px solid #c8c8c8;
+    border-radius: 6px;
+    padding: 9px 24px;
+    font-size: 13px;
+    min-width: 90px;
 }
-QPushButton:hover    { background-color: #e8f0f8; border-color: #0067c0; }
-QPushButton:disabled { color: #9e9e9e; border-color: #e0e0e0; }
-QLineEdit, QComboBox {
-    background-color: #ffffff; border: 1px solid #d0d0d0;
-    border-radius: 4px; padding: 8px 12px;
-    selection-background-color: #0067c0;
+QPushButton:hover {
+    background-color: #eaf3fc;
+    border-color: #1a7fd4;
+    color: #1259a0;
 }
-QLineEdit:focus, QComboBox:focus { border: 2px solid #0067c0; }
+QPushButton:pressed {
+    background-color: #d6eaf8;
+}
+QPushButton:disabled {
+    color: #b0b0b0;
+    border-color: #e0e0e0;
+    background-color: #f5f5f5;
+}
+
+/* ── Inputs ──────────────────────────────────────────────────────────── */
+QLineEdit,
+QComboBox {
+    background-color: #ffffff;
+    border: 1.5px solid #c8c8c8;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #1c1c1c;
+    selection-background-color: #1a7fd4;
+    selection-color: #ffffff;
+    font-size: 13px;
+}
+QLineEdit:focus,
+QComboBox:focus {
+    border: 2px solid #1a7fd4;
+    background-color: #fafcff;
+}
+QLineEdit:hover,
+QComboBox:hover {
+    border-color: #999999;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+QComboBox::down-arrow {
+    width: 10px;
+    height: 10px;
+}
+QComboBox QAbstractItemView {
+    background-color: #ffffff;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    selection-background-color: #eaf3fc;
+    selection-color: #1c1c1c;
+    padding: 4px;
+}
+
+/* ── Progress bar ────────────────────────────────────────────────────── */
 QProgressBar {
-    background-color: #e0e0e0; border: none;
-    border-radius: 2px; height: 4px; color: transparent;
+    background-color: #e4e4e4;
+    border: none;
+    border-radius: 3px;
+    height: 5px;
+    color: transparent;
+    text-align: center;
 }
-QProgressBar::chunk { background-color: #0067c0; border-radius: 2px; }
-QListView, QTreeView {
-    background-color: #ffffff; border: 1px solid #e0e0e0;
-    border-radius: 4px; alternate-background-color: #f8f8f8;
+QProgressBar::chunk {
+    background-color: #1a7fd4;
+    border-radius: 3px;
 }
-QListView::item:selected, QTreeView::item:selected {
-    background-color: #cce4f7; color: #1a1a1a;
+
+/* ── Lists and trees (partition view, locale picker, etc.) ───────────── */
+QListView,
+QTreeView {
+    background-color: #ffffff;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 6px;
+    alternate-background-color: #f8f8f8;
+    outline: none;
+    font-size: 13px;
 }
-QCheckBox, QRadioButton { spacing: 8px; font-size: 13px; }
-QCheckBox::indicator, QRadioButton::indicator { width: 18px; height: 18px; }
+QListView::item,
+QTreeView::item {
+    padding: 5px 8px;
+    border-radius: 4px;
+}
+QListView::item:hover,
+QTreeView::item:hover {
+    background-color: #eaf3fc;
+}
+QListView::item:selected,
+QTreeView::item:selected {
+    background-color: #cce1f7;
+    color: #1c1c1c;
+}
+
+/* ── Checkboxes and radio buttons ────────────────────────────────────── */
+QCheckBox,
+QRadioButton {
+    spacing: 8px;
+    font-size: 13px;
+    color: #1c1c1c;
+}
+QCheckBox::indicator,
+QRadioButton::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1.5px solid #b0b0b0;
+    background-color: #ffffff;
+}
+QCheckBox::indicator:hover,
+QRadioButton::indicator:hover {
+    border-color: #1a7fd4;
+}
 QCheckBox::indicator:checked {
-    background-color: #0067c0; border: 2px solid #0067c0; border-radius: 3px;
+    background-color: #1a7fd4;
+    border-color: #1a7fd4;
+    border-radius: 4px;
 }
+QRadioButton::indicator {
+    border-radius: 9px;
+}
+QRadioButton::indicator:checked {
+    background-color: #1a7fd4;
+    border-color: #1a7fd4;
+}
+
+/* ── Group boxes (used on users, keyboard pages) ─────────────────────── */
 QGroupBox {
-    border: 1px solid #e0e0e0; border-radius: 6px;
-    margin-top: 16px; padding: 12px; font-weight: 500;
+    border: 1.5px solid #e0e0e0;
+    border-radius: 8px;
+    margin-top: 18px;
+    padding: 14px 12px 10px 12px;
+    font-weight: 600;
+    color: #1c1c1c;
 }
 QGroupBox::title {
-    subcontrol-origin: margin; subcontrol-position: top left;
-    padding: 0 6px; color: #1a1a1a;
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 12px;
+    padding: 0 6px;
+    color: #555555;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
-QScrollBar:vertical   { background: transparent; width: 6px; margin: 0; }
-QScrollBar::handle:vertical { background: #c0c0c0; border-radius: 3px; min-height: 24px; }
-QScrollBar::handle:vertical:hover { background: #909090; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QScrollBar:horizontal { background: transparent; height: 6px; }
-QScrollBar::handle:horizontal { background: #c0c0c0; border-radius: 3px; min-width: 24px; }
-QScrollBar::handle:horizontal:hover { background: #909090; }
-QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+
+/* ── Scrollbars — thin and unobtrusive ───────────────────────────────── */
+QScrollBar:vertical {
+    background: transparent;
+    width: 7px;
+    margin: 0;
+}
+QScrollBar::handle:vertical {
+    background: #d0d0d0;
+    border-radius: 3px;
+    min-height: 28px;
+}
+QScrollBar::handle:vertical:hover { background: #aaaaaa; }
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical { height: 0; }
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 7px;
+}
+QScrollBar::handle:horizontal {
+    background: #d0d0d0;
+    border-radius: 3px;
+    min-width: 28px;
+}
+QScrollBar::handle:horizontal:hover { background: #aaaaaa; }
+QScrollBar::add-line:horizontal,
+QScrollBar::sub-line:horizontal { width: 0; }
+
+/* ── Tooltip ─────────────────────────────────────────────────────────── */
+QToolTip {
+    background-color: #1c1c1c;
+    color: #f5f5f5;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
 QSS
 
 cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/show.qml" << 'SHOWQML'
 import QtQuick 2.15
 import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 
 Item {
     id: root
     anchors.fill: parent
     property bool activatedInCalamares: false
 
+    // ── Slide data ─────────────────────────────────────────────────────
+    property var slides: [
+        {
+            icon:    "🐺",
+            heading: "Welcome to KibaOS",
+            body:    "We're setting everything up for you. This usually takes around 5–10 minutes depending on your hardware."
+        },
+        {
+            icon:    "⚡",
+            heading: "Fast by default",
+            body:    "KibaOS is built on Arch Linux, so you always get the latest software — fresh from upstream."
+        },
+        {
+            icon:    "🎨",
+            heading: "Made to look great",
+            body:    "The Deepin desktop is polished, smooth, and easy to navigate right out of the box."
+        },
+        {
+            icon:    "🔒",
+            heading: "Your system, your rules",
+            body:    "Full disk encryption, a powerful package manager, and the entire AUR are at your fingertips."
+        },
+        {
+            icon:    "💡",
+            heading: "Need help?",
+            body:    "Visit github.com/WolfTech-Innovations/Kiba for guides, the wiki, and to report issues."
+        }
+    ]
+
+    property int currentSlide: 0
+
+    // Auto-advance slides every 6 seconds once the installer is active
+    Timer {
+        interval: 6000
+        running: root.activatedInCalamares
+        repeat: true
+        onTriggered: root.currentSlide = (root.currentSlide + 1) % root.slides.length
+    }
+
+    // ── Background ─────────────────────────────────────────────────────
     Rectangle {
         anchors.fill: parent
-        color: "#f3f3f3"
+        color: "#f5f5f5"
 
-        Image {
-            id: logo
-            anchors { horizontalCenter: parent.horizontalCenter; top: parent.top; topMargin: parent.height * 0.28 }
-            source: "logo.png"
-            width: 120; height: 120
-            fillMode: Image.PreserveAspectFit
-            smooth: true
+        // ── Top logo strip ─────────────────────────────────────────────
+        Rectangle {
+            id: topStrip
+            anchors { top: parent.top; left: parent.left; right: parent.right }
+            height: parent.height * 0.38
+            color: "#1a7fd4"
+
+            // Subtle radial glow behind the logo
+            Rectangle {
+                anchors.centerIn: parent
+                width: 180; height: 180
+                radius: 90
+                color: "#ffffff"
+                opacity: 0.08
+            }
+
+            Image {
+                id: logo
+                anchors.centerIn: parent
+                source: "logo.png"
+                width: 96; height: 96
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+
+                // Gentle entrance scale on first load
+                NumberAnimation on scale {
+                    from: 0.8; to: 1.0; duration: 600
+                    easing.type: Easing.OutBack
+                    running: true
+                }
+            }
         }
 
-        Text {
-            id: heading
-            anchors { horizontalCenter: parent.horizontalCenter; top: logo.bottom; topMargin: 32 }
-            text: "Installing KibaOS"
-            font.pixelSize: 28; font.weight: Font.Light; color: "#1a1a1a"
-        }
+        // ── Slide content card ─────────────────────────────────────────
+        Rectangle {
+            id: card
+            anchors {
+                top: topStrip.bottom
+                topMargin: -16        // overlap the strip for a layered look
+                horizontalCenter: parent.horizontalCenter
+            }
+            width: Math.min(parent.width - 64, 520)
+            height: contentCol.implicitHeight + 48
+            radius: 12
+            color: "#ffffff"
+            layer.enabled: true
+            layer.effect: null       // no QtGraphicalEffects dependency
 
-        Text {
-            anchors { horizontalCenter: parent.horizontalCenter; top: heading.bottom; topMargin: 12 }
-            text: "This may take a few minutes. Your PC will restart automatically."
-            font.pixelSize: 13; color: "#5a5a5a"
-        }
+            ColumnLayout {
+                id: contentCol
+                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 32 }
+                spacing: 12
 
-        Row {
-            anchors { horizontalCenter: parent.horizontalCenter; bottom: progressBar.top; bottomMargin: 32 }
-            spacing: 10
-            Repeater {
-                model: 5
-                delegate: Rectangle {
-                    width: 8; height: 8; radius: 4; color: "#0067c0"; opacity: 0.25
-                    SequentialAnimation on opacity {
-                        running: root.activatedInCalamares; loops: Animation.Infinite
-                        PauseAnimation  { duration: index * 160 }
-                        NumberAnimation { to: 1.0;  duration: 300; easing.type: Easing.InOutQuad }
-                        NumberAnimation { to: 0.25; duration: 300; easing.type: Easing.InOutQuad }
-                        PauseAnimation  { duration: (4 - index) * 160 }
+                // Emoji icon
+                Text {
+                    Layout.alignment: Qt.AlignHCenter
+                    text: root.slides[root.currentSlide].icon
+                    font.pixelSize: 36
+                    Behavior on text { }
+                }
+
+                // Slide heading
+                Text {
+                    id: slideHeading
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    text: root.slides[root.currentSlide].heading
+                    font.pixelSize: 20
+                    font.weight: Font.Medium
+                    color: "#1c1c1c"
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+
+                    Behavior on text {
+                        SequentialAnimation {
+                            NumberAnimation { target: slideHeading; property: "opacity"; to: 0; duration: 180 }
+                            PropertyAction  { }
+                            NumberAnimation { target: slideHeading; property: "opacity"; to: 1; duration: 220 }
+                        }
+                    }
+                }
+
+                // Slide body
+                Text {
+                    id: slideBody
+                    Layout.alignment: Qt.AlignHCenter
+                    Layout.fillWidth: true
+                    text: root.slides[root.currentSlide].body
+                    font.pixelSize: 13
+                    color: "#555555"
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap
+                    lineHeight: 1.5
+
+                    Behavior on text {
+                        SequentialAnimation {
+                            NumberAnimation { target: slideBody; property: "opacity"; to: 0; duration: 180 }
+                            PropertyAction  { }
+                            NumberAnimation { target: slideBody; property: "opacity"; to: 1; duration: 220 }
+                        }
+                    }
+                }
+
+                // Dot pagination
+                Row {
+                    Layout.alignment: Qt.AlignHCenter
+                    spacing: 8
+                    Repeater {
+                        model: root.slides.length
+                        delegate: Rectangle {
+                            width:  index === root.currentSlide ? 18 : 7
+                            height: 7
+                            radius: 3.5
+                            color:  index === root.currentSlide ? "#1a7fd4" : "#d0d0d0"
+                            Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
+                            Behavior on color { ColorAnimation { duration: 200 } }
+
+                            // Tap to jump to slide
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.currentSlide = index
+                            }
+                        }
                     }
                 }
             }
         }
 
+        // ── Status label (mirrors Calamares job name if available) ─────
+        Text {
+            id: statusLabel
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                bottom: progressTrack.top
+                bottomMargin: 10
+            }
+            text: "Installing KibaOS…"
+            font.pixelSize: 12
+            color: "#888888"
+        }
+
+        // ── Animated progress bar ──────────────────────────────────────
         Rectangle {
-            id: progressBar
+            id: progressTrack
             anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-            height: 4; color: "#e0e0e0"
+            height: 5
+            color: "#e0e0e0"
+
             Rectangle {
+                id: progressFill
                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                width: 0; color: "#0067c0"; radius: 2
+                width: 0
+                color: "#1a7fd4"
+                radius: 2.5
+
                 SequentialAnimation on width {
-                    running: root.activatedInCalamares; loops: Animation.Infinite
-                    NumberAnimation { from: 0; to: progressBar.width; duration: 2200; easing.type: Easing.InOutCubic }
-                    PauseAnimation  { duration: 400 }
-                    NumberAnimation { from: progressBar.width; to: 0; duration: 800; easing.type: Easing.InCubic }
+                    running: root.activatedInCalamares
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                        from: 0; to: progressTrack.width * 0.85
+                        duration: 2800; easing.type: Easing.InOutCubic
+                    }
+                    PauseAnimation { duration: 500 }
+                    NumberAnimation {
+                        to: progressTrack.width
+                        duration: 600; easing.type: Easing.OutCubic
+                    }
+                    PauseAnimation { duration: 300 }
+                    NumberAnimation {
+                        to: 0; duration: 500; easing.type: Easing.InCubic
+                    }
                 }
             }
         }
@@ -689,7 +1014,6 @@ script:
           echo "=== Settings migrated to ${NEW_HOME} ==="
 SHELLPROC
 
-# ── Calamares displaymanager module: sddm ────────────────────────────────
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
@@ -733,7 +1057,6 @@ WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 
 ln -sf /usr/lib/systemd/system/graphical.target "${WANTS}/default.target"
-# SDDM ships its own sddm.service; point display-manager at it
 ln -sf /usr/lib/systemd/system/sddm.service     "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager.service \
        "${WANTS}/multi-user.target.wants/NetworkManager.service"
@@ -782,6 +1105,8 @@ sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/'   /etc/systemd/login
 sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
 
 # ── Root shell ────────────────────────────────────────────────────────────
+# zsh must be in /etc/shells before chsh will accept it
+grep -qx '/usr/bin/zsh' /etc/shells || echo '/usr/bin/zsh' >> /etc/shells
 chsh -s /usr/bin/zsh root
 
 # ── liveuser home ─────────────────────────────────────────────────────────
@@ -881,17 +1206,11 @@ DesktopNames=Cutefish
 SESSION
 chmod 644 /usr/share/xsessions/cutefish-xsession.desktop
 
-# ── SDDM: ensure service is enabled and sddm user exists ─────────────────
+# ── SDDM: ensure service is enabled and system user exists ────────────────
 systemctl enable sddm.service
-
-# SDDM needs its own system user to drop privileges before showing the greeter
 useradd -r -s /usr/bin/nologin -d /var/lib/sddm -M sddm 2>/dev/null || true
 mkdir -p /var/lib/sddm
 chown sddm:sddm /var/lib/sddm
-
-# Copy branding assets into the SDDM theme dir now that logo.png exists
-# (it was placed by the Plymouth section below via the same curl call)
-# We'll do the copy after the logo fetch later in this script.
 
 # ── Plymouth: KibaOS branded spinner theme ───────────────────────────────
 THEME_SRC="/usr/share/plymouth/themes/spinner"
@@ -916,16 +1235,15 @@ curl -fL --retry 3 --retry-delay 2 -o "${LOGO_RAW}" "${LOGO_URL}"
 magick "${LOGO_RAW}" -filter Lanczos -resize 256x256 \
   /usr/share/calamares/branding/kibaos/logo.png
 
-# SDDM theme assets — logo + a dark blurred background
+# SDDM theme assets
 magick "${LOGO_RAW}" -filter Lanczos -resize 96x96 \
   /usr/share/sddm/themes/kibaos/logo.png
 
-# Generate a simple dark gradient as the background (no external image needed)
-magick -size 1920x1080 \
-  gradient:"#0d0d0d-#1a1a2e" \
+# Dark gradient background for SDDM
+magick -size 1920x1080 gradient:"#0d0d0d-#1a1a2e" \
   /usr/share/sddm/themes/kibaos/background.png
 
-# Plymouth watermark
+# Plymouth watermark + icon
 magick "${LOGO_RAW}" -filter Lanczos -resize 400x \
   "${THEME_DST}/watermark.png"
 magick "${LOGO_RAW}" -filter Lanczos -resize 64x64 \
@@ -943,19 +1261,15 @@ systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
 systemctl enable plymouth-quit-wait.service  2>/dev/null || true
 
-# ── Strip ELF debug symbols ───────────────────────────────────────────────
-find /usr/bin /usr/lib /usr/lib32 -type f \( -name '*.so*' -o -perm /111 \) \
-  -exec sh -c 'file "$1" | grep -q ELF && strip --strip-unneeded "$1" 2>/dev/null' _ {} \; || true
-
+# ── Strip debug from uncompressed kernel modules only ────────────────────
+# Full ELF binary stripping (find /usr/bin /usr/lib ... strip --strip-unneeded)
+# is intentionally omitted: running `file` + exec sh against live chroot
+# binaries causes SIGSEGV/bus errors when strip or sh itself gets processed
+# mid-execution (signal 11, exit 135). squashfs xz + bcj filter in
+# profiledef.sh recovers equivalent space at pack time without the risk.
 find /usr/lib/modules -type f -name '*.ko' \
   -exec strip --strip-debug {} \; 2>/dev/null || true
-find /usr/lib/modules -type f -name '*.ko.zst' | while read -r f; do
-  tmp="${f%.zst}.tmp.ko"
-  zstd -d -q "${f}" -o "${tmp}" 2>/dev/null && \
-  strip --strip-debug "${tmp}" 2>/dev/null && \
-  zstd -19 -q "${tmp}" -o "${f}" --force 2>/dev/null && \
-  rm -f "${tmp}"
-done || true
+# .ko.zst recompression also omitted — same fragility concern in chroot.
 
 # ── Aggressive size reduction ─────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*
