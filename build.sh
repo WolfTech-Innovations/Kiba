@@ -275,7 +275,20 @@ LXDMTHEME
 # ══════════════════════════════════════════════════════════════════════════
 # LXDE session file
 # ══════════════════════════════════════════════════════════════════════════
-mkdir -p "${AIROOTFS}/usr/share/xsessions"
+mkdir -p "${AIROOTFS}/usr/share/xsessions" dbus-broker-units-37-3-x86_64 downloading...
+ base-3-3-any downloading...
+ dbus-units-37-3-x86_64 downloading...
+ ca-certificates-20240618-1-any downloading...
+checking keyring...
+checking package integrity...
+loading package files...
+checking for file conflicts...
+error: failed to commit transaction (conflicting files)
+lxde-common: /w/work/x86_64/airootfs/usr/share/xsessions/LXDE.desktop exists in filesystem
+Errors occurred, no packages were upgraded.
+==> ERROR: Failed to install packages to new root
+Error: Process completed with exit code 1.
+rm ${AIROOTFS}/usr/share/xsessions/LXDE.desktop
 cat > "${AIROOTFS}/usr/share/xsessions/LXDE.desktop" << 'LXDESKTOP'
 [Desktop Entry]
 Name=LXDE
@@ -378,11 +391,11 @@ Item {
     id: root; anchors.fill: parent
     property bool activatedInCalamares: false
     property var slides: [
-        { icon: "🐺", heading: "Welcome to KibaOS", body: "We're setting everything up for you. This usually takes 5–10 minutes." },
-        { icon: "⚡", heading: "Built on Arch Linux", body: "Rolling release means you always get the latest software, straight from upstream." },
-        { icon: "🖥", heading: "LXDE Desktop", body: "Fast, familiar, and easy to use. Works great on any hardware, old or new." },
-        { icon: "🔒", heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
-        { icon: "❤", heading: "KibaOS by WolfTech", body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
+        { icon: "", heading: "Welcome to KibaOS", body: "We're setting everything up for you. This usually takes 5–10 minutes." },
+        { icon: "", heading: "Built on Arch Linux", body: "Rolling release means you always get the latest software, straight from upstream." },
+        { icon: "", heading: "LXDE Desktop", body: "Fast, familiar, and easy to use. Works great on any hardware, old or new." },
+        { icon: "", heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
+        { icon: "", heading: "KibaOS by WolfTech", body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
     ]
     property int currentSlide: 0
 
