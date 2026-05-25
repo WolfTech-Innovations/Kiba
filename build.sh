@@ -467,7 +467,7 @@ SDDMQML
 
 # ══════════════════════════════════════════════════════════════════════════
 # PaperDE Wayland session file
-# ══════════════════════════════════════════════════════════════════════════
+# ════════════════════════════════pacma══════════════════════════════════════════
 mkdir -p "${AIROOTFS}/usr/share/wayland-sessions"
 cat > "${AIROOTFS}/usr/share/wayland-sessions/paperde.desktop" << 'PAPERDESKTOP'
 [Desktop Entry]
@@ -572,11 +572,11 @@ Item {
     id: root; anchors.fill: parent
     property bool activatedInCalamares: false
     property var slides: [
-        { icon: "🐺", heading: "Welcome to KibaOS", body: "We're setting everything up for you. This usually takes 5–10 minutes." },
-        { icon: "⚡", heading: "Built on Arch Linux", body: "Rolling release means you always get the latest software, straight from upstream." },
-        { icon: "🎨", heading: "PaperDE on Wayland", body: "A touch-friendly Qt6 desktop on Wayfire — fast, modern, and beautiful." },
-        { icon: "🔒", heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
-        { icon: "🐺", heading: "KibaOS by WolfTech", body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
+        { icon: "", heading: "Welcome to KibaOS", body: "We're setting everything up for you. This usually takes 5–10 minutes." },
+        { icon: "", heading: "Built on Arch Linux", body: "Rolling release means you always get the latest software, straight from upstream." },
+        { icon: "", heading: "PaperDE on Wayland", body: "A touch-friendly Qt6 desktop on Wayfire — fast, modern, and beautiful." },
+        { icon: "", heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
+        { icon: "", heading: "KibaOS by WolfTech", body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
     ]
     property int currentSlide: 0
 
@@ -805,7 +805,10 @@ mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
-
+pacman-key --init
+pacman-key --populate archlinux
+pacman -Sy archlinux-keyring --noconfirm
+pacman -Syy --noconfirm
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen
