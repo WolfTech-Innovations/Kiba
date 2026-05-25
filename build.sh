@@ -1,14 +1,4 @@
 #!/bin/bash
-# ╔══════════════════════════════════════════════════════════════════════════╗
-# ║  KibaOS ISO Build Script — PaperDE Edition                             ║
-# ║  WolfTech Innovations                                                   ║
-# ║                                                                         ║
-# ║  DE:       PaperDE (Qt6 / Wayland / Wayfire)                           ║
-# ║  Greeter:  SDDM Wayland + KibaOS theme + autologin                     ║
-# ║  Theme:    Material You teal (#006874) × ChromeOS shelf × macOS card   ║
-# ║  Apps:     Falkon · Elisa · Octopi · Dolphin · Konsole · KibaOS tools  ║
-# ║  Boot:     Plymouth spinner with real KibaOS logo (correctly applied)  ║
-# ╚══════════════════════════════════════════════════════════════════════════╝
 set -ex
 
 # ── Container deps ────────────────────────────────────────────────────────
