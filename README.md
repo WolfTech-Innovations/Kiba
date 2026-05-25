@@ -18,14 +18,13 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Paper Desktop Enviroment** as the desktop environment. It is developed and maintained by **WolfTech Innovations**.
+KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Paper Desktop Enviroment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
-## Star History
 
 <a href="https://www.star-history.com/?repos=WolfTech-Innovations%2FKiba&type=date&legend=top-left">
  <picture>
