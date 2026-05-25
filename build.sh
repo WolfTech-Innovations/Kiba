@@ -130,8 +130,7 @@ git
 base-devel
 papirus-icon-theme
 breeze-icons
-sddm
-chromium           
+sddm           
 gparted
 ntfs-3g
 exfatprogs
