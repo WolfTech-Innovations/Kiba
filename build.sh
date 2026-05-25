@@ -1,13 +1,8 @@
 #!/bin/bash
 # KibaOS ISO build script
-# Fixed: switched DM from SLiM to XDM, chotkeys skipped entirely,
-#        Cutefish build patches,
-#        Calamares sequence/modules, unpackfs path, package names, mkinitcpio hooks,
-#        liveuser setup, kiba-apply runtime dir, shellprocess users.json path, and more.
-#
-# AUTOLOGIN FIX: liveuser password set to "live", nopasswdlogin PAM group,
-#        xdm-autologin PAM service, chpasswd in chroot. Arch does not allow
-#        locked (!) shadow entries through XDM PAM autologin.
+# DE: Deepin Desktop Environment (deepin + deepin-kwin + deepin-extra)
+# Greeter: ReGreet (greetd + greetd-regreet + cage)
+# Auth: liveuser password "live", nopasswdlogin PAM group for autologin
 set -ex
 
 # ── Install ALL deps inside the container ────────────────────────────────
@@ -21,43 +16,22 @@ pacman -S --noconfirm --needed \
   \
   cmake extra-cmake-modules ninja \
   \
-  qt5-base qt5-declarative qt5-svg qt5-quickcontrols2 \
-  qt5-graphicaleffects qt5-x11extras qt5-tools \
-  qt5-quickcontrols qt5-multimedia qt5-wayland \
-  \
-  kwindowsystem5 kidletime5 kcoreaddons5 kconfig5 \
-  ki18n5 kiconthemes5 kdbusaddons5 kservice5 \
-  kio5 solid5 \
-  kwin \
-  \
-  libxcb xcb-util xcb-util-wm xcb-util-keysyms \
-  xcb-util-image xcb-util-renderutil \
-  libxkbcommon xorgproto libxcursor libxtst \
-  libpulse \
-  xorg-server-devel xf86-input-libinput xf86-input-synaptics \
-  \
-  dbus pam polkit polkit-qt5 \
-  gsettings-desktop-schemas networkmanager \
-  bluez \
-  fontconfig freetype2 icu \
-  \
-  appmenu-gtk-module \
-  \
   kpmcore boost boost-libs yaml-cpp libpwquality \
   python python-yaml python-jsonschema \
   qt5-xmlpatterns kparts5 \
   \
-  xorg-xdm \
+  dbus pam polkit \
+  networkmanager \
+  fontconfig freetype2 \
   \
-  xorg-xrandr xorg-xdpyinfo xorg-xwd xorg-xwud \
+  greetd greetd-regreet cage gtk4 \
+  \
   imagemagick \
-  dconf python-dbus python-gobject \
   openssl
 
 # ── Setup ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
-STAGING="/tmp/cutefish-staging"
 PROFILE="${WORKDIR}/kiba-profile"
 AIROOTFS="${PROFILE}/airootfs"
 SRCDIR="${WORKDIR}/src"
@@ -68,6 +42,35 @@ echo "=== Configuring archiso profile ==="
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 mkdir -p "${SRCDIR}"
+
+# ── Wallpaper: fetch + upscale to 4K ──────────────────────────────────────
+# Source is a 1920×1080 copyright-free purple aesthetic image.
+# We upscale to 3840×2160 with Lanczos so it looks sharp on HiDPI displays,
+# then embed it at /usr/share/wallpapers/kibaos/wallpaper.jpg in the airootfs.
+WALLPAPER_URL="https://wallpapers.com/images/hd/non-copyrighted-purple-aesthetic-view-6ad1lsfony65z6q5.jpg"
+WALLPAPER_SRC="${WORKDIR}/wallpaper_src.jpg"
+WALLPAPER_4K="${WORKDIR}/wallpaper_4k.jpg"
+
+echo "=== Fetching wallpaper ==="
+curl -fL --retry 3 --retry-delay 2 -o "${WALLPAPER_SRC}" "${WALLPAPER_URL}"
+
+echo "=== Upscaling wallpaper to 3840×2160 (Lanczos) ==="
+magick "${WALLPAPER_SRC}" \
+  -filter Lanczos \
+  -resize 3840x2160\! \
+  -unsharp 0x0.75+0.75+0.008 \
+  -quality 92 \
+  "${WALLPAPER_4K}"
+
+# Stage into airootfs — both paths covered:
+#   /usr/share/wallpapers/kibaos/wallpaper.jpg  (regreet + deepin dconf key)
+#   /usr/share/wallpapers/deepin/desktop.jpg    (deepin fallback default)
+mkdir -p "${AIROOTFS}/usr/share/wallpapers/kibaos"
+mkdir -p "${AIROOTFS}/usr/share/wallpapers/deepin"
+cp "${WALLPAPER_4K}" "${AIROOTFS}/usr/share/wallpapers/kibaos/wallpaper.jpg"
+cp "${WALLPAPER_4K}" "${AIROOTFS}/usr/share/wallpapers/deepin/desktop.jpg"
+
+echo "=== Wallpaper staged ==="
 
 # ── profiledef.sh ──────────────────────────────────────────────────────────
 cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
@@ -87,12 +90,6 @@ airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1048576' '-Xdict-s
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/gshadow"]="0:0:400"
-  ["/usr/local/bin/kiba-welcome"]="0:0:755"
-  ["/usr/local/bin/kiba-session"]="0:0:755"
-  ["/usr/local/bin/kiba-apply"]="0:0:755"
-  ["/usr/local/bin/kiba-set"]="0:0:755"
-  ["/usr/local/bin/kiba-access"]="0:0:755"
-  ["/usr/local/bin/kiba-freeze"]="0:0:755"
   ["/root"]="0:0:750"
   ["/home/liveuser"]="1000:1000:750"
 )
@@ -114,93 +111,8 @@ SUPPORT_URL="https://github.com/WolfTech-Innovations/Kiba/issues"
 LOGO=kibaos
 OSRELEASE
 
-# ── Compile Cutefish DE ───────────────────────────────────────────────────
-echo "=== Compiling Cutefish DE ==="
-
-build_cutefish_repo() {
-  local REPO=$1
-  local GITHUB_NAME=${2:-$REPO}
-  cd "${SRCDIR}"
-  git clone --depth 1 "https://github.com/cutefishos/${GITHUB_NAME}.git" "${REPO}"
-  cd "${SRCDIR}/${REPO}"
-
-  # ── Strip optional/broken submodules ──────────────────────────────────
-  sed -i '/add_subdirectory(bluetooth)/d'         CMakeLists.txt 2>/dev/null || true
-  sed -i '/add_subdirectory(bluez)/d'             CMakeLists.txt 2>/dev/null || true
-  sed -i '/add_subdirectory(networkmanagement)/d' CMakeLists.txt 2>/dev/null || true
-  sed -i '/add_subdirectory(screen)/d'            CMakeLists.txt 2>/dev/null || true
-  sed -i '/find_package(KF5BluezQt/d'             CMakeLists.txt 2>/dev/null || true
-  sed -i '/find_package(KF5NetworkManagerQt/d'    CMakeLists.txt 2>/dev/null || true
-  sed -i '/find_package(KF5ModemManagerQt/d'      CMakeLists.txt 2>/dev/null || true
-  sed -i '/find_package(KF5Screen/d'              CMakeLists.txt 2>/dev/null || true
-  sed -i '/KF5::BluezQt/d'                        CMakeLists.txt 2>/dev/null || true
-  sed -i '/KF5::NetworkManagerQt/d'               CMakeLists.txt 2>/dev/null || true
-  sed -i '/KF5::ModemManagerQt/d'                 CMakeLists.txt 2>/dev/null || true
-  sed -i '/KF5::Screen/d'                         CMakeLists.txt 2>/dev/null || true
-  sed -i '/src\/vpn\//d'                          CMakeLists.txt 2>/dev/null || true
-
-  # ── Fix qt5_create_translation calls ──────────────────────────────────
-  while IFS= read -r f; do
-    DIR=$(dirname "$f")
-    TS_COUNT=$(find "$DIR" -maxdepth 2 -name "*.ts" 2>/dev/null | wc -l)
-    if grep -q 'qt5_create_translation' "$f" 2>/dev/null; then
-      if [ "$TS_COUNT" -gt 0 ]; then
-        sed -i 's/qt5_create_translation(\(QM_FILES\)[^)]*\(\${[A-Z_]*TS_FILES}\))/qt5_add_translation(\1 \2)/g' "$f"
-        sed -i 's/qt5_create_translation(/qt5_add_translation(/g' "$f"
-        sed -i 's/qt5_add_translation(\(QM_FILES\) \${CMAKE_CURRENT_SOURCE_DIR}[^ )]*  */qt5_add_translation(\1 /g' "$f"
-      else
-        sed -i '/qt5_create_translation/d' "$f"
-        sed -i '/qt5_add_translation/d'    "$f"
-        sed -i '/QM_FILES/d'               "$f"
-        sed -i '/install.*\.qm/d'          "$f"
-      fi
-    fi
-  done < <(find . -name "CMakeLists.txt")
-
-  sed -i '/add_subdirectory(chotkeys)/d' CMakeLists.txt 2>/dev/null || true
-
-  mkdir -p build && cd build
-  cmake -DCMAKE_INSTALL_PREFIX=/usr \
-        -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
-        -DCMAKE_BUILD_TYPE=Release \
-        -GNinja ..
-  ninja
-  DESTDIR="${STAGING}"  ninja install
-  DESTDIR="${AIROOTFS}" ninja install
-  cd "${WORKDIR}"
-}
-
-for REPO in libcutefish fishui core dock launcher statusbar \
-            terminal filemanager calculator screenshot \
-            wallpapers icons; do
-  build_cutefish_repo "${REPO}" "${REPO}"
-done
-
-if [ ! -f "${AIROOTFS}/usr/bin/cutefish-session" ]; then
-  echo "ERROR: cutefish-session not found in airootfs after build!"
-  exit 1
-fi
-echo "=== cutefish-session installed OK ==="
-
-# ── Compile Calamares ──────────────────────────────────────────────────────
-echo "=== Compiling Calamares ==="
-cd "${SRCDIR}"
-git clone --depth 1 https://codeberg.org/Calamares/calamares.git calamares
-cd "${SRCDIR}/calamares"
-mkdir -p build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX=/usr \
-      -DWITH_PYTHONQT=OFF \
-      -DWITH_PYTHON=ON \
-      -DWITH_KF5DBus=ON \
-      -DSKIP_MODULES="webview interactiveterminal initramfs \
-                      initramfscfg dracut dracutlukscfg \
-                      dummyprocess dummypython dummycpp \
-                      dummypythonqt services-openrc" \
-      -GNinja ..
-ninja
-DESTDIR="${AIROOTFS}" ninja install
-cd "${WORKDIR}"
+# ── No source compilation needed — DDE ships as pacman packages ──────────
+echo "=== DDE will be installed from Arch repos via packages.x86_64 ==="
 
 # ── Package list ───────────────────────────────────────────────────────────
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
@@ -223,56 +135,25 @@ nano
 ttf-dejavu
 noto-fonts-emoji
 flatpak
-xdg-desktop-portal-kde
 xdg-desktop-portal-gtk
 firefox
 gparted
 ntfs-3g
 exfatprogs
 cryptsetup
-xorg-xdm
-zenity
 xorg-server
 xorg-xinit
 xorg-xrandr
-xorg-xdpyinfo
-xorg-xwd
-xorg-xwud
 xf86-video-vesa
-kwin
-qt5-base
-qt5-declarative
-qt5-svg
-qt5-quickcontrols2
-qt5-graphicaleffects
-qt5-x11extras
-qt5-quickcontrols
-qt5-multimedia
-kwindowsystem5
-kidletime5
-polkit-qt5
-libxcursor
-libxtst
-libxcb
-xcb-util
-xcb-util-cursor
-xcb-util-image
-xcb-util-keysyms
-xcb-util-renderutil
-xcb-util-wm
-xcb-util-xrm
-libxkbcommon-x11
-libpulse
-bluez
-appmenu-gtk-module
-squashfs-tools
-imagemagick
-dconf
-python-dbus
-python-gobject
-python
-python-yaml
-python-jsonschema
+deepin
+deepin-kwin
+deepin-extra
+lightdm
+lightdm-deepin-greeter
+greetd
+greetd-regreet
+cage
+gtk4
 openssl
 PACKAGES
 
@@ -312,101 +193,37 @@ if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
 fi
 
-# ── XDM display manager config ─────────────────────────────────────────────
-mkdir -p "${AIROOTFS}/etc/X11/xdm"
+# ── greetd + ReGreet config ────────────────────────────────────────────────
+# ReGreet runs under Cage (minimal Wayland compositor) as the greeter user.
+# It reads xsessions from /usr/share/xsessions and launches them via
+# startx /usr/bin/env <session-exec> (X11_CMD_PREFIX default).
+mkdir -p "${AIROOTFS}/etc/greetd"
 
-# xdm-config: autologin liveuser via xdm-autologin PAM service.
-# pamService points XDM at our custom PAM stack that allows nopasswdlogin
-# group members through without a password prompt.
-cat > "${AIROOTFS}/etc/X11/xdm/xdm-config" << 'XDMCONFIG'
-DisplayManager.errorLogFile:            /var/log/xdm.log
-DisplayManager.pidFile:                 /var/run/xdm.pid
-DisplayManager.keyFile:                 /etc/X11/xdm/xdm-keys
-DisplayManager.servers:                 /etc/X11/xdm/Xservers
-DisplayManager.accessFile:              /etc/X11/xdm/Xaccess
-DisplayManager*resources:               /etc/X11/xdm/Xresources
-DisplayManager*session:                 /etc/X11/xdm/Xsession
-DisplayManager*authComplain:            false
-DisplayManager*pamService:              xdm-autologin
-DisplayManager_0.authorize:             false
-DisplayManager_0.autoLogin:             liveuser
-DisplayManager_0.autoReLogin:           true
-DisplayManager.requestPort:             0
-XDMCONFIG
+cat > "${AIROOTFS}/etc/greetd/config.toml" << 'GREETDCONF'
+[terminal]
+vt = 1
 
-cat > "${AIROOTFS}/etc/X11/xdm/Xservers" << 'XSERVERS'
-:0 local /usr/bin/X :0 vt7 -nolisten tcp
-XSERVERS
+[default_session]
+command = "env GTK_USE_PORTAL=0 GDK_DEBUG=no-portals cage -s -mlast -- regreet"
+user = "greeter"
+GREETDCONF
 
-cat > "${AIROOTFS}/etc/X11/xdm/Xaccess" << 'XACCESS'
-*
-XACCESS
+# wallpaper path now points to our embedded KibaOS wallpaper
+cat > "${AIROOTFS}/etc/greetd/regreet.toml" << 'REGREETCONF'
+[background]
+path = "/usr/share/wallpapers/kibaos/wallpaper.jpg"
+fit = "Cover"
 
-cat > "${AIROOTFS}/etc/X11/xdm/Xresources" << 'XRESOURCES'
-xlogin*login.translations: #override\
-    <Key>Return: set-session-argument() finish-field()
-XRESOURCES
+[GTK]
+application_prefer_dark_theme = true
 
-cat > "${AIROOTFS}/etc/X11/xdm/Xsession" << 'XSESSION'
-#!/bin/bash
-# /etc/X11/xdm/Xsession — run as the logged-in user.
+[clock]
+format = "%H:%M — %A, %B %d"
 
-[ -f /etc/profile ]            && source /etc/profile
-[ -f "${HOME}/.profile" ]      && source "${HOME}/.profile" 2>/dev/null || true
-
-if [ -x "${HOME}/.xsession" ]; then
-    exec "${HOME}/.xsession"
-fi
-
-exec /usr/local/bin/kiba-session
-XSESSION
-chmod +x "${AIROOTFS}/etc/X11/xdm/Xsession"
-
-# ── PAM: xdm-autologin service ─────────────────────────────────────────────
-# pam_succeed_if: members of nopasswdlogin bypass password auth entirely.
-# Falls through to system-login for everything else (account, session, etc.).
-mkdir -p "${AIROOTFS}/etc/pam.d"
-cat > "${AIROOTFS}/etc/pam.d/xdm-autologin" << 'PAMAUTOLOGIN'
-auth        sufficient  pam_succeed_if.so user ingroup nopasswdlogin quiet
-auth        include     system-login
-account     include     system-login
-password    include     system-login
-session     include     system-login
-PAMAUTOLOGIN
-
-# ── kiba-session ──────────────────────────────────────────────────────────
-mkdir -p "${AIROOTFS}/usr/local/bin"
-cat > "${AIROOTFS}/usr/local/bin/kiba-session" << 'KIBASESSION'
-#!/bin/bash
-# kiba-session — KibaOS X session, exec'd from ~/.xsession by XDM.
-
-export XDG_CURRENT_DESKTOP=Cutefish
-export DESKTOP_SESSION=cutefish
-export XDG_SESSION_DESKTOP=cutefish
-export XDG_SESSION_TYPE=x11
-
-export XDG_RUNTIME_DIR="/run/user/$(id -u)"
-mkdir -p "${XDG_RUNTIME_DIR}"
-chmod 0700 "${XDG_RUNTIME_DIR}"
-
-unset KDE_FULL_SESSION
-unset KDE_SESSION_VERSION
-
-[ -f /etc/profile ]       && source /etc/profile
-[ -f "${HOME}/.profile" ] && source "${HOME}/.profile" 2>/dev/null || true
-
-if [ -z "${DBUS_SESSION_BUS_ADDRESS}" ]; then
-  eval "$(dbus-launch --sh-syntax --exit-with-session)"
-fi
-
-/usr/bin/kwin_x11 --replace &
-sleep 0.8
-
-/usr/local/bin/kiba-apply &
-
-exec /usr/bin/cutefish-session
-KIBASESSION
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-session"
+[commands]
+reboot = ["loginctl", "reboot"]
+poweroff = ["loginctl", "poweroff"]
+REGREETCONF
 
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
@@ -490,9 +307,8 @@ script:
           cp -a "${LIVE_HOME}/.config/dconf/user" \
                 "${NEW_HOME}/.config/dconf/user" 2>/dev/null || true
 
-          for f in cutefishtheme.conf cutefish-wallpaper.conf \
-                   cutefish-appearance.conf cutefish-dock.conf \
-                   cutefish-statusbar.conf; do
+          for f in org.deepin.dde.appearance org.deepin.dde.wallpaper \
+                   deepin-metacity deepin-wm-switcher; do
               src="${LIVE_HOME}/.config/${f}"
               [ -f "$src" ] && cp "$src" "${NEW_HOME}/.config/${f}"
           done
@@ -519,374 +335,12 @@ SHELLPROC
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
-  - xdm
+  - greetd
 defaultDesktopEnvironment:
-  executable: "cutefish-session"
-  desktopFile: "cutefish-xsession"
+  executable: "startdde"
+  desktopFile: "deepin"
 basicSetup: false
 DMCONF
-
-# ── kiba-freeze ───────────────────────────────────────────────────────────
-cat > "${AIROOTFS}/usr/local/bin/kiba-freeze" << 'KIBAFREEZE'
-#!/bin/bash
-DISPLAY="${DISPLAY:-:0}"
-TMP=$(mktemp /tmp/kiba-freeze-XXXXXX)
-TMP_PNG="${TMP}.png"
-xwd -display "${DISPLAY}" -root -silent -out "${TMP}"
-convert "${TMP}" "${TMP_PNG}" 2>/dev/null
-rm -f "${TMP}"
-display -display "${DISPLAY}" -window root "${TMP_PNG}" &
-OVERLAY_PID=$!
-sleep 0.04
-echo "${OVERLAY_PID}:${TMP_PNG}"
-KIBAFREEZE
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-freeze"
-
-# ── kiba-apply ────────────────────────────────────────────────────────────
-cat > "${AIROOTFS}/usr/local/bin/kiba-apply" << 'KIBAAPPLY'
-#!/usr/bin/env python3
-"""
-kiba-apply  — KibaOS instant-apply settings daemon
-Unix socket: /run/user/<uid>/kiba-apply.sock
-"""
-import json, os, signal, socket, subprocess, sys, threading, time
-
-UID       = os.getuid()
-SOCK_DIR  = os.environ.get("XDG_RUNTIME_DIR") or f"/tmp/kiba-{UID}"
-SOCK_PATH = f"{SOCK_DIR}/kiba-apply.sock"
-DISPLAY   = os.environ.get("DISPLAY", ":0")
-ENV       = {**os.environ, "DISPLAY": DISPLAY}
-
-os.makedirs(SOCK_DIR, exist_ok=True)
-
-def gsettings(schema, key, value):
-    subprocess.run(["gsettings", "set", schema, key, str(value)], env=ENV,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-def dconf_write(path, value):
-    subprocess.run(["dconf", "write", path, value], env=ENV,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-def xrandr_run(*args):
-    subprocess.run(["xrandr", "--display", DISPLAY] + list(args), env=ENV)
-
-def freeze_screen():
-    result = subprocess.run(["kiba-freeze"], capture_output=True, text=True, env=ENV)
-    token = result.stdout.strip()
-    if ":" not in token:
-        return None, None
-    pid_str, png_path = token.split(":", 1)
-    try:
-        return int(pid_str), png_path
-    except ValueError:
-        return None, None
-
-def unfreeze(pid, png_path):
-    if pid:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-    if png_path:
-        try:
-            os.unlink(png_path)
-        except FileNotFoundError:
-            pass
-
-def _current_dark():
-    r = subprocess.run(["dconf", "read", "/org/cutefish/theme/colorScheme"],
-                       capture_output=True, text=True, env=ENV)
-    return "dark" in r.stdout
-
-def op_theme(value):
-    dark = (value == "dark")
-    dconf_write("/org/cutefish/theme/colorScheme", "'dark'" if dark else "'light'")
-    gsettings("org.gnome.desktop.interface", "color-scheme",
-              "prefer-dark" if dark else "default")
-    gsettings("org.gnome.desktop.interface", "gtk-theme",
-              "Adwaita-dark" if dark else "Adwaita")
-    cfg = os.path.expanduser("~/.config/cutefishtheme.conf")
-    with open(cfg, "w") as f:
-        f.write(f"[Theme]\ncolorScheme={'dark' if dark else 'light'}\n")
-
-def op_wallpaper(path):
-    if not os.path.exists(path):
-        return
-    dconf_write("/org/cutefish/background/pictureUrl", f"'{path}'")
-    cfg = os.path.expanduser("~/.config/cutefish-wallpaper.conf")
-    with open(cfg, "w") as f:
-        f.write(f"[Wallpaper]\npath={path}\n")
-
-def op_font_scale(scale):
-    scale = max(0.5, min(3.0, float(scale)))
-    gsettings("org.gnome.desktop.interface", "text-scaling-factor", scale)
-    dconf_write("/org/cutefish/theme/fontPointSize", str(int(10 * scale)))
-
-def op_accessibility(key, value):
-    v = bool(value)
-    if key == "large_text":
-        op_font_scale(1.5 if v else 1.0)
-    elif key == "high_contrast":
-        dark = _current_dark()
-        theme  = "HighContrast"           if v else ("Adwaita-dark" if dark else "Adwaita")
-        scheme = "'highcontrast'"         if v else ("'dark'"       if dark else "'light'")
-        gsettings("org.gnome.desktop.interface", "gtk-theme", theme)
-        dconf_write("/org/cutefish/theme/colorScheme", scheme)
-    elif key == "reduce_motion":
-        gsettings("org.gnome.desktop.interface", "enable-animations",
-                  "false" if v else "true")
-
-def op_xrandr(args):
-    xrandr_run(*args)
-
-HANDLERS = {
-    "theme":         lambda d: op_theme(d["value"]),
-    "wallpaper":     lambda d: op_wallpaper(d["value"]),
-    "font_scale":    lambda d: op_font_scale(d["value"]),
-    "accessibility": lambda d: op_accessibility(d["key"], d["value"]),
-    "xrandr":        lambda d: op_xrandr(d["args"]),
-}
-
-def handle_client(conn):
-    try:
-        data = b""
-        while True:
-            chunk = conn.recv(4096)
-            if not chunk:
-                break
-            data += chunk
-        msg = json.loads(data.decode())
-        op  = msg.get("op")
-        fn  = HANDLERS.get(op)
-        if fn is None:
-            conn.sendall(b'{"error":"unknown op"}\n')
-            return
-        freeze_pid, freeze_png = freeze_screen()
-        try:
-            fn(msg)
-        finally:
-            time.sleep(0.06)
-            unfreeze(freeze_pid, freeze_png)
-        conn.sendall(b'{"ok":true}\n')
-    except Exception as e:
-        try:
-            conn.sendall(json.dumps({"error": str(e)}).encode() + b"\n")
-        except Exception:
-            pass
-    finally:
-        conn.close()
-
-def main():
-    if os.path.exists(SOCK_PATH):
-        os.unlink(SOCK_PATH)
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(SOCK_PATH)
-    os.chmod(SOCK_PATH, 0o600)
-    srv.listen(8)
-
-    def _shutdown(sig, _):
-        srv.close()
-        sys.exit(0)
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT,  _shutdown)
-
-    print(f"kiba-apply listening on {SOCK_PATH}", flush=True)
-    while True:
-        conn, _ = srv.accept()
-        threading.Thread(target=handle_client, args=(conn,), daemon=True).start()
-
-if __name__ == "__main__":
-    main()
-KIBAAPPLY
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-apply"
-
-# ── kiba-set ──────────────────────────────────────────────────────────────
-cat > "${AIROOTFS}/usr/local/bin/kiba-set" << 'KIBASET'
-#!/usr/bin/env python3
-"""
-kiba-set — send a settings instruction to kiba-apply
-Examples:
-  kiba-set theme dark
-  kiba-set theme light
-  kiba-set wallpaper /usr/share/cutefish-wallpapers/default.jpg
-  kiba-set font_scale 1.25
-  kiba-set accessibility large_text true
-  kiba-set accessibility high_contrast false
-  kiba-set accessibility reduce_motion true
-  kiba-set xrandr --output HDMI-1 --brightness 0.8
-"""
-import json, os, socket, sys
-
-UID  = os.getuid()
-SOCK = f"{os.environ.get('XDG_RUNTIME_DIR', f'/tmp/kiba-{UID}')}/kiba-apply.sock"
-
-def send(payload):
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.connect(SOCK)
-    s.sendall(json.dumps(payload).encode())
-    s.shutdown(socket.SHUT_WR)
-    resp = b""
-    while True:
-        c = s.recv(4096)
-        if not c:
-            break
-        resp += c
-    s.close()
-    return json.loads(resp)
-
-def main():
-    args = sys.argv[1:]
-    if not args:
-        print(__doc__)
-        sys.exit(1)
-    op = args[0]
-    if op == "theme":
-        payload = {"op": op, "value": args[1]}
-    elif op == "wallpaper":
-        payload = {"op": op, "value": args[1]}
-    elif op == "font_scale":
-        payload = {"op": op, "value": float(args[1])}
-    elif op == "accessibility":
-        payload = {"op": op, "key": args[1],
-                   "value": args[2].lower() in ("true", "1", "yes")}
-    elif op == "xrandr":
-        payload = {"op": op, "args": args[1:]}
-    else:
-        print(f"Unknown op: {op}")
-        sys.exit(1)
-    print(json.dumps(send(payload)))
-
-if __name__ == "__main__":
-    main()
-KIBASET
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-set"
-
-# ── kiba-access ───────────────────────────────────────────────────────────
-cat > "${AIROOTFS}/usr/local/bin/kiba-access" << 'KIBAACCESS'
-#!/usr/bin/env python3
-"""kiba-access — KibaOS accessibility quick panel"""
-import json, os, subprocess, sys
-
-def dconf_read(k):
-    r = subprocess.run(["dconf", "read", k], capture_output=True, text=True)
-    return r.stdout.strip().strip("'\"")
-
-def scale_value():
-    try:
-        return float(dconf_read("/org/gnome/desktop/interface/text-scaling-factor"))
-    except Exception:
-        return 1.0
-
-large   = scale_value() >= 1.4
-hc      = "highcontrast" in dconf_read("/org/cutefish/theme/colorScheme").lower()
-reduced = dconf_read("/org/gnome/desktop/interface/enable-animations") == "false"
-
-rows = []
-for tag, label, state in [
-    ("large_text",    "Large Text (150%)",           large),
-    ("high_contrast", "High Contrast",               hc),
-    ("reduce_motion", "Reduce Motion / Animations",  reduced),
-]:
-    rows += [("TRUE" if state else "FALSE"), tag, label]
-
-result = subprocess.run(
-    ["zenity", "--list", "--checklist",
-     "--title=KibaOS Accessibility",
-     "--text=Toggle accessibility features:",
-     "--column=", "--column=Key", "--column=Feature",
-     "--hide-column=2", "--print-column=2",
-     "--separator=,",
-     "--width=390", "--height=260",
-     "--ok-label=Apply", "--cancel-label=Cancel",
-     ] + rows,
-    capture_output=True, text=True
-)
-if result.returncode != 0:
-    sys.exit(0)
-
-chosen = set(result.stdout.strip().split(",")) if result.stdout.strip() else set()
-
-for tag, _, was in [
-    ("large_text",    "", large),
-    ("high_contrast", "", hc),
-    ("reduce_motion", "", reduced),
-]:
-    now = tag in chosen
-    if now != was:
-        subprocess.run(["kiba-set", "accessibility", tag, str(now).lower()])
-KIBAACCESS
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-access"
-
-# ── systemd user unit: kiba-apply ─────────────────────────────────────────
-mkdir -p "${AIROOTFS}/usr/lib/systemd/user"
-cat > "${AIROOTFS}/usr/lib/systemd/user/kiba-apply.service" << 'KAUNIT'
-[Unit]
-Description=KibaOS instant-apply settings daemon
-After=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStart=/usr/local/bin/kiba-apply
-Restart=on-failure
-RestartSec=2
-
-[Install]
-WantedBy=graphical-session.target
-KAUNIT
-
-mkdir -p "${AIROOTFS}/usr/lib/systemd/user/graphical-session.target.wants"
-ln -sf /usr/lib/systemd/user/kiba-apply.service \
-       "${AIROOTFS}/usr/lib/systemd/user/graphical-session.target.wants/kiba-apply.service"
-
-# ── kiba-welcome ──────────────────────────────────────────────────────────
-cat > "${AIROOTFS}/usr/local/bin/kiba-welcome" << 'WELCOME'
-#!/bin/bash
-while true; do
-  CHOICE=$(zenity --list --title="Welcome to KibaOS" \
-    --text="Welcome to KibaOS. What would you like to do?" \
-    --column="Tag" --column="Action" --column="Description" \
-    "install"       "Install KibaOS"        "Install the system permanently to your disk" \
-    "browser"       "Web Browser"           "Browse the internet" \
-    "terminal"      "Open Terminal"         "Use Meta+T to launch" \
-    "files"         "File Manager"          "Use Meta+E to browse" \
-    "screenshot"    "Screen Capture"        "Use Print to capture" \
-    "accessibility" "Accessibility"         "Font size, contrast, motion settings" \
-    "info"          "System Information"    "View technical system details" \
-    "shortcuts"     "Keyboard Shortcuts"    "View useful desktop shortcuts" \
-    "wiki"          "Online Wiki"           "Read the technical documentation" \
-    --hide-column=1 --print-column=1 \
-    --width=450 --height=520 --ok-label="Launch" --cancel-label="Close" 2>/dev/null)
-
-  [ -z "$CHOICE" ] && break
-
-  case "$CHOICE" in
-    install)        sudo calamares & break ;;
-    browser)        firefox & break ;;
-    terminal)       cutefish-terminal & break ;;
-    files)          cutefish-filemanager & break ;;
-    screenshot)     cutefish-screenshot & break ;;
-    accessibility)  kiba-access & ;;
-    info)           (fastfetch | zenity --text-info \
-                      --title="KibaOS System Information") & ;;
-    shortcuts)
-      zenity --list --title="KibaOS Shortcuts" \
-        --column="Action" --column="Shortcut" \
-        "Application Menu"   "Meta" \
-        "Terminal"           "Meta + T" \
-        "Search"             "Meta + Space" \
-        "File Manager"       "Meta + E" \
-        "Accessibility"      "Statusbar icon or kiba-access" \
-        "Apply theme"        "kiba-set theme dark|light" \
-        --ok-label="Close" --cancel-label="Close" 2>/dev/null &
-      ;;
-    wiki)
-      firefox "https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" & break
-      ;;
-  esac
-done
-WELCOME
-chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
 
 # ── pacman.conf ───────────────────────────────────────────────────────────
 PACMAN_CONF="${PROFILE}/pacman.conf"
@@ -994,7 +448,7 @@ chmod +x /home/liveuser/.xsession
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
-# ── dconf system-db: dark mode defaults ───────────────────────────────────
+# ── dconf system-db: dark mode + wallpaper defaults ───────────────────────
 mkdir -p /etc/dconf/profile
 cat > /etc/dconf/profile/user << 'DCONFPROFILE'
 user-db:user
@@ -1014,6 +468,12 @@ text-scaling-factor=1.0
 
 [org/gnome/desktop/a11y/interface]
 high-contrast=false
+
+[com/deepin/dde/appearance]
+wallpaper='/usr/share/wallpapers/kibaos/wallpaper.jpg'
+
+[com/deepin/dde/filemanager/wallpaper]
+wallpaper-uri='file:///usr/share/wallpapers/kibaos/wallpaper.jpg'
 DCONFKEYS
 dconf update
 
@@ -1034,6 +494,24 @@ icon=preferences-desktop-accessibility
 tooltip=Accessibility
 command=kiba-access
 SBCONF
+
+# ── Deepin wallpaper config file (DDE native, pre-seeds the gsetting key) ─
+# DDE reads ~/.config/deepin/deepin-wallpaper.ini as a per-user override
+# before the dconf key takes effect. Belt-and-suspenders for live session.
+mkdir -p /home/liveuser/.config/deepin
+cat > /home/liveuser/.config/deepin/deepin-wallpaper.ini << 'WALLINI'
+[Wallpaper]
+Wallpaper=/usr/share/wallpapers/kibaos/wallpaper.jpg
+WALLINI
+
+# Also write the org.deepin.dde.appearance gsettings XML override so the
+# setting survives even if dconf-deepin integration isn't active at first boot.
+mkdir -p /usr/share/glib-2.0/schemas
+cat > /usr/share/glib-2.0/schemas/99-kibaos-wallpaper.gschema.override << 'GSCHEMA'
+[com.deepin.dde.appearance]
+wallpaper='/usr/share/wallpapers/kibaos/wallpaper.jpg'
+GSCHEMA
+glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 
 # ── kiba-apply user service: enable for liveuser ──────────────────────────
 mkdir -p /home/liveuser/.config/systemd/user/graphical-session.target.wants
