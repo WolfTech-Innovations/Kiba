@@ -1,0 +1,28 @@
+name: Audit Repo README Mandatory Sections
+on:
+  push:
+    paths:
+      - 'README.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Features Section
+        run: |
+          if ! grep -q "## Features" README.md; then
+            echo "Error: README.md is missing the 'Features' section."
+            exit 1
+          fi
+      - name: Check License Section
+        run: |
+          if ! grep -q "## License" README.md; then
+            echo "Error: README.md is missing the 'License' section."
+            exit 1
+          fi

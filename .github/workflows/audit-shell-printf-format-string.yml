@@ -1,0 +1,25 @@
+name: Audit Shell Printf Format String
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Printf Arguments
+        run: |
+          if grep -rnE "printf [^\"'-]" .; then
+            echo "Error: printf should always have a format string as its first argument."
+            exit 1
+          fi

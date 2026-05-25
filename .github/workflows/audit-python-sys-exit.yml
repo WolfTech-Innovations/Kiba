@@ -1,0 +1,31 @@
+name: Audit Python Sys Exit
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Exit Usage
+        run: |
+          if grep -rnE " (exit|quit)\(" . | grep -v "sys.exit"; then
+            echo "Error: Use 'sys.exit()' instead of 'exit()' or 'quit()' in production code."
+            exit 1
+          fi
+      - name: Check Sys Import
+        run: |
+          if grep -rE "sys\.exit\(" . && ! grep -qr "import sys" .; then
+             echo "Error: sys.exit() used but sys is not imported."
+             exit 1
+          fi

@@ -1,0 +1,30 @@
+name: Audit Shell Case Default
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Case Wildcard
+        run: |
+          # This is a simplified check for the presence of *) in case blocks
+          for f in $(find . -name "*.sh"); do
+            if grep -q "case " "$f"; then
+              if ! grep -q "\*)" "$f"; then
+                echo "Error: $f contains a case statement without a default *) branch."
+                exit 1
+              fi
+            fi
+          done

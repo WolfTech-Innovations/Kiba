@@ -1,0 +1,25 @@
+name: Audit Shell While Read R
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Read -r
+        run: |
+          if grep -rn "read " . | grep -v "read -r"; then
+            echo "Error: Use 'read -r' to prevent backslashes from acting as escape characters."
+            exit 1
+          fi

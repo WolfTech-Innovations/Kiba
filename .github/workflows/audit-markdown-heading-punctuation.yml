@@ -1,0 +1,25 @@
+name: Audit Markdown Heading Punctuation
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Heading Trailing Punctuation
+        run: |
+          if grep -rnE "^#+ .*[.!?:,;]$" .; then
+            echo "Error: Headings should not end with punctuation."
+            exit 1
+          fi

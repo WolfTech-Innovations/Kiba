@@ -1,0 +1,25 @@
+name: Audit Markdown Horizontal Rule Style
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check HR Style
+        run: |
+          if grep -rnE "^(\* \* \*|___)$" .; then
+            echo "Error: Use '---' for horizontal rules for consistency."
+            exit 1
+          fi

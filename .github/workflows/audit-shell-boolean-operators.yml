@@ -1,0 +1,25 @@
+name: Audit Shell Boolean Operators
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for Obsolete Boolean Operators
+        run: |
+          if grep -rE "\[.* (-a|-o) .*\]" .; then
+            echo "Error: Use && and || instead of -a and -o inside [ ] for better portability."
+            exit 1
+          fi

@@ -1,0 +1,25 @@
+name: Audit Shell Function Definition Style
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Function Keyword
+        run: |
+          if grep -r "function " .; then
+            echo "Error: Use 'name()' instead of 'function name' for POSIX compliance."
+            exit 1
+          fi

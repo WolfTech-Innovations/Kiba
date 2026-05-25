@@ -1,0 +1,25 @@
+name: Audit Markdown Relative Links
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Internal Relative Links
+        run: |
+          if grep -rnE "\[.*\]\(https://github.com/WolfTech-Innovations/Kiba/(blob|tree)/main/.*\)" .; then
+            echo "Error: Use relative links for internal repository files instead of absolute URLs."
+            exit 1
+          fi

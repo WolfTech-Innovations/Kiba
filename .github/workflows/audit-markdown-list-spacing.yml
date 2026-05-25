@@ -1,0 +1,27 @@
+name: Audit Markdown List Spacing
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check List Blank Line
+        run: |
+          # Ensure there is a blank line before a list starts
+          if grep -rnP "(?<!^$|^\n)^[a-zA-Z0-9].*\n(?=- )" .; then
+            echo "Error: Add a blank line before starting a Markdown list."
+            exit 1
+          fi
+          # Note: PCRE support is needed for negative lookbehind

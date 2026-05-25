@@ -1,0 +1,25 @@
+name: Audit Python Try Except Pass
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Try Except Pass
+        run: |
+          if grep -rnA 1 "except.*:" . | grep -v "except" | grep "pass" | grep -v "#"; then
+            echo "Error: Silencing exceptions with 'pass' without a comment is discouraged."
+            exit 1
+          fi
