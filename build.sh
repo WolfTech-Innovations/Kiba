@@ -2,9 +2,18 @@
 set -ex
 
 # ── Container deps ────────────────────────────────────────────────────────
-id alpm &>/dev/null || useradd -r -s /usr/bin/nologin -U alpm
 pacman-key --init
 pacman-key --populate archlinux
+# pacman sandbox fix
+useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
+
+mkdir -p /var/cache/pacman/pkg
+
+chmod 755 /etc
+chmod 755 /var/cache/pacman
+chmod 755 /var/cache/pacman/pkg
+
+chown -R alpm:alpm /var/cache/pacman
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 
@@ -1450,16 +1459,8 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 </div>
 
 <section>
-  <h2>Included Apps</h2>
+  <h2></h2>
   <div class="app-grid">
-    <div class="app-item"><span class="icon">🌐</span><strong>KibaOS Browser</strong><span>Firefox</span></div>
-    <div class="app-item"><span class="icon">📁</span><strong>KibaOS Files</strong><span>PCManFM</span></div>
-    <div class="app-item"><span class="icon">💻</span><strong>KibaOS Terminal</strong><span>LXTerminal</span></div>
-    <div class="app-item"><span class="icon">📝</span><strong>KibaOS Editor</strong><span>Mousepad</span></div>
-    <div class="app-item"><span class="icon">🖼</span><strong>KibaOS Photos</strong><span>Ristretto</span></div>
-    <div class="app-item"><span class="icon">💿</span><strong>KibaOS Disks</strong><span>GParted</span></div>
-    <div class="app-item"><span class="icon">🎵</span><strong>Music Player</strong><span>Parole</span></div>
-    <div class="app-item"><span class="icon">🔧</span><strong>Install KibaOS</strong><span>Calamares</span></div>
   </div>
 
   <h2>Keyboard Shortcuts</h2>
