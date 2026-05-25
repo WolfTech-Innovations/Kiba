@@ -10,9 +10,9 @@ pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake extra-cmake-modules ninja meson \
-  wayland wayland-protocols wlroots libdrm libinput \
-  qt6-base qt6-wayland qt6-declarative qt6-tools qt6-svg qt6-uitools qt6-5compat \
-  qt6ct kvantum-qt6 \
+  wayland wayland-protocols wlroots0.19 libdrm libinput \
+  qt6-base qt6-wayland qt6-declarative qt6-tools qt6-svg qt6-5compat \
+  qt6ct kvantum \
   glm cairo pango freetype2 libpng libjpeg pixman libxml2 \
   boost boost-libs yaml-cpp \
   kpmcore python python-yaml python-jsonschema \
