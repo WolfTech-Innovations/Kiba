@@ -1307,6 +1307,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   .app-item .icon { font-size: 1.6rem; display: block; margin-bottom: 6px; }
   .app-item strong { display: block; font-weight: 600; margin-bottom: 2px; }
   .app-item span   { color: var(--sub); }
+  .kbd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 12px; }
+  .kbd-item { background: var(--surface); border-radius: 10px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; font-size: .85rem; border-left: 3px solid var(--teal); }
+  kbd { background: #eef2f4; border: 1px solid #d0dae0; border-radius: 4px; padding: 2px 6px; font-family: 'JetBrains Mono', monospace; font-size: .8rem; color: var(--teal); }
   .btn { display: inline-block; background: var(--teal); color: #fff; border-radius: 10px;
          padding: 10px 22px; text-decoration: none; font-size: .9rem; font-weight: 600;
          margin-right: 8px; margin-top: 8px; }
@@ -1329,16 +1332,24 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 
 <section>
   <h2>Included Apps</h2>
-  <div class="app-grid">
-    <div class="app-item"><span class="icon">🌐</span><strong>KibaOS Browser</strong><span>Falkon</span></div>
-    <div class="app-item"><span class="icon">🎵</span><strong>KibaOS Music</strong><span>Elisa</span></div>
-    <div class="app-item"><span class="icon">📁</span><strong>KibaOS Files</strong><span>Dolphin</span></div>
-    <div class="app-item"><span class="icon">💻</span><strong>KibaOS Terminal</strong><span>Konsole</span></div>
-    <div class="app-item"><span class="icon">🖼</span><strong>KibaOS Photos</strong><span>Gwenview</span></div>
-    <div class="app-item"><span class="icon">📝</span><strong>KibaOS Editor</strong><span>Kate</span></div>
-    <div class="app-item"><span class="icon">📦</span><strong>KibaOS Software</strong><span>Octopi</span></div>
-    <div class="app-item"><span class="icon">💿</span><strong>KibaOS Disks</strong><span>GParted</span></div>
-    <div class="app-item"><span class="icon">🔧</span><strong>Install KibaOS</strong><span>Calamares</span></div>
+  <div class="app-grid" role="list">
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">🌐</span><strong>KibaOS Browser</strong><span>Falkon</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">🎵</span><strong>KibaOS Music</strong><span>Elisa</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">📁</span><strong>KibaOS Files</strong><span>Dolphin</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">💻</span><strong>KibaOS Terminal</strong><span>Konsole</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">🖼</span><strong>KibaOS Photos</strong><span>Gwenview</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">📝</span><strong>KibaOS Editor</strong><span>Kate</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">📦</span><strong>KibaOS Software</strong><span>Octopi</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">💿</span><strong>KibaOS Disks</strong><span>GParted</span></div>
+    <div class="app-item" role="listitem"><span class="icon" aria-hidden="true">🔧</span><strong>Install KibaOS</strong><span>Calamares</span></div>
+  </div>
+
+  <h2>Keyboard Shortcuts</h2>
+  <div class="kbd-grid">
+    <div class="kbd-item"><span>Screen Capture</span><kbd>Print</kbd></div>
+    <div class="kbd-item"><span>Open Terminal</span><kbd>Meta+T</kbd></div>
+    <div class="kbd-item"><span>App Launcher</span><kbd>Meta</kbd></div>
+    <div class="kbd-item"><span>File Manager</span><kbd>Meta+E</kbd></div>
   </div>
 
   <h2>Get Started</h2>
