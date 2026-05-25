@@ -215,6 +215,237 @@ REGREETCONF
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
 
+# ── Calamares branding: OOBE-style fullscreen ─────────────────────────────
+# Goals:
+#   - True fullscreen (windowExpanding: fullscreen)
+#   - No sidebar, no navigation bar (sidebar: none, navigation: none)
+#   - White/near-white background like Windows 11 OOBE
+#   - Large centered logo + friendly heading during installation slideshow
+#   - Thin animated blue progress bar at the bottom
+mkdir -p "${AIROOTFS}/usr/share/calamares/branding/kibaos"
+
+cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/branding.desc" << 'BRANDING'
+---
+componentName: kibaos
+
+welcomeStyleCalamares: false
+welcomeExpandingLogo: false
+
+strings:
+  productName:         KibaOS
+  shortProductName:    KibaOS
+  version:             Rolling
+  shortVersion:        Rolling
+  versionedName:       KibaOS Rolling
+  shortVersionedName:  KibaOS
+  bootloaderEntryName: KibaOS
+  productUrl:          https://github.com/WolfTech-Innovations/Kiba
+  supportUrl:          https://github.com/WolfTech-Innovations/Kiba/issues
+  knownIssuesUrl:      https://github.com/WolfTech-Innovations/Kiba/issues
+  releaseNotesUrl:     https://github.com/WolfTech-Innovations/Kiba
+
+images:
+  productLogo:    "logo.png"
+  productIcon:    "logo.png"
+  productWelcome: "logo.png"
+
+slideshow:    "show.qml"
+slideshowAPI: 2
+
+style:
+  sidebarBackground:    "#f3f3f3"
+  sidebarText:          "#1a1a1a"
+  sidebarTextSelect:    "#0067c0"
+  sidebarTextHighlight: "#0067c0"
+
+windowExpanding:  fullscreen
+windowSize:       "1024px,768px"
+windowPlacement:  center
+
+sidebar:    none
+navigation: none
+BRANDING
+
+# ── QSS stylesheet: Windows 11 OOBE look ─────────────────────────────────
+cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
+QWidget {
+    background-color: #f3f3f3;
+    color: #1a1a1a;
+    font-family: "Segoe UI", "Noto Sans", sans-serif;
+    font-size: 13px;
+}
+QStackedWidget, QFrame#mainContent {
+    background-color: #ffffff;
+}
+QLabel#labelTitle, QLabel[objectName="labelTitle"] {
+    font-size: 28px;
+    font-weight: 300;
+    color: #1a1a1a;
+    padding-top: 32px;
+    padding-bottom: 8px;
+}
+QLabel { color: #1a1a1a; font-size: 13px; }
+QPushButton#nextButton, QPushButton[objectName="nextButton"] {
+    background-color: #0067c0;
+    color: #ffffff;
+    border: none;
+    border-radius: 4px;
+    padding: 10px 32px;
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 120px;
+}
+QPushButton#nextButton:hover  { background-color: #005ba5; }
+QPushButton#nextButton:pressed { background-color: #004f8f; }
+QPushButton {
+    background-color: transparent;
+    color: #0067c0;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 9px 24px;
+    font-size: 13px;
+    min-width: 90px;
+}
+QPushButton:hover    { background-color: #e8f0f8; border-color: #0067c0; }
+QPushButton:disabled { color: #9e9e9e; border-color: #e0e0e0; }
+QLineEdit, QComboBox {
+    background-color: #ffffff;
+    border: 1px solid #d0d0d0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    selection-background-color: #0067c0;
+}
+QLineEdit:focus, QComboBox:focus { border: 2px solid #0067c0; }
+QProgressBar {
+    background-color: #e0e0e0;
+    border: none;
+    border-radius: 2px;
+    height: 4px;
+    color: transparent;
+}
+QProgressBar::chunk { background-color: #0067c0; border-radius: 2px; }
+QListView, QTreeView {
+    background-color: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    alternate-background-color: #f8f8f8;
+}
+QListView::item:selected, QTreeView::item:selected {
+    background-color: #cce4f7;
+    color: #1a1a1a;
+}
+QCheckBox, QRadioButton { spacing: 8px; font-size: 13px; }
+QCheckBox::indicator, QRadioButton::indicator { width: 18px; height: 18px; }
+QCheckBox::indicator:checked {
+    background-color: #0067c0;
+    border: 2px solid #0067c0;
+    border-radius: 3px;
+}
+QGroupBox {
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+    margin-top: 16px;
+    padding: 12px;
+    font-weight: 500;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    padding: 0 6px;
+    color: #1a1a1a;
+}
+QScrollBar:vertical   { background: transparent; width: 6px; margin: 0; }
+QScrollBar::handle:vertical { background: #c0c0c0; border-radius: 3px; min-height: 24px; }
+QScrollBar::handle:vertical:hover { background: #909090; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar:horizontal { background: transparent; height: 6px; }
+QScrollBar::handle:horizontal { background: #c0c0c0; border-radius: 3px; min-width: 24px; }
+QScrollBar::handle:horizontal:hover { background: #909090; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QSS
+
+# ── Installation slideshow (API 2, async) ─────────────────────────────────
+cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/show.qml" << 'SHOWQML'
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+
+Item {
+    id: root
+    anchors.fill: parent
+    property bool activatedInCalamares: false
+
+    Rectangle {
+        anchors.fill: parent
+        color: "#f3f3f3"
+
+        Image {
+            id: logo
+            anchors {
+                horizontalCenter: parent.horizontalCenter
+                top: parent.top
+                topMargin: parent.height * 0.28
+            }
+            source: "logo.png"
+            width: 120; height: 120
+            fillMode: Image.PreserveAspectFit
+            smooth: true
+        }
+
+        Text {
+            id: heading
+            anchors { horizontalCenter: parent.horizontalCenter; top: logo.bottom; topMargin: 32 }
+            text: "Installing KibaOS"
+            font.pixelSize: 28
+            font.weight: Font.Light
+            color: "#1a1a1a"
+        }
+
+        Text {
+            anchors { horizontalCenter: parent.horizontalCenter; top: heading.bottom; topMargin: 12 }
+            text: "This may take a few minutes. Your PC will restart automatically."
+            font.pixelSize: 13
+            color: "#5a5a5a"
+        }
+
+        Row {
+            anchors { horizontalCenter: parent.horizontalCenter; bottom: progressBar.top; bottomMargin: 32 }
+            spacing: 10
+            Repeater {
+                model: 5
+                delegate: Rectangle {
+                    width: 8; height: 8; radius: 4; color: "#0067c0"; opacity: 0.25
+                    SequentialAnimation on opacity {
+                        running: root.activatedInCalamares
+                        loops: Animation.Infinite
+                        PauseAnimation  { duration: index * 160 }
+                        NumberAnimation { to: 1.0;  duration: 300; easing.type: Easing.InOutQuad }
+                        NumberAnimation { to: 0.25; duration: 300; easing.type: Easing.InOutQuad }
+                        PauseAnimation  { duration: (4 - index) * 160 }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            id: progressBar
+            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+            height: 4; color: "#e0e0e0"
+            Rectangle {
+                anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+                width: 0; color: "#0067c0"; radius: 2
+                SequentialAnimation on width {
+                    running: root.activatedInCalamares
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 0; to: progressBar.width; duration: 2200; easing.type: Easing.InOutCubic }
+                    PauseAnimation  { duration: 400 }
+                    NumberAnimation { from: progressBar.width; to: 0; duration: 800; easing.type: Easing.InCubic }
+                }
+            }
+        }
+    }
+}
+SHOWQML
+
 cat > "${AIROOTFS}/etc/calamares/settings.conf" << 'CALA_SETTINGS'
 ---
 modules-search: [ local, /usr/lib/calamares/modules ]
@@ -554,6 +785,10 @@ LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.p
 LOGO_RAW="/tmp/kibaos_boot_raw.png"
 
 curl -fL --retry 3 --retry-delay 2 -o "${LOGO_RAW}" "${LOGO_URL}"
+
+# Copy logo into Calamares branding dir
+magick "${LOGO_RAW}" -filter Lanczos -resize 256x256 \
+  /usr/share/calamares/branding/kibaos/logo.png
 
 # Watermark: 400 × auto (preserve aspect ratio), transparent background kept
 magick "${LOGO_RAW}" \
