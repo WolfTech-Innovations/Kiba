@@ -2,6 +2,7 @@
 set -ex
 
 # ── Container deps ────────────────────────────────────────────────────────
+id alpm &>/dev/null || useradd -r -s /usr/bin/nologin -U alpm
 pacman-key --init
 pacman-key --populate archlinux
 pacman -Syy --noconfirm
@@ -1438,14 +1439,14 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 </head>
 <body>
 <header>
-  <h1>🐺 Welcome to KibaOS</h1>
+  <h1>Welcome to KibaOS</h1>
   <p>A fast, friendly desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
 <div class="card-row">
-  <div class="card"><div class="icon">⚡</div><h2>Fast &amp; Lightweight</h2><p>LXDE uses very little RAM and runs great on older and newer hardware alike.</p></div>
-  <div class="card"><div class="icon">🔄</div><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
-  <div class="card"><div class="icon">🔒</div><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
+  <div class="card"><div class="icon"></div><h2>Fast &amp; Lightweight</h2><p>LXDE uses very little RAM and runs great on older and newer hardware alike.</p></div>
+  <div class="card"><div class="icon"></div><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
+  <div class="card"><div class="icon"></div><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 
 <section>
