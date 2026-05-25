@@ -273,21 +273,6 @@ bg=/usr/share/kibaos/wallpaper.png
 LXDMTHEME
 
 # ══════════════════════════════════════════════════════════════════════════
-# LXDE session file
-# ══════════════════════════════════════════════════════════════════════════
-mkdir -p "${AIROOTFS}/usr/share/xsessions"
-rm ${AIROOTFS}/usr/share/xsessions/LXDE.desktop
-cat > "${AIROOTFS}/usr/share/xsessions/LXDE.desktop" << 'LXDESKTOP'
-[Desktop Entry]
-Name=LXDE
-Comment=KibaOS Desktop (LXDE on Openbox)
-Exec=/usr/bin/startlxde
-TryExec=/usr/bin/startlxde
-Type=Application
-DesktopNames=LXDE;KibaOS
-LXDESKTOP
-
-# ══════════════════════════════════════════════════════════════════════════
 # Calamares installer config
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
