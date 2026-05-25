@@ -139,6 +139,7 @@ gnome-themes-extra
 
 # Display manager extras
 accountsservice
+dbus-broker
 
 # Apps — GTK-native, no heavy deps
 firefox
@@ -152,8 +153,10 @@ network-manager-applet
 
 # Media
 parole
-pulseaudio
-pulseaudio-alsa
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
 pavucontrol
 
 # System tools
@@ -275,20 +278,7 @@ LXDMTHEME
 # ══════════════════════════════════════════════════════════════════════════
 # LXDE session file
 # ══════════════════════════════════════════════════════════════════════════
-mkdir -p "${AIROOTFS}/usr/share/xsessions" dbus-broker-units-37-3-x86_64 downloading...
- base-3-3-any downloading...
- dbus-units-37-3-x86_64 downloading...
- ca-certificates-20240618-1-any downloading...
-checking keyring...
-checking package integrity...
-loading package files...
-checking for file conflicts...
-error: failed to commit transaction (conflicting files)
-lxde-common: /w/work/x86_64/airootfs/usr/share/xsessions/LXDE.desktop exists in filesystem
-Errors occurred, no packages were upgraded.
-==> ERROR: Failed to install packages to new root
-Error: Process completed with exit code 1.
-rm ${AIROOTFS}/usr/share/xsessions/LXDE.desktop
+mkdir -p "${AIROOTFS}/usr/share/xsessions"
 cat > "${AIROOTFS}/usr/share/xsessions/LXDE.desktop" << 'LXDESKTOP'
 [Desktop Entry]
 Name=LXDE
