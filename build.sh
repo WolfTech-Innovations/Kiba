@@ -136,7 +136,6 @@ picom
 # GTK theming — in [extra], no AUR needed
 papirus-icon-theme
 gnome-themes-extra
-gtk-engine-murrine
 
 # Display manager extras
 accountsservice
@@ -176,7 +175,6 @@ xdg-desktop-portal
 xdg-desktop-portal-gtk
 
 # Wallpaper setter (no GNOME/KDE deps)
-nitrogen
 feh
 PACKAGES
 
