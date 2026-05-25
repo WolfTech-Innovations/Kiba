@@ -1,0 +1,24 @@
+name: Audit Workflow Concurrency Cancel
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check cancel-in-progress
+        run: |
+          # Ensure 'cancel-in-progress: true' is present if 'concurrency:' is used
+          MISSING=$(grep -l "concurrency:" .github/workflows/*.yml | xargs grep -L "cancel-in-progress: true" || true)
+          if [ -n "$MISSING" ]; then
+            echo "Error: Workflows using concurrency should enable cancel-in-progress: true. Missing in: $MISSING"
+            exit 1
+          fi

@@ -596,3 +596,33 @@ Generated on Sat May 23 03:05:55 UTC 2026
 | Zshrc Command Collision Check | `.github/workflows/zshrc-command-collision-check.yml` |
 | ZshRC Logic Checker | `.github/workflows/zshrc-logic-checker.yml` |
 | Zshrc Prompt Optimization | `.github/workflows/zshrc-prompt-optimization-audit.yml` |
+| Audit Shell Boolean Operators | `.github/workflows/audit-shell-boolean-operators.yml` |
+| Audit Shell Function Definition Style | `.github/workflows/audit-shell-function-definition-style.yml` |
+| Audit Shell Printf Format String | `.github/workflows/audit-shell-printf-format-string.yml` |
+| Audit Shell Case Default | `.github/workflows/audit-shell-case-default.yml` |
+| Audit Shell While Read R | `.github/workflows/audit-shell-while-read-r.yml` |
+| Audit Shell Heredoc Tabs | `.github/workflows/audit-shell-heredoc-tabs.yml` |
+| Audit Shell Unquoted Command Substitution | `.github/workflows/audit-shell-unquoted-command-substitution.yml` |
+| Audit Shell Echo vs Printf | `.github/workflows/audit-shell-echo-vs-printf.yml` |
+| Audit Shell Test Operator Consistency | `.github/workflows/audit-shell-test-operator-consistency.yml` |
+| Audit Shell Exit Code Standard | `.github/workflows/audit-shell-exit-code-standard.yml` |
+| Audit Python Docstring Position | `.github/workflows/audit-python-docstring-position.yml` |
+| Audit Python Sys Exit | `.github/workflows/audit-python-sys-exit.yml` |
+| Audit Python Is Not Comparison | `.github/workflows/audit-python-is-not-comparison.yml` |
+| Audit Python Redundant F-String | `.github/workflows/audit-python-redundant-fstring.yml` |
+| Audit Python Try Except Pass | `.github/workflows/audit-python-try-except-pass.yml` |
+| Audit Markdown Heading Punctuation | `.github/workflows/audit-markdown-heading-punctuation.yml` |
+| Audit Markdown List Spacing | `.github/workflows/audit-markdown-list-spacing.yml` |
+| Audit Markdown Relative Links | `.github/workflows/audit-markdown-relative-links.yml` |
+| Audit Markdown Blockquote Style | `.github/workflows/audit-markdown-blockquote-style.yml` |
+| Audit Markdown Horizontal Rule Style | `.github/workflows/audit-markdown-hr-style.yml` |
+| Audit Repo Lowercase Directories | `.github/workflows/audit-repo-lowercase-directories.yml` |
+| Audit Repo No Temp Files | `.github/workflows/audit-repo-no-temp-files.yml` |
+| Audit Repo README Mandatory Sections | `.github/workflows/audit-repo-readme-mandatory-sections.yml` |
+| Audit Repo License Filename | `.github/workflows/audit-repo-license-filename.yml` |
+| Audit Repo Forbidden Binary Extensions | `.github/workflows/audit-repo-forbidden-binary-extensions.yml` |
+| Audit Workflow Concurrency Cancel | `.github/workflows/audit-workflow-concurrency-cancel.yml` |
+| Audit Workflow Step Name Verb | `.github/workflows/audit-workflow-step-name-verb.yml` |
+| Audit Workflow Env Var Naming | `.github/workflows/audit-workflow-env-var-naming.yml` |
+| Audit Workflow On Pull Request Types | `.github/workflows/audit-workflow-on-pull-request-types.yml` |
+| Audit Workflow Max Timeout | `.github/workflows/audit-workflow-max-timeout.yml` |

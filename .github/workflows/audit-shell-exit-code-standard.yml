@@ -1,0 +1,27 @@
+name: Audit Shell Exit Code Standard
+on:
+  push:
+    paths:
+      - '**.sh'
+  pull_request:
+    paths:
+      - '**.sh'
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Exit Codes
+        run: |
+          # Check for exit codes outside 0-255
+          if grep -rnE "exit [0-9]{3,}" .; then
+             # This regex is a bit greedy, but should catch 256+
+             echo "Error: Exit codes should be between 0 and 255."
+             exit 1
+          fi
