@@ -1,0 +1,22 @@
+name: Audit Repo Gitkeep No Extension
+on:
+  push:
+    paths: [ '**/.gitkeep' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify .gitkeep
+        run: |
+          if find . -name ".gitkeep.*" | grep -q "."; then
+            echo "Error: Found .gitkeep file with extension."
+            exit 1
+          fi
+        shell: bash

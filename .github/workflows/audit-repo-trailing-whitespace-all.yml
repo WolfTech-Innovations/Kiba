@@ -1,0 +1,21 @@
+name: Audit Repo Trailing Whitespace All
+on:
+  push:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check whitespace
+        run: |
+          if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml"; then
+            echo "Error: Found trailing whitespace."
+            exit 1
+          fi
+        shell: bash

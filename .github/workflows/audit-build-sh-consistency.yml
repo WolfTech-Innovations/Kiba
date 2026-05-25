@@ -1,0 +1,35 @@
+name: Audit Build SH Consistency
+on:
+  push:
+    paths: [ 'build.sh' ]
+  pull_request:
+    paths: [ 'build.sh' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify build.sh specific patterns
+        run: |
+          # 1. SDDM theme name
+          if ! grep -q "Current=kibaos" build.sh; then
+            echo "Error: SDDM theme in build.sh is not set to kibaos"
+            exit 1
+          fi
+          # 2. os-release ID
+          if ! grep -q "ID=kibaos" build.sh; then
+            echo "Error: os-release ID in build.sh is not kibaos"
+            exit 1
+          fi
+          # 3. pacman keyinit
+          if ! grep -q "pacman-key --init" build.sh; then
+            echo "Error: build.sh is missing pacman-key --init"
+            exit 1
+          fi
+        shell: bash

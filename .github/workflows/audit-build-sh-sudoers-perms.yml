@@ -1,0 +1,24 @@
+name: Audit Build SH Sudoers Perms
+on:
+  push:
+    paths: [ 'build.sh' ]
+  pull_request:
+    paths: [ 'build.sh' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify permissions
+        run: |
+          if grep -q "/etc/sudoers.d/" build.sh && ! grep -q "chmod 0440" build.sh; then
+             echo "Error: Found sudoers.d modification but no chmod 0440."
+             exit 1
+          fi
+        shell: bash

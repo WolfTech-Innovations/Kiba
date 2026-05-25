@@ -1,0 +1,35 @@
+name: Audit Workflow Security Best Practices
+on:
+  push:
+    paths: [ '.github/workflows/*.yml' ]
+  pull_request:
+    paths: [ '.github/workflows/*.yml' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Security Check
+        run: |
+          # 1. No top-level write-all
+          if grep -r "^permissions: write-all" .github/workflows/; then
+            echo "Error: Found top-level write-all permissions."
+            exit 1
+          fi
+          # 2. No Node 16 actions (heuristics)
+          if grep -rE "uses: actions/(upload-artifact|download-artifact|setup-node)@v3" .github/workflows/; then
+            echo "Warning: Found actions likely using Node 16 (v3). Consider upgrading to v4."
+          fi
+          # 3. Reasonable timeouts
+          BAD_TIMEOUTS=$(grep -rhE "timeout-minutes: [0-9]{3,}" .github/workflows/ | awk '$2 > 360 {print $0}' || true)
+          if [ -n "$BAD_TIMEOUTS" ]; then
+            echo "Error: Found excessively high timeout-minutes (> 360)."
+            exit 1
+          fi
+        shell: bash
