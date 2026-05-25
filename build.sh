@@ -104,7 +104,7 @@ noto-fonts-cjk
 # Wayland stack
 wayland
 wayland-protocols
-wlroots
+wlroots0.19
 libdrm
 libinput
 libxkbcommon
@@ -117,10 +117,9 @@ qt6-wayland
 qt6-declarative
 qt6-tools
 qt6-svg
-qt6-uitools
 qt6-5compat
 qt6ct
-kvantum-qt6
+kvantum
 
 # PaperDE build deps (also runtime)
 glm
@@ -144,7 +143,7 @@ breeze-icons
 sddm
 
 # Apps — all generic, all Qt6 where possible
-falkon                   # browser (Qt6 WebEngine)
+firefox                   # browser (Qt6 WebEngine)
 dolphin                  # file manager (KDE/Qt6)
 konsole                  # terminal (KDE/Qt6)
 elisa                    # music player (KDE/Qt6)
