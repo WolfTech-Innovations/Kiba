@@ -156,6 +156,7 @@ flatpak
 xdg-desktop-portal
 xdg-desktop-portal-gtk
 feh
+imagemagick
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
