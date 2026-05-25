@@ -1,0 +1,21 @@
+name: Audit Repo No Plaintext Chpasswd
+on:
+  push:
+    paths: [ 'build.sh' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check chpasswd
+        run: |
+          if grep -r "echo \".*\:.*\" | chpasswd" .; then
+             echo "Warning: Found plaintext password pattern."
+          fi
+        shell: bash

@@ -1,0 +1,22 @@
+name: Audit Workflow Checkout V4
+on:
+  push:
+    paths: [ '.github/workflows/*.yml' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify checkout@v4
+        run: |
+          if grep -r "uses: actions/checkout@" .github/workflows/ | grep -vE "@v4|@[a-f0-9]{40}"; then
+            echo "Error: Outdated actions/checkout version."
+            exit 1
+          fi
+        shell: bash

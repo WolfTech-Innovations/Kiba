@@ -1,0 +1,24 @@
+name: Audit Markdown Empty Link Check
+on:
+  push:
+    paths: [ '**/*.md' ]
+  pull_request:
+    paths: [ '**/*.md' ]
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check links
+        run: |
+          if grep -rE "\[[^]]*\]\(\)" . --include="*.md"; then
+            echo "Error: Found empty markdown targets."
+            exit 1
+          fi
+        shell: bash

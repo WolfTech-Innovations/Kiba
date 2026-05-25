@@ -1,0 +1,36 @@
+name: Audit Repository Hygiene Strict
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hygiene Check
+        run: |
+          # 1. Lowercase extensions
+          BAD_EXT=$(find . -type f -name "*.[A-Z]*" -not -path "./.git/*" || true)
+          if [ -n "$BAD_EXT" ]; then
+            echo "Warning: Found files with uppercase extensions."
+          fi
+          # 2. Kebab-case workflows
+          for f in .github/workflows/*.yml; do
+            base=$(basename "$f")
+            if [[ "$base" =~ [^a-z0-9.-] ]]; then
+              echo "Error: Workflow filename $base is not kebab-case."
+              exit 1
+            fi
+          done
+          # 3. License existence check (sanity)
+          if [ ! -f "LICENSE" ]; then
+            echo "Error: LICENSE file missing."
+            exit 1
+          fi
+        shell: bash
