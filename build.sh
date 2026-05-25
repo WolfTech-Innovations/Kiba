@@ -26,7 +26,6 @@ pacman -S --noconfirm --needed \
   \
   greetd greetd-regreet cage gtk4 \
   \
-  imagemagick \
   openssl
 
 # ── Setup ─────────────────────────────────────────────────────────────────
@@ -43,34 +42,9 @@ cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 mkdir -p "${SRCDIR}"
 
-# ── Wallpaper: fetch + upscale to 4K ──────────────────────────────────────
-# Source is a 1920×1080 copyright-free purple aesthetic image.
-# We upscale to 3840×2160 with Lanczos so it looks sharp on HiDPI displays,
-# then embed it at /usr/share/wallpapers/kibaos/wallpaper.jpg in the airootfs.
-WALLPAPER_URL="https://wallpapers.com/images/hd/non-copyrighted-purple-aesthetic-view-6ad1lsfony65z6q5.jpg"
-WALLPAPER_SRC="${WORKDIR}/wallpaper_src.jpg"
-WALLPAPER_4K="${WORKDIR}/wallpaper_4k.jpg"
 
-echo "=== Fetching wallpaper ==="
-curl -fL --retry 3 --retry-delay 2 -o "${WALLPAPER_SRC}" "${WALLPAPER_URL}"
 
-echo "=== Upscaling wallpaper to 3840×2160 (Lanczos) ==="
-magick "${WALLPAPER_SRC}" \
-  -filter Lanczos \
-  -resize 3840x2160\! \
-  -unsharp 0x0.75+0.75+0.008 \
-  -quality 92 \
-  "${WALLPAPER_4K}"
 
-# Stage into airootfs — both paths covered:
-#   /usr/share/wallpapers/kibaos/wallpaper.jpg  (regreet + deepin dconf key)
-#   /usr/share/wallpapers/deepin/desktop.jpg    (deepin fallback default)
-mkdir -p "${AIROOTFS}/usr/share/wallpapers/kibaos"
-mkdir -p "${AIROOTFS}/usr/share/wallpapers/deepin"
-cp "${WALLPAPER_4K}" "${AIROOTFS}/usr/share/wallpapers/kibaos/wallpaper.jpg"
-cp "${WALLPAPER_4K}" "${AIROOTFS}/usr/share/wallpapers/deepin/desktop.jpg"
-
-echo "=== Wallpaper staged ==="
 
 # ── profiledef.sh ──────────────────────────────────────────────────────────
 cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
@@ -208,12 +182,7 @@ command = "env GTK_USE_PORTAL=0 GDK_DEBUG=no-portals cage -s -mlast -- regreet"
 user = "greeter"
 GREETDCONF
 
-# wallpaper path now points to our embedded KibaOS wallpaper
 cat > "${AIROOTFS}/etc/greetd/regreet.toml" << 'REGREETCONF'
-[background]
-path = "/usr/share/wallpapers/kibaos/wallpaper.jpg"
-fit = "Cover"
-
 [GTK]
 application_prefer_dark_theme = true
 
@@ -391,7 +360,8 @@ ln -sf /usr/lib/systemd/system/pacman-init.service \
 
 # ── customize_airootfs.sh ─────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/root"
-cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
+# customize_airootfs.sh is built in two heredoc passes so we can inject the
+cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE_PART1'
 #!/usr/bin/env bash
 set -e
 
@@ -448,7 +418,6 @@ chmod +x /home/liveuser/.xsession
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
-# ── dconf system-db: dark mode + wallpaper defaults ───────────────────────
 mkdir -p /etc/dconf/profile
 cat > /etc/dconf/profile/user << 'DCONFPROFILE'
 user-db:user
@@ -470,10 +439,6 @@ text-scaling-factor=1.0
 high-contrast=false
 
 [com/deepin/dde/appearance]
-wallpaper='/usr/share/wallpapers/kibaos/wallpaper.jpg'
-
-[com/deepin/dde/filemanager/wallpaper]
-wallpaper-uri='file:///usr/share/wallpapers/kibaos/wallpaper.jpg'
 DCONFKEYS
 dconf update
 
@@ -495,23 +460,10 @@ tooltip=Accessibility
 command=kiba-access
 SBCONF
 
-# ── Deepin wallpaper config file (DDE native, pre-seeds the gsetting key) ─
-# DDE reads ~/.config/deepin/deepin-wallpaper.ini as a per-user override
-# before the dconf key takes effect. Belt-and-suspenders for live session.
-mkdir -p /home/liveuser/.config/deepin
-cat > /home/liveuser/.config/deepin/deepin-wallpaper.ini << 'WALLINI'
-[Wallpaper]
-Wallpaper=/usr/share/wallpapers/kibaos/wallpaper.jpg
-WALLINI
 
 # Also write the org.deepin.dde.appearance gsettings XML override so the
 # setting survives even if dconf-deepin integration isn't active at first boot.
-mkdir -p /usr/share/glib-2.0/schemas
-cat > /usr/share/glib-2.0/schemas/99-kibaos-wallpaper.gschema.override << 'GSCHEMA'
-[com.deepin.dde.appearance]
-wallpaper='/usr/share/wallpapers/kibaos/wallpaper.jpg'
-GSCHEMA
-glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
+
 
 # ── kiba-apply user service: enable for liveuser ──────────────────────────
 mkdir -p /home/liveuser/.config/systemd/user/graphical-session.target.wants
@@ -601,6 +553,7 @@ chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
 # ── Build the ISO ──────────────────────────────────────────────────────────
 cd "${WORKDIR}"
+rm -rf "${WORKDIR}/work"
 mkarchiso -v -w work -o out "${PROFILE}/"
 
 if ls out/*.iso 1>/dev/null 2>&1; then
