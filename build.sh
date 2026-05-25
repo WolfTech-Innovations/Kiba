@@ -143,15 +143,15 @@ breeze-icons
 sddm
 
 # Apps — all generic, all Qt6 where possible
-firefox                   # browser (Qt6 WebEngine)
-dolphin                  # file manager (KDE/Qt6)
-konsole                  # terminal (KDE/Qt6)
-elisa                    # music player (KDE/Qt6)
-gwenview                 # image viewer (KDE/Qt6)
-ark                      # archive manager (KDE/Qt6)
-kate                     # text editor (KDE/Qt6)
-spectacle                # screenshot tool (KDE/Qt6)
-kcalc                    # calculator (KDE/Qt6)
+firefox                   
+dolphin                  
+elisa
+konsole
+gwenview               
+ark                      
+kate                   
+spectacle             
+kcalc                    
 # Octopi (Qt app store/package manager) — AUR, built in customize_airootfs.sh
 
 # System utilities
