@@ -1,0 +1,19 @@
+name: Audit Repo No Pyc
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit_repo_no_pyc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure no .pyc files are tracked
+        run: |
+          find . -name "*.pyc" | grep . && exit 1 || exit 0

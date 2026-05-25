@@ -1,0 +1,19 @@
+name: Github Actions Consistent Runner
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  github_actions_consistent_runner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure ubuntu-latest is used
+        run: |
+          grep "runs-on:" .github/workflows/*.yml | grep -v "ubuntu-latest" && exit 1 || exit 0

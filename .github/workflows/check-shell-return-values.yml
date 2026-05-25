@@ -1,0 +1,19 @@
+name: Check Shell Return Values
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_shell_return_values:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure return used in functions
+        run: |
+          grep -r "function" . -A 10 --include="*.sh" | grep -v "return " && exit 1 || exit 0

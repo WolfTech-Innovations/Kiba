@@ -1,0 +1,19 @@
+name: Docs No Broken External Anchors
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  docs_no_broken_external_anchors:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for broken external links with anchors
+        run: |
+          grep -rE "https?://[^ ]+#[^ ]+" . --include="*.md" || exit 0

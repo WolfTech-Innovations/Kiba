@@ -1,0 +1,19 @@
+name: Shell No Useless Pipes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  shell_no_useless_pipes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect cat | grep
+        run: |
+          grep -r "cat .* | grep" . && exit 1 || exit 0

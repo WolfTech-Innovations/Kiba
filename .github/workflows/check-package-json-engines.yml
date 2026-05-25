@@ -1,0 +1,19 @@
+name: Check Package Json Engines
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_package_json_engines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure engines field is present
+        run: |
+          if [ -f package.json ]; then jq -e ".engines" package.json || exit 1; fi

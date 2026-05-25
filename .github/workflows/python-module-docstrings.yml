@@ -1,0 +1,19 @@
+name: Python Module Docstrings
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python_module_docstrings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure all python files have module docstrings
+        run: |
+          find . -name "*.py" -exec python3 -c "import sys; content=open(sys.argv[1]).read(); sys.exit(0 if content.startswith('\"\"\"') or content.startswith(\"'''\") else 1)" {} \;

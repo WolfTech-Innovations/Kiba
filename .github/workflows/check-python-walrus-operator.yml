@@ -1,0 +1,19 @@
+name: Check Python Walrus Operator
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_python_walrus_operator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Audit use of walrus operator
+        run: |
+          grep -r ":=" .

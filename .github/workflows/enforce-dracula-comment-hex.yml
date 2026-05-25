@@ -1,0 +1,19 @@
+name: Enforce Dracula Comment Hex
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  enforce_dracula_comment_hex:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure #6272a4 is used for comments
+        run: |
+          grep -r "comment" . | grep -v "#6272a4" | grep "#" && exit 1 || exit 0

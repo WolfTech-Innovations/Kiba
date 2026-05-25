@@ -1,0 +1,19 @@
+name: Check Python Os Path
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_python_os_path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Encourage pathlib over os.path
+        run: |
+          grep -r "os.path." . --include="*.py" && exit 1 || exit 0

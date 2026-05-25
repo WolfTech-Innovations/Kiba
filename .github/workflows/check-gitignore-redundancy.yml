@@ -1,0 +1,19 @@
+name: Check Gitignore Redundancy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_gitignore_redundancy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check for redundant patterns in .gitignore
+        run: |
+          sort .gitignore | uniq -d | grep . && exit 1 || exit 0

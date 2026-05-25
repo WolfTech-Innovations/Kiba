@@ -1,0 +1,19 @@
+name: Markdown List Consistency V4
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  markdown_list_consistency_v4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure lists use -
+        run: |
+          grep -r "^* " . --include="*.md" && exit 1 || exit 0
