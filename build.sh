@@ -2,7 +2,6 @@
 # KibaOS ISO build script
 # DE: LXQt + Openbox + Picom
 # Greeter: SDDM with autologin for liveuser (Session=lxqt.desktop)
-# Theme: ChromeOS shelf layout × macOS vibrancy × Material You (teal)
 # Wallpaper: auto-set from WolfTech branding repo
 set -ex
 
@@ -1027,6 +1026,7 @@ cat > "${LXQT_CFG}/session.conf" << 'SESSIONCONF'
 [General]
 __userfile__=true
 window_manager=openbox
+desktop_manager=pcmanfm-qt
 
 [Environment]
 QT_QPA_PLATFORMTHEME=qt5ct
@@ -1099,7 +1099,6 @@ mkdir -p /home/liveuser/.config/picom
 cat > /home/liveuser/.config/picom/picom.conf << 'PICOMCONF'
 # KibaOS Picom — macOS-inspired compositing
 backend = "glx";
-glx-no-stencil = true;
 glx-copy-from-front = false;
 vsync = true;
 
@@ -1689,6 +1688,16 @@ NoDisplay=false
 Comment=GPU-accelerated compositor with blur and shadows
 PICOMDESK
 
+# ── Autostart: pcmanfm-qt desktop (LXQt Module — auto-restarted on crash) ─
+cat > /home/liveuser/.config/autostart/pcmanfm-qt-desktop.desktop << 'PCMANFMDESK'
+[Desktop Entry]
+Type=Application
+Name=Desktop
+Exec=pcmanfm-qt --desktop --profile lxqt
+OnlyShowIn=LXQt;
+X-LXQt-Module=true
+PCMANFMDESK
+
 # ── Autostart: KibaOS welcome ─────────────────────────────────────────────
 cat > /home/liveuser/.config/autostart/kiba-welcome.desktop << 'WDESK'
 [Desktop Entry]
@@ -1720,11 +1729,13 @@ sed -i \
   -e 's/^ModuleName=.*/ModuleName=spinner/' \
   "${THEME_DST}/kibaos.plymouth"
 
-if [ -f /usr/share/kibaos/wallpaper.png ]; then
-  magick /usr/share/kibaos/wallpaper.png -filter Lanczos -resize 400x \
+# Solid dark background — clean boot screen, no wallpaper bleed
+magick -size 1920x1080 xc:"#0d1b2a" "${THEME_DST}/background-tile.png"
+
+# Logo as watermark (centered by spinner plugin)
+if [ -f "${LOGO_RAW}" ]; then
+  magick "${LOGO_RAW}" -filter Lanczos -resize 200x200 \
     "${THEME_DST}/watermark.png"
-  magick /usr/share/kibaos/wallpaper.png -filter Lanczos -resize 64x64 \
-    "${THEME_DST}/entry-icon.png"
 fi
 
 plymouth-set-default-theme -R kibaos 2>/dev/null || \
