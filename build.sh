@@ -60,7 +60,7 @@ bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito' 'uefi-ia32.systemd-boot.
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
-airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1048576' '-Xdict-size' '100%' '-always-use-fragments' '-noappend')
+airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1048576' '-Xdict-size' '1048576' '-Xcompression-level' '9' '-no-duplicates' '-noappend')
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/gshadow"]="0:0:400"
@@ -129,12 +129,14 @@ greetd-regreet
 cage
 gtk4
 openssl
+plymouth
+imagemagick
 PACKAGES
 
 # ── initramfs ──────────────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
-HOOKS=(base udev keyboard keymap modconf memdisk archiso block filesystems)
+HOOKS=(base udev keyboard keymap modconf memdisk archiso block plymouth filesystems)
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
@@ -158,13 +160,29 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash plymouth.enable=1 rd.plymouth=1
 ENTRY
+
+cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
+title   KibaOS (safe mode — no Plymouth, verbose)
+linux   /arch/boot/x86_64/vmlinuz-linux
+initrd  /arch/boot/x86_64/initramfs-linux.img
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
+ENTRY_SAFE
 
 SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
+  # Append a safe-mode entry for BIOS boots
+  cat >> "${SYSLINUX_CFG}" << 'SYSLINUX_SAFE'
+
+LABEL kibaos-safe
+  MENU LABEL KibaOS (safe mode - no Plymouth, verbose)
+  LINUX boot/x86_64/vmlinuz-linux
+  INITRD boot/x86_64/initramfs-linux.img
+  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
+SYSLINUX_SAFE
 fi
 
 # ── greetd + ReGreet config ────────────────────────────────────────────────
@@ -509,6 +527,82 @@ DesktopNames=Cutefish
 SESSION
 chmod 644 /usr/share/xsessions/cutefish-xsession.desktop
 
+# ── Plymouth: KibaOS branded spinner theme ───────────────────────────────
+# Base theme: spinner (ships with plymouth, no extra package needed).
+# We copy it to a 'kibaos' theme dir and replace the watermark with our logo.
+THEME_SRC="/usr/share/plymouth/themes/spinner"
+THEME_DST="/usr/share/plymouth/themes/kibaos"
+
+mkdir -p "${THEME_DST}"
+cp -a "${THEME_SRC}/." "${THEME_DST}/"
+
+# Rename the .plymouth descriptor
+mv "${THEME_DST}/spinner.plymouth" "${THEME_DST}/kibaos.plymouth" 2>/dev/null || true
+
+# Patch the descriptor: name, description, image references
+sed -i \
+  -e 's/^Name=.*/Name=kibaos/' \
+  -e 's/^Description=.*/Description=KibaOS Boot Splash/' \
+  -e 's/spinner\.plymouth/kibaos.plymouth/g' \
+  -e 's/^ModuleName=.*/ModuleName=spinner/' \
+  "${THEME_DST}/kibaos.plymouth"
+
+# Fetch the KibaOS logo from GitHub and convert to the sizes spinner uses:
+#   watermark.png  — shown centred above the spinner ring (recommended ≤400px wide)
+#   throbber-*.png — not replaced; spinner generates them from the theme script
+LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
+LOGO_RAW="/tmp/kibaos_boot_raw.png"
+
+curl -fL --retry 3 --retry-delay 2 -o "${LOGO_RAW}" "${LOGO_URL}"
+
+# Watermark: 400 × auto (preserve aspect ratio), transparent background kept
+magick "${LOGO_RAW}" \
+  -filter Lanczos \
+  -resize 400x \
+  "${THEME_DST}/watermark.png"
+
+# Also drop a 64×64 icon-size copy as entry-icon.png (used by some plymouth scripts)
+magick "${LOGO_RAW}" \
+  -filter Lanczos \
+  -resize 64x64 \
+  "${THEME_DST}/entry-icon.png"
+
+rm -f "${LOGO_RAW}"
+
+# Wire spinner.script to reference our watermark (it already does by default,
+# but patch the path explicitly in case the stock script uses a hardcoded name)
+if [ -f "${THEME_DST}/spinner.script" ]; then
+  sed -i 's|watermark\.png|watermark.png|g' "${THEME_DST}/spinner.script"
+fi
+
+# Set kibaos as the default plymouth theme and rebuild the initrd cache
+plymouth-set-default-theme -R kibaos 2>/dev/null || \
+  plymouth-set-default-theme kibaos 2>/dev/null || true
+
+# Ensure plymouth systemd service is enabled
+systemctl enable plymouth-start.service    2>/dev/null || true
+systemctl enable plymouth-read-write.service 2>/dev/null || true
+systemctl enable plymouth-quit-wait.service  2>/dev/null || true
+
+# ── Strip ELF debug symbols from binaries and libraries ───────────────────
+# Removes DWARF debug info from all ELF files; safe for a live image where
+# crash debugging tools like gdb are not included. Saves 50–150 MB typical.
+find /usr/bin /usr/lib /usr/lib32 -type f \( -name '*.so*' -o -perm /111 \) \
+  -exec sh -c 'file "$1" | grep -q ELF && strip --strip-unneeded "$1" 2>/dev/null' _ {} \; || true
+
+# ── Strip debug symbols from kernel modules ───────────────────────────────
+# Arch ships .ko.zst modules with debug info; stripping before squashfs packs
+# them gives significant savings (often 30–60 MB on top of binary stripping).
+find /usr/lib/modules -type f -name '*.ko' \
+  -exec strip --strip-debug {} \; 2>/dev/null || true
+find /usr/lib/modules -type f -name '*.ko.zst' | while read -r f; do
+  tmp="${f%.zst}.tmp.ko"
+  zstd -d -q "${f}" -o "${tmp}" 2>/dev/null && \
+  strip --strip-debug "${tmp}" 2>/dev/null && \
+  zstd -19 -q "${tmp}" -o "${f}" --force 2>/dev/null && \
+  rm -f "${tmp}"
+done || true
+
 # ── Aggressive size reduction ─────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*
 rm -rf /usr/share/man/*
@@ -523,18 +617,24 @@ find /usr/share/i18n/locales -mindepth 1 -maxdepth 1 \
   -exec rm -rf {} + 2>/dev/null || true
 
 find /usr/lib/firmware -mindepth 1 -maxdepth 1 \
-  ! -name 'i915'     \
-  ! -name 'amdgpu'   \
-  ! -name 'radeon'   \
-  ! -name 'iwlwifi*' \
-  ! -name 'ath*'     \
-  ! -name 'rtl_nic'  \
-  ! -name 'rtlwifi'  \
-  ! -name 'mt7601u*' \
-  ! -name 'sof'      \
-  ! -name 'sof-tplg' \
-  ! -name 'intel'    \
-  ! -name 'qed'      \
+  ! -name 'i915'       \
+  ! -name 'amdgpu'     \
+  ! -name 'radeon'     \
+  ! -name 'nouveau'    \
+  ! -name 'iwlwifi*'   \
+  ! -name 'ath*'       \
+  ! -name 'ath10k'     \
+  ! -name 'ath11k'     \
+  ! -name 'rtl_nic'    \
+  ! -name 'rtlwifi'    \
+  ! -name 'rtw88'      \
+  ! -name 'rtw89'      \
+  ! -name 'mt7601u*'   \
+  ! -name 'mediatek'   \
+  ! -name 'sof'        \
+  ! -name 'sof-tplg'   \
+  ! -name 'intel'      \
+  ! -name 'qed'        \
   -exec rm -rf {} + 2>/dev/null || true
 
 find /usr -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
