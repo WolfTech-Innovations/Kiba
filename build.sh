@@ -360,8 +360,7 @@ ln -sf /usr/lib/systemd/system/pacman-init.service \
 
 # ── customize_airootfs.sh ─────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/root"
-# customize_airootfs.sh is built in two heredoc passes so we can inject the
-cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE_PART1'
+cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
 
