@@ -131,15 +131,7 @@ base-devel
 papirus-icon-theme
 breeze-icons
 sddm
-firefox                   
-dolphin                  
-elisa
-konsole
-gwenview               
-ark                      
-kate                   
-spectacle             
-kcalc                    
+chromium           
 gparted
 ntfs-3g
 exfatprogs
