@@ -100,8 +100,6 @@ noto-fonts
 noto-fonts-emoji
 ttf-liberation
 noto-fonts-cjk
-
-# Wayland stack
 wayland
 wayland-protocols
 wlroots0.19
@@ -110,8 +108,6 @@ libinput
 libxkbcommon
 xorg-xwayland
 seatd
-
-# Qt6 runtime
 qt6-base
 qt6-wayland
 qt6-declarative
@@ -120,8 +116,6 @@ qt6-svg
 qt6-5compat
 qt6ct
 kvantum
-
-# PaperDE build deps (also runtime)
 glm
 cairo
 pango
@@ -134,15 +128,9 @@ cmake
 ninja
 git
 base-devel
-
-# Theming
 papirus-icon-theme
 breeze-icons
-
-# Display manager
 sddm
-
-# Apps — all generic, all Qt6 where possible
 firefox                   
 dolphin                  
 elisa
@@ -152,9 +140,6 @@ ark
 kate                   
 spectacle             
 kcalc                    
-# Octopi (Qt app store/package manager) — AUR, built in customize_airootfs.sh
-
-# System utilities
 gparted
 ntfs-3g
 exfatprogs
@@ -166,14 +151,10 @@ pipewire-pulse
 pipewire-alsa
 wireplumber
 pavucontrol-qt
-
-# Flatpak / portals
 flatpak
 xdg-desktop-portal
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
-
-# Plymouth
 plymouth
 imagemagick
 curl
