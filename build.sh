@@ -4,6 +4,10 @@
 #        Cutefish build patches,
 #        Calamares sequence/modules, unpackfs path, package names, mkinitcpio hooks,
 #        liveuser setup, kiba-apply runtime dir, shellprocess users.json path, and more.
+#
+# AUTOLOGIN FIX: liveuser password set to "live", nopasswdlogin PAM group,
+#        xdm-autologin PAM service, chpasswd in chroot. Arch does not allow
+#        locked (!) shadow entries through XDM PAM autologin.
 set -ex
 
 # ── Install ALL deps inside the container ────────────────────────────────
@@ -47,7 +51,8 @@ pacman -S --noconfirm --needed \
   \
   xorg-xrandr xorg-xdpyinfo xorg-xwd xorg-xwud \
   imagemagick \
-  dconf python-dbus python-gobject
+  dconf python-dbus python-gobject \
+  openssl
 
 # ── Setup ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
@@ -120,7 +125,6 @@ build_cutefish_repo() {
   cd "${SRCDIR}/${REPO}"
 
   # ── Strip optional/broken submodules ──────────────────────────────────
-  # Do this before cmake so find_package failures don't abort the build.
   sed -i '/add_subdirectory(bluetooth)/d'         CMakeLists.txt 2>/dev/null || true
   sed -i '/add_subdirectory(bluez)/d'             CMakeLists.txt 2>/dev/null || true
   sed -i '/add_subdirectory(networkmanagement)/d' CMakeLists.txt 2>/dev/null || true
@@ -133,11 +137,9 @@ build_cutefish_repo() {
   sed -i '/KF5::NetworkManagerQt/d'               CMakeLists.txt 2>/dev/null || true
   sed -i '/KF5::ModemManagerQt/d'                 CMakeLists.txt 2>/dev/null || true
   sed -i '/KF5::Screen/d'                         CMakeLists.txt 2>/dev/null || true
-  # VPN modules drag in NetworkManager headers we don't have
   sed -i '/src\/vpn\//d'                          CMakeLists.txt 2>/dev/null || true
 
   # ── Fix qt5_create_translation calls ──────────────────────────────────
-  # If .ts files exist use qt5_add_translation; otherwise strip entirely.
   while IFS= read -r f; do
     DIR=$(dirname "$f")
     TS_COUNT=$(find "$DIR" -maxdepth 2 -name "*.ts" 2>/dev/null | wc -l)
@@ -155,11 +157,8 @@ build_cutefish_repo() {
     fi
   done < <(find . -name "CMakeLists.txt")
 
-  # chotkeys has an unimplemented slot that breaks linking — just skip it.
-  # KibaOS doesn't need it; Cutefish's own keybindings work without it.
   sed -i '/add_subdirectory(chotkeys)/d' CMakeLists.txt 2>/dev/null || true
 
-  # ── Configure and build ────────────────────────────────────────────────
   mkdir -p build && cd build
   cmake -DCMAKE_INSTALL_PREFIX=/usr \
         -DCMAKE_PREFIX_PATH="${STAGING}/usr" \
@@ -177,13 +176,11 @@ for REPO in libcutefish fishui core dock launcher statusbar \
   build_cutefish_repo "${REPO}" "${REPO}"
 done
 
-# Sanity check: cutefish-session must have been installed by the core repo.
 if [ ! -f "${AIROOTFS}/usr/bin/cutefish-session" ]; then
   echo "ERROR: cutefish-session not found in airootfs after build!"
-  echo "       The 'core' repo cmake install may have failed silently."
   exit 1
 fi
-echo "=== cutefish-session installed OK ===" 
+echo "=== cutefish-session installed OK ==="
 
 # ── Compile Calamares ──────────────────────────────────────────────────────
 echo "=== Compiling Calamares ==="
@@ -276,12 +273,10 @@ python-gobject
 python
 python-yaml
 python-jsonschema
+openssl
 PACKAGES
 
 # ── initramfs ──────────────────────────────────────────────────────────────
-# archiso hooks: memdisk loads the squashfs into RAM; archiso mounts it.
-# 'keyboard' and 'keymap' must come before 'archiso' so the console works
-# if something goes wrong. 'filesystems' last for fallback mount support.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
 HOOKS=(base udev keyboard keymap modconf memdisk archiso block filesystems)
@@ -311,7 +306,6 @@ initrd  /arch/boot/x86_64/initramfs-linux.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash
 ENTRY
 
-# Syslinux (BIOS boot)
 SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
@@ -319,12 +313,11 @@ if [ -f "${SYSLINUX_CFG}" ]; then
 fi
 
 # ── XDM display manager config ─────────────────────────────────────────────
-# XDM manages the X server and calls Xsession for the session.
-# Autologin is handled via DisplayManager_0.autoLogin in xdm-config —
-# no password prompt, no PAM interaction needed for the live session.
 mkdir -p "${AIROOTFS}/etc/X11/xdm"
 
-# xdm-config: autologin liveuser, disable network chooser.
+# xdm-config: autologin liveuser via xdm-autologin PAM service.
+# pamService points XDM at our custom PAM stack that allows nopasswdlogin
+# group members through without a password prompt.
 cat > "${AIROOTFS}/etc/X11/xdm/xdm-config" << 'XDMCONFIG'
 DisplayManager.errorLogFile:            /var/log/xdm.log
 DisplayManager.pidFile:                 /var/run/xdm.pid
@@ -334,31 +327,26 @@ DisplayManager.accessFile:              /etc/X11/xdm/Xaccess
 DisplayManager*resources:               /etc/X11/xdm/Xresources
 DisplayManager*session:                 /etc/X11/xdm/Xsession
 DisplayManager*authComplain:            false
+DisplayManager*pamService:              xdm-autologin
 DisplayManager_0.authorize:             false
 DisplayManager_0.autoLogin:             liveuser
 DisplayManager_0.autoReLogin:           true
 DisplayManager.requestPort:             0
 XDMCONFIG
 
-# Xservers: one local X server on vt7.
 cat > "${AIROOTFS}/etc/X11/xdm/Xservers" << 'XSERVERS'
 :0 local /usr/bin/X :0 vt7 -nolisten tcp
 XSERVERS
 
-# Xaccess: local connections only.
 cat > "${AIROOTFS}/etc/X11/xdm/Xaccess" << 'XACCESS'
 *
 XACCESS
 
-# Xresources: minimal — no login box since we autologin.
 cat > "${AIROOTFS}/etc/X11/xdm/Xresources" << 'XRESOURCES'
 xlogin*login.translations: #override\
     <Key>Return: set-session-argument() finish-field()
 XRESOURCES
 
-# Xsession: called by XDM after login. Execs ~/.xsession if present,
-# otherwise falls back to kiba-session directly.
-# XDM passes the username as $1 for autologin.
 cat > "${AIROOTFS}/etc/X11/xdm/Xsession" << 'XSESSION'
 #!/bin/bash
 # /etc/X11/xdm/Xsession — run as the logged-in user.
@@ -366,19 +354,27 @@ cat > "${AIROOTFS}/etc/X11/xdm/Xsession" << 'XSESSION'
 [ -f /etc/profile ]            && source /etc/profile
 [ -f "${HOME}/.profile" ]      && source "${HOME}/.profile" 2>/dev/null || true
 
-# XDM's primary session mechanism: exec ~/.xsession if it exists and is executable.
 if [ -x "${HOME}/.xsession" ]; then
     exec "${HOME}/.xsession"
 fi
 
-# Fallback: launch kiba-session directly.
 exec /usr/local/bin/kiba-session
 XSESSION
 chmod +x "${AIROOTFS}/etc/X11/xdm/Xsession"
 
-# ── kiba-session — the X session script, exec'd by XDM ────────────────────
-# XDM has started X and called our Xsession wrapper which execs this script.
-# We handle dbus, XDG_RUNTIME_DIR, kwin, and cutefish ourselves.
+# ── PAM: xdm-autologin service ─────────────────────────────────────────────
+# pam_succeed_if: members of nopasswdlogin bypass password auth entirely.
+# Falls through to system-login for everything else (account, session, etc.).
+mkdir -p "${AIROOTFS}/etc/pam.d"
+cat > "${AIROOTFS}/etc/pam.d/xdm-autologin" << 'PAMAUTOLOGIN'
+auth        sufficient  pam_succeed_if.so user ingroup nopasswdlogin quiet
+auth        include     system-login
+account     include     system-login
+password    include     system-login
+session     include     system-login
+PAMAUTOLOGIN
+
+# ── kiba-session ──────────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/usr/local/bin"
 cat > "${AIROOTFS}/usr/local/bin/kiba-session" << 'KIBASESSION'
 #!/bin/bash
@@ -389,33 +385,25 @@ export DESKTOP_SESSION=cutefish
 export XDG_SESSION_DESKTOP=cutefish
 export XDG_SESSION_TYPE=x11
 
-# XDM doesn't run pam_systemd so XDG_RUNTIME_DIR won't exist — create it.
 export XDG_RUNTIME_DIR="/run/user/$(id -u)"
 mkdir -p "${XDG_RUNTIME_DIR}"
 chmod 0700 "${XDG_RUNTIME_DIR}"
 
-# Unset KDE session vars — kwin is present as a dep but we don't want
-# anything assuming this is a Plasma session.
 unset KDE_FULL_SESSION
 unset KDE_SESSION_VERSION
 
-# Source user profile (PATH, locale, etc.)
 [ -f /etc/profile ]       && source /etc/profile
 [ -f "${HOME}/.profile" ] && source "${HOME}/.profile" 2>/dev/null || true
 
-# D-Bus session bus — XDM doesn't start one for us.
 if [ -z "${DBUS_SESSION_BUS_ADDRESS}" ]; then
   eval "$(dbus-launch --sh-syntax --exit-with-session)"
 fi
 
-# kwin compositor — must start before cutefish-session.
 /usr/bin/kwin_x11 --replace &
 sleep 0.8
 
-# kiba-apply settings daemon.
 /usr/local/bin/kiba-apply &
 
-# Hand off to cutefish. cutefish-session installs to /usr/bin via cmake.
 exec /usr/bin/cutefish-session
 KIBASESSION
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-session"
@@ -423,13 +411,6 @@ chmod +x "${AIROOTFS}/usr/local/bin/kiba-session"
 # ── Calamares config ───────────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
 
-# settings.conf — module sequence.
-# Notes:
-#   - 'localecfg' writes /etc/locale.conf; 'locale' in exec sets the timezone.
-#   - 'networkcfg' copies the live NetworkManager state to the installed system.
-#   - 'shellprocess@copy-user-settings' migrates liveuser dotfiles.
-#   - 'bootloader' must come after 'fstab' and after 'mount'.
-#   - 'umount' must be last in exec.
 cat > "${AIROOTFS}/etc/calamares/settings.conf" << 'CALA_SETTINGS'
 ---
 modules-search: [ local, /usr/lib/calamares/modules ]
@@ -465,9 +446,6 @@ prompt-install: false
 dont-chroot: false
 CALA_SETTINGS
 
-# unpackfs.conf
-# The squashfs path in archiso releng lives under:
-# /run/archiso/bootmnt/arch/x86_64/airootfs.sfs
 cat > "${AIROOTFS}/etc/calamares/modules/unpackfs.conf" << 'UNPACKFS'
 ---
 unpack:
@@ -476,8 +454,6 @@ unpack:
     destination: ""
 UNPACKFS
 
-# shellprocess: migrate liveuser settings to the newly created account.
-# Calamares runtime state is in global_storage.json (not users.json).
 cat > "${AIROOTFS}/etc/calamares/modules/shellprocess@copy-user-settings.conf" << 'SHELLPROC'
 ---
 dontChroot: false
@@ -487,7 +463,6 @@ script:
   - "-": |
           NEW_USER=$(python3 -c "
           import json, sys
-          # Calamares runtime state is in global_storage.json
           for path in [
               '/etc/calamares/global_storage.json',
               '/tmp/calamares-global-storage.json',
@@ -500,7 +475,6 @@ script:
                       sys.exit(0)
               except Exception:
                   pass
-          # Fallback: first non-system user in passwd
           import pwd
           for p in pwd.getpwall():
               if p.pw_uid >= 1000 and p.pw_name != 'liveuser':
@@ -512,12 +486,10 @@ script:
           NEW_HOME="/home/${NEW_USER}"
           LIVE_HOME="/home/liveuser"
 
-          # dconf binary database (theme, colour, accessibility state)
           mkdir -p "${NEW_HOME}/.config/dconf"
           cp -a "${LIVE_HOME}/.config/dconf/user" \
                 "${NEW_HOME}/.config/dconf/user" 2>/dev/null || true
 
-          # Cutefish native config files
           for f in cutefishtheme.conf cutefish-wallpaper.conf \
                    cutefish-appearance.conf cutefish-dock.conf \
                    cutefish-statusbar.conf; do
@@ -525,11 +497,9 @@ script:
               [ -f "$src" ] && cp "$src" "${NEW_HOME}/.config/${f}"
           done
 
-          # Qt / KDE globals
           [ -f "${LIVE_HOME}/.config/kdeglobals" ] && \
               cp "${LIVE_HOME}/.config/kdeglobals" "${NEW_HOME}/.config/kdeglobals"
 
-          # GTK theming
           for d in .config/gtk-3.0 .config/gtk-4.0 .gtkrc-2.0; do
               src="${LIVE_HOME}/${d}"
               dst="${NEW_HOME}/${d}"
@@ -538,7 +508,6 @@ script:
               cp -a "$src" "$dst"
           done
 
-          # Fontconfig / accessibility overrides
           [ -d "${LIVE_HOME}/.config/fontconfig" ] && \
               cp -a "${LIVE_HOME}/.config/fontconfig" \
                     "${NEW_HOME}/.config/fontconfig"
@@ -547,7 +516,6 @@ script:
           echo "=== Settings migrated to ${NEW_HOME} ==="
 SHELLPROC
 
-# displaymanager.conf — tell Calamares to configure XDM on the installed system.
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
@@ -558,52 +526,28 @@ defaultDesktopEnvironment:
 basicSetup: false
 DMCONF
 
-# ── kiba-freeze: X11 framebuffer freeze primitive ─────────────────────────
+# ── kiba-freeze ───────────────────────────────────────────────────────────
 cat > "${AIROOTFS}/usr/local/bin/kiba-freeze" << 'KIBAFREEZE'
 #!/bin/bash
-# kiba-freeze — freeze the X11 framebuffer, print "PID:PNG_PATH" to stdout.
-# Usage:
-#   TOKEN=$(kiba-freeze)
-#   PID=${TOKEN%%:*}  PNG=${TOKEN#*:}
-#   ... make changes ...
-#   kill "$PID"; rm -f "$PNG"
-
 DISPLAY="${DISPLAY:-:0}"
 TMP=$(mktemp /tmp/kiba-freeze-XXXXXX)
 TMP_PNG="${TMP}.png"
-
-# xwd: raw X11 dump — frame-perfect, no compositor lag
 xwd -display "${DISPLAY}" -root -silent -out "${TMP}"
-
-# Convert XWD → PNG for display -window root
 convert "${TMP}" "${TMP_PNG}" 2>/dev/null
 rm -f "${TMP}"
-
-# Overlay the frozen frame on the root window.
 display -display "${DISPLAY}" -window root "${TMP_PNG}" &
 OVERLAY_PID=$!
-
-# One frame for the X server to composite the overlay
 sleep 0.04
-
 echo "${OVERLAY_PID}:${TMP_PNG}"
 KIBAFREEZE
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-freeze"
 
-# ── kiba-apply: instant-apply settings daemon ─────────────────────────────
+# ── kiba-apply ────────────────────────────────────────────────────────────
 cat > "${AIROOTFS}/usr/local/bin/kiba-apply" << 'KIBAAPPLY'
 #!/usr/bin/env python3
 """
 kiba-apply  — KibaOS instant-apply settings daemon
 Unix socket: /run/user/<uid>/kiba-apply.sock
-
-Supported ops (send as JSON, one line):
-  {"op":"theme",        "value":"dark"|"light"}
-  {"op":"wallpaper",    "value":"/path/to/image"}
-  {"op":"font_scale",   "value":1.0}
-  {"op":"accessibility","key":"large_text"|"high_contrast"|"reduce_motion",
-                        "value":true|false}
-  {"op":"xrandr",       "args":["--output","HDMI-1","--brightness","0.8"]}
 """
 import json, os, signal, socket, subprocess, sys, threading, time
 
@@ -615,7 +559,6 @@ ENV       = {**os.environ, "DISPLAY": DISPLAY}
 
 os.makedirs(SOCK_DIR, exist_ok=True)
 
-# ── helpers ───────────────────────────────────────────────────────────────
 def gsettings(schema, key, value):
     subprocess.run(["gsettings", "set", schema, key, str(value)], env=ENV,
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -627,7 +570,6 @@ def dconf_write(path, value):
 def xrandr_run(*args):
     subprocess.run(["xrandr", "--display", DISPLAY] + list(args), env=ENV)
 
-# ── freeze / unfreeze ─────────────────────────────────────────────────────
 def freeze_screen():
     result = subprocess.run(["kiba-freeze"], capture_output=True, text=True, env=ENV)
     token = result.stdout.strip()
@@ -651,7 +593,6 @@ def unfreeze(pid, png_path):
         except FileNotFoundError:
             pass
 
-# ── operation handlers ────────────────────────────────────────────────────
 def _current_dark():
     r = subprocess.run(["dconf", "read", "/org/cutefish/theme/colorScheme"],
                        capture_output=True, text=True, env=ENV)
@@ -706,7 +647,6 @@ HANDLERS = {
     "xrandr":        lambda d: op_xrandr(d["args"]),
 }
 
-# ── socket server ─────────────────────────────────────────────────────────
 def handle_client(conn):
     try:
         data = b""
@@ -721,14 +661,12 @@ def handle_client(conn):
         if fn is None:
             conn.sendall(b'{"error":"unknown op"}\n')
             return
-
         freeze_pid, freeze_png = freeze_screen()
         try:
             fn(msg)
         finally:
             time.sleep(0.06)
             unfreeze(freeze_pid, freeze_png)
-
         conn.sendall(b'{"ok":true}\n')
     except Exception as e:
         try:
@@ -762,7 +700,7 @@ if __name__ == "__main__":
 KIBAAPPLY
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-apply"
 
-# ── kiba-set: thin CLI client ──────────────────────────────────────────────
+# ── kiba-set ──────────────────────────────────────────────────────────────
 cat > "${AIROOTFS}/usr/local/bin/kiba-set" << 'KIBASET'
 #!/usr/bin/env python3
 """
@@ -823,13 +761,10 @@ if __name__ == "__main__":
 KIBASET
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-set"
 
-# ── kiba-access: accessibility quick panel ────────────────────────────────
+# ── kiba-access ───────────────────────────────────────────────────────────
 cat > "${AIROOTFS}/usr/local/bin/kiba-access" << 'KIBAACCESS'
 #!/usr/bin/env python3
-"""
-kiba-access — KibaOS accessibility quick panel
-Launched from the statusbar accessibility icon or kiba-welcome.
-"""
+"""kiba-access — KibaOS accessibility quick panel"""
 import json, os, subprocess, sys
 
 def dconf_read(k):
@@ -904,7 +839,7 @@ mkdir -p "${AIROOTFS}/usr/lib/systemd/user/graphical-session.target.wants"
 ln -sf /usr/lib/systemd/user/kiba-apply.service \
        "${AIROOTFS}/usr/lib/systemd/user/graphical-session.target.wants/kiba-apply.service"
 
-# ── Welcome script ─────────────────────────────────────────────────────────
+# ── kiba-welcome ──────────────────────────────────────────────────────────
 cat > "${AIROOTFS}/usr/local/bin/kiba-welcome" << 'WELCOME'
 #!/bin/bash
 while true; do
@@ -953,7 +888,7 @@ done
 WELCOME
 chmod +x "${AIROOTFS}/usr/local/bin/kiba-welcome"
 
-# ── pacman.conf: NoExtract to skip man/doc/locale at install time ─────────
+# ── pacman.conf ───────────────────────────────────────────────────────────
 PACMAN_CONF="${PROFILE}/pacman.conf"
 if [ -f "${PACMAN_CONF}" ]; then
   grep -q 'NoExtract' "${PACMAN_CONF}" || \
@@ -962,16 +897,23 @@ if [ -f "${PACMAN_CONF}" ]; then
 fi
 
 # ── liveuser account ───────────────────────────────────────────────────────
+# Password is "live" — SHA-512 hash generated at build time via openssl.
+# The nopasswdlogin group + xdm-autologin PAM service means XDM never prompts,
+# but the password works at TTY and as a sudo fallback.
 mkdir -p "${AIROOTFS}/etc"
 
-grep -q '^liveuser:' "${AIROOTFS}/etc/passwd"  2>/dev/null || \
+LIVE_HASH=$(openssl passwd -6 "live")
+
+grep -q '^liveuser:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'liveuser:x:1000:1000:KibaOS Live User:/home/liveuser:/usr/bin/zsh' \
   >> "${AIROOTFS}/etc/passwd"
-grep -q '^liveuser:' "${AIROOTFS}/etc/group"   2>/dev/null || \
-  echo 'liveuser:x:1000:liveuser'              >> "${AIROOTFS}/etc/group"
-# '!' locks the password — XDM autoLogin bypasses PAM auth so this is fine.
-grep -q '^liveuser:' "${AIROOTFS}/etc/shadow"  2>/dev/null || \
-  echo 'liveuser:!:19000:0:99999:7:::'         >> "${AIROOTFS}/etc/shadow"
+
+grep -q '^liveuser:' "${AIROOTFS}/etc/group" 2>/dev/null || \
+  echo 'liveuser:x:1000:liveuser' >> "${AIROOTFS}/etc/group"
+
+# Real password hash — NOT locked with "!"
+grep -q '^liveuser:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
+  echo "liveuser:${LIVE_HASH}:19000:0:99999:7:::" >> "${AIROOTFS}/etc/shadow"
 
 mkdir -p "${AIROOTFS}/home/liveuser"
 mkdir -p "${AIROOTFS}/etc/sudoers.d"
@@ -993,7 +935,7 @@ ln -sf /usr/lib/systemd/system/bluetooth.service \
 ln -sf /usr/lib/systemd/system/pacman-init.service \
        "${WANTS}/multi-user.target.wants/pacman-init.service"
 
-# ── customize_airootfs.sh (runs in chroot at build time) ──────────────────
+# ── customize_airootfs.sh ─────────────────────────────────────────────────
 mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
@@ -1017,10 +959,19 @@ for g in users wheel audio video input network storage; do
   groupadd -r "$g" 2>/dev/null || true
 done
 
+# nopasswdlogin: members bypass XDM PAM password auth via pam_succeed_if.
+# This is the Arch-standard mechanism for display manager autologin.
+groupadd -r nopasswdlogin 2>/dev/null || true
+
 # ── liveuser group membership ─────────────────────────────────────────────
-for g in users wheel audio video input network storage; do
+for g in users wheel audio video input network storage nopasswdlogin; do
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
+
+# ── Set liveuser password to "live" ──────────────────────────────────────
+# Belt-and-suspenders: shadow hash was written at build time, chpasswd
+# re-hashes inside the chroot so the final shadow is definitely correct.
+echo "liveuser:live" | chpasswd
 
 # ── systemd tunables ──────────────────────────────────────────────────────
 sed -i 's/#Storage=auto/Storage=volatile/'                    /etc/systemd/journald.conf
@@ -1034,7 +985,6 @@ chsh -s /usr/bin/zsh root
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
 
 # ~/.xsession: XDM's actual session entry point.
-# Must be executable; execs kiba-session which does the rest.
 cat > /home/liveuser/.xsession << 'DOTXSESSION'
 #!/bin/bash
 exec /usr/local/bin/kiba-session
@@ -1075,7 +1025,6 @@ cat > /home/liveuser/.config/cutefishtheme.conf << 'CFTHEME'
 colorScheme=dark
 CFTHEME
 
-# Statusbar: accessibility launcher button
 cat > /home/liveuser/.config/cutefish-statusbar.conf << 'SBCONF'
 [Plugins]
 enabled=network,volume,battery,datetime,accessibility-kiba
