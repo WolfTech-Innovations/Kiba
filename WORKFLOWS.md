@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Mon May 25 16:17:47 UTC 2026
+Generated on Mon May 25 16:55:25 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -18,6 +18,7 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | APT Source Validator | `.github/workflows/apt-source-validator.yml` |
 | ARIA Label Audit | `.github/workflows/aria-label-audit.yml` |
 | Artifact Retention Policy | `.github/workflows/artifact-retention-policy.yml` |
+| Audit Action Pinning | `.github/workflows/audit-action-pinning.yml` |
 | Audit Build JQ Dependency | `.github/workflows/audit-build-jq-dependency.yml` |
 | Audit Build Reproducibility | `.github/workflows/audit-build-reproducibility.yml` |
 | Audit Build Welcome Apps | `.github/workflows/audit-build-welcome-apps.yml` |
@@ -259,20 +260,25 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | Calamares Branding Validator | `.github/workflows/calamares-branding-validator.yml` |
 | Calamares Config Linter | `.github/workflows/calamares-config-linter.yml` |
 | Check Acknowledgments Content | `.github/workflows/check-acknowledgments-content.yml` |
+| Check Action Caching | `.github/workflows/check-action-caching-v3.yml` |
+| Check Action Pinning | `.github/workflows/check-action-pinning-v3.yml` |
 | Check Arch Package Naming | `.github/workflows/check-arch-package-naming.yml` |
 | Check Architecture Headers | `.github/workflows/check-architecture-headers-audit.yml` |
 | Check Bash Completion Syntax | `.github/workflows/check-bash-completion-syntax.yml` |
 | Check Bash Version Compatibility | `.github/workflows/check-bash-version-compatibility.yml` |
 | Check Branch Naming | `.github/workflows/check-branch-naming-v3.yml` |
 | Check Branding Banner PNG | `.github/workflows/check-branding-banner-png.yml` |
+| Check Branding Colors | `.github/workflows/check-branding-colors-v3.yml` |
 | Check Branding Svg Viewbox | `.github/workflows/check-branding-svg-viewbox.yml` |
 | Check Build Cleanup | `.github/workflows/check-build-cleanup-v3.yml` |
 | Check Build Idempotency | `.github/workflows/check-build-idempotency-v3.yml` |
 | Check Build NBD | `.github/workflows/check-build-nbd-v3.yml` |
+| Check Build Parallel | `.github/workflows/check-build-parallel-v3.yml` |
 | Check Calamares Branding Colors | `.github/workflows/check-calamares-branding-colors.yml` |
 | Check Commit Message Quality | `.github/workflows/check-commit-message-quality-v3.yml` |
 | Check CONTRIBUTING.md Existence | `.github/workflows/check-contributing-guide-existence.yml` |
 | Check Contributing Guide Steps | `.github/workflows/check-contributing-guide-steps.yml` |
+| Check Contributing Links | `.github/workflows/check-contributing-links-v3.yml` |
 | Check cron Syntax | `.github/workflows/check-cron-syntax.yml` |
 | Check crypttab Syntax | `.github/workflows/check-crypttab-syntax.yml` |
 | Check D-Bus Services | `.github/workflows/check-dbus-services.yml` |
@@ -280,6 +286,7 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | Check Docs Broken Fragments | `.github/workflows/check-docs-broken-fragments.yml` |
 | Check Docs Internal Link Case | `.github/workflows/check-docs-internal-link-case.yml` |
 | Check Docs MD Links | `.github/workflows/check-docs-md-links.yml` |
+| Check Docs Terminology | `.github/workflows/check-docs-terminology-v3.yml` |
 | Check environment.d | `.github/workflows/check-environment-d.yml` |
 | Check EOF Newline | `.github/workflows/check-eof-newline-v3.yml` |
 | Check etc skel | `.github/workflows/check-etc-skel.yml` |
@@ -295,10 +302,12 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | Check gsettings Overrides | `.github/workflows/check-gsettings-overrides.yml` |
 | Check Hostname Config | `.github/workflows/check-hostname-config.yml` |
 | Check Icon Theme Index | `.github/workflows/check-icon-theme-index.yml` |
+| Check Issue Template Quality | `.github/workflows/check-issue-template-quality-v3.yml` |
 | Check Journal Bolt File | `.github/workflows/check-journal-bolt-file.yml` |
 | Check Journal Sentinel File | `.github/workflows/check-journal-sentinel-file.yml` |
 | Check JSON Syntax | `.github/workflows/check-json-syntax-v3.yml` |
 | Check KWin Script Metadata | `.github/workflows/check-kwin-script-metadata.yml` |
+| Check License Year | `.github/workflows/check-license-year-v3.yml` |
 | Check locale-gen Config | `.github/workflows/check-locale-gen.yml` |
 | Check logrotate Snippets | `.github/workflows/check-logrotate-snippets.yml` |
 | Check Markdown Backtick Balance | `.github/workflows/check-markdown-backtick-balance.yml` |
@@ -325,7 +334,9 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | Check Python Os Path | `.github/workflows/check-python-os-path.yml` |
 | Check Python Walrus Operator | `.github/workflows/check-python-walrus-operator.yml` |
 | Check README Badge Links | `.github/workflows/check-readme-badge-links.yml` |
+| Check README HTTPS | `.github/workflows/check-readme-https-v3.yml` |
 | Check Repo Hygiene | `.github/workflows/check-repo-hygiene-v3.yml` |
+| Check Security Contact | `.github/workflows/check-security-contact-v3.yml` |
 | Check Security MD Contact Info | `.github/workflows/check-security-md-contact-info.yml` |
 | Check Shell Ifs Leaks | `.github/workflows/check-shell-ifs-leaks.yml` |
 | Check Shell Nounset Usage | `.github/workflows/check-shell-nounset-usage-enforce.yml` |
@@ -333,6 +344,9 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | Check Shell Pipefail Literal | `.github/workflows/check-shell-pipefail-literal-enforce.yml` |
 | Check Shell Return Values | `.github/workflows/check-shell-return-values.yml` |
 | Check Shell Script BOM | `.github/workflows/check-shell-script-bom.yml` |
+| Check Shell Script Lint | `.github/workflows/check-shell-script-lint-v3.yml` |
+| Check Shell Strict Mode | `.github/workflows/check-shell-strict-mode-v3.yml` |
+| Check Shell Variable Quoting | `.github/workflows/check-shell-variable-quoting-v3.yml` |
 | Check Splash QML Animation | `.github/workflows/check-splash-qml-animation.yml` |
 | Check SSHD Config | `.github/workflows/check-sshd-config.yml` |
 | Check sudoers Snippets | `.github/workflows/check-sudoers-snippets.yml` |
@@ -343,8 +357,13 @@ Generated on Mon May 25 16:17:47 UTC 2026
 | Check TODO Priority Enforcement | `.github/workflows/check-todo-priority-enforcement.yml` |
 | Check Wayland Configs | `.github/workflows/check-wayland-configs.yml` |
 | Check Wiki Overview Presence | `.github/workflows/check-wiki-overview-presence.yml` |
+| Check Workflow Cancel In Progress | `.github/workflows/check-workflow-cancel-in-progress-v3.yml` |
 | Check Workflow Deprecated Actions | `.github/workflows/check-workflow-deprecated-actions.yml` |
+| Check Workflow No Write All | `.github/workflows/check-workflow-no-write-all-v3.yml` |
+| Check Workflow Security | `.github/workflows/check-workflow-security-v3.yml` |
+| Check Workflow Strategy Fail Fast | `.github/workflows/check-workflow-strategy-fail-fast-v3.yml` |
 | Check Workflow Timeout Minutes Standard | `.github/workflows/check-workflow-timeout-minutes-standard.yml` |
+| Check Workflow Timeout | `.github/workflows/check-workflow-timeout-v3.yml` |
 | Check Zsh Completion Syntax | `.github/workflows/check-zsh-completion-syntax.yml` |
 | Check Zshrc Performance | `.github/workflows/check-zshrc-performance-v3.yml` |
 | Check Zshrc Performance | `.github/workflows/check-zshrc-performance.yml` |
