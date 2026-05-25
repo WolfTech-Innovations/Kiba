@@ -567,7 +567,6 @@ chown -R alpm:alpm /var/cache/pacman
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Sy archlinux-keyring --noconfirm
 pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
