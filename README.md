@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1983" height="793" alt="KibaOS Desktop Environment showing the Budgie desktop with the Arc-Dark theme" src="https://github.com/user-attachments/assets/37d34069-f536-4134-aa77-5d5411d38ad1" />
+<img width="1672" height="941" alt="image" src="https://github.com/user-attachments/assets/3620491a-4433-4708-b886-c9c89dcf5d3d" />
 </p>
 
 <p align="center">
