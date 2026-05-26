@@ -151,6 +151,8 @@ fastfetch
 plymouth
 flatpak
 xdg-desktop-portal
+pamac-gtk
+pamac-flatpak-plugin
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
