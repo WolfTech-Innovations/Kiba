@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1983" height="793" alt="image" src="https://github.com/user-attachments/assets/37d34069-f536-4134-aa77-5d5411d38ad1" />
+<img width="1983" height="793" alt="KibaOS Desktop Environment showing the LXDE desktop with the Arc-Dark theme" src="https://github.com/user-attachments/assets/37d34069-f536-4134-aa77-5d5411d38ad1" />
 </p>
 
 <p align="center">
