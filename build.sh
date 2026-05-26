@@ -24,13 +24,12 @@ pacman -S --noconfirm --needed \
 WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
 PROFILE="${WORKDIR}/kiba-profile"
-sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
-
+sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
 # ══════════════════════════════════════════════════════════════════════════
