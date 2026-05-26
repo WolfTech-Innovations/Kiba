@@ -30,6 +30,7 @@ cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
 # ══════════════════════════════════════════════════════════════════════════
@@ -38,7 +39,7 @@ cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
 iso_name="kibaos"
 iso_label="KIBAOS"
 iso_publisher="WolfTech Innovations <https://github.com/WolfTech-Innovations>"
-iso_application="KibaOS — A friendly desktop built on Arch Linux"
+iso_application="KibaOS — A friendly Budgie desktop built on Arch Linux"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
@@ -76,7 +77,7 @@ LOGO=kibaos
 OSRELEASE
 
 # ══════════════════════════════════════════════════════════════════════════
-# Package list
+# Package list — Budgie edition
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
@@ -96,25 +97,46 @@ curl
 wget
 git
 mesa
+xf86-video-vesa
+xf86-video-fbdev
+xorg-server
+xorg-xinit
+xorg-xrandr
+xorg-xsetroot
+xorg-xauth
 fakeroot
-gpicview
 debugedit
 gcc
 make
 pkg-config
-scrot
+budgie
+budgie-screensaver
+nemo
+nemo-fileroller
+gnome-terminal
+gnome-control-center
+gnome-system-monitor
+gnome-disk-utility
+gnome-backgrounds
+gnome-keyring
+gnome-session
+gnome-settings-daemon
+gnome-shell
+gvfs
+gvfs-mtp
+gvfs-smb
+file-roller
+gedit
+eog
+evince
+lightdm
+lightdm-gtk-greeter
+lightdm-gtk-greeter-settings
 papirus-icon-theme
 accountsservice
 firefox
-mousepad
-meson
 sassc
 network-manager-applet
-lightdm-gtk-greeter
-budgie
-system-config-printer
-network-manager-applet
-parole
 pulseaudio
 pulseaudio-alsa
 pavucontrol
@@ -125,21 +147,22 @@ polkit
 polkit-gnome
 udisks2
 upower
+scrot
 fastfetch
 plymouth
 flatpak
 xdg-desktop-portal
-xdg-desktop-portal-gtk
+xdg-desktop-portal-gnome
 feh
 imagemagick
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
-# mkinitcpio
+# mkinitcpio — plymouth after udev
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
-HOOKS=(base udev keyboard keymap modconf memdisk archiso block plymouth filesystems)
+HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesystems)
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
@@ -409,6 +432,7 @@ timeout: 120
 script:
 SHELLPROC
 
+# Calamares displaymanager — Budgie via LightDM
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
@@ -449,27 +473,23 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 # ══════════════════════════════════════════════════════════════════════════
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
-ln -sf /usr/lib/systemd/system/graphical.target        "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/lightdm.service            "${WANTS}/display-manager.service"
-ln -sf /usr/lib/systemd/system/NetworkManager.service  "${WANTS}/multi-user.target.wants/NetworkManager.service"
+ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
+ln -sf /usr/lib/systemd/system/lightdm.service        "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/NetworkManager.service "${WANTS}/multi-user.target.wants/NetworkManager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
        "${WANTS}/dbus-org.freedesktop.nm-dispatcher.service"
-ln -sf /usr/lib/systemd/system/pacman-init.service     "${WANTS}/multi-user.target.wants/pacman-init.service"
-ln -sf /usr/lib/systemd/system/bluetooth.service       "${WANTS}/multi-user.target.wants/bluetooth.service"
+ln -sf /usr/lib/systemd/system/pacman-init.service    "${WANTS}/multi-user.target.wants/pacman-init.service"
+ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.target.wants/bluetooth.service"
 
 # ══════════════════════════════════════════════════════════════════════════
-# customize_airootfs.sh — runs inside the chroot at build time
-# THE FIX: create alpm user at the very top, before any pacman call
+# customize_airootfs.sh — runs inside chroot at build time
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
 
-# ── alpm user — MUST exist before any pacman invocation ───────────────────
-# pacman 6.1+ uses DownloadUser=alpm in pacman.conf. The chroot starts from
-# a clean airootfs install; the host's /etc/passwd is not inherited, so we
-# must create the system user here before pacman-key / pacman -Sy.
+# ── alpm user — must exist before any pacman call ─────────────────────────
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
@@ -558,15 +578,16 @@ gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 
 # ══════════════════════════════════════════════════════════════════════════
-# BUILD arc-gtk-theme FROM AUR
+# ══════════════════════════════════════════════════════════════════════════
+# BUILD calamares + arc-gtk-theme FROM AUR
 # ══════════════════════════════════════════════════════════════════════════
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
+sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-for pkg in arc-gtk-theme calamares; do
+for pkg in calamares arc-gtk-theme; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -578,7 +599,7 @@ done
 cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
-echo "=== arc-gtk-theme installed ==="
+echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH — KibaOS boot splash
@@ -612,14 +633,12 @@ magick -size 1920x1080 \
 
 cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 
-for f in background-tile.png watermark.png kibaos.plymouth; do
-  [ -L "${PLYMOUTH_THEME}/${f}" ] && cp --remove-destination \
-    "$(readlink -f "${PLYMOUTH_THEME}/${f}")" "${PLYMOUTH_THEME}/${f}" || true
-done
+# Set theme WITHOUT -R to avoid chroot mkinitcpio hang
+plymouth-set-default-theme kibaos 2>/dev/null || \
+  plymouth-set-default-theme spinner 2>/dev/null || true
 
-  plymouth-set-default-theme -R kibaos 2>/dev/null || \
-  plymouth-set-default-theme -R spinner 2>/dev/null || \
-  echo "WARNING: plymouth theme set failed, skipping"
+# Regenerate initramfs explicitly after theme is set
+mkinitcpio -p linux 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -628,7 +647,7 @@ systemctl enable plymouth-quit-wait.service  2>/dev/null || true
 echo "=== Plymouth configured ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME CONFIGURATION
+# GTK THEME — system-wide
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
@@ -659,271 +678,19 @@ gtk-xft-rgba=rgb
 GTK3RC
 
 # ══════════════════════════════════════════════════════════════════════════
-# LXDE DESKTOP CONFIGURATION
+# BUDGIE USER CONFIGURATION
 # ══════════════════════════════════════════════════════════════════════════
-LXHOME="/home/liveuser"
+BHOME="/home/liveuser"
 mkdir -p \
-  "${LXHOME}/.config/openbox" \
-  "${LXHOME}/.config/lxsession/LXDE" \
-  "${LXHOME}/.config/lxpanel/LXDE/panels" \
-  "${LXHOME}/.config/pcmanfm/LXDE" \
-  "${LXHOME}/.config/gtk-3.0" \
-  "${LXHOME}/.config/gtk-2.0" \
-  "${LXHOME}/.config/picom" \
-  "${LXHOME}/.local/share/applications"
+  "${BHOME}/.config/gtk-3.0" \
+  "${BHOME}/.config/gtk-2.0" \
+  "${BHOME}/.config/dconf" \
+  "${BHOME}/.config/autostart" \
+  "${BHOME}/.local/share/applications" \
+  "${BHOME}/Desktop"
 
-cat > "${LXHOME}/.config/lxsession/LXDE/desktop.conf" << 'LXSESS'
-[Session]
-window_manager=openbox-lxde
-
-[GTK]
-sNet/ThemeName=Arc-Dark
-sNet/IconThemeName=Papirus-Dark
-sGtk/FontName=Noto Sans 11
-sGtk/CursorThemeName=Adwaita
-iGtk/CursorThemeSize=24
-iXft/Antialias=1
-iXft/Hinting=1
-sXft/HintStyle=hintslight
-sXft/RGBA=rgb
-
-[Dbus]
-autostart=true
-
-[Autostart]
-disable_autostart=no
-LXSESS
-
-cat > "${LXHOME}/.config/openbox/lxde-rc.xml" << 'OBCONF'
-<?xml version="1.0" encoding="UTF-8"?>
-<openbox_config xmlns="http://openbox.org/3.4/rc"
-                xmlns:xi="http://www.w3.org/2001/XInclude">
-  <resistance><strength>10</strength><screen_edge_strength>20</screen_edge_strength></resistance>
-  <focus><focusNew>yes</focusNew><followMouse>no</followMouse><focusLast>yes</focusLast><underMouse>no</underMouse><focusDelay>200</focusDelay><raiseOnFocus>no</raiseOnFocus></focus>
-  <placement><policy>Smart</policy><center>yes</center><monitor>Primary</monitor></placement>
-  <theme>
-    <name>Arc-Dark</name>
-    <titleLayout>NLIMC</titleLayout>
-    <keepBorder>yes</keepBorder>
-    <animateIconify>yes</animateIconify>
-    <font place="ActiveWindow"><name>Noto Sans</name><size>10</size><weight>Normal</weight><slant>Normal</slant></font>
-    <font place="InactiveWindow"><name>Noto Sans</name><size>10</size><weight>Normal</weight><slant>Normal</slant></font>
-    <font place="MenuHeader"><name>Noto Sans</name><size>10</size><weight>Bold</weight><slant>Normal</slant></font>
-    <font place="MenuItem"><name>Noto Sans</name><size>10</size><weight>Normal</weight><slant>Normal</slant></font>
-    <font place="OnScreenDisplay"><name>Noto Sans</name><size>10</size><weight>Bold</weight><slant>Normal</slant></font>
-  </theme>
-  <desktops><number>1</number><firstdesk>1</firstdesk><names><name>KibaOS</name></names><popupTime>875</popupTime></desktops>
-  <resize><drawContents>yes</drawContents><popupShow>Nonpixel</popupShow></resize>
-  <margins><top>0</top><bottom>48</bottom><left>0</left><right>0</right></margins>
-  <dock><position>Bottom</position><floatingY>450</floatingY><stacking>Above</stacking><direction>Horizontal</direction><autoHide>no</autoHide><hideDelay>300</hideDelay><showDelay>300</showDelay><moveButton>Middle</moveButton></dock>
-  <keyboard>
-    <chainQuitKey>C-g</chainQuitKey>
-    <keybind key="W-e"><action name="Execute"><command>pcmanfm</command></action></keybind>
-    <keybind key="W-t"><action name="Execute"><command>lxterminal</command></action></keybind>
-    <keybind key="W-b"><action name="Execute"><command>firefox</command></action></keybind>
-    <keybind key="W-d"><action name="ToggleShowDesktop"/></keybind>
-    <keybind key="A-F4"><action name="Close"/></keybind>
-    <keybind key="A-Tab"><action name="NextWindow"><finalactions><action name="Focus"/><action name="Raise"/><action name="Unshade"/></finalactions></action></keybind>
-    <keybind key="Print"><action name="Execute"><command>scrot ~/Pictures/screenshot-%Y%m%d-%H%M%S.png</command></action></keybind>
-    <keybind key="C-A-t"><action name="Execute"><command>lxterminal</command></action></keybind>
-    <keybind key="C-A-Delete"><action name="Execute"><command>lxtask</command></action></keybind>
-    <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>amixer -q set Master 5%+ unmute</command></action></keybind>
-    <keybind key="XF86AudioLowerVolume"><action name="Execute"><command>amixer -q set Master 5%- unmute</command></action></keybind>
-    <keybind key="XF86AudioMute"><action name="Execute"><command>amixer -q set Master toggle</command></action></keybind>
-  </keyboard>
-  <mouse>
-    <dragThreshold>8</dragThreshold><doubleClickTime>500</doubleClickTime>
-    <screenEdgeWarpTime>400</screenEdgeWarpTime><screenEdgeWarpMouse>false</screenEdgeWarpMouse>
-    <context name="Frame">
-      <mousebind button="A-Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
-      <mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind>
-      <mousebind button="A-Right" action="Drag"><action name="Resize"/></mousebind>
-      <mousebind button="A-Middle" action="Press"><action name="Lower"/></mousebind>
-    </context>
-    <context name="Titlebar">
-      <mousebind button="Left" action="Drag"><action name="Move"/></mousebind>
-      <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize"/></mousebind>
-      <mousebind button="Right" action="Press"><action name="Focus"/><action name="Raise"/><action name="ShowMenu"><menu>client-menu</menu></action></mousebind>
-    </context>
-    <context name="Desktop">
-      <mousebind button="Right" action="Press"><action name="ShowMenu"><menu>root-menu</menu></action></mousebind>
-      <mousebind button="Middle" action="Press"><action name="ShowMenu"><menu>client-list-combined-menu</menu></action></mousebind>
-    </context>
-    <context name="Client">
-      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
-      <mousebind button="Middle" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
-      <mousebind button="Right" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
-    </context>
-  </mouse>
-  <menu>
-    <file>menu.xml</file><hideDelay>200</hideDelay><middle>no</middle>
-    <submenuShowDelay>100</submenuShowDelay><submenuHideDelay>400</submenuHideDelay>
-    <applicationIcons>yes</applicationIcons><manageDesktops>no</manageDesktops>
-  </menu>
-  <applications>
-    <application name="pcmanfm"><focus>yes</focus></application>
-    <application name="lxpanel"><layer>above</layer></application>
-    <application name="firefox"><maximized>yes</maximized></application>
-  </applications>
-</openbox_config>
-OBCONF
-
-cat > "${LXHOME}/.config/openbox/menu.xml" << 'OBMENU'
-<?xml version="1.0" encoding="UTF-8"?>
-<openbox_menu xmlns="http://openbox.org/3.4/menu">
-<menu id="root-menu" label="KibaOS">
-  <item label="Files"><action name="Execute"><execute>pcmanfm</execute></action></item>
-  <item label="Terminal"><action name="Execute"><execute>lxterminal</execute></action></item>
-  <item label="Browser"><action name="Execute"><execute>firefox</execute></action></item>
-  <item label="Text Editor"><action name="Execute"><execute>mousepad</execute></action></item>
-  <separator/>
-  <menu id="system-menu" label="System">
-    <item label="Task Manager"><action name="Execute"><execute>lxtask</execute></action></item>
-    <item label="Disk Manager"><action name="Execute"><execute>gparted</execute></action></item>
-    <item label="Display Settings"><action name="Execute"><execute>lxrandr</execute></action></item>
-    <item label="Appearance"><action name="Execute"><execute>lxappearance</execute></action></item>
-    <item label="Install KibaOS"><action name="Execute"><execute>sudo calamares</execute></action></item>
-  </menu>
-  <separator/>
-  <item label="Refresh Desktop"><action name="Execute"><execute>lxde-settings-daemon</execute></action></item>
-  <separator/>
-  <item label="Log Out"><action name="Execute"><execute>lxsession-logout</execute></action></item>
-</menu>
-</openbox_menu>
-OBMENU
-
-cat > "${LXHOME}/.config/lxpanel/LXDE/panels/panel" << 'PANEL'
-Global {
-  edge=bottom
-  allign=left
-  margin=0
-  widthtype=percent
-  width=100
-  height=40
-  transparent=0
-  tintcolor=#1e2a2e
-  alpha=255
-  setdocktype=1
-  setpartialstrut=1
-  autohide=0
-  heightwhenhidden=2
-  usefontcolor=1
-  fontcolor=#e8f0f2
-  fontsize=11
-  background=1
-  backgroundcolor=#1e2a2e
-  loglevel=4
-  monitor=0
-}
-Plugin {
-  type=menu
-  Config {
-    image=/usr/share/kibaos/logo-32.png
-    system {
-    }
-    separator {
-    }
-    item {
-      name=Install KibaOS
-      image=system-software-install
-      action=sudo calamares
-    }
-  }
-}
-Plugin {
-  type=launchbar
-  Config {
-    Button { id=pcmanfm.desktop }
-    Button { id=firefox.desktop }
-    Button { id=lxterminal.desktop }
-    Button { id=mousepad.desktop }
-  }
-}
-Plugin { type=space
-  Config { Size=4 }
-}
-Plugin {
-  type=taskbar
-  expand=1
-  Config {
-    tooltips=1
-    IconsOnly=0
-    ShowAllDesks=1
-    UseMouseWheel=1
-    UseUrgencyHint=1
-    FlatButton=0
-    MaxTaskWidth=200
-    spacing=1
-    GroupedTasks=0
-  }
-}
-Plugin { type=space
-  Config { Size=4 }
-}
-Plugin { type=tray }
-Plugin { type=volume }
-Plugin {
-  type=netstatus
-  Config {
-    iface=
-    configtool=nm-connection-editor
-  }
-}
-Plugin {
-  type=dclock
-  Config {
-    ClockFmt=%H:%M
-    TooltipFmt=%A, %B %d %Y
-    BoldFont=1
-    IconOnly=0
-    CenterText=1
-  }
-}
-Plugin {
-  type=launchbar
-  Config {
-    Button { id=system-shutdown.desktop }
-  }
-}
-PANEL
-
-cat > "${LXHOME}/.config/pcmanfm/LXDE/pcmanfm.conf" << 'PCMANFM'
-[config]
-show_thumbnail=1
-thumbnail_max_size=8192
-show_hidden=0
-sort_by=name
-sort_type=ascending
-view_mode=icon_view
-
-[volume]
-mount_on_startup=1
-mount_removable=1
-autorun=0
-
-[ui]
-always_show_tabs=0
-max_tab_chars=32
-win_width=760
-win_height=480
-splitter_pos=150
-side_pane_mode=dir_tree
-toolbar_buttons=back;forward;up;home;
-
-[desktop]
-wallpaper_mode=stretch
-wallpaper=/usr/share/kibaos/wallpaper.png
-desktop_bg=#0d1b2a
-desktop_fg=#e8f0f2
-desktop_shadow=#000000
-desktop_font=Noto Sans 11
-show_wm_menu=0
-show_documents=1
-show_trash=1
-show_mounts=1
-PCMANFM
-
-cat > "${LXHOME}/.config/gtk-3.0/settings.ini" << 'GTK3USER'
+# GTK theme for liveuser
+cat > "${BHOME}/.config/gtk-3.0/settings.ini" << 'GTK3USER'
 [Settings]
 gtk-theme-name=Arc-Dark
 gtk-icon-theme-name=Papirus-Dark
@@ -938,7 +705,7 @@ gtk-menu-images=1
 gtk-enable-animations=1
 GTK3USER
 
-cat > "${LXHOME}/.gtkrc-2.0" << 'GTK2USER'
+cat > "${BHOME}/.gtkrc-2.0" << 'GTK2USER'
 gtk-theme-name="Arc-Dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Noto Sans 11"
@@ -952,102 +719,65 @@ gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
 GTK2USER
 
-cat > "${LXHOME}/.config/picom/picom.conf" << 'PICOMCONF'
-backend = "glx";
-vsync = true;
-shadow = true;
-shadow-radius = 12;
-shadow-offset-x = -5;
-shadow-offset-y = -5;
-shadow-opacity = 0.4;
-shadow-exclude = [
-  "name = 'Notification'",
-  "class_g = 'lxpanel'",
-  "_GTK_FRAME_EXTENTS@:c"
-];
-fading = true;
-fade-in-step = 0.05;
-fade-out-step = 0.05;
-fade-delta = 8;
-inactive-opacity = 0.95;
-active-opacity = 1.0;
-frame-opacity = 0.85;
-inactive-opacity-override = false;
-opacity-rule = [
-  "100:class_g = 'firefox'",
-  "100:class_g = 'lxterminal'",
-  "100:class_g = 'Pcmanfm'"
-];
-glx-no-stencil = true;
-glx-no-rebind-pixmap = true;
-use-damage = true;
-PICOMCONF
+# dconf settings — Budgie theme, wallpaper, panel
+# Written as a dconf keyfile, imported on first login via autostart
+mkdir -p "${BHOME}/.config/dconf"
+cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
+#!/usr/bin/env bash
+# Runs once on first login to apply dconf settings
+STAMP="${HOME}/.config/.kibaos-configured"
+[ -f "${STAMP}" ] && exit 0
 
-cat > "${LXHOME}/.config/lxsession/LXDE/autostart" << 'LXAUTOSTART'
-@/usr/lib/policykit-1-gnome/polkit-gnome-authentication-agent-1
-@picom --config /home/liveuser/.config/picom/picom.conf
-@nm-applet
-@nitrogen --restore
-@/usr/local/bin/kiba-welcome
-LXAUTOSTART
+dbus-launch dconf write /org/gnome/desktop/interface/gtk-theme "'Arc-Dark'"
+dbus-launch dconf write /org/gnome/desktop/interface/icon-theme "'Papirus-Dark'"
+dbus-launch dconf write /org/gnome/desktop/interface/font-name "'Noto Sans 11'"
+dbus-launch dconf write /org/gnome/desktop/interface/document-font-name "'Noto Sans 11'"
+dbus-launch dconf write /org/gnome/desktop/interface/monospace-font-name "'Noto Sans Mono 11'"
+dbus-launch dconf write /org/gnome/desktop/background/picture-uri "'file:///usr/share/kibaos/wallpaper.png'"
+dbus-launch dconf write /org/gnome/desktop/background/picture-uri-dark "'file:///usr/share/kibaos/wallpaper.png'"
+dbus-launch dconf write /org/gnome/desktop/background/picture-options "'zoom'"
+dbus-launch dconf write /org/gnome/desktop/background/primary-color "'#0d1b2a'"
+dbus-launch dconf write /com/solus-project/budgie-panel/layout "'default'"
 
-mkdir -p "${LXHOME}/.config/nitrogen"
-cat > "${LXHOME}/.config/nitrogen/bg-saved.cfg" << 'NITROCFG'
-[xin_-1]
-file=/usr/share/kibaos/wallpaper.png
-mode=4
-bgcolor=#0d1b2a
-NITROCFG
+touch "${STAMP}"
+FIRSTLOGIN
+chmod +x /usr/local/bin/kibaos-first-login
 
-cat > "${LXHOME}/.config/nitrogen/nitrogen.cfg" << 'NITROCFG2'
-[geometry]
-posx=0
-posy=0
-sizex=560
-sizey=400
+# Autostart entry for first-login config
+cat > "${BHOME}/.config/autostart/kibaos-configure.desktop" << 'AUTOCFG'
+[Desktop Entry]
+Type=Application
+Name=KibaOS First Login Setup
+Exec=/usr/local/bin/kibaos-first-login
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+AUTOCFG
 
-[nitrogen]
-view=icon
-recurse=true
-sort=alpha
-icon_caps=false
-dirs=/usr/share/kibaos;/usr/share/wallpapers;
-NITROCFG2
+# Polkit agent — correct Arch path
+cat > "${BHOME}/.config/autostart/polkit-gnome.desktop" << 'POLKIT'
+[Desktop Entry]
+Type=Application
+Name=Polkit Authentication Agent
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+POLKIT
 
-mkdir -p "${LXHOME}/.config/lxterminal"
-cat > "${LXHOME}/.config/lxterminal/lxterminal.conf" << 'LXTERM'
-[general]
-fontname=Noto Sans Mono 11
-selchars=-A-Za-z0-9,./?%&#:_
-scrollback=5000
-bgcolor=#1e2a2e
-fgcolor=#d8e6ea
-color_preset=Custom
-color0=#1e2a2e
-color1=#e06c75
-color2=#00b892
-color3=#e5c07b
-color4=#61afef
-color5=#c678dd
-color6=#56b6c2
-color7=#abb2bf
-color8=#3e4a50
-color9=#e06c75
-color10=#00c9a0
-color11=#e5c07b
-color12=#61afef
-color13=#c678dd
-color14=#56b6c2
-color15=#ffffff
-tabpos=top
-hidescrollbar=0
-hidemenubar=0
-hideclosebutton=0
-disablef10=0
-disablealt=0
-LXTERM
+# Welcome page autostart
+cat > "${BHOME}/.config/autostart/kiba-welcome.desktop" << 'WELCOME_AUTO'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Welcome
+Exec=/usr/local/bin/kiba-welcome
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+WELCOME_AUTO
 
-cat > "${LXHOME}/.bashrc" << 'BASHRC'
+# bashrc
+cat > "${BHOME}/.bashrc" << 'BASHRC'
 [[ $- != *i* ]] && return
 PS1='\[\e[1;36m\][KibaOS]\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]\$ '
 alias ls='ls --color=auto'
@@ -1058,8 +788,9 @@ alias update='sudo pacman -Syu'
 fastfetch 2>/dev/null || true
 BASHRC
 
-mkdir -p "${LXHOME}/.config/fastfetch"
-cat > "${LXHOME}/.config/fastfetch/config.jsonc" << 'FFCONF'
+# fastfetch config
+mkdir -p "${BHOME}/.config/fastfetch"
+cat > "${BHOME}/.config/fastfetch/config.jsonc" << 'FFCONF'
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
@@ -1087,9 +818,9 @@ cat > "${LXHOME}/.config/fastfetch/config.jsonc" << 'FFCONF'
 FFCONF
 
 # ══════════════════════════════════════════════════════════════════════════
-# DESKTOP SHORTCUT FILES
+# DESKTOP SHORTCUTS
 # ══════════════════════════════════════════════════════════════════════════
-mkdir -p /usr/share/applications /usr/share/kibaos
+mkdir -p /usr/share/applications
 
 cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
@@ -1114,46 +845,16 @@ Type=Application
 Categories=System;
 ABOUTDESK
 
-[ -f /usr/share/applications/firefox.desktop ] && {
-  cp /usr/share/applications/firefox.desktop /usr/share/applications/kibaos-browser.desktop
-  sed -i -e 's/^Name=.*/Name=KibaOS Browser/' \
-         -e 's/^GenericName=.*/GenericName=Web Browser/' \
-         -e 's/^Comment=.*/Comment=Browse the web/' \
-    /usr/share/applications/kibaos-browser.desktop; }
-
-[ -f /usr/share/applications/pcmanfm.desktop ] && {
-  cp /usr/share/applications/pcmanfm.desktop /usr/share/applications/kibaos-files.desktop
-  sed -i -e 's/^Name=.*/Name=KibaOS Files/' \
-         -e 's/^GenericName=.*/GenericName=File Manager/' \
-    /usr/share/applications/kibaos-files.desktop; }
-
-[ -f /usr/share/applications/lxterminal.desktop ] && {
-  cp /usr/share/applications/lxterminal.desktop /usr/share/applications/kibaos-terminal.desktop
-  sed -i -e 's/^Name=.*/Name=KibaOS Terminal/' \
-    /usr/share/applications/kibaos-terminal.desktop; }
-
-for src in /usr/share/applications/mousepad.desktop /usr/share/applications/org.xfce.mousepad.desktop; do
-  [ -f "$src" ] && { cp "$src" /usr/share/applications/kibaos-editor.desktop
-    sed -i -e 's/^Name=.*/Name=KibaOS Editor/' /usr/share/applications/kibaos-editor.desktop; break; }
-done
-
-for src in /usr/share/applications/ristretto.desktop /usr/share/applications/org.xfce.ristretto.desktop; do
-  [ -f "$src" ] && { cp "$src" /usr/share/applications/kibaos-photos.desktop
-    sed -i -e 's/^Name=.*/Name=KibaOS Photos/' /usr/share/applications/kibaos-photos.desktop; break; }
-done
-
-[ -f /usr/share/applications/gparted.desktop ] && {
-  cp /usr/share/applications/gparted.desktop /usr/share/applications/kibaos-disks.desktop
-  sed -i -e 's/^Name=.*/Name=KibaOS Disks/' /usr/share/applications/kibaos-disks.desktop; }
-
-DESKTOP="${LXHOME}/Desktop"
-mkdir -p "${DESKTOP}"
-for src_desktop in kibaos-install kibaos-browser kibaos-files kibaos-terminal kibaos-editor kibaos-photos kibaos-disks; do
+DESKTOP="${BHOME}/Desktop"
+for src_desktop in kibaos-install kibaos-about; do
   [ -f "/usr/share/applications/${src_desktop}.desktop" ] && \
     cp "/usr/share/applications/${src_desktop}.desktop" "${DESKTOP}/${src_desktop}.desktop" && \
     chmod +x "${DESKTOP}/${src_desktop}.desktop" || true
 done
 
+# ══════════════════════════════════════════════════════════════════════════
+# WELCOME PAGE
+# ══════════════════════════════════════════════════════════════════════════
 cat > /usr/local/bin/kiba-welcome << 'WELCOMESCRIPT'
 #!/usr/bin/env bash
 WELCOME_HTML="/usr/share/kibaos/welcome.html"
@@ -1192,18 +893,13 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 </style>
 </head>
 <body>
-<header><h1>Welcome to KibaOS</h1><p>A fast, friendly desktop built on Arch Linux - by WolfTech Innovations</p></header>
+<header><h1>Welcome to KibaOS</h1><p>A fast, friendly Budgie desktop built on Arch Linux — by WolfTech Innovations</p></header>
 <div class="card-row">
-  <div class="card"><h2>Fast &amp; Lightweight</h2><p>LXDE uses very little RAM and runs great on older and newer hardware alike.</p></div>
+  <div class="card"><h2>Budgie Desktop</h2><p>Modern, clean, and intuitive. Great on any hardware.</p></div>
   <div class="card"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
   <div class="card"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
-  <h2>Keyboard Shortcuts</h2>
-  <div class="tip">
-    <b>Super+E</b> Files | <b>Super+T</b> Terminal | <b>Super+B</b> Browser | <b>Super+D</b> Show Desktop<br><br>
-    <b>Ctrl+Alt+T</b> Terminal | <b>Print</b> Screenshot | <b>Alt+F4</b> Close window
-  </div>
   <h2>Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or open a terminal and run:</p>
   <div class="tip"><code>sudo calamares</code></div><br>
@@ -1211,23 +907,25 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
   <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
 </section>
-<footer>KibaOS Rolling - WolfTech Innovations - github.com/WolfTech-Innovations/Kiba</footer>
+<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>
 </html>
 WELCOMEHTML
-# Add Chaotic-AUR
-pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
-pacman-key --lsign-key 3056513887B78AEB
-pacman -U --noconfirm \
-  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
-  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
-
-echo '[chaotic-aur]' >> /etc/pacman.conf
-echo 'Include = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf
 
 # ══════════════════════════════════════════════════════════════════════════
 # SYSTEM BRANDING
 # ══════════════════════════════════════════════════════════════════════════
+cat > /etc/environment << 'ENV'
+DESKTOP_SESSION=budgie-desktop
+XDG_CURRENT_DESKTOP=Budgie:GNOME
+XDG_SESSION_DESKTOP=budgie-desktop
+XDG_SESSION_TYPE=x11
+QT_AUTO_SCREEN_SCALE_FACTOR=1
+GTK_THEME=Arc-Dark
+KIBAOS_VERSION=rolling
+KIBAOS_VENDOR="WolfTech Innovations"
+ENV
+
 cat > /etc/issue << 'ISSUE'
 
   ██╗  ██╗██╗██████╗  █████╗  ██████╗ ███████╗
@@ -1237,31 +935,22 @@ cat > /etc/issue << 'ISSUE'
   ██║  ██╗██║██████╔╝██║  ██║╚██████╔╝███████║
   ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 
-  KibaOS Rolling - WolfTech Innovations
+  KibaOS Rolling — Budgie Edition — WolfTech Innovations
   Live session: user=liveuser  password=live
   Install: click the desktop icon or run  sudo calamares
 
 ISSUE
 
 cat > /etc/motd << 'MOTD'
-Welcome to KibaOS - Fast Budgie desktop on Arch Linux.
+Welcome to KibaOS — Budgie desktop on Arch Linux.
 Built with love by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
 
-cat > /etc/environment << 'ENV'
-DESKTOP_SESSION=LXDE
-XDG_CURRENT_DESKTOP=LXDE
-XDG_SESSION_DESKTOP=LXDE
-XDG_SESSION_TYPE=x11
-QT_AUTO_SCREEN_SCALE_FACTOR=1
-GTK_THEME=Arc-Dark
-KIBAOS_VERSION=rolling
-KIBAOS_VENDOR="WolfTech Innovations"
-ENV
-
+# ── Services ───────────────────────────────────────────────────────────────
 systemctl enable lightdm
 systemctl enable NetworkManager.service
 
+# ── Fix ownership ──────────────────────────────────────────────────────────
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
@@ -1300,10 +989,10 @@ mkarchiso -v -w work -o out "${PROFILE}/"
 if ls out/*.iso 1>/dev/null 2>&1; then
   mv out/*.iso "${ISO}.iso"
   sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
-  echo "╔══════════════════════════════════╗"
-  echo "║  KibaOS LXDE build complete!     ║"
-  echo "║  ${ISO}.iso          ║"
-  echo "╚══════════════════════════════════╝"
+  echo "╔══════════════════════════════════════╗"
+  echo "║  KibaOS Budgie build complete!       ║"
+  echo "║  ${ISO}.iso            ║"
+  echo "╚══════════════════════════════════════╝"
 else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
