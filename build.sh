@@ -112,6 +112,7 @@ xf86-video-vesa
 mesa
 fakeroot
 gpicview
+debugedit
 lxappearance
 lxappearance-obconf
 lxde-common
