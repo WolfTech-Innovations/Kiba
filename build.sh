@@ -135,6 +135,8 @@ gnome-themes-extra
 accountsservice
 firefox
 mousepad
+meson
+sassc
 ristretto
 file-roller
 galculator
