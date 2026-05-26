@@ -28,10 +28,7 @@ if [ -f "build.sh" ]; then
     if ! grep -q "pacman-key --populate archlinux" build.sh; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
-    # Verify ldconfig after PaperDE build
-    if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
-        log_error "ldconfig not found after PaperDE installation in build.sh"
-    fi
+    # NOTE: PaperDE build checks removed as project transitioned to LXDE/Openbox
     # Verify liveuser UID consistency
     if grep -q "liveuser" build.sh; then
         if ! grep -q "1000:1000" build.sh; then

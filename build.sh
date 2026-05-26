@@ -461,6 +461,10 @@ ln -sf /usr/lib/systemd/system/bluetooth.service       "${WANTS}/multi-user.targ
 # customize_airootfs.sh — runs inside the chroot at build time
 # THE FIX: create alpm user at the very top, before any pacman call
 # ══════════════════════════════════════════════════════════════════════════
+mkdir -p "${AIROOTFS}/usr/share/kibaos"
+cp -v branding/wallpaper.png "${AIROOTFS}/usr/share/kibaos/wallpaper.png"
+cp -v branding/boot.png "${AIROOTFS}/usr/share/kibaos/logo-raw.png"
+
 mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
@@ -478,6 +482,16 @@ chown -R alpm:alpm /var/cache/pacman
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+
+# ── Chaotic-AUR ───────────────────────────────────────────────────────────
+pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+pacman-key --lsign-key 3056513887B78AEB
+pacman -U --noconfirm \
+  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
+  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
+echo '[chaotic-aur]' >> /etc/pacman.conf
+echo 'Include = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf
 pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
@@ -522,12 +536,16 @@ LOGO_32="/usr/share/kibaos/logo-32.png"
 
 mkdir -p /usr/share/kibaos /usr/share/pixmaps
 
-echo "=== Downloading KibaOS wallpaper ==="
-curl -fL --retry 5 --retry-delay 3 -o "${WALLPAPER_DEST}" "${WALLPAPER_URL}" || \
-  magick -size 1920x1080 gradient:"#004f57-#0d1b2a" "${WALLPAPER_DEST}"
+echo "=== Processing KibaOS wallpaper ==="
+if [ ! -f "${WALLPAPER_DEST}" ]; then
+  curl -fL --retry 5 --retry-delay 3 -o "${WALLPAPER_DEST}" "${WALLPAPER_URL}" || \
+    magick -size 1920x1080 gradient:"#004f57-#0d1b2a" "${WALLPAPER_DEST}"
+fi
 
-echo "=== Downloading KibaOS logo ==="
-curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
+echo "=== Processing KibaOS logo ==="
+if [ ! -f "${LOGO_SRC}" ]; then
+  curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
+fi
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
   magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
@@ -558,27 +576,10 @@ gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 
 # ══════════════════════════════════════════════════════════════════════════
-# BUILD arc-gtk-theme FROM AUR
+# INSTALL arc-gtk-theme + calamares (Binary from Chaotic-AUR)
 # ══════════════════════════════════════════════════════════════════════════
-useradd -m -s /bin/bash builduser 2>/dev/null || true
-echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
-
-AUR_BUILD="/tmp/aur-build"
-mkdir -p "${AUR_BUILD}"
-sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-for pkg in arc-gtk-theme calamares; do
-  echo "=== Building ${pkg} from AUR ==="
-  git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
-  chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
-  cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
-  cd /
-done
-
-cd /; rm -rf "${AUR_BUILD}"
-userdel -r builduser 2>/dev/null || true
-rm -f /etc/sudoers.d/builduser
-echo "=== arc-gtk-theme installed ==="
+pacman -S --noconfirm arc-gtk-theme calamares
+echo "=== arc-gtk-theme + calamares installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH — KibaOS boot splash
@@ -1215,16 +1216,6 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 </body>
 </html>
 WELCOMEHTML
-# Add Chaotic-AUR
-pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
-pacman-key --lsign-key 3056513887B78AEB
-pacman -U --noconfirm \
-  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' \
-  'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
-
-echo '[chaotic-aur]' >> /etc/pacman.conf
-echo 'Include = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf
-
 # ══════════════════════════════════════════════════════════════════════════
 # SYSTEM BRANDING
 # ══════════════════════════════════════════════════════════════════════════
