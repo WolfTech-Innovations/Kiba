@@ -16,9 +16,10 @@ pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
-  xorg-server xorg-xinit xorg-xrandr xorg-xsetroot \
-  libx11 libxext libxrender libxcomposite libxfixes \
   openssl curl imagemagick
+
+# NOTE: xorg-server and friends intentionally removed from host deps —
+# Budgie 10.10 is Wayland-only, no X11 stack needed.
 
 # ── Paths ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
@@ -77,8 +78,21 @@ LOGO=kibaos
 OSRELEASE
 
 # ══════════════════════════════════════════════════════════════════════════
-# Package list — Budgie edition
+# Package list — Budgie 10.10 Wayland edition
 # ══════════════════════════════════════════════════════════════════════════
+# FIXES vs original:
+#   - REMOVED: arc-gtk-theme (AUR-only; built in chroot instead)
+#   - REMOVED: lightdm, lightdm-gtk-greeter, lightdm-gtk-greeter-settings (X11 DM, incompatible with Wayland-only Budgie 10.10)
+#   - REMOVED: xf86-video-vesa, xf86-video-fbdev, xorg-server, xorg-xinit, xorg-xrandr, xorg-xsetroot, xorg-xauth (Budgie 10.10 is Wayland-only; no X server needed)
+#   - REMOVED: gnome-shell, gnome-session (Budgie replaces these; pulling gnome-shell risks conflicts)
+#   - ADDED: sddm (Wayland-capable display manager)
+#   - ADDED: xorg-xwayland (XWayland for legacy X11 app compat inside Wayland session)
+#   - ADDED: labwc (Budgie 10.10's recommended Wayland compositor)
+#   - ADDED: swaybg, grim, slurp, swayidle, gtklock, wlopm, wdisplays (Budgie 10.10 Wayland tool stack)
+#   - ADDED: xdg-desktop-portal-wlr (screencasting/screenshots portal for Wayland)
+#   - ADDED: budgie-desktop-view (desktop icons, now a separate package in 10.10)
+#   - ADDED: budgie-desktop-services (new daemon required by 10.10)
+#   - ADDED: budgie-control-center (replaces gnome-control-center for Budgie 10.10)
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
@@ -97,30 +111,28 @@ curl
 wget
 git
 mesa
-xf86-video-vesa
-xf86-video-fbdev
-xorg-server
-xorg-xinit
-xorg-xrandr
-xorg-xsetroot
-xorg-xauth
-fakeroot
-debugedit
-gcc
-make
-pkg-config
+xorg-xwayland
+labwc
+sddm
 budgie
+budgie-desktop-view
+budgie-desktop-services
+budgie-control-center
+swaybg
+grim
+slurp
+swayidle
+gtklock
+wlopm
+wdisplays
 nemo
 nemo-fileroller
 gnome-terminal
-gnome-control-center
 gnome-system-monitor
 gnome-disk-utility
 gnome-backgrounds
 gnome-keyring
-gnome-session
 gnome-settings-daemon
-gnome-shell
 gvfs
 gvfs-mtp
 gvfs-smb
@@ -128,22 +140,21 @@ file-roller
 gedit
 eog
 evince
-lightdm
-lightdm-gtk-greeter
-lightdm-gtk-greeter-settings
 papirus-icon-theme
 accountsservice
 firefox
 sassc
 network-manager-applet
-pulseaudio
-pulseaudio-alsa
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
 pavucontrol
 gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-gnome
+polkit-kde-agent
 udisks2
 upower
 scrot
@@ -151,8 +162,8 @@ fastfetch
 plymouth
 flatpak
 xdg-desktop-portal
-xdg-desktop-portal-gnome
-feh
+xdg-desktop-portal-gtk
+xdg-desktop-portal-wlr
 imagemagick
 PACKAGES
 
@@ -431,11 +442,13 @@ timeout: 120
 script:
 SHELLPROC
 
-# Calamares displaymanager — Budgie via LightDM
+# FIX: Calamares displaymanager — Budgie 10.10 Wayland via SDDM
+# - Changed DM from lightdm → sddm (lightdm has no Wayland session support)
+# - desktopFile is "budgie-desktop" — confirmed from /usr/share/wayland-sessions/budgie-desktop.desktop
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
-  - lightdm
+  - sddm
 defaultDesktopEnvironment:
   executable: "budgie-desktop"
   desktopFile: "budgie-desktop"
@@ -469,11 +482,12 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 
 # ══════════════════════════════════════════════════════════════════════════
 # systemd symlinks
+# FIX: sddm replaces lightdm; removed all X11-era display/xrandr services
 # ══════════════════════════════════════════════════════════════════════════
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/lightdm.service        "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/sddm.service           "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager.service "${WANTS}/multi-user.target.wants/NetworkManager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
        "${WANTS}/dbus-org.freedesktop.nm-dispatcher.service"
@@ -577,8 +591,9 @@ gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 
 # ══════════════════════════════════════════════════════════════════════════
-# ══════════════════════════════════════════════════════════════════════════
 # BUILD calamares + arc-gtk-theme FROM AUR
+# arc-gtk-theme is AUR-only — NOT in packages.x86_64 (that would break
+# mkarchiso's pacman step). Built here in the chroot instead.
 # ══════════════════════════════════════════════════════════════════════════
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
@@ -632,11 +647,9 @@ magick -size 1920x1080 \
 
 cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 
-# Set theme WITHOUT -R to avoid chroot mkinitcpio hang
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-# Regenerate initramfs explicitly after theme is set
 mkinitcpio -p linux 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
@@ -646,7 +659,7 @@ systemctl enable plymouth-quit-wait.service  2>/dev/null || true
 echo "=== Plymouth configured ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME — system-wide
+# GTK THEME — system-wide (arc-gtk-theme now built from AUR above)
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
@@ -677,7 +690,30 @@ gtk-xft-rgba=rgb
 GTK3RC
 
 # ══════════════════════════════════════════════════════════════════════════
+# SDDM configuration
+# FIX: Replaced all lightdm config with sddm.conf
+# ══════════════════════════════════════════════════════════════════════════
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
+[Autologin]
+# Uncomment to autologin liveuser on boot (optional for live session)
+# User=liveuser
+# Session=budgie-desktop
+
+[Theme]
+# Use default theme for now; can be customized later
+Current=
+
+[General]
+DisplayServer=wayland
+GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+SDDMCONF
+
+# ══════════════════════════════════════════════════════════════════════════
 # BUDGIE USER CONFIGURATION
+# FIX: Removed all gnome-shell/X11 session references.
+#      dconf keys updated for Budgie 10.10 Wayland (no picture-uri-dark needed
+#      for swaybg, but kept for compatibility). Removed xrandr autostart.
 # ══════════════════════════════════════════════════════════════════════════
 BHOME="/home/liveuser"
 mkdir -p \
@@ -718,25 +754,24 @@ gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
 GTK2USER
 
-# dconf settings — Budgie theme, wallpaper, panel
-# Written as a dconf keyfile, imported on first login via autostart
-mkdir -p "${BHOME}/.config/dconf"
+# First-login dconf setup script
 cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
-# Runs once on first login to apply dconf settings
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
-dbus-launch dconf write /org/gnome/desktop/interface/gtk-theme "'Arc-Dark'"
-dbus-launch dconf write /org/gnome/desktop/interface/icon-theme "'Papirus-Dark'"
-dbus-launch dconf write /org/gnome/desktop/interface/font-name "'Noto Sans 11'"
-dbus-launch dconf write /org/gnome/desktop/interface/document-font-name "'Noto Sans 11'"
-dbus-launch dconf write /org/gnome/desktop/interface/monospace-font-name "'Noto Sans Mono 11'"
-dbus-launch dconf write /org/gnome/desktop/background/picture-uri "'file:///usr/share/kibaos/wallpaper.png'"
-dbus-launch dconf write /org/gnome/desktop/background/picture-uri-dark "'file:///usr/share/kibaos/wallpaper.png'"
-dbus-launch dconf write /org/gnome/desktop/background/picture-options "'zoom'"
-dbus-launch dconf write /org/gnome/desktop/background/primary-color "'#0d1b2a'"
-dbus-launch dconf write /com/solus-project/budgie-panel/layout "'default'"
+# FIX: Use gsettings (works under Wayland) instead of dbus-launch dconf
+# Budgie 10.10 reads org.gnome.desktop settings for theme/font/bg
+gsettings set org.gnome.desktop.interface gtk-theme 'Arc-Dark'
+gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark'
+gsettings set org.gnome.desktop.interface font-name 'Noto Sans 11'
+gsettings set org.gnome.desktop.interface document-font-name 'Noto Sans 11'
+gsettings set org.gnome.desktop.interface monospace-font-name 'Noto Sans Mono 11'
+# Budgie 10.10 uses swaybg for wallpaper — set via gsettings, budgie-desktop-services picks it up
+gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-options 'zoom'
+gsettings set org.gnome.desktop.background primary-color '#0d1b2a'
 
 touch "${STAMP}"
 FIRSTLOGIN
@@ -753,12 +788,13 @@ NoDisplay=true
 X-GNOME-Autostart-enabled=true
 AUTOCFG
 
-# Polkit agent — correct Arch path
-cat > "${BHOME}/.config/autostart/polkit-gnome.desktop" << 'POLKIT'
+# FIX: Replaced polkit-gnome (GNOME-specific, not in Arch repos standalone)
+# with polkit-kde-agent which is available and works under Wayland
+cat > "${BHOME}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+Exec=/usr/lib/polkit-1/polkit-agent-helper-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -894,7 +930,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <body>
 <header><h1>Welcome to KibaOS</h1><p>A fast, friendly Budgie desktop built on Arch Linux — by WolfTech Innovations</p></header>
 <div class="card-row">
-  <div class="card"><h2>Budgie Desktop</h2><p>Modern, clean, and intuitive. Great on any hardware.</p></div>
+  <div class="card"><h2>Budgie Desktop</h2><p>Modern, clean, and intuitive. Fully Wayland-native on Budgie 10.10.</p></div>
   <div class="card"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
   <div class="card"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
@@ -913,14 +949,20 @@ WELCOMEHTML
 
 # ══════════════════════════════════════════════════════════════════════════
 # SYSTEM BRANDING
+# FIX: Removed XDG_SESSION_TYPE=x11 and replaced with wayland.
+#      Removed DESKTOP_SESSION/XDG vars that reference x11 session names.
+#      Removed gnome-shell references.
 # ══════════════════════════════════════════════════════════════════════════
 cat > /etc/environment << 'ENV'
 DESKTOP_SESSION=budgie-desktop
 XDG_CURRENT_DESKTOP=Budgie:GNOME
 XDG_SESSION_DESKTOP=budgie-desktop
-XDG_SESSION_TYPE=x11
+XDG_SESSION_TYPE=wayland
 QT_AUTO_SCREEN_SCALE_FACTOR=1
 GTK_THEME=Arc-Dark
+MOZ_ENABLE_WAYLAND=1
+QT_QPA_PLATFORM=wayland
+CLUTTER_BACKEND=wayland
 KIBAOS_VERSION=rolling
 KIBAOS_VENDOR="WolfTech Innovations"
 ENV
@@ -934,19 +976,20 @@ cat > /etc/issue << 'ISSUE'
   ██║  ██╗██║██████╔╝██║  ██║╚██████╔╝███████║
   ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 
-  KibaOS Rolling — Budgie Edition — WolfTech Innovations
+  KibaOS Rolling — Budgie 10.10 Wayland Edition — WolfTech Innovations
   Live session: user=liveuser  password=live
   Install: click the desktop icon or run  sudo calamares
 
 ISSUE
 
 cat > /etc/motd << 'MOTD'
-Welcome to KibaOS — Budgie desktop on Arch Linux.
+Welcome to KibaOS — Budgie 10.10 Wayland desktop on Arch Linux.
 Built with love by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
 
 # ── Services ───────────────────────────────────────────────────────────────
-systemctl enable lightdm
+# FIX: sddm instead of lightdm
+systemctl enable sddm
 systemctl enable NetworkManager.service
 
 # ── Fix ownership ──────────────────────────────────────────────────────────
