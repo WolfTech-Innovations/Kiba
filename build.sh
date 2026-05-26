@@ -673,7 +673,14 @@ cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 echo "=== arc-gtk-theme installed ==="
-
+for pkg in arc-gtk-theme calamares; do
+  echo "=== Building ${pkg} from AUR ==="
+  git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
+  chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
+  cd "${AUR_BUILD}/${pkg}"
+  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  cd /
+done
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH — KibaOS boot splash
 # ══════════════════════════════════════════════════════════════════════════
@@ -1319,8 +1326,6 @@ pacman -U --noconfirm \
 echo '[chaotic-aur]' >> /etc/pacman.conf
 echo 'Include = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf
 
-pacman -Syy --noconfirm
-pacman -S --noconfirm calamares
 # ══════════════════════════════════════════════════════════════════════════
 # SYSTEM BRANDING
 # ══════════════════════════════════════════════════════════════════════════
