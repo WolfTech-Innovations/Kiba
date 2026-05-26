@@ -25,7 +25,6 @@ KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)*
     <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
   </a>
 </p>
-<img width="1440" height="3926" alt="image" src="https://github.com/user-attachments/assets/54f7b4ad-d67a-44d3-901c-6a5542d25a29" />
 
 <a href="https://www.star-history.com/?repos=WolfTech-Innovations%2FKiba&type=date&legend=top-left">
  <picture>
