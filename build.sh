@@ -1261,7 +1261,7 @@ KIBAOS_VERSION=rolling
 KIBAOS_VENDOR="WolfTech Innovations"
 ENV
 
-systemctl enable lxdm.service
+systemctl enable lightdm
 systemctl enable NetworkManager.service
 
 chown -R 1000:1000 /home/liveuser
