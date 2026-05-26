@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=cutefish" alt="Desktop">
+  <img src="https://img.shields.io/badge/Desktop-LXDE-22a7f0?style=for-the-badge&logo=linux" alt="Desktop">
   <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
@@ -29,9 +29,10 @@ KibaOS is built with a focus on "modern simplicity." This document details the v
 - [Boot Branding](#boot-branding)
   - [Interface Components](#interface-components)
   - [Typography](#typography)
-- [Desktop Experience (Cutefish OS)](#desktop-experience-plasma-bigscreen)
+- [Desktop Experience (LXDE/Openbox)](#desktop-experience-lxdeopenbox)
   - [Window Management Polish](#window-management-polish)
   - [Desktop Layout](#desktop-layout)
+- [Accessibility Standards](#accessibility-standards)
 - [The Modern Terminal](#the-modern-terminal)
   - [Modern Alternative Comparison](#modern-alternative-comparison)
   - [Shell Configuration (Zsh)](#shell-configuration-zsh)
@@ -57,8 +58,8 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 ### Look and Feel
 
-- **Desktop Environment:** Cutefish OS.
-- **Global Theme:** A customized version of **Ant-Dark**.
+- **Desktop Environment:** LXDE with Openbox window manager.
+- **Global Theme:** A customized version of **Arc-Dark**.
 - **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
 - **Icons:** **Kora** icon theme for a colorful and modern look.
 - **Cursors:** **Vimix** cursor theme.
@@ -123,20 +124,31 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-## Desktop Experience (Cutefish OS)
+## Desktop Experience (LXDE/Openbox)
 
-KibaOS leverages the power of **Cutefish OS** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the lightweight power of **LXDE** and **Openbox** to provide a fast and familiar desktop experience.
 
 ### Window Management Polish
 
-- **Rounded Corners:** Custom **KWin** rules apply 16px rounded corners to all windows.
-- **Glass Effects:** Background blur and translucency are enabled for an elegant, layered look.
-- **Floating Panel:** The system panel is configured to be floating and rounded by default, located at the bottom of the screen.
+- **Shadows & Effects:** **Picom** provides subtle window shadows and smooth fading transitions.
+- **Unified Theme:** A consistent **Arc-Dark** theme is applied system-wide to GTK2, GTK3, and Openbox decorations.
 
 ### Desktop Layout
 
-- **Minimalist Panel:** Contains the application launcher, task manager, system tray, and clock.
-- **Clean Desktop:** No icons by default, keeping the workspace clutter-free.
+- **Traditional Panel:** A highly customized **LXPanel** at the bottom provides quick access to apps, running tasks, and system indicators.
+- **Quick Launchers:** Key applications like Firefox and Terminal are pinned for immediate access.
+
+## Accessibility Standards
+
+KibaOS is committed to providing an accessible out-of-the-box experience.
+
+### ARIA Labels and Roles
+
+To ensure that the KibaOS interface is navigable by users relying on assistive technologies:
+
+- **Welcome Experience:** The `kiba-welcome` interface uses semantic HTML5 and ARIA roles (e.g., `role="list"`, `role="listitem"`) to structure information.
+- **Descriptive Labels:** Interactive elements, including action buttons and social links, are equipped with descriptive `aria-label` attributes to provide context to screen readers.
+- **Keyboard Navigation:** All web-based interfaces support standard keyboard navigation, including high-visibility `:focus-visible` indicators.
 
 ---
 
@@ -155,7 +167,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+| `pacman`        | **`pacman`**         | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 

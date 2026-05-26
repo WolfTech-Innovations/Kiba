@@ -1186,30 +1186,33 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   section h2{font-size:1.3rem;font-weight:600;margin:28px 0 14px;color:var(--teal)}
   .tip{background:#e8f6f8;border-left:4px solid var(--teal);border-radius:8px;padding:14px 18px;margin-top:12px;font-size:.9rem}
   .tip code{background:#d0eaee;padding:2px 6px;border-radius:4px;font-family:monospace}
-  .btn{display:inline-block;background:var(--teal);color:#fff;border-radius:10px;padding:10px 22px;text-decoration:none;font-size:.9rem;font-weight:600;margin-right:8px;margin-top:8px}
-  .btn:hover{background:var(--teal-dark)}
+  kbd{background:#fff;border:1px solid #cdd7d9;border-radius:4px;box-shadow:0 1px 0 rgba(0,0,0,0.2),0 0 0 2px #fff inset;color:#333;display:inline-block;font-family:monospace;font-size:.82rem;line-height:1.4;padding:0.1rem 0.4rem;white-space:nowrap}
+  .btn{display:inline-block;background:var(--teal);color:#fff !important;border-radius:10px;padding:10px 22px;text-decoration:none;font-size:.9rem;font-weight:600;margin-right:8px;margin-top:8px;transition:all 0.2s ease-in-out;outline:none}
+  .btn:hover{background:var(--teal-dark);transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.1)}
+  .btn:active{transform:translateY(0);box-shadow:none}
+  .btn:focus-visible{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--teal)}
   footer{text-align:center;padding:24px;color:var(--sub);font-size:.82rem;border-top:1px solid #d8e0e2;margin-top:16px}
 </style>
 </head>
 <body>
 <header><h1>Welcome to KibaOS</h1><p>A fast, friendly desktop built on Arch Linux - by WolfTech Innovations</p></header>
-<div class="card-row">
-  <div class="card"><h2>Fast &amp; Lightweight</h2><p>LXDE uses very little RAM and runs great on older and newer hardware alike.</p></div>
-  <div class="card"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
-  <div class="card"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
+<div class="card-row" role="list" aria-label="Key features">
+  <div class="card" role="listitem"><h2>Fast &amp; Lightweight</h2><p>LXDE uses very little RAM and runs great on older and newer hardware alike.</p></div>
+  <div class="card" role="listitem"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
+  <div class="card" role="listitem"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
   <h2>Keyboard Shortcuts</h2>
-  <div class="tip">
-    <b>Super+E</b> Files | <b>Super+T</b> Terminal | <b>Super+B</b> Browser | <b>Super+D</b> Show Desktop<br><br>
-    <b>Ctrl+Alt+T</b> Terminal | <b>Print</b> Screenshot | <b>Alt+F4</b> Close window
+  <div class="tip" role="list" aria-label="Common keyboard shortcuts">
+    <kbd>Super+E</kbd> Files | <kbd>Super+T</kbd> Terminal | <kbd>Super+B</kbd> Browser | <kbd>Super+D</kbd> Show Desktop<br><br>
+    <kbd>Ctrl+Alt+T</kbd> Terminal | <kbd>Print</kbd> Screenshot | <kbd>Alt+F4</kbd> Close window
   </div>
   <h2>Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or open a terminal and run:</p>
   <div class="tip"><code>sudo calamares</code></div><br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Visit the KibaOS Wiki for detailed documentation">Wiki</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue or bug on the KibaOS GitHub issues page">Report Issue</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View the KibaOS source code and project on GitHub">GitHub</a>
 </section>
 <footer>KibaOS Rolling - WolfTech Innovations - github.com/WolfTech-Innovations/Kiba</footer>
 </body>
