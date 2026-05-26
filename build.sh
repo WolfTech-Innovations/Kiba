@@ -97,6 +97,8 @@ wget
 git
 mesa
 xorg-xwayland
+layer-shell-qt
+budgie-session
 gcc
 debugedit
 base-devel
@@ -521,7 +523,7 @@ cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 displaymanagers:
   - sddm
 defaultDesktopEnvironment:
-  executable: "budgie-desktop"
+  executable: "budgie-session"
   desktopFile: "budgie-desktop"
 basicSetup: false
 DMCONF
@@ -865,7 +867,6 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [General]
 DisplayServer=wayland
-GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 
 [Wayland]
 CompositorCommand=labwc
@@ -875,8 +876,8 @@ Current=
 
 [Autologin]
 # Uncomment for instant live-session boot:
-# User=liveuser
-# Session=budgie-desktop
+User=liveuser
+Session=budgie-desktop
 SDDMCONF
 
 mkdir -p /var/lib/sddm
