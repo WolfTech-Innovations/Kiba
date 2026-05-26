@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/actions/.workflows/build.yml">
+  <a href="https://github.com/WolfTech-Innovations/Kiba/.github/workflows/build.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-lightblue?style=for-the-badge" alt="License">
