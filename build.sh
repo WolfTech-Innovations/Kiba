@@ -32,6 +32,11 @@ cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 
+# Copy branding assets to airootfs
+mkdir -p "${AIROOTFS}/usr/share/kibaos"
+cp -v branding/wallpaper.png "${AIROOTFS}/usr/share/kibaos/wallpaper.png"
+cp -v branding/boot.png "${AIROOTFS}/usr/share/kibaos/logo-raw.png"
+
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
 # ══════════════════════════════════════════════════════════════════════════
@@ -547,10 +552,8 @@ sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/'   /etc/systemd/login
 sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
 
 # ══════════════════════════════════════════════════════════════════════════
-# DOWNLOAD BRANDING ASSETS
+# PREPARE BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
-WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/78699a64fff1f243162f50ffba206a2de0d3272e/branding/wallpaper.png?raw=true"
-LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.png"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
 LOGO_256="/usr/share/kibaos/logo-256.png"
@@ -560,12 +563,10 @@ LOGO_32="/usr/share/kibaos/logo-32.png"
 
 mkdir -p /usr/share/kibaos /usr/share/pixmaps
 
-echo "=== Downloading KibaOS wallpaper ==="
-curl -fL --retry 5 --retry-delay 3 -o "${WALLPAPER_DEST}" "${WALLPAPER_URL}" || \
+if [ ! -f "${WALLPAPER_DEST}" ]; then
+  echo "WARN: Wallpaper missing, generating fallback"
   magick -size 1920x1080 gradient:"#004f57-#0d1b2a" "${WALLPAPER_DEST}"
-
-echo "=== Downloading KibaOS logo ==="
-curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
+fi
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
   magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
