@@ -101,6 +101,7 @@ linux
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
+fakeroot
 grub
 efibootmgr
 networkmanager
