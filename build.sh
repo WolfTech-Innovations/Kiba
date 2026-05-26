@@ -660,7 +660,7 @@ echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-for pkg in arc-gtk-theme; do
+for pkg in arc-gtk-theme calamares; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -673,14 +673,7 @@ cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 echo "=== arc-gtk-theme installed ==="
-for pkg in arc-gtk-theme calamares; do
-  echo "=== Building ${pkg} from AUR ==="
-  git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
-  chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
-  cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
-  cd /
-done
+
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH — KibaOS boot splash
 # ══════════════════════════════════════════════════════════════════════════
