@@ -880,33 +880,37 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   header h1{font-size:2.4rem;font-weight:300}
   header p{font-size:1rem;opacity:.75;margin-top:6px}
   .card-row{display:flex;gap:20px;flex-wrap:wrap;padding:28px 32px;max-width:900px;margin:-28px auto 0}
-  .card{background:var(--surface);border-radius:16px;padding:24px;flex:1;min-width:220px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+  .card{background:var(--surface);border-radius:16px;padding:24px;flex:1;min-width:220px;box-shadow:0 2px 12px rgba(0,0,0,.08);transition:transform 0.2s ease,box-shadow 0.2s ease}
+  .card:hover{transform:translateY(-4px);box-shadow:0 4px 20px rgba(0,0,0,.12)}
   .card h2{font-size:1.1rem;font-weight:600;margin-bottom:6px}
   .card p{font-size:.9rem;color:var(--sub);line-height:1.5}
   section{max-width:900px;margin:0 auto;padding:0 32px 40px}
   section h2{font-size:1.3rem;font-weight:600;margin:28px 0 14px;color:var(--teal)}
   .tip{background:#e8f6f8;border-left:4px solid var(--teal);border-radius:8px;padding:14px 18px;margin-top:12px;font-size:.9rem}
-  .tip code{background:#d0eaee;padding:2px 6px;border-radius:4px;font-family:monospace}
-  .btn{display:inline-block;background:var(--teal);color:#fff;border-radius:10px;padding:10px 22px;text-decoration:none;font-size:.9rem;font-weight:600;margin-right:8px;margin-top:8px}
+  kbd{background:#fff;border:1px solid #cdd7d9;border-radius:4px;box-shadow:0 1px 0 rgba(0,0,0,.2),inset 0 0 0 2px #fff;color:var(--text);display:inline-block;font-family:monospace;font-size:.85rem;line-height:1.4;margin:0 .1rem;padding:.1rem .4rem;white-space:nowrap}
+  .btn{display:inline-block;background:var(--teal);color:#fff;border-radius:10px;padding:10px 22px;text-decoration:none;font-size:.9rem;font-weight:600;margin-right:8px;margin-top:8px;transition:background 0.2s ease,transform 0.1s ease}
   .btn:hover{background:var(--teal-dark)}
+  .btn:active{transform:scale(0.98)}
   footer{text-align:center;padding:24px;color:var(--sub);font-size:.82rem;border-top:1px solid #d8e0e2;margin-top:16px}
 </style>
 </head>
 <body>
 <header><h1>Welcome to KibaOS</h1><p>A fast, friendly Budgie desktop built on Arch Linux — by WolfTech Innovations</p></header>
-<div class="card-row">
-  <div class="card"><h2>Budgie Desktop</h2><p>Modern, clean, and intuitive. Great on any hardware.</p></div>
-  <div class="card"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
-  <div class="card"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
+<main>
+<div class="card-row" role="list" aria-label="Key features">
+  <div class="card" role="listitem"><h2>Budgie Desktop</h2><p>Modern, clean, and intuitive. Great on any hardware.</p></div>
+  <div class="card" role="listitem"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
+  <div class="card" role="listitem"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
-<section>
-  <h2>Ready to Install?</h2>
+<section aria-labelledby="install-heading">
+  <h2 id="install-heading">Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or open a terminal and run:</p>
-  <div class="tip"><code>sudo calamares</code></div><br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <div class="tip"><kbd>sudo calamares</kbd></div><br>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Visit the KibaOS Wiki for detailed documentation">Wiki</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue or bug on GitHub">Report Issue</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View the KibaOS source code on GitHub">GitHub</a>
 </section>
+</main>
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>
 </html>
