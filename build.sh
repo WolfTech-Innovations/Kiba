@@ -110,7 +110,6 @@ gcc
 make
 pkg-config
 budgie
-budgie-screensaver
 nemo
 nemo-fileroller
 gnome-terminal
