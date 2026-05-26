@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **LXDE Desktop Enviroment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
+KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -70,7 +70,7 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaOS.
-- [**Manual Compilation**](./docs/manual-compilation.md): Building the LXDE Desktop Enviroment from source.
+- [**Manual Compilation**](./docs/manual-compilation.md): Building the Budgie Desktop from source.
 - [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
@@ -80,12 +80,12 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 
 - **Arch Linux Base:** Built on **Arch Linux Rolling**
 - **Deep Cloud Integration:** System-wide file and setting sync powered by Cloud Services. Built on **Arch Linux Rolling** (supported until 2030).
-- **Modern Desktop:** **LXDE Desktop Enviroment** with **Wayland** as the default session.
+- **Modern Desktop:** **Budgie Desktop** with **X11** as the default session.
 - **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
 - **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
 - **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
 - **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
-- **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
+- **Essential Apps:** **Falkon**, **Dolphin**, **Konsole**, **Kate**, **Elisa**, **Gwenview**, **GParted** included.
 - **Performance:** No bloat — only what you need is installed.
 
 ---
@@ -176,7 +176,7 @@ KibaOS ships the **Dracula** color scheme system-wide using the official palette
 | Pink       | `#ff79c6` | Selection    |
 | Green      | `#50fa7b` | Success      |
 
-The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The scheme is applied to **Budgie Desktop**, **Konsole**, window decorations, and **Plymouth**.
 
 ### System Requirements
 

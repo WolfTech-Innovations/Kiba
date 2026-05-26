@@ -18,7 +18,19 @@ pacman -S --noconfirm --needed \
   cmake ninja meson \
   xorg-server xorg-xinit xorg-xrandr xorg-xsetroot \
   libx11 libxext libxrender libxcomposite libxfixes \
-  openssl curl imagemagick
+  openssl curl imagemagick python-pyyaml
+
+# ── Chaotic-AUR ───────────────────────────────────────────────────────────
+pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com
+pacman-key --lsign-key 3056513887B78AEB
+pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst'
+pacman -U --noconfirm 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst'
+
+cat >> /etc/pacman.conf << 'CHAOTIC'
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+CHAOTIC
+pacman -Sy
 
 # ── Paths ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
@@ -30,6 +42,11 @@ cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+
+cat >> "${PROFILE}/pacman.conf" << 'CHAOTIC_PROFILE'
+[chaotic-aur]
+Include = /etc/pacman.d/chaotic-mirrorlist
+CHAOTIC_PROFILE
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -111,9 +128,12 @@ make
 pkg-config
 budgie
 budgie-screensaver
-nemo
-nemo-fileroller
-gnome-terminal
+dolphin
+konsole
+elisa
+gwenview
+kate
+okular
 gnome-control-center
 gnome-system-monitor
 gnome-disk-utility
@@ -126,20 +146,20 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
-evince
 lightdm
 lightdm-gtk-greeter
 lightdm-gtk-greeter-settings
 papirus-icon-theme
 accountsservice
-firefox
+falkon
+octopi
 sassc
 network-manager-applet
-pulseaudio
-pulseaudio-alsa
-pavucontrol
+pipewire
+pipewire-pulse
+pipewire-alsa
+wireplumber
+dbus-broker
 gparted
 ntfs-3g
 exfatprogs
@@ -155,6 +175,10 @@ xdg-desktop-portal
 xdg-desktop-portal-gnome
 feh
 imagemagick
+chaotic-keyring
+chaotic-mirrorlist
+calamares
+arc-gtk-theme
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -497,7 +521,7 @@ chown -R alpm:alpm /var/cache/pacman
 
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
-pacman-key --populate archlinux
+pacman-key --populate archlinux chaotic
 pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
@@ -576,30 +600,6 @@ cp "${LOGO_32}"  /usr/share/icons/hicolor/32x32/apps/kibaos.png
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 
 cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
-
-# ══════════════════════════════════════════════════════════════════════════
-# ══════════════════════════════════════════════════════════════════════════
-# BUILD calamares + arc-gtk-theme FROM AUR
-# ══════════════════════════════════════════════════════════════════════════
-useradd -m -s /bin/bash builduser 2>/dev/null || true
-echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
-sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-
-AUR_BUILD="/tmp/aur-build"
-mkdir -p "${AUR_BUILD}"
-for pkg in calamares arc-gtk-theme; do
-  echo "=== Building ${pkg} from AUR ==="
-  git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
-  chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
-  cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
-  cd /
-done
-
-cd /; rm -rf "${AUR_BUILD}"
-userdel -r builduser 2>/dev/null || true
-rm -f /etc/sudoers.d/builduser
-echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH — KibaOS boot splash
@@ -858,8 +858,8 @@ done
 cat > /usr/local/bin/kiba-welcome << 'WELCOMESCRIPT'
 #!/usr/bin/env bash
 WELCOME_HTML="/usr/share/kibaos/welcome.html"
-if command -v firefox &>/dev/null; then
-  firefox --no-remote "${WELCOME_HTML}" &
+if command -v falkon &>/dev/null; then
+  falkon "${WELCOME_HTML}" &
 elif command -v xdg-open &>/dev/null; then
   xdg-open "${WELCOME_HTML}" &
 fi
@@ -900,6 +900,16 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <div class="card"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
+  <h2>Standard Applications</h2>
+  <div class="card-row" style="margin-top: 0; padding: 0;" role="list">
+    <div class="card" role="listitem" aria-label="Falkon Web Browser"><h2>Falkon</h2><p>Web Browser</p></div>
+    <div class="card" role="listitem" aria-label="Elisa Music Player"><h2>Elisa</h2><p>Music Player</p></div>
+    <div class="card" role="listitem" aria-label="Dolphin File Manager"><h2>Dolphin</h2><p>File Manager</p></div>
+    <div class="card" role="listitem" aria-label="Konsole Terminal"><h2>Konsole</h2><p>Terminal</p></div>
+    <div class="card" role="listitem" aria-label="Gwenview Image Viewer"><h2>Gwenview</h2><p>Image Viewer</p></div>
+    <div class="card" role="listitem" aria-label="Kate Text Editor"><h2>Kate</h2><p>Text Editor</p></div>
+    <div class="card" role="listitem" aria-label="Octopi Software Manager"><h2>Octopi</h2><p>Software Manager</p></div>
+  </div>
   <h2>Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or open a terminal and run:</p>
   <div class="tip"><code>sudo calamares</code></div><br>
@@ -949,6 +959,11 @@ MOTD
 # ── Services ───────────────────────────────────────────────────────────────
 systemctl enable lightdm
 systemctl enable NetworkManager.service
+systemctl enable dbus-broker.service
+systemctl --global enable dbus-broker.service
+systemctl --global enable pipewire.socket
+systemctl --global enable pipewire-pulse.socket
+systemctl --global enable wireplumber.service
 
 # ── Fix ownership ──────────────────────────────────────────────────────────
 chown -R 1000:1000 /home/liveuser

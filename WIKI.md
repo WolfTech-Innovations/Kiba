@@ -62,7 +62,7 @@ KibaOS is built upon the **Arch Linux base (Rolling)** testing branch, providing
 
 - **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
 - **Init System:** **Systemd**.
-- **Display Server:** **Wayland** (default) with **X11** fallback.
+- **Display Server:** **X11** (default).
 - **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems).
 
 ### Extreme Minimization
@@ -82,15 +82,15 @@ The system undergoes aggressive footprint reduction during the build process:
 
 KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component               | Choice               |
-| ----------------------- | -------------------- |
-| **Desktop Environment** | **Cutefish OS** |
-| **Global Theme**        | **Ant-Dark**         |
-| **Color Scheme**        | **Dracula**          |
-| **Icon Theme**          | **Kora**             |
-| **Cursor Theme**        | **Vimix**            |
-| **System Font**         | **Inter**            |
-| **Monospace Font**      | **JetBrains Mono**   |
+| Component               | Choice             |
+| ----------------------- | ------------------ |
+| **Desktop Environment** | **Budgie Desktop** |
+| **Global Theme**        | **Arc-Dark**       |
+| **Color Scheme**        | **Dracula**        |
+| **Icon Theme**          | **Papirus-Dark**   |
+| **Cursor Theme**        | **Default**        |
+| **System Font**         | **Inter**          |
+| **Monospace Font**      | **JetBrains Mono** |
 
 ### Shell Experience
 
@@ -99,14 +99,8 @@ KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 - **Prompt:** **Starship** (Pre-configured with a minimalist Dracula theme).
 - **Plugins:** Autosuggestions and Syntax Highlighting are enabled by default.
 - **Modern CLI Tools:**
-  - `pacman` (Beautiful frontend for `pacman`)
-  - `eza` (Modern `ls` replacement)
-  - `bat` (Syntax-highlighting `cat`)
+  - `pacman` (The powerful Arch Linux package manager)
   - `fastfetch` (System information)
-  - `btop` (Resource monitor)
-  - `ripgrep` (Fast search)
-  - `fd-find` (Fast file finder)
-  - `tealdeer` (`tldr` implementation)
 
 ### Boot & Branding
 
@@ -123,9 +117,8 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 
 ### Repositories & Packages
 
-- **Ungoogled Chromium:** Provided via OBS (Open Build Service) repository.
+- **Chaotic-AUR:** Pre-compiled AUR packages for faster installation.
 - **Flatpak:** Integrated by default with the **Flathub** remote.
-- **Nala:** Configured as the primary package manager frontend with system-wide aliases (`pacman` -> `pacman`).
 
 ---
 

@@ -50,14 +50,14 @@ For those who prefer the command line, KibaOS defaults to **Pacman** — a moder
 
 ### Common Commands
 
-| Task                     | Command                                                        |
-| :----------------------- | :------------------------------------------------------------- |
+| Task                     | Command                                   |
+| :----------------------- | :---------------------------------------- |
 | **Update system**        | `update` _(Alias for `sudo pacman -Syu`)_ |
-| **Search for a package** | `search <name>`                                                |
-| **Install a package**    | `install <name>`                                               |
-| **Remove a package**     | `remove <name>`                                                |
-| **View history**         | `pacman -Qi`                                                 |
-| **Undo an operation**    | `sudo pacman -Qi undo <ID>`                                  |
+| **Search for a package** | `search <name>`                           |
+| **Install a package**    | `install <name>`                          |
+| **Remove a package**     | `remove <name>`                           |
+| **View history**         | `pacman -Qi`                              |
+| **Undo an operation**    | `sudo pacman -Qi undo <ID>`               |
 
 > [!NOTE]
 
@@ -65,15 +65,13 @@ For those who prefer the command line, KibaOS defaults to **Pacman** — a moder
 
 ## Specialized Repositories
 
-### Ungoogled Chromium
+### Chaotic-AUR
 
-KibaOS includes **Ungoogled Chromium** as a privacy-focused browser alternative. It is integrated into the system via a dedicated Open Build Service (OBS) repository to ensure regular updates directly from the source.
+KibaOS includes the **Chaotic-AUR** repository to provide pre-compiled binaries for many AUR packages, such as `calamares` and `arc-gtk-theme`. This ensures faster builds and reliable updates.
 
 ### Modern CLI Suite
 
-As detailed in the [UX Design](./ux-design.md) document, KibaOS ships with a suite of modern CLI tools like `eza`, `bat`, `btop`, and `yt-dlp` to provide a superior terminal experience.
-
-KibaOS includes **Ungoogled Chromium** as the default browser for users who prioritize privacy. It is integrated via a dedicated **OBS (Open Build Service)** repository, ensuring you receive timely security updates directly from the source.
+As detailed in the [UX Design](./ux-design.md) document, KibaOS ships with a suite of modern CLI tools like `fastfetch` and `pacman` to provide a superior experience.
 
 ### Flatpak (CLI)
 

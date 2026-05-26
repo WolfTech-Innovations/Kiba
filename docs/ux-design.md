@@ -57,18 +57,18 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 ### Look and Feel
 
-- **Desktop Environment:** Cutefish OS.
-- **Global Theme:** A customized version of **Ant-Dark**.
-- **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
-- **Icons:** **Kora** icon theme for a colorful and modern look.
-- **Cursors:** **Vimix** cursor theme.
+- **Desktop Environment:** Budgie Desktop.
+- **Global Theme:** **Arc-Dark**.
+- **Color Scheme:** **Dracula**, applied system-wide to widgets, window decorations, and applications.
+- **Icons:** **Papirus-Dark** icon theme for a colorful and modern look.
+- **Cursors:** **Default** cursor theme.
 - **Fonts:** **Inter** for the system UI and **JetBrains Mono** for monospace/terminal text.
 
 ### Window Management
 
-- **Rounded Corners:** KWin is configured to provide 16px rounded corners for all windows.
-- **Glass Effects:** Blur and contrast effects are enabled for an elegant, translucent look.
-- **Floating Panel:** The Plasma panel is configured to be floating and rounded by default.
+- **Rounded Corners:** Budgie is configured to provide elegant rounded corners for all windows.
+- **Glass Effects:** Blur and contrast effects are enabled for an elegant look.
+- **Floating Panel:** The Budgie panel is configured to be clean and intuitive by default.
 
 ## Shell Experience
 
@@ -82,24 +82,18 @@ The **Starship** cross-shell prompt is pre-installed and configured with a minim
 
 We prefer modern, faster alternatives to classic Unix commands:
 
-- **`pacman`**: A beautiful and feature-rich frontend for `pacman`.
-- **`eza`**: A modern replacement for `ls` with icons and color-coding.
-- **`bat`**: A `cat` clone with syntax highlighting and Git integration.
 - **`fastfetch`**: A fast and highly customizable system information tool.
-- **`btop`**: An interactive resource monitor.
-- **`ripgrep` (`rg`)**: An extremely fast alternative to `grep`.
-- **`fd-find` (`fd`)**: A simple, fast, and user-friendly alternative to `find`.
-- **`tealdeer` (`tldr`)**: A fast implementation of `tldr` for simplified man pages.
+- **`pacman`**: The powerful Arch Linux package manager.
 
 ### System-wide Aliases
 
-Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
+Common aliases are configured in `.bashrc` to improve workflow:
 
-- `pacman` -> `pacman`
-- `ls` -> `eza`
-- `cat` -> `bat`
-- `grep` -> `ripgrep`
-- `update` -> `sudo pacman -Syu -y`
+- `ls` -> `ls --color=auto`
+- `ll` -> `ls -lah --color=auto`
+- `grep` -> `grep --color=auto`
+- `update` -> `sudo pacman -Syu`
+- `install` -> `sudo calamares`
 - `edit` -> `micro` (System default editor)
 - `please` -> `sudo`
 - `cls` -> `clear`
@@ -123,15 +117,15 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-## Desktop Experience (Cutefish OS)
+## Desktop Experience (Budgie)
 
-KibaOS leverages the power of **Cutefish OS** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of **Budgie Desktop** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
-- **Rounded Corners:** Custom **KWin** rules apply 16px rounded corners to all windows.
+- **Rounded Corners:** Budgie provides elegant rounded corners to all windows.
 - **Glass Effects:** Background blur and translucency are enabled for an elegant, layered look.
-- **Floating Panel:** The system panel is configured to be floating and rounded by default, located at the bottom of the screen.
+- **Panel:** The system panel is configured to be clean and responsive.
 
 ### Desktop Layout
 
@@ -155,7 +149,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+| `pacman`        | **`pacman`**         | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 
