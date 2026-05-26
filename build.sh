@@ -120,6 +120,9 @@ lxdm
 lxhotkey
 lxinput
 lxlauncher
+gcc
+make
+pkg-config
 lxmusic
 lxpanel
 lxrandr
