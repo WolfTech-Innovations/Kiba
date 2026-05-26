@@ -190,44 +190,6 @@ SYSLINUX_SAFE
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
-# LXDM config
-# ══════════════════════════════════════════════════════════════════════════
-mkdir -p "${AIROOTFS}/etc/lxdm"
-cat > "${AIROOTFS}/etc/lxdm/lxdm.conf" << 'LXDMCONF'
-[base]
-greeter=/usr/lib/lxdm/lxdm-greeter-gtk
-autologin=liveuser
-session=/usr/bin/startlxde
-lang=1
-numlock=0
-bg=/usr/share/kibaos/wallpaper.png
-
-[server]
-arg=/usr/bin/X -background vt1
-
-[display]
-gtk_theme=Arc-Dark
-icon_theme=Papirus-Dark
-font=Noto Sans 11
-language=
-
-[input]
-
-[userlist]
-disable=0
-white=
-black=
-LXDMCONF
-
-mkdir -p "${AIROOTFS}/usr/share/lxdm/themes/KibaOS"
-cat > "${AIROOTFS}/usr/share/lxdm/themes/KibaOS/theme.conf" << 'LXDMTHEME'
-[theme]
-greeter_label_bg=#006874
-greeter_label_fg=#ffffff
-bg=/usr/share/kibaos/wallpaper.png
-LXDMTHEME
-
-# ══════════════════════════════════════════════════════════════════════════
 # Calamares installer config
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${AIROOTFS}/etc/calamares/modules"
@@ -321,7 +283,7 @@ Item {
     property var slides: [
         { icon: "", heading: "Welcome to KibaOS", body: "We're setting everything up for you. This usually takes 5-10 minutes." },
         { icon: "", heading: "Built on Arch Linux", body: "Rolling release means you always get the latest software, straight from upstream." },
-        { icon: "", heading: "LXDE Desktop", body: "Fast, familiar, and easy to use. Works great on any hardware, old or new." },
+        { icon: "", heading: "Budgie Desktop", body: "Fast, familiar, and easy to use. Works great on any hardware, old or new." },
         { icon: "", heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
         { icon: "", heading: "KibaOS by WolfTech", body: "github.com/WolfTech-Innovations/Kiba - guides, wiki, and issue reporting." }
     ]
