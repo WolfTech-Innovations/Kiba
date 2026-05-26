@@ -110,6 +110,7 @@ xorg-xdpyinfo
 xf86-input-libinput
 xf86-video-vesa
 mesa
+fakeroot
 gpicview
 lxappearance
 lxappearance-obconf
