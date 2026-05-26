@@ -13,7 +13,6 @@ chmod 755 /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
-
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
@@ -25,6 +24,7 @@ pacman -S --noconfirm --needed \
 WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
 PROFILE="${WORKDIR}/kiba-profile"
+sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
@@ -659,7 +659,7 @@ echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-
+sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 for pkg in arc-gtk-theme; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
