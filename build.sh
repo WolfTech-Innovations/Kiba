@@ -124,7 +124,6 @@ lxmusic
 lxpanel
 lxrandr
 scrot
-nitrogen
 lxsession
 lxtask
 lxterminal
