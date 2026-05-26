@@ -56,8 +56,12 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh"; then
     log_error "Found dangerous chmod 777"
+fi
+# Insecure makepkg flags
+if grep -rE "makepkg.*--skippgpcheck" . --exclude="repo_audit.sh"; then
+    log_error "Found insecure makepkg --skippgpcheck flag"
 fi
 # Token leaks in workflows
 if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
