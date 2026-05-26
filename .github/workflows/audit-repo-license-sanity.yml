@@ -1,0 +1,26 @@
+name: "Audit Repo License Sanity"
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit license presence"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify LICENSE file"
+        shell: bash
+        run: |
+          if [ ! -f "LICENSE" ]; then
+            echo "Error: LICENSE file missing from root"
+            exit 1
+          fi
+          if ! grep -qi "MIT" LICENSE; then
+            echo "Warning: LICENSE file does not appear to be MIT (expected per repository standards)"
+          fi

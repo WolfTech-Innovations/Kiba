@@ -1,0 +1,39 @@
+name: "Audit Build SH PaperDE ldconfig"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit PaperDE ldconfig requirement"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify PaperDE or replacement status"
+        shell: bash
+        run: |
+          # Memory suggests PaperDE was replaced by Budgie.
+          # If PaperDE is found, it MUST have ldconfig.
+          if grep -q "paperde" build.sh; then
+            if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
+              echo "Error: ldconfig not found after PaperDE installation in build.sh"
+              exit 1
+            fi
+          else
+            echo "PaperDE not found, skipping ldconfig audit for it."
+          fi
+          # Check for legacy PaperDE references in audit script
+          if grep -q "paperde" scripts/repo_audit.sh; then
+            echo "Note: paperde still referenced in scripts/repo_audit.sh"
+          fi

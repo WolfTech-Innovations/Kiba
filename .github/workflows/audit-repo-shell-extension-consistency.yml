@@ -1,0 +1,29 @@
+name: "Audit Repo Shell Extension Consistency"
+on:
+  push:
+    paths:
+      - "**.sh"
+  pull_request:
+    paths:
+      - "**.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit shell script extensions"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify .sh extension for shell scripts"
+        shell: bash
+        run: |
+          # Find files with shebang but no .sh extension (excluding directories like .git)
+          BAD_FILES=$(find . -type f -not -path '*/.*' -not -name "*.sh" -exec grep -l "^#\!/bin/" {} + || true)
+          if [ -n "$BAD_FILES" ]; then
+            echo "Note: The following files have shebangs but no .sh extension:"
+            echo "$BAD_FILES"
+          fi

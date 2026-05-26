@@ -1,0 +1,30 @@
+name: "Audit Build SH Desktop Entry Kiba"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit KibaOS desktop entries"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify KibaOS desktop entry categories"
+        shell: bash
+        run: |
+          # Use more robust matching by searching for the category within the heredoc sections
+          if ! grep "Categories=System;" build.sh | grep -q "System;"; then
+             echo "Error: Could not find System category in build.sh desktop entries"
+             exit 1
+          fi

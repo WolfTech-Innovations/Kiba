@@ -1,0 +1,28 @@
+name: "Audit Workflow Kebab Filenames Strict"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit workflow filenames"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify kebab-case filenames"
+        shell: bash
+        run: |
+          BAD_FILENAMES=$(find .github/workflows -name "*.yml" -o -name "*.yaml" | grep -vE "/[a-z0-9-]+\.(yml|yaml)$" || true)
+          if [ -n "$BAD_FILENAMES" ]; then
+            echo "Error: Workflow filenames must be kebab-case (lowercase, numbers, dashes): $BAD_FILENAMES"
+            exit 1
+          fi

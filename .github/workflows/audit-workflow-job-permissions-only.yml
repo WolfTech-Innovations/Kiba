@@ -1,0 +1,32 @@
+name: "Audit Workflow Job Permissions Only"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit job-level permissions"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify no top-level write-all"
+        shell: bash
+        run: |
+          if grep -r "permissions: write-all" .github/workflows/; then
+            echo "Error: Found 'permissions: write-all'. Use granular job-level permissions instead."
+            exit 1
+          fi
+          # Check for top-level permissions (outside of a job)
+          # This is a basic check for 'permissions:' not being indented
+          if grep "^permissions:" .github/workflows/*.yml | grep -v "write-all"; then
+            echo "Note: Found top-level permissions. Ensure they are intentional or move to job-level."
+          fi

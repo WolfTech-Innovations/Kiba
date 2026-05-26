@@ -1,0 +1,37 @@
+name: "Audit Build SH Zsh Default"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit Zsh configuration"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify Zsh setup"
+        shell: bash
+        run: |
+          # Currently build.sh uses /bin/bash for liveuser.
+          # If we transition to Zsh, this audit will ensure it's done correctly.
+          if grep -q "zsh" build.sh; then
+            echo "Zsh mentioned in build.sh. Ensuring /etc/shells is updated."
+            if ! grep -q "grep -qx '/bin/zsh' /etc/shells" build.sh; then
+               echo "Warning: Zsh found but /etc/shells update not found."
+            fi
+          fi
+          # Memory check: build.sh currently sets /bin/bash for liveuser
+          if grep -q "liveuser" build.sh | grep -q "/bin/bash"; then
+             echo "Liveuser is correctly using bash as default."
+          fi

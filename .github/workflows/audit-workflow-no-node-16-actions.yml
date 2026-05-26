@@ -1,0 +1,27 @@
+name: "Audit Workflow No Node 16 Actions"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit for Node 16 actions"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify action versions"
+        shell: bash
+        run: |
+          # Node 16 actions are EOL. v3 of many actions are Node 16 based.
+          if grep -r "uses: actions/.*@v3" .github/workflows/ | grep -v "free-disk-space"; then
+            echo "Warning: Found @v3 actions which may be Node 16 based. Consider upgrading to @v4."
+          fi

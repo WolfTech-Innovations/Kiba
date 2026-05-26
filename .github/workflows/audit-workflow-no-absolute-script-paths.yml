@@ -1,0 +1,29 @@
+name: "Audit Workflow No Absolute Script Paths"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit script paths in workflows"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify relative script paths"
+        shell: bash
+        run: |
+          if grep -r " /w/" .github/workflows/ | grep -v "docker run"; then
+            echo "Warning: Found potential absolute path /w/ in workflow run steps outside of docker run context."
+          fi
+          if grep -r " /home/runner/" .github/workflows/; then
+            echo "Warning: Found absolute path /home/runner/ in workflows. Use GITHUB_WORKSPACE instead."
+          fi

@@ -1,0 +1,24 @@
+name: "Audit Repo No Chmod 777 Strict"
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit for chmod 777"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Find dangerous chmod 777"
+        shell: bash
+        run: |
+          # Exclude the audit script itself to avoid false positives
+          if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="audit-repo-no-chmod-777-strict.yml"; then
+            echo "Error: Found dangerous chmod 777"
+            exit 1
+          fi

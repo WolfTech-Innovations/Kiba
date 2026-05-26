@@ -1,0 +1,24 @@
+name: "Audit Repo Gitkeep No Extension"
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit .gitkeep filenames"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Find .gitkeep files with extensions"
+        shell: bash
+        run: |
+          BAD_GITKEEP=$(find . -name ".gitkeep.*")
+          if [ -n "$BAD_GITKEEP" ]; then
+            echo "Error: .gitkeep files should not have extensions: $BAD_GITKEEP"
+            exit 1
+          fi

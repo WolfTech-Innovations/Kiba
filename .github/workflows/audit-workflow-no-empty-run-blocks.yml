@@ -1,0 +1,27 @@
+name: "Audit Workflow No Empty Run Blocks"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit for empty run blocks"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Find empty run blocks"
+        shell: bash
+        run: |
+          if grep -r "run: \"\"" .github/workflows/ || grep -r "run: ''" .github/workflows/; then
+            echo "Error: Found empty run blocks in workflows"
+            exit 1
+          fi

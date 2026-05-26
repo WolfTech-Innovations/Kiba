@@ -1,0 +1,30 @@
+name: "Audit Workflow Explicit Bash Shell"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit explicit bash shell usage"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify shell: bash in run steps"
+        shell: bash
+        run: |
+          # We prefer explicit shell: bash for consistency and pipefail support
+          # This is a heuristic check
+          BAD_WORKFLOWS=$(grep -l "run:" .github/workflows/*.yml | xargs grep -L "shell: bash" || true)
+          if [ -n "$BAD_WORKFLOWS" ]; then
+            echo "Warning: The following workflows might be missing explicit 'shell: bash' for some run steps:"
+            echo "$BAD_WORKFLOWS"
+          fi

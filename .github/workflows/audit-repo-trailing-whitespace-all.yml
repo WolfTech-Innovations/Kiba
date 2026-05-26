@@ -1,0 +1,23 @@
+name: "Audit Repo Trailing Whitespace All"
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit trailing whitespace"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Find trailing whitespace"
+        shell: bash
+        run: |
+          if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg" --exclude="*.webp" --exclude="*.ico"; then
+            echo "Error: Found trailing whitespace"
+            exit 1
+          fi

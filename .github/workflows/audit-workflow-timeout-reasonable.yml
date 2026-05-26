@@ -1,0 +1,32 @@
+name: "Audit Workflow Timeout Reasonable"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit workflow timeouts"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify timeout-minutes presence and value"
+        shell: bash
+        run: |
+          MISSING_TIMEOUT=$(grep -L "timeout-minutes" .github/workflows/*.yml || true)
+          if [ -n "$MISSING_TIMEOUT" ]; then
+            echo "Warning: The following workflows are missing 'timeout-minutes':"
+            echo "$MISSING_TIMEOUT"
+          fi
+          # Check for excessively large timeouts (> 360 minutes / 6 hours)
+          if grep "timeout-minutes:" .github/workflows/*.yml | awk '$2 > 360'; then
+            echo "Warning: Found workflows with timeout-minutes > 360"
+          fi

@@ -1,0 +1,35 @@
+name: "Audit Build SH Wallpaper Consistency"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit wallpaper path consistency"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify wallpaper paths"
+        shell: bash
+        run: |
+          W_PATH=$(grep "WALLPAPER_DEST=" build.sh | cut -d'"' -f2)
+          if [ -z "$W_PATH" ]; then
+            echo "Error: WALLPAPER_DEST not defined in build.sh"
+            exit 1
+          fi
+          # Check if gsettings uses the same path
+          if ! grep -q "gsettings set org.gnome.desktop.background picture-uri 'file://${W_PATH}'" build.sh; then
+            echo "Error: Wallpaper path mismatch between WALLPAPER_DEST and gsettings"
+            exit 1
+          fi

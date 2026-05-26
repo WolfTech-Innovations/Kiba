@@ -1,0 +1,32 @@
+name: "Audit Workflow Unused Workflow Inputs"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit unused workflow inputs"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify input usage"
+        shell: bash
+        run: |
+          # Heuristic: check if inputs defined in workflow_dispatch are used via github.event.inputs or inputs.
+          for wf in .github/workflows/*.yml; do
+            INPUTS=$(grep -A 20 "workflow_dispatch:" "$wf" | grep -E "^  [a-zA-Z0-9_-]+:" | sed 's/://' | awk '{print $1}' || true)
+            for input in $INPUTS; do
+              if ! grep -qE "inputs\.${input}|github\.event\.inputs\.${input}" "$wf"; then
+                echo "Warning: Input '${input}' in ${wf} might be unused."
+              fi
+            done
+          done

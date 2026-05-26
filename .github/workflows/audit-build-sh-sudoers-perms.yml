@@ -1,0 +1,29 @@
+name: "Audit Build SH Sudoers Perms"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit sudoers permissions"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify sudoers file permissions"
+        shell: bash
+        run: |
+          if ! grep -q "chmod 0440 \"\${AIROOTFS}/etc/sudoers.d/liveuser\"" build.sh; then
+            echo "Error: liveuser sudoers file in build.sh missing chmod 0440"
+            exit 1
+          fi

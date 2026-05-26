@@ -1,0 +1,26 @@
+name: "Audit Repo No Plaintext Chpasswd"
+on:
+  push:
+    paths:
+      - "build.sh"
+  pull_request:
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit for plaintext chpasswd"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Find plaintext chpasswd"
+        shell: bash
+        run: |
+          if grep -q "echo \"liveuser:live\" | chpasswd" build.sh; then
+            echo "Warning: Found plaintext chpasswd for liveuser in build.sh"
+          fi

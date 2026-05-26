@@ -1,0 +1,27 @@
+name: "Audit Workflow No GitHub Token Leak"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit for GitHub Token leaks"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify no echo of tokens"
+        shell: bash
+        run: |
+          if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
+            echo "Error: Potential GitHub Token/Secret leak via echo in workflows"
+            exit 1
+          fi

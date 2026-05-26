@@ -1,0 +1,27 @@
+name: "Audit Workflow Checkout V4"
+on:
+  push:
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit actions/checkout version"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify actions/checkout@v4 usage"
+        shell: bash
+        run: |
+          if grep -r "uses: actions/checkout@" .github/workflows/ | grep -vE "@v4|@[a-f0-9]{40}"; then
+            echo "Error: Outdated actions/checkout version (upgrade to @v4 or use SHA pin)"
+            exit 1
+          fi

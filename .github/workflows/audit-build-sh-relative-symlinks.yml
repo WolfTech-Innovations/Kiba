@@ -1,0 +1,34 @@
+name: "Audit Build SH Relative Symlinks"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit relative symlinks"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify relative symlinks in systemd config"
+        shell: bash
+        run: |
+          # Check for absolute symlinks that might be problematic in airootfs
+          # We prefer relative symlinks for things like display-manager.service
+          if grep "ln -sf /usr/lib/systemd/system/" build.sh | grep -qv "\${WANTS}"; then
+             echo "Warning: Found absolute symlinks to /usr/lib. Ensure they are intentional."
+          fi
+          # Specific check for common relative symlink pattern
+          if ! grep -q "ln -sf /usr/lib/systemd/system/graphical.target" build.sh; then
+             echo "Note: graphical.target symlink changed or missing."
+          fi

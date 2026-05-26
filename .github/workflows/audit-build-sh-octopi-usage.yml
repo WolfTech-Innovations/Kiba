@@ -1,0 +1,30 @@
+name: "Audit Build SH Octopi Usage"
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - "build.sh"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit Octopi presence"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify Octopi removal"
+        shell: bash
+        run: |
+          # Octopi was removed due to X11 dependencies.
+          if grep -iq "octopi" build.sh | grep -v "REMOVED"; then
+            echo "Error: Octopi found in build.sh but it should have been removed for Wayland compatibility"
+            exit 1
+          fi

@@ -1,0 +1,27 @@
+name: "Audit Repo README Badge HTTPS"
+on:
+  push:
+    paths:
+      - "README.md"
+  pull_request:
+    paths:
+      - "README.md"
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: "Audit README badge HTTPS"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+      - name: "Verify HTTPS for badges"
+        shell: bash
+        run: |
+          if grep -E "!\[.*\]\(http://" README.md; then
+            echo "Error: Found non-HTTPS badge link in README.md"
+            exit 1
+          fi
