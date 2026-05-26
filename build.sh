@@ -115,7 +115,7 @@ mesa
 xorg-xwayland
 gcc
 debugedit
-make 
+base-devel
 pkg-config
 labwc
 sddm
