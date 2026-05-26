@@ -710,7 +710,9 @@ for f in background-tile.png watermark.png kibaos.plymouth; do
     "$(readlink -f "${PLYMOUTH_THEME}/${f}")" "${PLYMOUTH_THEME}/${f}" || true
 done
 
-plymouth-set-default-theme -R kibaos
+  plymouth-set-default-theme -R kibaos 2>/dev/null || \
+  plymouth-set-default-theme -R spinner 2>/dev/null || \
+  echo "WARNING: plymouth theme set failed, skipping"
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
