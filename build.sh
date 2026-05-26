@@ -112,6 +112,10 @@ wget
 git
 mesa
 xorg-xwayland
+gcc
+debugedit
+make 
+pkg-config
 labwc
 sddm
 budgie
