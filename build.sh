@@ -407,8 +407,6 @@ cat > "${AIROOTFS}/etc/calamares/modules/shellprocess@copy-user-settings.conf" <
 dontChroot: false
 timeout: 120
 script:
-  - "-": "echo '=== KibaOS: migrating live session settings ==='"
-  - "-": |
 SHELLPROC
 
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
@@ -452,7 +450,7 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target        "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/lxdm.service            "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/lightdm.service            "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager.service  "${WANTS}/multi-user.target.wants/NetworkManager.service"
 ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
        "${WANTS}/dbus-org.freedesktop.nm-dispatcher.service"
@@ -1246,7 +1244,7 @@ cat > /etc/issue << 'ISSUE'
 ISSUE
 
 cat > /etc/motd << 'MOTD'
-Welcome to KibaOS - Fast LXDE desktop on Arch Linux.
+Welcome to KibaOS - Fast Budgie desktop on Arch Linux.
 Built with love by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
 
