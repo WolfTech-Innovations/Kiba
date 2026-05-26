@@ -96,6 +96,8 @@ curl
 wget
 git
 mesa
+networkmanager
+network-manager-applet
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -182,7 +184,7 @@ PRESET
 mkdir -p "${PROFILE}/efiboot/loader/entries"
 cat > "${PROFILE}/efiboot/loader/loader.conf" << 'LOADER'
 default kibaos.conf
-timeout 5
+timeout 0
 console-mode max
 editor no
 LOADER
@@ -191,7 +193,7 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash plymouth.enable=1 rd.plymouth=1
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
@@ -673,7 +675,7 @@ sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/login
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
-WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/78699a64fff1f243162f50ffba206a2de0d3272e/branding/wallpaper.png?raw=true"
+WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/445f7e3039867428feb75f021af9e7ca835d33c2/branding/forest-k.png"
 LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.png"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
@@ -1207,7 +1209,7 @@ cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
 Name=Install KibaOS
 Comment=Install KibaOS to your hard drive
-Exec=sudo calamares
+Exec=/usr/local/bin/calamares-launch
 Icon=kibaos
 Terminal=false
 Type=Application
@@ -1417,7 +1419,16 @@ cat > /etc/motd << 'MOTD'
 Welcome to KibaOS — Budgie 10.10 Wayland desktop on Arch Linux.
 Built by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
+cat > /usr/local/bin/calamares-launch << 'EOF'
+#!/usr/bin/env bash
+exec sudo -E \
+  WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
+  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+  QT_QPA_PLATFORM=wayland \
+  /usr/bin/calamares
+EOF
 
+chmod +x /usr/local/bin/calamares-launch
 # ── Services ───────────────────────────────────────────────────────────────
 systemctl enable sddm
 systemctl enable NetworkManager.service
@@ -1447,6 +1458,7 @@ find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser
+sudo systemctl enable NetworkManager
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
