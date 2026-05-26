@@ -590,6 +590,10 @@ SHELLPROC
 # ══════════════════════════════════════════════════════════════════════════
 PACMAN_CONF="${PROFILE}/pacman.conf"
 if [ -f "${PACMAN_CONF}" ]; then
+  # Enable parallel downloads for faster package acquisition during build
+  grep -q '^ParallelDownloads' "${PACMAN_CONF}" || \
+    sed -i '/^\[options\]/a ParallelDownloads = 5' "${PACMAN_CONF}"
+
   grep -q 'NoExtract' "${PACMAN_CONF}" || \
     sed -i '/^\[options\]/a NoExtract  = usr/share/man/* usr/share/info/* usr/share/doc/*\nNoExtract  = usr/share/locale/* !usr/share/locale/en_US/* !usr/share/locale/en_GB/* !usr/share/locale/locale.alias' \
     "${PACMAN_CONF}"
@@ -725,15 +729,20 @@ cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
+# Enable parallel downloads inside the ISO environment for faster AUR dependency installation
+grep -q '^ParallelDownloads' /etc/pacman.conf || \
+  sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
+# Speed up AUR package compilation by using all available CPU cores
+PARALLEL_JOBS=$(nproc)
 for pkg in calamares arc-gtk-theme; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  sudo -u builduser MAKEFLAGS="-j${PARALLEL_JOBS}" makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
