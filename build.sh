@@ -18,9 +18,6 @@ pacman -S --noconfirm --needed \
   cmake ninja meson \
   openssl curl imagemagick
 
-# NOTE: xorg-server and friends intentionally removed from host deps —
-# Budgie 10.10 is Wayland-only, no X11 stack needed.
-
 # ── Paths ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
@@ -78,21 +75,8 @@ LOGO=kibaos
 OSRELEASE
 
 # ══════════════════════════════════════════════════════════════════════════
-# Package list — Budgie 10.10 Wayland edition
+# Package list
 # ══════════════════════════════════════════════════════════════════════════
-# FIXES vs original:
-#   - REMOVED: arc-gtk-theme (AUR-only; built in chroot instead)
-#   - REMOVED: lightdm, lightdm-gtk-greeter, lightdm-gtk-greeter-settings (X11 DM, incompatible with Wayland-only Budgie 10.10)
-#   - REMOVED: xf86-video-vesa, xf86-video-fbdev, xorg-server, xorg-xinit, xorg-xrandr, xorg-xsetroot, xorg-xauth (Budgie 10.10 is Wayland-only; no X server needed)
-#   - REMOVED: gnome-shell, gnome-session (Budgie replaces these; pulling gnome-shell risks conflicts)
-#   - ADDED: sddm (Wayland-capable display manager)
-#   - ADDED: xorg-xwayland (XWayland for legacy X11 app compat inside Wayland session)
-#   - ADDED: labwc (Budgie 10.10's recommended Wayland compositor)
-#   - ADDED: swaybg, grim, slurp, swayidle, gtklock, wlopm, wdisplays (Budgie 10.10 Wayland tool stack)
-#   - ADDED: xdg-desktop-portal-wlr (screencasting/screenshots portal for Wayland)
-#   - ADDED: budgie-desktop-view (desktop icons, now a separate package in 10.10)
-#   - ADDED: budgie-desktop-services (new daemon required by 10.10)
-#   - ADDED: budgie-control-center (replaces gnome-control-center for Budgie 10.10)
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
@@ -170,10 +154,11 @@ xdg-desktop-portal
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
+eglinfo
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
-# mkinitcpio — plymouth after udev
+# mkinitcpio
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
@@ -257,10 +242,10 @@ images:
 slideshow:    "show.qml"
 slideshowAPI: 2
 style:
-  sidebarBackground:    "#f3f3f3"
+  sidebarBackground:    "#f5f8fa"
   sidebarText:          "#1a1a2e"
-  sidebarTextSelect:    "#006874"
-  sidebarTextHighlight: "#006874"
+  sidebarTextSelect:    "#0099cc"
+  sidebarTextHighlight: "#0099cc"
 windowExpanding:  fullscreen
 windowSize:       "1024px,768px"
 windowPlacement:  center
@@ -270,44 +255,104 @@ BRANDING
 
 cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
 QWidget {
-    background-color: #f2f7f9; color: #1a1a2e;
-    font-family: "Noto Sans", "DejaVu Sans", sans-serif; font-size: 13px;
+    background-color: #f0f6fa;
+    color: #1a2030;
+    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+    font-size: 13px;
 }
-QStackedWidget, QFrame#mainContent { background-color: #ffffff; border-radius: 12px; }
-QLabel#labelTitle { font-size: 26px; font-weight: 400; color: #1a1a2e; padding-top: 28px; }
-QLabel { color: #3a4050; font-size: 13px; }
+QStackedWidget, QFrame#mainContent {
+    background-color: #ffffff;
+    border-radius: 16px;
+    border: 1px solid rgba(0,0,0,0.06);
+}
+QLabel#labelTitle {
+    font-size: 24px;
+    font-weight: 400;
+    color: #0d1b2a;
+    padding-top: 24px;
+    letter-spacing: 0.5px;
+}
+QLabel {
+    color: #3a4660;
+    font-size: 13px;
+}
 QPushButton#nextButton {
-    background-color: #006874; color: #ffffff; border: none;
-    border-radius: 10px; padding: 10px 36px; font-size: 13px; font-weight: 600; min-width: 120px;
+    background-color: #0099cc;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    padding: 10px 36px;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 120px;
 }
-QPushButton#nextButton:hover { background-color: #004f57; }
-QPushButton#nextButton:pressed { background-color: #003640; }
-QPushButton#nextButton:disabled { background-color: #a0c8ce; }
+QPushButton#nextButton:hover    { background-color: #007aaa; }
+QPushButton#nextButton:pressed  { background-color: #005f88; }
+QPushButton#nextButton:disabled { background-color: #a8d8ea; }
 QPushButton {
-    background-color: #eef5f6; color: #006874; border: 1px solid #cdd7d9;
-    border-radius: 10px; padding: 9px 24px; font-size: 13px; min-width: 90px;
+    background-color: #eaf4f8;
+    color: #0099cc;
+    border: 1.5px solid #c5dde8;
+    border-radius: 12px;
+    padding: 9px 24px;
+    font-size: 13px;
+    min-width: 90px;
 }
-QPushButton:hover { background-color: #d8edef; border-color: #006874; }
-QPushButton:pressed { background-color: #c0e4e8; }
-QPushButton:disabled { color: #aabbbb; border-color: #dde8e9; }
+QPushButton:hover   { background-color: #d0ecf5; border-color: #0099cc; }
+QPushButton:pressed { background-color: #b8e2f0; }
+QPushButton:disabled { color: #aabbc8; border-color: #dde8ef; }
 QLineEdit, QComboBox {
-    background-color: #eef5f6; border: 1.5px solid #cdd7d9; border-radius: 10px;
-    padding: 8px 12px; color: #1a1a2e; selection-background-color: #006874;
-    selection-color: #ffffff; font-size: 13px;
+    background-color: #eaf4f8;
+    border: 1.5px solid #c5dde8;
+    border-radius: 12px;
+    padding: 9px 14px;
+    color: #1a2030;
+    selection-background-color: #0099cc;
+    selection-color: #ffffff;
+    font-size: 13px;
 }
-QLineEdit:focus, QComboBox:focus { border: 2px solid #006874; background-color: #f0fafb; }
-QProgressBar { background-color: #d8edef; border: none; border-radius: 4px; height: 6px; }
-QProgressBar::chunk { background-color: #006874; border-radius: 4px; }
+QLineEdit:focus, QComboBox:focus {
+    border: 2px solid #0099cc;
+    background-color: #f4fbff;
+}
+QProgressBar {
+    background-color: #d0ecf5;
+    border: none;
+    border-radius: 5px;
+    height: 7px;
+}
+QProgressBar::chunk {
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #0099cc, stop:1 #00bfff);
+    border-radius: 5px;
+}
 QListView, QTreeView {
-    background-color: #ffffff; border: 1.5px solid #d8e0e2; border-radius: 10px;
-    alternate-background-color: #f5fafb; outline: none;
+    background-color: #ffffff;
+    border: 1.5px solid #d8e8ef;
+    border-radius: 12px;
+    alternate-background-color: #f4fafd;
+    outline: none;
 }
-QListView::item:hover, QTreeView::item:hover { background-color: #d8edef; }
-QListView::item:selected, QTreeView::item:selected { background-color: #b0d8dc; color: #1a1a2e; }
+QListView::item:hover, QTreeView::item:hover { background-color: #d8f0fa; }
+QListView::item:selected, QTreeView::item:selected {
+    background-color: #b0e0f5;
+    color: #0d1b2a;
+}
 QScrollBar:vertical { background: transparent; width: 7px; }
-QScrollBar::handle:vertical { background: #c0d4d8; border-radius: 3px; min-height: 28px; }
+QScrollBar::handle:vertical {
+    background: #bbd8e8;
+    border-radius: 3px;
+    min-height: 28px;
+}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QToolTip { background-color: #1a1a2e; color: #e8f0f2; border: none; border-radius: 6px; padding: 5px 8px; }
+QToolTip {
+    background-color: #0d1b2a;
+    color: #e8f4fa;
+    border: none;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+}
 QSS
 
 cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/show.qml" << 'SHOWQML'
@@ -319,76 +364,106 @@ Item {
     id: root; anchors.fill: parent
     property bool activatedInCalamares: false
     property var slides: [
-        { icon: "", heading: "Welcome to KibaOS", body: "We're setting everything up for you. This usually takes 5-10 minutes." },
-        { icon: "", heading: "Built on Arch Linux", body: "Rolling release means you always get the latest software, straight from upstream." },
-        { icon: "", heading: "Budgie Desktop", body: "Fast, familiar, and easy to use. Works great on any hardware, old or new." },
-        { icon: "", heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
-        { icon: "", heading: "KibaOS by WolfTech", body: "github.com/WolfTech-Innovations/Kiba - guides, wiki, and issue reporting." }
+        { heading: "Welcome to KibaOS",       body: "We're setting everything up for you. This usually takes 5 to 10 minutes." },
+        { heading: "Built on Arch Linux",     body: "Rolling release. Always the latest software, straight from upstream." },
+        { heading: "Budgie 10.10 Wayland",    body: "Fully Wayland-native. Fast, modern, and compositor-agnostic." },
+        { heading: "Designed with care",      body: "KibaOS blends the best of DDE, Paper, and Cutefish into one cohesive look." },
+        { heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
+        { heading: "KibaOS by WolfTech",      body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
     ]
     property int currentSlide: 0
 
-    Timer { interval: 6000; running: root.activatedInCalamares; repeat: true
-        onTriggered: root.currentSlide = (root.currentSlide + 1) % root.slides.length }
+    Timer {
+        interval: 6000; running: root.activatedInCalamares; repeat: true
+        onTriggered: root.currentSlide = (root.currentSlide + 1) % root.slides.length
+    }
 
     Rectangle {
-        anchors.fill: parent; color: "#f2f7f9"
+        anchors.fill: parent; color: "#f0f6fa"
+
         Rectangle {
             id: topStrip
             anchors { top: parent.top; left: parent.left; right: parent.right }
-            height: parent.height * 0.38; color: "#006874"
+            height: parent.height * 0.36
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: "#005f88" }
+                GradientStop { position: 1.0; color: "#0099cc" }
+            }
             Image {
-                anchors.centerIn: parent; source: "logo.png"; width: 96; height: 96
+                anchors.centerIn: parent; source: "logo.png"
+                width: 88; height: 88
                 fillMode: Image.PreserveAspectFit; smooth: true
             }
         }
+
         Rectangle {
-            anchors { top: topStrip.bottom; topMargin: -20; horizontalCenter: parent.horizontalCenter }
-            width: Math.min(parent.width - 64, 520); height: contentCol.implicitHeight + 48
-            radius: 16; color: "#ffffff"
+            anchors {
+                top: topStrip.bottom; topMargin: -22
+                horizontalCenter: parent.horizontalCenter
+            }
+            width: Math.min(parent.width - 56, 500)
+            height: contentCol.implicitHeight + 52
+            radius: 20
+            color: "#ffffff"
+
             ColumnLayout {
                 id: contentCol
                 anchors { top: parent.top; left: parent.left; right: parent.right; margins: 32 }
-                spacing: 12
-                Text { Layout.alignment: Qt.AlignHCenter; text: root.slides[root.currentSlide].icon; font.pixelSize: 36 }
+                spacing: 14
+
                 Text {
                     Layout.alignment: Qt.AlignHCenter; Layout.fillWidth: true
                     text: root.slides[root.currentSlide].heading
-                    font.pixelSize: 20; font.weight: Font.Medium; color: "#1a1a2e"
+                    font.pixelSize: 19; font.weight: Font.Medium
+                    color: "#0d1b2a"
                     horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
                 }
                 Text {
                     Layout.alignment: Qt.AlignHCenter; Layout.fillWidth: true
                     text: root.slides[root.currentSlide].body
-                    font.pixelSize: 13; color: "#556677"; horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap; lineHeight: 1.5
+                    font.pixelSize: 13; color: "#4a5a70"
+                    horizontalAlignment: Text.AlignHCenter
+                    wrapMode: Text.WordWrap; lineHeight: 1.55
                 }
                 Row {
-                    Layout.alignment: Qt.AlignHCenter; spacing: 8
+                    Layout.alignment: Qt.AlignHCenter; spacing: 7
                     Repeater {
                         model: root.slides.length
                         delegate: Rectangle {
-                            width: index === root.currentSlide ? 18 : 7; height: 7; radius: 3.5
-                            color: index === root.currentSlide ? "#006874" : "#cce0e4"
+                            width: index === root.currentSlide ? 20 : 7
+                            height: 7; radius: 3.5
+                            color: index === root.currentSlide ? "#0099cc" : "#c5dde8"
                             Behavior on width { NumberAnimation { duration: 200 } }
-                            MouseArea { anchors.fill: parent; onClicked: root.currentSlide = index }
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: root.currentSlide = index
+                            }
                         }
                     }
                 }
             }
         }
+
         Rectangle {
             id: progressTrack
             anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-            height: 5; color: "#d0eaee"
+            height: 5; color: "#cde8f5"
             Rectangle {
                 anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                width: 0; color: "#006874"; radius: 2.5
+                width: 0
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0.0; color: "#0099cc" }
+                    GradientStop { position: 1.0; color: "#00bfff" }
+                }
+                radius: 2.5
                 SequentialAnimation on width {
                     running: root.activatedInCalamares; loops: Animation.Infinite
                     NumberAnimation { from: 0; to: progressTrack.width * 0.85; duration: 2800; easing.type: Easing.InOutCubic }
-                    PauseAnimation { duration: 500 }
+                    PauseAnimation  { duration: 500 }
                     NumberAnimation { to: progressTrack.width; duration: 600 }
-                    PauseAnimation { duration: 300 }
+                    PauseAnimation  { duration: 300 }
                     NumberAnimation { to: 0; duration: 500 }
                 }
             }
@@ -422,7 +497,7 @@ sequence:
   - networkcfg
   - hwclock
   - services-systemd
-  - shellprocess@copy-user-settings
+  - shellprocess@copy-kibaos-configs
   - bootloader
   - umount
 - show:
@@ -440,16 +515,6 @@ unpack:
     destination: ""
 UNPACKFS
 
-cat > "${AIROOTFS}/etc/calamares/modules/shellprocess@copy-user-settings.conf" << 'SHELLPROC'
----
-dontChroot: false
-timeout: 120
-script:
-SHELLPROC
-
-# FIX: Calamares displaymanager — Budgie 10.10 Wayland via SDDM
-# - Changed DM from lightdm → sddm (lightdm has no Wayland session support)
-# - desktopFile is "budgie-desktop" — confirmed from /usr/share/wayland-sessions/budgie-desktop.desktop
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
@@ -460,8 +525,65 @@ defaultDesktopEnvironment:
 basicSetup: false
 DMCONF
 
+# ──────────────────────────────────────────────────────────────────────────
+# shellprocess@copy-kibaos-configs
+# This runs inside the installed system's chroot (dontChroot: false).
+# It copies every KibaOS theme, config, and branding asset from the live
+# squashfs (already unpacked into the target by unpackfs) into the correct
+# locations, then wires up per-user skeleton files so every new user gets
+# the full theme out of the box — no settings app required.
+# ──────────────────────────────────────────────────────────────────────────
+cat > "${AIROOTFS}/etc/calamares/modules/shellprocess@copy-kibaos-configs.conf" << 'SHELLPROC'
+---
+dontChroot: false
+timeout: 180
+script:
+  - "-":
+    - "mkdir -p /etc/sddm.conf.d"
+    - "mkdir -p /etc/xdg/labwc"
+    - "mkdir -p /etc/gtk-2.0"
+    - "mkdir -p /etc/gtk-3.0"
+    - "mkdir -p /etc/gtk-4.0"
+    - "mkdir -p /usr/share/themes/kibaos/openbox-3"
+    - "mkdir -p /usr/share/kibaos"
+    - "mkdir -p /usr/share/calamares/branding/kibaos"
+    - "mkdir -p /usr/share/plymouth/themes/kibaos"
+    - "mkdir -p /usr/local/bin"
+    - "mkdir -p /etc/skel/.config/gtk-3.0"
+    - "mkdir -p /etc/skel/.config/gtk-4.0"
+    - "mkdir -p /etc/skel/.config/autostart"
+    - "mkdir -p /etc/skel/.config/fastfetch"
+  - "cp -f /etc/sddm.conf.d/kibaos.conf /etc/sddm.conf.d/kibaos.conf"
+  - "cp -f /etc/xdg/labwc/rc.xml /etc/xdg/labwc/rc.xml"
+  - "cp -rf /usr/share/themes/kibaos /usr/share/themes/"
+  - "cp -f /usr/share/gtk-2.0/gtkrc /usr/share/gtk-2.0/gtkrc"
+  - "cp -f /etc/gtk-3.0/settings.ini /etc/gtk-3.0/settings.ini"
+  - "cp -f /etc/gtk-4.0/gtk.css /etc/gtk-4.0/gtk.css"
+  - "cp -rf /usr/share/kibaos /usr/share/"
+  - "cp -rf /usr/share/calamares/branding/kibaos /usr/share/calamares/branding/"
+  - "cp -rf /usr/share/plymouth/themes/kibaos /usr/share/plymouth/themes/"
+  - "cp -f /etc/environment /etc/environment"
+  - "cp -f /usr/local/bin/kibaos-first-login /usr/local/bin/kibaos-first-login"
+  - "cp -f /usr/local/bin/kiba-welcome /usr/local/bin/kiba-welcome"
+  - "chmod +x /usr/local/bin/kibaos-first-login"
+  - "chmod +x /usr/local/bin/kiba-welcome"
+  - "cp -f /usr/share/applications/kibaos-install.desktop /usr/share/applications/kibaos-install.desktop"
+  - "cp -f /usr/share/applications/kibaos-about.desktop /usr/share/applications/kibaos-about.desktop"
+  - "cp -f /etc/skel/.config/gtk-3.0/settings.ini /etc/skel/.config/gtk-3.0/settings.ini"
+  - "cp -f /etc/skel/.config/gtk-4.0/gtk.css /etc/skel/.config/gtk-4.0/gtk.css"
+  - "cp -f /etc/skel/.gtkrc-2.0 /etc/skel/.gtkrc-2.0"
+  - "cp -f /etc/skel/.bashrc /etc/skel/.bashrc"
+  - "cp -f /etc/skel/.config/autostart/kibaos-configure.desktop /etc/skel/.config/autostart/kibaos-configure.desktop"
+  - "cp -f /etc/skel/.config/autostart/polkit-agent.desktop /etc/skel/.config/autostart/polkit-agent.desktop"
+  - "cp -rf /etc/skel/.config/fastfetch /etc/skel/.config/"
+  - "plymouth-set-default-theme kibaos 2>/dev/null || true"
+  - "gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true"
+  - "systemctl enable sddm 2>/dev/null || true"
+  - "systemctl enable NetworkManager 2>/dev/null || true"
+SHELLPROC
+
 # ══════════════════════════════════════════════════════════════════════════
-# pacman.conf — locale pruning
+# pacman.conf tweaks
 # ══════════════════════════════════════════════════════════════════════════
 PACMAN_CONF="${PROFILE}/pacman.conf"
 if [ -f "${PACMAN_CONF}" ]; then
@@ -487,7 +609,6 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 
 # ══════════════════════════════════════════════════════════════════════════
 # systemd symlinks
-# FIX: sddm replaces lightdm; removed all X11-era display/xrandr services
 # ══════════════════════════════════════════════════════════════════════════
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
@@ -507,7 +628,7 @@ cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
 
-# ── alpm user — must exist before any pacman call ─────────────────────────
+# ── alpm user ──────────────────────────────────────────────────────────────
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
@@ -547,7 +668,7 @@ sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/'   /etc/systemd/login
 sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
 
 # ══════════════════════════════════════════════════════════════════════════
-# DOWNLOAD BRANDING ASSETS
+# BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
 WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/78699a64fff1f243162f50ffba206a2de0d3272e/branding/wallpaper.png?raw=true"
 LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
@@ -562,7 +683,7 @@ mkdir -p /usr/share/kibaos /usr/share/pixmaps
 
 echo "=== Downloading KibaOS wallpaper ==="
 curl -fL --retry 5 --retry-delay 3 -o "${WALLPAPER_DEST}" "${WALLPAPER_URL}" || \
-  magick -size 1920x1080 gradient:"#004f57-#0d1b2a" "${WALLPAPER_DEST}"
+  magick -size 1920x1080 gradient:"#003f5c-#0099cc" "${WALLPAPER_DEST}"
 
 echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
@@ -576,7 +697,7 @@ if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
 else
   for sz in 256 96 48 32; do
     magick -size ${sz}x${sz} xc:none \
-      -fill '#006874' -draw "circle $((sz/2)),$((sz/2)) $((sz/2)),1" \
+      -fill '#0099cc' -draw "circle $((sz/2)),$((sz/2)) $((sz/2)),1" \
       -fill white -pointsize $((sz/2)) -gravity Center -annotate 0 'K' \
       "/usr/share/kibaos/logo-${sz}.png"
   done
@@ -596,9 +717,7 @@ gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 
 # ══════════════════════════════════════════════════════════════════════════
-# BUILD calamares + arc-gtk-theme FROM AUR
-# arc-gtk-theme is AUR-only — NOT in packages.x86_64 (that would break
-# mkarchiso's pacman step). Built here in the chroot instead.
+# AUR PACKAGES: calamares + arc-gtk-theme
 # ══════════════════════════════════════════════════════════════════════════
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
@@ -621,16 +740,14 @@ rm -f /etc/sudoers.d/builduser
 echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# PLYMOUTH — KibaOS boot splash
+# PLYMOUTH
 # ══════════════════════════════════════════════════════════════════════════
 PLYMOUTH_THEME="/usr/share/plymouth/themes/kibaos"
 mkdir -p "${PLYMOUTH_THEME}"
 
 SPINNER_SRC="/usr/share/plymouth/themes/spinner"
-if [ -d "${SPINNER_SRC}" ]; then
-  cp -a "${SPINNER_SRC}/." "${PLYMOUTH_THEME}/"
+[ -d "${SPINNER_SRC}" ] && cp -a "${SPINNER_SRC}/." "${PLYMOUTH_THEME}/" && \
   rm -f "${PLYMOUTH_THEME}/spinner.plymouth"
-fi
 
 cat > "${PLYMOUTH_THEME}/kibaos.plymouth" << 'PLYM'
 [Plymouth Theme]
@@ -645,9 +762,7 @@ TransitionDuration=3
 PLYM
 
 magick -size 1920x1080 \
-  \( xc:'#0d1b2a' \) \
-  \( xc:'#004f57' -resize 1920x1080! \) \
-  -compose Multiply -composite \
+  gradient:"#003f5c-#0d1b2a" \
   "${PLYMOUTH_THEME}/background-tile.png"
 
 cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
@@ -660,11 +775,10 @@ mkinitcpio -p linux 2>/dev/null || true
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
 systemctl enable plymouth-quit-wait.service  2>/dev/null || true
-
 echo "=== Plymouth configured ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME — system-wide (arc-gtk-theme now built from AUR above)
+# GTK THEME — system-wide Arc-Dark
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
@@ -695,42 +809,241 @@ gtk-xft-rgba=rgb
 GTK3RC
 
 # ══════════════════════════════════════════════════════════════════════════
-# SDDM configuration
-# FIX: Replaced all lightdm config with sddm.conf
+# GTK4 CSS OVERRIDE
+# ══════════════════════════════════════════════════════════════════════════
+mkdir -p /etc/gtk-4.0
+cat > /etc/gtk-4.0/gtk.css << 'GTK4CSS'
+/* KibaOS unified GTK4 override — DDE+Paper+Cutefish fusion */
+
+@define-color accent_color #0099cc;
+@define-color accent_bg_color #0099cc;
+@define-color accent_fg_color #ffffff;
+@define-color window_bg_color #1e2430;
+@define-color window_fg_color #e8eef5;
+@define-color view_bg_color #252c3a;
+@define-color view_fg_color #dde5ef;
+@define-color card_bg_color #2a3242;
+@define-color popover_bg_color #2a3242;
+@define-color sidebar_bg_color #1a2030;
+@define-color headerbar_bg_color #1a2030;
+@define-color headerbar_fg_color #dde5ef;
+
+window, .window-frame          { border-radius: 16px; }
+headerbar                      { border-radius: 16px 16px 0 0; }
+.card, frame, .frame           { border-radius: 14px; }
+button                         { border-radius: 10px; }
+entry                          { border-radius: 10px; }
+popover > contents             { border-radius: 14px; }
+.sidebar-row                   { border-radius: 8px; }
+listview                       { border-radius: 12px; }
+notebook > header              { border-radius: 12px 12px 0 0; }
+
+button {
+    box-shadow: none;
+    -gtk-icon-shadow: none;
+}
+.suggested-action {
+    background: @accent_bg_color;
+    color: @accent_fg_color;
+    border: none;
+}
+.suggested-action:hover { background: shade(@accent_bg_color, 0.88); }
+
+headerbar { padding: 8px 12px; min-height: 44px; }
+row        { padding: 4px 8px; }
+GTK4CSS
+
+# ══════════════════════════════════════════════════════════════════════════
+# SDDM CONFIGURATION
+# FIX: [Wayland] CompositorCommand=labwc added — without this SDDM in
+# Wayland mode produces a black screen with a blinking underscore cursor
+# and never starts the greeter.
+# FIX: /var/lib/sddm created and owned — required for greeter user.
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
-[Autologin]
-# Uncomment to autologin liveuser on boot (optional for live session)
-# User=liveuser
-# Session=budgie-desktop
-
-[Theme]
-# Use default theme for now; can be customized later
-Current=
-
 [General]
 DisplayServer=wayland
 GreeterEnvironment=QT_WAYLAND_SHELL_INTEGRATION=layer-shell
+
+[Wayland]
+CompositorCommand=labwc
+
+[Theme]
+Current=
+
+[Autologin]
+# Uncomment for instant live-session boot:
+# User=liveuser
+# Session=budgie-desktop
 SDDMCONF
 
-# ══════════════════════════════════════════════════════════════════════════
-# BUDGIE USER CONFIGURATION
-# FIX: Removed all gnome-shell/X11 session references.
-#      dconf keys updated for Budgie 10.10 Wayland (no picture-uri-dark needed
-#      for swaybg, but kept for compatibility). Removed xrandr autostart.
-# ══════════════════════════════════════════════════════════════════════════
-BHOME="/home/liveuser"
-mkdir -p \
-  "${BHOME}/.config/gtk-3.0" \
-  "${BHOME}/.config/gtk-2.0" \
-  "${BHOME}/.config/dconf" \
-  "${BHOME}/.config/autostart" \
-  "${BHOME}/.local/share/applications" \
-  "${BHOME}/Desktop"
+mkdir -p /var/lib/sddm
+chown sddm:sddm /var/lib/sddm 2>/dev/null || true
+chmod 750 /var/lib/sddm
 
-# GTK theme for liveuser
-cat > "${BHOME}/.config/gtk-3.0/settings.ini" << 'GTK3USER'
+# ══════════════════════════════════════════════════════════════════════════
+# LABWC CONFIG
+# Placed in /etc/xdg/labwc/ as a system-wide default.
+# Budgie's labwc-bridge overlays ~/.config/budgie-desktop/labwc/ on top,
+# so Budgie keybinds still take precedence.
+# ══════════════════════════════════════════════════════════════════════════
+mkdir -p /etc/xdg/labwc
+
+cat > /etc/xdg/labwc/rc.xml << 'LABWCRC'
+<?xml version="1.0"?>
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+
+  <core>
+    <decoration>server</decoration>
+    <gap>6</gap>
+    <adaptiveSync>yes</adaptiveSync>
+    <allowTearing>no</allowTearing>
+    <reuseOutputMode>no</reuseOutputMode>
+  </core>
+
+  <theme>
+    <name>kibaos</name>
+    <cornerRadius>14</cornerRadius>
+    <font place="ActiveWindow">
+      <name>Noto Sans</name>
+      <size>10</size>
+      <weight>medium</weight>
+      <slant>normal</slant>
+    </font>
+    <font place="InactiveWindow">
+      <name>Noto Sans</name>
+      <size>10</size>
+      <weight>normal</weight>
+      <slant>normal</slant>
+    </font>
+    <titlebar>
+      <layout>:iconify,max,close</layout>
+      <showTitle>yes</showTitle>
+    </titlebar>
+    <dropShadows>yes</dropShadows>
+  </theme>
+
+  <snapping>
+    <range>8</range>
+    <topMaximize>yes</topMaximize>
+    <notifyClient>always</notifyClient>
+    <overlay>
+      <enabled>yes</enabled>
+      <delay inner="500" outer="500"/>
+    </overlay>
+  </snapping>
+
+  <focus>
+    <followMouse>no</followMouse>
+    <raiseOnFocus>no</raiseOnFocus>
+  </focus>
+
+  <workspaces>
+    <popupTime>1000</popupTime>
+    <names>
+      <name>1</name>
+      <name>2</name>
+      <name>3</name>
+      <name>4</name>
+    </names>
+  </workspaces>
+
+  <windowRules>
+    <windowRule identifier="*">
+      <serverDecoration>yes</serverDecoration>
+    </windowRule>
+    <windowRule type="dock">
+      <serverDecoration>no</serverDecoration>
+      <shadow>no</shadow>
+    </windowRule>
+    <windowRule identifier="*notification*">
+      <serverDecoration>no</serverDecoration>
+      <shadow>no</shadow>
+    </windowRule>
+  </windowRules>
+
+</openbox_config>
+LABWCRC
+
+mkdir -p /usr/share/themes/kibaos/openbox-3
+
+cat > /usr/share/themes/kibaos/openbox-3/themerc << 'THEMERC'
+# KibaOS labwc theme — DDE+Paper+Cutefish fusion
+
+border.width: 1
+window.client.padding.width: 0
+window.client.padding.height: 0
+
+window.active.title.bg:                  Flat solid
+window.active.title.bg.color:           #1a2030
+window.active.label.text.color:         #e8eef5
+window.active.label.text.font:          shadow=no
+
+window.inactive.title.bg:               Flat solid
+window.inactive.title.bg.color:        #232b3a
+window.inactive.label.text.color:      #6a7a90
+
+window.active.border.color:            #0099cc
+window.inactive.border.color:          #3a4455
+
+window.button.width:                     18
+window.button.height:                    18
+window.button.hover.bg.corner-radius:     9
+
+window.active.button.unpressed.bg:       Flat solid
+window.active.button.unpressed.bg.color: #1a2030
+window.active.button.unpressed.image.color: #8aacbe
+window.active.button.hover.bg:           Flat solid
+window.active.button.hover.bg.color:     #0099cc40
+window.active.button.hover.image.color:  #e8eef5
+window.active.button.pressed.bg:         Flat solid
+window.active.button.pressed.bg.color:   #00699990
+window.active.button.pressed.image.color: #ffffff
+
+window.inactive.button.unpressed.bg:     Flat solid
+window.inactive.button.unpressed.bg.color: #232b3a
+window.inactive.button.unpressed.image.color: #4a5a70
+
+shadow.size:          30
+shadow.inactive.size: 20
+shadow.color:          #00000070
+shadow.inactive.color: #00000040
+
+menu.border.width:  1
+menu.border.color:  #0099cc30
+menu.items.bg.color: #1e2430
+menu.items.text.color: #ccdae5
+menu.items.active.bg.color: #0099cc
+menu.items.active.text.color: #ffffff
+menu.separator.color: #2e3a4a
+menu.separator.width: 1
+menu.separator.padding.width:  4
+menu.separator.padding.height: 3
+
+osd.bg:                 Flat solid
+osd.bg.color:           #1a2030ee
+osd.border.color:       #0099cc60
+osd.border.width:       1
+osd.label.text.color:   #e8eef5
+osd.hilight.bg:         Flat solid
+osd.hilight.bg.color:   #0099cc
+osd.unhilight.bg:       Flat solid
+osd.unhilight.bg.color: #2e3a4a
+THEMERC
+
+# ══════════════════════════════════════════════════════════════════════════
+# SKELETON — every new account created by Calamares or adduser inherits
+# the full KibaOS theme without a settings app.
+# ══════════════════════════════════════════════════════════════════════════
+SKEL="/etc/skel"
+mkdir -p \
+  "${SKEL}/.config/gtk-3.0" \
+  "${SKEL}/.config/gtk-4.0" \
+  "${SKEL}/.config/autostart" \
+  "${SKEL}/.config/fastfetch"
+
+cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=Arc-Dark
 gtk-icon-theme-name=Papirus-Dark
@@ -743,9 +1056,11 @@ gtk-xft-rgba=rgb
 gtk-button-images=1
 gtk-menu-images=1
 gtk-enable-animations=1
-GTK3USER
+GTK3SKEL
 
-cat > "${BHOME}/.gtkrc-2.0" << 'GTK2USER'
+cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
+
+cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="Arc-Dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Noto Sans 11"
@@ -757,33 +1072,57 @@ gtk-xft-antialias=1
 gtk-xft-hinting=1
 gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
-GTK2USER
+GTK2SKEL
 
-# First-login dconf setup script
+# ══════════════════════════════════════════════════════════════════════════
+# FIRST-LOGIN SCRIPT
+# Sets gsettings on first login. Runs once via autostart, stamps ~/.config.
+# ══════════════════════════════════════════════════════════════════════════
 cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
-# FIX: Use gsettings (works under Wayland) instead of dbus-launch dconf
-# Budgie 10.10 reads org.gnome.desktop settings for theme/font/bg
-gsettings set org.gnome.desktop.interface gtk-theme 'Arc-Dark'
-gsettings set org.gnome.desktop.interface icon-theme 'Papirus-Dark'
-gsettings set org.gnome.desktop.interface font-name 'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name 'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name 'Noto Sans Mono 11'
-# Budgie 10.10 uses swaybg for wallpaper — set via gsettings, budgie-desktop-services picks it up
-gsettings set org.gnome.desktop.background picture-uri 'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-options 'zoom'
-gsettings set org.gnome.desktop.background primary-color '#0d1b2a'
+gsettings set org.gnome.desktop.interface gtk-theme               'Arc-Dark'
+gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
+gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface cursor-size             24
+gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
+gsettings set org.gnome.desktop.interface enable-animations       true
+
+gsettings set org.gnome.desktop.background picture-uri       'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-uri-dark  'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-options   'zoom'
+gsettings set org.gnome.desktop.background primary-color     '#0d1b2a'
+
+PANEL_UUID=$(gsettings get com.solus-project.budgie.panel panels 2>/dev/null | \
+  tr -d "[]' " | cut -d',' -f1)
+if [ -n "${PANEL_UUID}" ]; then
+  PANEL_PATH="/com/solus-project/budgie/panel/panels/${PANEL_UUID}/"
+  dconf write "${PANEL_PATH}position"     "'BOTTOM'"
+  dconf write "${PANEL_PATH}size"         "40"
+  dconf write "${PANEL_PATH}transparency" "'DYNAMIC'"
+  dconf write "${PANEL_PATH}shadow"       "true"
+fi
+
+gsettings set org.gnome.desktop.wm.preferences button-layout                ':minimize,maximize,close'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font                 'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar  'toggle-maximize'
+gsettings set org.gnome.desktop.wm.preferences num-workspaces                4
+
+gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click   true
+gsettings set org.gnome.desktop.peripherals.touchpad natural-scroll  true
+gsettings set org.gnome.desktop.peripherals.mouse    natural-scroll  false
+gsettings set org.gnome.desktop.peripherals.mouse    accel-profile   'adaptive'
 
 touch "${STAMP}"
 FIRSTLOGIN
 chmod +x /usr/local/bin/kibaos-first-login
 
-# Autostart entry for first-login config
-cat > "${BHOME}/.config/autostart/kibaos-configure.desktop" << 'AUTOCFG'
+cat > "${SKEL}/.config/autostart/kibaos-configure.desktop" << 'AUTOCFG'
 [Desktop Entry]
 Type=Application
 Name=KibaOS First Login Setup
@@ -793,20 +1132,17 @@ NoDisplay=true
 X-GNOME-Autostart-enabled=true
 AUTOCFG
 
-# FIX: Replaced polkit-gnome (GNOME-specific, not in Arch repos standalone)
-# with polkit-kde-agent which is available and works under Wayland
-cat > "${BHOME}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
+cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-1/polkit-agent-helper-1
+Exec=/usr/lib/polkit-kde-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 POLKIT
 
-# Welcome page autostart
-cat > "${BHOME}/.config/autostart/kiba-welcome.desktop" << 'WELCOME_AUTO'
+cat > "${SKEL}/.config/autostart/kiba-welcome.desktop" << 'WELCOME_AUTO'
 [Desktop Entry]
 Type=Application
 Name=KibaOS Welcome
@@ -816,8 +1152,7 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 WELCOME_AUTO
 
-# bashrc
-cat > "${BHOME}/.bashrc" << 'BASHRC'
+cat > "${SKEL}/.bashrc" << 'BASHRC'
 [[ $- != *i* ]] && return
 PS1='\[\e[1;36m\][KibaOS]\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]\$ '
 alias ls='ls --color=auto'
@@ -828,9 +1163,8 @@ alias update='sudo pacman -Syu'
 fastfetch 2>/dev/null || true
 BASHRC
 
-# fastfetch config
-mkdir -p "${BHOME}/.config/fastfetch"
-cat > "${BHOME}/.config/fastfetch/config.jsonc" << 'FFCONF'
+mkdir -p "${SKEL}/.config/fastfetch"
+cat > "${SKEL}/.config/fastfetch/config.jsonc" << 'FFCONF'
 {
   "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
   "logo": {
@@ -856,6 +1190,11 @@ cat > "${BHOME}/.config/fastfetch/config.jsonc" << 'FFCONF'
   ]
 }
 FFCONF
+
+# ── Apply skeleton to liveuser ─────────────────────────────────────────────
+cp -aT "${SKEL}/" /home/liveuser/
+chown -R 1000:1000 /home/liveuser
+chmod 750 /home/liveuser
 
 # ══════════════════════════════════════════════════════════════════════════
 # DESKTOP SHORTCUTS
@@ -885,11 +1224,11 @@ Type=Application
 Categories=System;
 ABOUTDESK
 
-DESKTOP="${BHOME}/Desktop"
+mkdir -p /home/liveuser/Desktop
 for src_desktop in kibaos-install kibaos-about; do
-  [ -f "/usr/share/applications/${src_desktop}.desktop" ] && \
-    cp "/usr/share/applications/${src_desktop}.desktop" "${DESKTOP}/${src_desktop}.desktop" && \
-    chmod +x "${DESKTOP}/${src_desktop}.desktop" || true
+  cp "/usr/share/applications/${src_desktop}.desktop" \
+     "/home/liveuser/Desktop/${src_desktop}.desktop" 2>/dev/null || true
+  chmod +x "/home/liveuser/Desktop/${src_desktop}.desktop" 2>/dev/null || true
 done
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -913,50 +1252,132 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <meta charset="UTF-8">
 <title>Welcome to KibaOS</title>
 <style>
-  :root{--teal:#006874;--teal-dark:#004f57;--bg:#f2f7f9;--surface:#fff;--text:#1a1a2e;--sub:#556677}
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Noto Sans',sans-serif;background:var(--bg);color:var(--text)}
-  header{background:var(--teal);color:#fff;padding:48px 32px 64px;text-align:center}
-  header h1{font-size:2.4rem;font-weight:300}
-  header p{font-size:1rem;opacity:.75;margin-top:6px}
-  .card-row{display:flex;gap:20px;flex-wrap:wrap;padding:28px 32px;max-width:900px;margin:-28px auto 0}
-  .card{background:var(--surface);border-radius:16px;padding:24px;flex:1;min-width:220px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
-  .card h2{font-size:1.1rem;font-weight:600;margin-bottom:6px}
-  .card p{font-size:.9rem;color:var(--sub);line-height:1.5}
-  section{max-width:900px;margin:0 auto;padding:0 32px 40px}
-  section h2{font-size:1.3rem;font-weight:600;margin:28px 0 14px;color:var(--teal)}
-  .tip{background:#e8f6f8;border-left:4px solid var(--teal);border-radius:8px;padding:14px 18px;margin-top:12px;font-size:.9rem}
-  .tip code{background:#d0eaee;padding:2px 6px;border-radius:4px;font-family:monospace}
-  .btn{display:inline-block;background:var(--teal);color:#fff;border-radius:10px;padding:10px 22px;text-decoration:none;font-size:.9rem;font-weight:600;margin-right:8px;margin-top:8px}
-  .btn:hover{background:var(--teal-dark)}
-  footer{text-align:center;padding:24px;color:var(--sub);font-size:.82rem;border-top:1px solid #d8e0e2;margin-top:16px}
+  :root {
+    --accent: #0099cc;
+    --accent-dark: #0077aa;
+    --bg: #f0f6fa;
+    --surface: #fff;
+    --surface-2: #f7fbfd;
+    --text: #0d1b2a;
+    --sub: #4a5a70;
+    --border: #d4e8f2;
+    --shadow: 0 4px 24px rgba(0,100,160,0.10);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+
+  header {
+    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
+    color:#fff; padding:52px 32px 72px; text-align:center;
+  }
+  header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
+  header p  { font-size:1rem; opacity:.72; margin-top:8px; }
+
+  .card-row {
+    display:flex; gap:18px; flex-wrap:wrap;
+    padding:28px 32px; max-width:920px; margin:-32px auto 0;
+  }
+  .card {
+    background:var(--surface); border-radius:18px; padding:24px 22px;
+    flex:1; min-width:200px; box-shadow:var(--shadow);
+    border:1px solid var(--border);
+    transition: transform .15s, box-shadow .15s;
+  }
+  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
+  .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
+
+  section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
+  section h2 {
+    font-size:1.2rem; font-weight:600; margin:28px 0 12px;
+    color:var(--accent);
+  }
+  .tip {
+    background:#e6f6fc; border-left:3px solid var(--accent);
+    border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px;
+    font-size:.9rem; color:var(--text);
+  }
+  .tip code {
+    background:#cde8f5; padding:2px 7px; border-radius:5px;
+    font-family:'Noto Sans Mono',monospace; font-size:.88em;
+  }
+
+  .btn {
+    display:inline-block; background:var(--accent); color:#fff;
+    border-radius:10px; padding:9px 20px; text-decoration:none;
+    font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
+    transition: background .12s;
+  }
+  .btn:hover { background:var(--accent-dark); }
+  .btn.secondary {
+    background:var(--surface); color:var(--accent);
+    border:1.5px solid var(--border);
+  }
+  .btn.secondary:hover { background:#e6f6fc; }
+
+  .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .pill {
+    background:var(--surface-2); border:1px solid var(--border);
+    border-radius:100px; padding:5px 14px; font-size:.82rem;
+    color:var(--sub);
+  }
+
+  footer {
+    text-align:center; padding:24px; color:var(--sub); font-size:.8rem;
+    border-top:1px solid var(--border); margin-top:16px;
+  }
 </style>
 </head>
 <body>
-<header><h1>Welcome to KibaOS</h1><p>A fast, friendly Budgie desktop built on Arch Linux — by WolfTech Innovations</p></header>
+<header>
+  <h1>Welcome to KibaOS</h1>
+  <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
+</header>
+
 <div class="card-row">
-  <div class="card"><h2>Budgie Desktop</h2><p>Modern, clean, and intuitive. Fully Wayland-native on Budgie 10.10.</p></div>
-  <div class="card"><h2>Rolling Release</h2><p>Always up to date. Powered by Arch Linux and the AUR.</p></div>
-  <div class="card"><h2>Your System</h2><p>Full encryption support. No telemetry. Your data stays yours.</p></div>
+  <div class="card">
+    <h2>Budgie 10.10 Wayland</h2>
+    <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+  </div>
+  <div class="card">
+    <h2>Built on Arch Linux</h2>
+    <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
+  </div>
+  <div class="card">
+    <h2>Unified Design</h2>
+    <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
+  </div>
+  <div class="card">
+    <h2>Private by Default</h2>
+    <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
+  </div>
 </div>
+
 <section>
   <h2>Ready to Install?</h2>
-  <p>Click <strong>Install KibaOS</strong> on the desktop, or open a terminal and run:</p>
-  <div class="tip"><code>sudo calamares</code></div><br>
+  <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
+  <div class="tip"><code>sudo calamares</code></div>
+  <br>
   <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+
+  <h2>Design Language</h2>
+  <p>KibaOS's visual identity draws from three reference desktops:</p>
+  <div class="design-pills">
+    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
+    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
+    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+  </div>
 </section>
+
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>
 </html>
 WELCOMEHTML
 
 # ══════════════════════════════════════════════════════════════════════════
-# SYSTEM BRANDING
-# FIX: Removed XDG_SESSION_TYPE=x11 and replaced with wayland.
-#      Removed DESKTOP_SESSION/XDG vars that reference x11 session names.
-#      Removed gnome-shell references.
+# SYSTEM ENVIRONMENT
 # ══════════════════════════════════════════════════════════════════════════
 cat > /etc/environment << 'ENV'
 DESKTOP_SESSION=budgie-desktop
@@ -964,10 +1385,13 @@ XDG_CURRENT_DESKTOP=Budgie:GNOME
 XDG_SESSION_DESKTOP=budgie-desktop
 XDG_SESSION_TYPE=wayland
 QT_AUTO_SCREEN_SCALE_FACTOR=1
+QT_QPA_PLATFORM=wayland
+QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 GTK_THEME=Arc-Dark
 MOZ_ENABLE_WAYLAND=1
-QT_QPA_PLATFORM=wayland
+ELECTRON_OZONE_PLATFORM_HINT=wayland
 CLUTTER_BACKEND=wayland
+SDL_VIDEODRIVER=wayland
 KIBAOS_VERSION=rolling
 KIBAOS_VENDOR="WolfTech Innovations"
 ENV
@@ -989,11 +1413,10 @@ ISSUE
 
 cat > /etc/motd << 'MOTD'
 Welcome to KibaOS — Budgie 10.10 Wayland desktop on Arch Linux.
-Built with love by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
+Built by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
 
 # ── Services ───────────────────────────────────────────────────────────────
-# FIX: sddm instead of lightdm
 systemctl enable sddm
 systemctl enable NetworkManager.service
 
