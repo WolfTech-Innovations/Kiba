@@ -409,40 +409,15 @@ timeout: 120
 script:
   - "-": "echo '=== KibaOS: migrating live session settings ==='"
   - "-": |
-          NEW_USER=$(python3 -c "
-          import json, sys
-          for path in ['/etc/calamares/global_storage.json', '/tmp/calamares-global-storage.json']:
-              try:
-                  d = json.load(open(path))
-                  u = d.get('username') or d.get('loginName') or ''
-                  if u: print(u); sys.exit(0)
-              except: pass
-          import pwd
-          for p in pwd.getpwall():
-              if p.pw_uid >= 1000 and p.pw_name != 'liveuser': print(p.pw_name); sys.exit(0)
-          print('')
-          ")
-          [ -z "$NEW_USER" ] && { echo 'WARNING: no username found'; exit 0; }
-          NEW_HOME="/home/${NEW_USER}"
-          LIVE_HOME="/home/liveuser"
-          for d in openbox lxpanel lxsession lxde lxappearance gtk-3.0 gtk-4.0 gtk-2.0; do
-              src="${LIVE_HOME}/.config/${d}"
-              dst="${NEW_HOME}/.config/${d}"
-              [ -d "$src" ] || continue
-              mkdir -p "$(dirname "$dst")"
-              cp -a "$src" "$dst"
-          done
-          chown -R "${NEW_USER}:${NEW_USER}" "${NEW_HOME}/.config" 2>/dev/null || true
-          echo "=== Settings migrated to ${NEW_HOME} ==="
 SHELLPROC
 
 cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
 ---
 displaymanagers:
-  - lxdm
+  - lightdm
 defaultDesktopEnvironment:
-  executable: "startlxde"
-  desktopFile: "LXDE"
+  executable: "budgie-desktop"
+  desktopFile: "budgie-desktop"
 basicSetup: false
 DMCONF
 
