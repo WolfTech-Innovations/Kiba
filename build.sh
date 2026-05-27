@@ -739,6 +739,9 @@ useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 
+# Import NicoHood's PGP key for arc-gtk-theme
+sudo -u builduser gpg --keyserver keyserver.ubuntu.com --recv-keys 31743CDF250EF641E57503E5FAEDBC4FB5AA3B17
+
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 for pkg in calamares arc-gtk-theme; do
@@ -746,7 +749,7 @@ for pkg in calamares arc-gtk-theme; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  sudo -u builduser makepkg -si --noconfirm
   cd /
 done
 
