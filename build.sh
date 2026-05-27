@@ -738,7 +738,24 @@ cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-
+# Before building calamares in customize_airootfs.sh, ensure deps:
+pacman -S --noconfirm --needed \
+  kpmcore \
+  python \
+  python-yaml \
+  python-jsonschema \
+  qt5-wayland \
+  qt5-xmlpatterns \
+  solid \
+  kcoreaddons \
+  ki18n \
+  kio \
+  kservice \
+  kpackage \
+  kdeclarative \
+  kiconthemes \
+  kwidgetsaddons \
+  kpmcore
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 for pkg in calamares arc-gtk-theme; do
@@ -852,7 +869,43 @@ cat > /etc/gtk-4.0/gtk.css << 'GTK4CSS'
 @define-color sidebar_bg_color #1a2030;
 @define-color headerbar_bg_color #1a2030;
 @define-color headerbar_fg_color #dde5ef;
+/* === KibaOS: Floating pill panel === */
 
+/* The outer container — give it breathing room from screen edges */
+.budgie-panel {
+    margin: 6px 12px;              /* lifts it off the bottom edge */
+    border-radius: 999px;          /* full pill shape */
+    background-image: none;
+    background-color: rgba(15, 22, 38, 0.72);  /* semi-transparent navy */
+    border: 1px solid rgba(0, 153, 204, 0.18); /* subtle cyan rim */
+    box-shadow:
+        0 4px 32px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255,255,255,0.06);  /* inner highlight = glass depth */
+    padding: 0 8px;
+}
+
+/* Applet buttons inside the panel */
+.budgie-panel .budgie-applet-button,
+.budgie-panel button.flat {
+    border-radius: 999px;
+    background: transparent;
+    transition: background 0.15s ease;
+}
+.budgie-panel .budgie-applet-button:hover,
+.budgie-panel button.flat:hover {
+    background: rgba(0, 153, 204, 0.15);
+}
+.budgie-panel .budgie-applet-button:active,
+.budgie-panel button.flat:active {
+    background: rgba(0, 153, 204, 0.28);
+}
+
+/* Active window indicators (tasklist underlines) */
+.budgie-panel .launcher:checked,
+.budgie-panel .launcher.running {
+    border-bottom: 2px solid #0099cc;
+    border-radius: 0;
+}
 window, .window-frame          { border-radius: 16px; }
 headerbar                      { border-radius: 16px 16px 0 0; }
 .card, frame, .frame           { border-radius: 14px; }
@@ -1106,7 +1159,7 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
-
+gsettings set com.solus-project.budgie.panel enable-built-in-theme false
 gsettings set org.gnome.desktop.interface gtk-theme               'Arc-Dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
@@ -1447,13 +1500,18 @@ Built by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
 cat > /usr/local/bin/calamares-launch << 'EOF'
 #!/usr/bin/env bash
+# Pass the live user's Wayland socket to root's calamares process.
+# We need the *user's* XDG_RUNTIME_DIR, not root's /tmp/runtime-root.
+LIVE_UID=1000
+LIVE_RUNTIME="/run/user/${LIVE_UID}"
+
 exec sudo -E \
-  WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
-  XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR" \
+  WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
+  XDG_RUNTIME_DIR="${LIVE_RUNTIME}" \
   QT_QPA_PLATFORM=wayland \
+  QT_WAYLAND_SHELL_INTEGRATION=layer-shell \
   /usr/bin/calamares
 EOF
-
 chmod +x /usr/local/bin/calamares-launch
 # ── Services ───────────────────────────────────────────────────────────────
 systemctl enable sddm
