@@ -1,0 +1,19 @@
+name: "ShellCheck Analysis"
+on:
+  push:
+    paths: [ '**.sh' ]
+  pull_request:
+    paths: [ '**.sh' ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master

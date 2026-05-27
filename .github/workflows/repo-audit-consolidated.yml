@@ -1,0 +1,17 @@
+name: "Consolidated Repo Audit"
+on:
+  push: {}
+  pull_request: {}
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run Audit Script
+        run: "bash scripts/repo_audit.sh"

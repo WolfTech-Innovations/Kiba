@@ -1,0 +1,17 @@
+name: "Contributor List Updater"
+on:
+  pull_request:
+    types: [ closed ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Update contributors
+        run: "python3 scripts/update_contributors.py"

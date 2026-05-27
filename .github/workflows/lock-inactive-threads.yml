@@ -1,0 +1,19 @@
+name: "Lock Inactive Threads"
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Lock threads
+        uses: dessant/lock-threads@v5
+        with:
+          issue-inactive-days: 90

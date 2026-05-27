@@ -1,0 +1,19 @@
+name: "Markdown Link Check"
+on:
+  push:
+    paths: [ '**.md' ]
+  pull_request:
+    paths: [ '**.md' ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check links
+        uses: tcort/markdown-link-check@v3

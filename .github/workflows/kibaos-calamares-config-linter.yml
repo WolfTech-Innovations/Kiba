@@ -1,0 +1,17 @@
+name: "KibaOS Calamares Config Linter"
+on:
+  pull_request:
+    paths: [ 'build.sh' ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Verify Calamares settings YAML
+        run: "grep -A 20 'cat > \"${AIROOTFS}/etc/calamares/settings.conf\"' build.sh | grep -v 'cat >' | grep -v 'CALA_SETTINGS' > temp.yml && python3 -c \"import yaml, sys; yaml.safe_load(open('temp.yml'))\""

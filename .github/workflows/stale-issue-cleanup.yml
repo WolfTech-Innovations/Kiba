@@ -1,0 +1,21 @@
+name: "Stale Issue Cleanup"
+on:
+  schedule:
+    - cron: '30 1 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Close stale issues
+        uses: actions/stale@v9
+        with:
+          stale-issue-message: "This issue is stale."
+          stale-pr-message: "This PR is stale."
+          days-before-stale: 30

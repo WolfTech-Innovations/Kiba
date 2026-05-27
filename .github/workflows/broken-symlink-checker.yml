@@ -1,0 +1,17 @@
+name: "Broken Symlink Checker"
+on:
+  push: {}
+  pull_request: {}
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Find broken symlinks
+        run: "find . -xtype l -print -delete | grep . && exit 1 || exit 0"

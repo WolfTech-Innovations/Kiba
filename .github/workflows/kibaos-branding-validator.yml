@@ -1,0 +1,17 @@
+name: "KibaOS Branding Validator"
+on:
+  pull_request:
+    paths: [ 'branding/**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check logo existence
+        run: "[ -f branding/boot.png ]"

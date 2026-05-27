@@ -1,0 +1,18 @@
+name: "Auto Generate Documentation"
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'scripts/**' ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Generate WIKI
+        run: "python3 scripts/gen_wiki.py"

@@ -1,0 +1,19 @@
+name: "CI Cache Cleanup"
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Cleanup caches
+        run: "gh cache delete --all"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

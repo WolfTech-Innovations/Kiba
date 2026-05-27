@@ -1,0 +1,18 @@
+name: "CI Performance Metrics"
+on:
+  workflow_run:
+    workflows: [ 'Build KibaOS' ]
+    types: [ completed ]
+
+permissions:
+  contents: read
+
+jobs:
+  job:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Analyze duration
+        run: "echo \"Build took ${{ github.event.workflow_run.duration }}\""
