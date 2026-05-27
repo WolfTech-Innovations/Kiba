@@ -155,7 +155,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+| `pacman`        | **`pacman`**         | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 
@@ -173,3 +173,14 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 - [**Architecture**](./architecture.md)
 - [**Software Management**](./software-management.md)
 - [**WIKI**](../WIKI.md)
+
+---
+
+## Accessibility Standards
+
+To ensure KibaOS remains accessible to all users, the following standards must be followed for all web-based interfaces and internal tools:
+
+- **Landmarks:** Core content must be wrapped in a `<main>` landmark tag to allow screen reader users to skip directly to the primary content.
+- **List Structures:** Container elements for lists of features or actions should use `role="list"`, and individual items within those containers must use `role="listitem"`.
+- **ARIA Labels:** All interactive elements (buttons, links) and informative cards must have descriptive `aria-label` attributes that clearly explain their purpose or destination.
+- **Focus States:** Interactive elements must have clear, high-contrast focus indicators for keyboard navigation.
