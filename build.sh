@@ -88,7 +88,7 @@ mkinitcpio-archiso
 fakeroot
 grub
 efibootmgr
-networkmanager
+bluez
 sudo
 bash
 nano
@@ -97,6 +97,16 @@ wget
 git
 mesa
 networkmanager
+power-profiles-daemon
+xdg-user-dirs
+noto-fonts
+noto-fonts-emoji
+bluez-utils
+gnome-weather
+gnome-clocks
+gnome-calculator
+sof-firmware
+thermald
 network-manager-applet
 xorg-xwayland
 layer-shell-qt
@@ -742,6 +752,7 @@ done
 cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
+pacman -Rns --noconfirm gcc base-devel debugedit binutils make patch libtool autoconf automake
 echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
