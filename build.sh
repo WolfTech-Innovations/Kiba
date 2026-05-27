@@ -761,7 +761,7 @@ pacman -Rns --noconfirm \
     patch \
     autoconf \
     automake
-pacman -Qtdq | pacman -Rns -
+pacman -Qtdq | pacman -Rns --noconfirm -
 echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
