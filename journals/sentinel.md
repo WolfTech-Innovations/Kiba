@@ -11,3 +11,9 @@
 **Vulnerability:** Use of GitHub context variables (e.g., `${{ github.base_ref }}`) directly in `run` steps.
 **Learning:** GitHub context variables can contain malicious shell characters or CLI flags if not properly sanitized or mapped to environment variables.
 **Prevention:** Always map GitHub context variables to environment variables before using them in shell scripts within workflows. Use the `--` separator for CLI tools to prevent flag injection where applicable.
+
+## 2026-05-27 - [Enforcing PGP Verification for AUR Packages]
+
+**Vulnerability:** AUR package builds in `build.sh` used the `--skippgpcheck` flag, bypassing source integrity verification.
+**Learning:** Automated build scripts often skip security checks for convenience, but this exposes the system to supply chain attacks if the AUR source is compromised.
+**Prevention:** Never use `--skippgpcheck` in production build scripts. Pre-import required PGP keys for all AUR packages built from source to ensure non-interactive verification passes.

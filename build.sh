@@ -730,12 +730,15 @@ sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
+# Import PGP keys for AUR packages:
+# NicoHood (arc-gtk-theme)
+sudo -u builduser gpg --recv-keys 31743CDF250EF641E57503E5FAEDBC4FB5AA3B17
 for pkg in calamares arc-gtk-theme; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  sudo -u builduser makepkg -si --noconfirm
   cd /
 done
 
