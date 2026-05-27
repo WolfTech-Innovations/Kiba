@@ -1,0 +1,22 @@
+name: Action Pinning Audit V2
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit-pinning:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit action pinning
+        shell: bash
+        run: |
+          # Ensure all actions are pinned to a specific version or digest
+          if grep -r "uses: [a-zA-Z0-9-]\+/[a-zA-Z0-9-]\+:[a-zA-Z0-9._-]\+" .github/workflows/; then
+             echo "Found actions using ':' instead of '@'. Actions should use '@version' or '@digest'."
+             exit 1
+          fi

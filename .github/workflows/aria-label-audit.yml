@@ -1,0 +1,23 @@
+name: ARIA Label Audit
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit ARIA labels
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+             # Check for aria-label in embedded HTML
+             if grep -q "<button" build.sh && ! grep -q "aria-label" build.sh; then
+                echo "WARN: HTML buttons in build.sh might be missing aria-labels"
+             fi
+          fi

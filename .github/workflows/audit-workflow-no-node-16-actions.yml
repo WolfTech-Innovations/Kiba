@@ -1,0 +1,22 @@
+name: Audit Workflow No Node 16 Actions
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit Node 16 actions
+        shell: bash
+        run: |
+          # Common actions that moved from Node 12/16 to Node 20
+          if grep -rE "actions/(checkout|setup-node|upload-artifact|download-artifact)@(v1|v2|v3)" .github/workflows/; then
+            echo "ERROR: Found actions using deprecated Node versions. Upgrade to latest (e.g., @v4)."
+            exit 1
+          fi

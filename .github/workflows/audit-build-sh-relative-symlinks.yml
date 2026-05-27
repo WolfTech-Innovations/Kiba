@@ -1,0 +1,27 @@
+name: Audit Build SH Relative Symlinks
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit for absolute symlinks
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            # We want to ensure symlinks created within AIROOTFS don't point to host absolute paths
+            # but rather are valid within the target root or relative.
+            # Most links in build.sh are ln -sf /usr/lib/... which is fine for the target.
+            # A 'bad' link would be something like ln -sf /home/runner/work/...
+            if grep "ln -sf /" build.sh | grep -vE "/usr/lib|/bin|/etc|/var|/usr/share"; then
+               echo "ERROR: Found potential absolute symlinks pointing to host-specific paths."
+               exit 1
+            fi
+          fi

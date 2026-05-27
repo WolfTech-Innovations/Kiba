@@ -1,0 +1,22 @@
+name: Audit Repo No Nested Git Dir
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit nested .git directories
+        shell: bash
+        run: |
+          NESTED_GIT=$(find . -mindepth 2 -name ".git" -type d)
+          if [ -n "$NESTED_GIT" ]; then
+            echo "ERROR: Found nested .git directories"
+            exit 1
+          fi

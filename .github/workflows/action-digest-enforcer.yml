@@ -1,0 +1,24 @@
+name: Action Digest Enforcer
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  enforce-digest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for SHA-1 digests in actions
+        shell: bash
+        run: |
+          # Find actions not pinned by SHA (excluding some known ones if necessary)
+          BAD_ACTIONS=$(grep -r "uses: " .github/workflows/ | grep -vE "@[a-f0-9]{40}|actions/checkout@v4|actions/setup-node@v4")
+          if [ -n "$BAD_ACTIONS" ]; then
+            echo "ERROR: Actions must be pinned to a SHA-1 digest for security:"
+            echo "$BAD_ACTIONS"
+            exit 1
+          fi

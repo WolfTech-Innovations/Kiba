@@ -1,0 +1,27 @@
+name: Audit Build SH Wallpaper Consistency
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit wallpaper consistency
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if ! grep -q "WALLPAPER_URL" build.sh; then
+              echo "ERROR: WALLPAPER_URL not found in build.sh"
+              exit 1
+            fi
+            if ! grep -q "gradient" build.sh; then
+              echo "ERROR: Wallpaper fallback gradient not found in build.sh"
+              exit 1
+            fi
+          fi

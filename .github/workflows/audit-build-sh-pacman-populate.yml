@@ -1,0 +1,23 @@
+name: Audit Build SH Pacman Populate
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit pacman-key --populate
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if ! grep -q "pacman-key --populate archlinux" build.sh; then
+              echo "ERROR: build.sh is missing pacman-key --populate archlinux"
+              exit 1
+            fi
+          fi

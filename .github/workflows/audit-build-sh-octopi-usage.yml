@@ -1,0 +1,23 @@
+name: Audit Build SH Octopi Usage
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit octopi usage
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if grep -qi "octopi" build.sh; then
+              echo "ERROR: Legacy octopi reference found in build.sh"
+              exit 1
+            fi
+          fi

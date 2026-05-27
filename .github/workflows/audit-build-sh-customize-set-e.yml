@@ -1,0 +1,23 @@
+name: Audit Build SH Customize Set E
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit set -e in customize_airootfs.sh
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if ! grep -A 2 "cat > \"\${AIROOTFS}/root/customize_airootfs.sh\"" build.sh | grep -q "set -e"; then
+              echo "ERROR: customize_airootfs.sh in build.sh is missing set -e"
+              exit 1
+            fi
+          fi

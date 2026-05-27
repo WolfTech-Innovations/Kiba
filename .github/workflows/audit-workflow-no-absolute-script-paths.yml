@@ -1,0 +1,25 @@
+name: Audit Workflow No Absolute Script Paths
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit absolute script paths
+        shell: bash
+        run: |
+          if grep -rE "run: /" .github/workflows/; then
+             # This might have false positives for 'run: /bin/bash' etc.
+             # Better check for scripts in the repo being called with absolute paths.
+             if grep -rE "run: \$(pwd)/|run: /home/runner/work/" .github/workflows/; then
+                echo "ERROR: Absolute script paths found in workflows"
+                exit 1
+             fi
+          fi

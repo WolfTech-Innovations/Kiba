@@ -1,0 +1,23 @@
+name: Analyze Build Efficiency
+on:
+  workflow_run:
+    workflows: ["Build KibaOS"]
+    types: [completed]
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - name: Analyze duration
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUN_ID=${{ github.event.workflow_run.id }}
+          DURATION=$(gh api repos/${{ github.repository }}/actions/runs/$RUN_ID | jq '.run_duration_ms / 60000')
+          echo "Build run $RUN_ID took $DURATION minutes."
+          if (( $(echo "$DURATION > 60" | bc -l) )); then
+             echo "WARN: Build took more than an hour"
+          fi

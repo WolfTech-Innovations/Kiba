@@ -1,0 +1,28 @@
+name: Audit Repo No Plaintext Chpasswd
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit plaintext chpasswd
+        shell: bash
+        run: |
+          # We expect chpasswd for liveuser but generally should be avoided
+          if grep -r "chpasswd" . --exclude="build.sh" --exclude-dir=.git; then
+            echo "ERROR: Potential plaintext chpasswd usage found outside build.sh"
+            exit 1
+          fi
+          if [ -f "build.sh" ]; then
+             if grep "chpasswd" build.sh | grep -v "liveuser:live"; then
+                echo "ERROR: Unexpected chpasswd usage in build.sh"
+                exit 1
+             fi
+          fi

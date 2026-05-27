@@ -1,0 +1,25 @@
+name: Audit Repo Shell Extension Consistency
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit shell script extensions
+        shell: bash
+        run: |
+          # Scripts in scripts/ should have .sh extension usually,
+          # but some might be extensionless if intended as commands.
+          # The audit requirement suggests consistency.
+          find scripts/ -type f ! -name "*.sh" ! -name ".*" | while read -r file; do
+             if head -n 1 "$file" | grep -qE "^#!.*/bin/(bash|sh|zsh)"; then
+                echo "WARN: Shell script without .sh extension: $file"
+             fi
+          done

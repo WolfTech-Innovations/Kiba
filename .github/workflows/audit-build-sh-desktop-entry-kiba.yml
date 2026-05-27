@@ -1,0 +1,23 @@
+name: Audit Build SH Desktop Entry Kiba
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit Kiba desktop entries
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if ! grep -q "\[Desktop Entry\]" build.sh; then
+              echo "ERROR: No desktop entries found in build.sh"
+              exit 1
+            fi
+          fi

@@ -1,0 +1,31 @@
+name: Audit Workflow Explicit Bash Shell
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit explicit bash shell
+        shell: bash
+        run: |
+          # Ensure run steps have shell: bash defined for predictability
+          # Iterate over all yaml files and check that if 'run:' exists, 'shell: bash' is nearby.
+          FAIL=0
+          for wf in .github/workflows/*.yml; do
+            # We look for lines with 'run:' that don't have 'shell: bash' in the preceding or following 2 lines
+            # This is a bit complex for grep, but we can do a simpler count check.
+            run_count=$(grep -c "run:" "$wf" || true)
+            shell_count=$(grep -c "shell: bash" "$wf" || true)
+            if [ "$run_count" -gt "$shell_count" ]; then
+              echo "ERROR: $wf contains run: blocks without explicit shell: bash ($run_count run vs $shell_count shell)"
+              FAIL=1
+            fi
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi

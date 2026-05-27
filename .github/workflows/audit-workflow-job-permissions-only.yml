@@ -1,0 +1,25 @@
+name: Audit Workflow Job Permissions Only
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit job-level permissions
+        shell: bash
+        run: |
+          # Scans for top-level 'permissions:' which should be avoided in favor of job-level
+          # A simple check: if 'permissions:' appears before any 'jobs:'
+          for wf in .github/workflows/*.yml; do
+            if sed -n '1,/jobs:/p' "$wf" | grep -q "^permissions:"; then
+               echo "ERROR: $wf contains top-level permissions. Move to job-level."
+               exit 1
+            fi
+          done

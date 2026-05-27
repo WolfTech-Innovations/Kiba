@@ -1,0 +1,21 @@
+name: Action Version Pinning Audit
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit-version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit action versions
+        shell: bash
+        run: |
+          # Warn if major versions like @v1 are used when @v4 is available
+          if grep -r "uses: actions/checkout@v[1-3]" .github/workflows/; then
+            echo "WARN: Outdated actions/checkout version found."
+          fi

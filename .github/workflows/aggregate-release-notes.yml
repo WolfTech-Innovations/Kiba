@@ -1,0 +1,20 @@
+name: Aggregate Release Notes
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Aggregate notes
+        shell: bash
+        run: |
+          mkdir -p Notes/Aggregated
+          cat Notes/*.md > Notes/Aggregated/latest.md 2>/dev/null || true

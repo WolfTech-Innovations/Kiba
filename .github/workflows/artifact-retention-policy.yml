@@ -1,0 +1,22 @@
+name: Artifact Retention Policy
+on:
+  push:
+    branches: [ main ]
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    timeout-minutes: 5
+    steps:
+      - name: Enforce retention
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RETENTION=$(gh api repos/${{ github.repository }} | jq '.default_workflow_retention_days')
+          echo "Default retention is $RETENTION days"
+          if [ "$RETENTION" -gt 90 ]; then
+             echo "ERROR: Retention should be 90 days or less"
+             exit 1
+          fi

@@ -1,0 +1,25 @@
+name: Audit Build SH Sudoers Perms
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit sudoers permissions
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if grep -q "etc/sudoers.d" build.sh; then
+              if ! grep -q "chmod 0440" build.sh; then
+                echo "ERROR: sudoers.d found but chmod 0440 is missing in build.sh"
+                exit 1
+              fi
+            fi
+          fi

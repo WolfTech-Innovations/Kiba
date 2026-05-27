@@ -1,0 +1,21 @@
+name: Audit Repo License Sanity
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit license presence
+        shell: bash
+        run: |
+          if [ ! -f "LICENSE" ]; then
+            echo "ERROR: LICENSE file is missing"
+            exit 1
+          fi

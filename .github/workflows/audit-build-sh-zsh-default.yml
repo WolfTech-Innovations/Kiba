@@ -1,0 +1,22 @@
+name: Audit Build SH Zsh Default
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit zsh default handling
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if grep -q "zsh" build.sh; then
+               echo "Zsh detected in build.sh"
+            fi
+          fi

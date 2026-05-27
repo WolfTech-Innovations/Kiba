@@ -1,0 +1,24 @@
+name: Audit Workflow Kebab Filenames Strict
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit kebab-case filenames
+        shell: bash
+        run: |
+          find .github/workflows/ -name "*.yml" | while read -r wf; do
+            base=$(basename "$wf")
+            if [[ "$base" =~ [A-Z_] ]]; then
+              echo "ERROR: $wf should use kebab-case (lowercase and hyphens only)"
+              exit 1
+            fi
+          done

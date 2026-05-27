@@ -1,0 +1,29 @@
+name: Audit Workflow Unused Workflow Inputs
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit unused inputs
+        shell: bash
+        run: |
+          FAIL=0
+          for wf in .github/workflows/*.yml; do
+            # Find input keys under inputs:
+            inputs=$(sed -n '/inputs:/,/jobs:/p' "$wf" | grep "^  [a-zA-Z0-9_-]\+:" | sed 's/^[ ]*//;s/:.*//' || true)
+            for input in $inputs; do
+              if ! grep -q "github\.event\.inputs\.$input" "$wf" && ! grep -q "inputs\.$input" "$wf"; then
+                 echo "ERROR: Unused input '$input' in $wf"
+                 FAIL=1
+              fi
+            done
+          done
+          if [ "$FAIL" -eq 1 ]; then exit 1; fi

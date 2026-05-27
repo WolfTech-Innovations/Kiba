@@ -1,0 +1,19 @@
+name: Analyze Build Success Trend
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+jobs:
+  trend:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    timeout-minutes: 5
+    steps:
+      - name: Fetch recent runs
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/${{ github.repository }}/actions/runs?per_page=50 | \
+            jq -r '.workflow_runs[] | "\(.conclusion) \(.name)"' | \
+            grep "Build KibaOS" | sort | uniq -c

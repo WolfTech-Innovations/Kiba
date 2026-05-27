@@ -1,0 +1,23 @@
+name: Audit Repo README Badge HTTPS
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit README badge HTTPS
+        shell: bash
+        run: |
+          if [ -f "README.md" ]; then
+            if grep "http://" README.md | grep "img.shields.io"; then
+              echo "ERROR: README badges must use HTTPS"
+              exit 1
+            fi
+          fi

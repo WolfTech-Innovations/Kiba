@@ -1,0 +1,27 @@
+name: APT Security Policy Enforcer
+on:
+  push:
+    paths:
+      - '**/sources.list'
+      - '**/preferences'
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit APT policies
+        shell: bash
+        run: |
+          # Check for dangerous 'Trusted: yes' in apt sources
+          if grep -r "Trusted: yes" .; then
+             echo "ERROR: Found 'Trusted: yes' in APT configuration. Use signed-by instead."
+             exit 1
+          fi
+          # Check for generic 'Allow-Authenticated'
+          if grep -r "Allow-Authenticated" .; then
+             echo "ERROR: Found Allow-Authenticated in APT configuration."
+             exit 1
+          fi

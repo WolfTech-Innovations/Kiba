@@ -1,0 +1,28 @@
+name: Audit Build SH PaperDE ldconfig
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit ldconfig after PaperDE build
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            # The current build.sh doesn't seem to build paperde-src/build anymore,
+            # but the audit script in repo_audit.sh still checks for it.
+            # We keep it as a regression check.
+            if grep -q "paperde-src" build.sh; then
+              if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
+                echo "ERROR: ldconfig not found after PaperDE installation in build.sh"
+                exit 1
+              fi
+            fi
+          fi

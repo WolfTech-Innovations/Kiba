@@ -1,0 +1,30 @@
+name: Audit Workflow Timeout Reasonable
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit reasonable timeouts
+        shell: bash
+        run: |
+          # Checks for workflows without timeout-minutes or with too high values (> 60)
+          # excluding build.yml which might need more.
+          find .github/workflows/ -name "*.yml" ! -name "build.yml" | while read -r wf; do
+            if ! grep -q "timeout-minutes:" "$wf"; then
+              echo "ERROR: $wf is missing timeout-minutes"
+              exit 1
+            fi
+            TO=$(grep "timeout-minutes:" "$wf" | head -n 1 | awk '{print $2}')
+            if [ "$TO" -gt 60 ]; then
+               echo "ERROR: $wf has excessive timeout-minutes ($TO)"
+               exit 1
+            fi
+          done

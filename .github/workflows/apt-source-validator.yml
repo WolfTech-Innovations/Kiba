@@ -1,0 +1,20 @@
+name: APT Source Validator
+on:
+  push:
+    paths:
+      - '**/sources.list'
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate APT sources
+        shell: bash
+        run: |
+          echo "Validating APT sources"
+          if grep -r "http://" . --include="sources.list"; then
+             echo "WARN: Non-HTTPS APT source found"
+          fi
