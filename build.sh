@@ -88,7 +88,6 @@ mkinitcpio-archiso
 fakeroot
 grub
 efibootmgr
-networkmanager
 sudo
 bash
 nano
@@ -104,7 +103,7 @@ budgie-session
 gcc
 debugedit
 base-devel
-pkg-config
+pkgconf
 labwc
 sddm
 budgie
@@ -137,7 +136,7 @@ papirus-icon-theme
 accountsservice
 firefox
 sassc
-network-manager-applet
+qt6-wayland
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -159,7 +158,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -735,7 +734,10 @@ for pkg in calamares arc-gtk-theme; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  if [ "$pkg" = "arc-gtk-theme" ]; then
+    sudo -u builduser gpg --keyserver keyserver.ubuntu.com --recv-keys 31743CDF250EF641E57503E5FAEDBC4FB5AA3B17
+  fi
+  sudo -u builduser makepkg -si --noconfirm
   cd /
 done
 
