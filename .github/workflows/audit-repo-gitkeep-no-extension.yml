@@ -1,0 +1,21 @@
+name: "Audit Repo Gitkeep Extension"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check .gitkeep filename
+        run: |
+          [ -z "$(find . -name '.gitkeep.*')" ]
+        shell: bash

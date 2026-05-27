@@ -1,0 +1,21 @@
+name: "Audit Workflow Timeout"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check timeout minutes
+        run: |
+          grep -r 'timeout-minutes:' .github/workflows/ | awk '{if($2 > 60) { print "Timeout too long: " $0; err=1 }} END {if(err) exit 1}'
+        shell: bash

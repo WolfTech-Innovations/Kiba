@@ -1,0 +1,21 @@
+name: "Audit Build SH Zsh Default"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check default shell
+        run: |
+          grep -q 'SHELL=/bin/bash' build.sh || grep -q '/bin/bash' build.sh
+        shell: bash

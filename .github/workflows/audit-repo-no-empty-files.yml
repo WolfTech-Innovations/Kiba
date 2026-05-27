@@ -1,0 +1,21 @@
+name: "Audit Repo No Empty Files"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check for empty files
+        run: |
+          [ "$(find . -type f -size 0 -not -name '.gitkeep' -not -path './.git/*' | wc -l)" -eq 0 ]
+        shell: bash

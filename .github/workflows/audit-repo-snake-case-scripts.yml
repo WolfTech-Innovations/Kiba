@@ -1,0 +1,21 @@
+name: "Audit Repo Snake Case Scripts"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check script naming
+        run: |
+          [ "$(find scripts/ -name '*[A-Z]*' | wc -l)" -eq 0 ]
+        shell: bash

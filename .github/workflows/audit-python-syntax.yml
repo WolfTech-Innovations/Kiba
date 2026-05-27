@@ -1,0 +1,21 @@
+name: "Audit Python Syntax"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check python syntax
+        run: |
+          python3 -m compileall . -q
+        shell: bash

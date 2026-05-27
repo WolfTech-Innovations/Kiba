@@ -1,0 +1,21 @@
+name: "Audit JSON Syntax"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check JSON syntax
+        run: |
+          find . -name '*.json' -not -path './node_modules/*' -exec npx jsonlint -q {} +
+        shell: bash

@@ -1,0 +1,21 @@
+name: "Audit Repo No Plaintext Chpasswd"
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check chpasswd security
+        run: |
+          ! grep -r 'chpasswd' . --exclude='build.sh' --exclude='repo_audit.sh' --exclude-dir='.github' | grep -v 'liveuser'
+        shell: bash
