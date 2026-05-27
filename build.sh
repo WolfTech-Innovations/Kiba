@@ -101,6 +101,7 @@ power-profiles-daemon
 xdg-user-dirs
 noto-fonts
 noto-fonts-emoji
+noto-fonts-cjk
 bluez-utils
 gnome-weather
 gnome-clocks
@@ -752,7 +753,15 @@ done
 cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
-pacman -Rns --noconfirm gcc base-devel debugedit binutils make patch libtool autoconf automake
+pacman -Rns --noconfirm \
+    gcc \
+    base-devel \
+    debugedit \
+    make \
+    patch \
+    autoconf \
+    automake
+pacman -Qtdq | pacman -Rns -
 echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
