@@ -675,7 +675,7 @@ sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/login
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
-WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/445f7e3039867428feb75f021af9e7ca835d33c2/branding/forest-k.png"
+WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/2b65c409ad91c34854f530a69ee1c29183689257/branding/forest-k.png?raw=true"
 LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.png"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
@@ -1204,7 +1204,13 @@ chmod 750 /home/liveuser
 # DESKTOP SHORTCUTS
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/applications
-
+mkdir -p /etc/skel/Desktop
+cat > /etc/skel/.config/user-dirs.dirs << 'USERDIRS'
+XDG_DESKTOP_DIR="$HOME/Desktop"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+XDG_PICTURES_DIR="$HOME/Pictures"
+USERDIRS
 cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
 Name=Install KibaOS
