@@ -22,11 +22,16 @@
 # SOFTWARE.
 
 set -eu
+set -o pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
 # Centralized script to save release notes to the Notes/ folder
 # Convention: NTE-DDHYM.md
+# DD: Day of month (01-31)
+# H: Hour of day (0-23 -> 0123456789ABCDEFGHIJKLMN)
+# Y: Last digit of year (e.g., 6 for 2026)
+# M: Month (1-12 -> 123456789ABC)
 
 save_release_notes() {
   if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
@@ -53,14 +58,17 @@ save_release_notes() {
     return 1
   fi
 
-  # 1. Generate filename: NTE-DDHYM
-  # Optimization: Single date call reduces process spawning.
-  # DD: Day of month (01-31)
-  # H: Hour of day (0-N for 0-23)
-  # Y: Last digit of year
-  # M: Month (1-C for 1-12)
+  # Check for dependencies
+  for cmd in curl jq git; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      printf "Error: %s is required but not installed.\n" "$cmd" >&2
+      return 1
+    fi
+  done
 
-  vars=$(date "+%d %H %y %m")
+  # 1. Generate filename: NTE-DDHYM
+  # Use current date in UTC to avoid timezone issues
+  vars=$(date -u "+%d %H %y %m")
   dd=$(echo "$vars" | cut -d' ' -f1)
   h_val=$(echo "$vars" | cut -d' ' -f2)
   y_val=$(echo "$vars" | cut -d' ' -f3)
@@ -70,19 +78,20 @@ save_release_notes() {
   h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
   m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
 
+  # 24 characters for 24 hours (0-23)
   hours="0123456789ABCDEFGHIJKLMN"
   h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
   y=$(echo "$y_val" | cut -c 2)
+  # 12 characters for 12 months (1-12)
   months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
+  m=$(echo "$months" | cut -c "$((m_val_clean))")
 
   filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [ ! -f Notes/.gitkeep ]; then
-    touch Notes/.gitkeep
-  fi
+  # Ensure .gitkeep is empty as per repository hygiene
+  truncate -s 0 Notes/.gitkeep
 
   # 3. Fetch release body using curl -fsS and jq
   api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
@@ -98,15 +107,19 @@ save_release_notes() {
   fi
 
   # 5. Git operations
+  # Ensure git is configured for the commit
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
+
   git add "$filename" Notes/.gitkeep
 
+  # Commit if there are changes
   if git commit -m "docs: add release notes $filename [skip ci]"; then
+    # Pull latest changes before pushing to avoid conflicts
     git pull --rebase origin main
     git push origin main
   else
-    printf "No changes to commit\n"
+    printf "No changes to commit (or commit failed)\n"
   fi
 }
 
