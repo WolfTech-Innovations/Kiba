@@ -513,7 +513,6 @@ sequence:
   - networkcfg
   - hwclock
   - services-systemd
-  - shellprocess@copy-kibaos-configs
   - bootloader
   - umount
 - show:
@@ -540,63 +539,6 @@ defaultDesktopEnvironment:
   desktopFile: "budgie-desktop"
 basicSetup: false
 DMCONF
-
-# ──────────────────────────────────────────────────────────────────────────
-# shellprocess@copy-kibaos-configs
-# This runs inside the installed system's chroot (dontChroot: false).
-# It copies every KibaOS theme, config, and branding asset from the live
-# squashfs (already unpacked into the target by unpackfs) into the correct
-# locations, then wires up per-user skeleton files so every new user gets
-# the full theme out of the box — no settings app required.
-# ──────────────────────────────────────────────────────────────────────────
-cat > "${AIROOTFS}/etc/calamares/modules/shellprocess@copy-kibaos-configs.conf" << 'SHELLPROC'
----
-dontChroot: false
-timeout: 180
-script:
-  - "-":
-    - "mkdir -p /etc/sddm.conf.d"
-    - "mkdir -p /etc/xdg/labwc"
-    - "mkdir -p /etc/gtk-2.0"
-    - "mkdir -p /etc/gtk-3.0"
-    - "mkdir -p /etc/gtk-4.0"
-    - "mkdir -p /usr/share/themes/kibaos/openbox-3"
-    - "mkdir -p /usr/share/kibaos"
-    - "mkdir -p /usr/share/calamares/branding/kibaos"
-    - "mkdir -p /usr/share/plymouth/themes/kibaos"
-    - "mkdir -p /usr/local/bin"
-    - "mkdir -p /etc/skel/.config/gtk-3.0"
-    - "mkdir -p /etc/skel/.config/gtk-4.0"
-    - "mkdir -p /etc/skel/.config/autostart"
-    - "mkdir -p /etc/skel/.config/fastfetch"
-  - "cp -f /etc/sddm.conf.d/kibaos.conf /etc/sddm.conf.d/kibaos.conf"
-  - "cp -f /etc/xdg/labwc/rc.xml /etc/xdg/labwc/rc.xml"
-  - "cp -rf /usr/share/themes/kibaos /usr/share/themes/"
-  - "cp -f /usr/share/gtk-2.0/gtkrc /usr/share/gtk-2.0/gtkrc"
-  - "cp -f /etc/gtk-3.0/settings.ini /etc/gtk-3.0/settings.ini"
-  - "cp -f /etc/gtk-4.0/gtk.css /etc/gtk-4.0/gtk.css"
-  - "cp -rf /usr/share/kibaos /usr/share/"
-  - "cp -rf /usr/share/calamares/branding/kibaos /usr/share/calamares/branding/"
-  - "cp -rf /usr/share/plymouth/themes/kibaos /usr/share/plymouth/themes/"
-  - "cp -f /etc/environment /etc/environment"
-  - "cp -f /usr/local/bin/kibaos-first-login /usr/local/bin/kibaos-first-login"
-  - "cp -f /usr/local/bin/kiba-welcome /usr/local/bin/kiba-welcome"
-  - "chmod +x /usr/local/bin/kibaos-first-login"
-  - "chmod +x /usr/local/bin/kiba-welcome"
-  - "cp -f /usr/share/applications/kibaos-install.desktop /usr/share/applications/kibaos-install.desktop"
-  - "cp -f /usr/share/applications/kibaos-about.desktop /usr/share/applications/kibaos-about.desktop"
-  - "cp -f /etc/skel/.config/gtk-3.0/settings.ini /etc/skel/.config/gtk-3.0/settings.ini"
-  - "cp -f /etc/skel/.config/gtk-4.0/gtk.css /etc/skel/.config/gtk-4.0/gtk.css"
-  - "cp -f /etc/skel/.gtkrc-2.0 /etc/skel/.gtkrc-2.0"
-  - "cp -f /etc/skel/.bashrc /etc/skel/.bashrc"
-  - "cp -f /etc/skel/.config/autostart/kibaos-configure.desktop /etc/skel/.config/autostart/kibaos-configure.desktop"
-  - "cp -f /etc/skel/.config/autostart/polkit-agent.desktop /etc/skel/.config/autostart/polkit-agent.desktop"
-  - "cp -rf /etc/skel/.config/fastfetch /etc/skel/.config/"
-  - "plymouth-set-default-theme kibaos 2>/dev/null || true"
-  - "gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true"
-  - "systemctl enable sddm 2>/dev/null || true"
-  - "systemctl enable NetworkManager 2>/dev/null || true"
-SHELLPROC
 
 # ══════════════════════════════════════════════════════════════════════════
 # pacman.conf tweaks
