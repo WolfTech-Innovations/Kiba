@@ -81,7 +81,7 @@ cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
 base
-linux
+linux-cachyos
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -182,11 +182,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -202,15 +202,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -218,12 +218,14 @@ SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
+  sed -i 's/vmlinuz-linux/vmlinuz-linux-cachyos/g' "${SYSLINUX_CFG}"
+  sed -i 's/initramfs-linux.img/initramfs-linux-cachyos.img/g' "${SYSLINUX_CFG}"
   cat >> "${SYSLINUX_CFG}" << 'SYSLINUX_SAFE'
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -606,6 +608,11 @@ if [ -f "${PACMAN_CONF}" ]; then
   grep -q 'NoExtract' "${PACMAN_CONF}" || \
     sed -i '/^\[options\]/a NoExtract  = usr/share/man/* usr/share/info/* usr/share/doc/*\nNoExtract  = usr/share/locale/* !usr/share/locale/en_US/* !usr/share/locale/en_GB/* !usr/share/locale/locale.alias' \
     "${PACMAN_CONF}"
+  cat >> "${PACMAN_CONF}" << 'CACHY_REPO'
+
+[cachyos]
+Server = https://mirror.cachyos.org/repo/x86_64/cachyos
+CACHY_REPO
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -653,7 +660,18 @@ chown -R alpm:alpm /var/cache/pacman
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+pacman-key --recv-keys F3B607488DB35A47 --keyserver keyserver.ubuntu.com
+pacman-key --lsign-key F3B607488DB35A47
+# Temporary add repo to install keyring and mirrorlist
+if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
+  cat >> /etc/pacman.conf << 'CACHY_TEMP'
+
+[cachyos]
+Server = https://mirror.cachyos.org/repo/x86_64/cachyos
+CACHY_TEMP
+fi
 pacman -Syy --noconfirm
+pacman -S --noconfirm cachyos-keyring cachyos-mirrorlist
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -1370,6 +1388,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
 
+  .btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 {
     font-size:1.2rem; font-weight:600; margin:28px 0 12px;
@@ -1389,7 +1412,8 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     display:inline-block; background:var(--accent); color:#fff;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, outline-color .15s;
+    outline: 2px solid transparent;
   }
   .btn:hover { background:var(--accent-dark); }
   .btn.secondary {
@@ -1417,20 +1441,21 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
-<div class="card-row">
-  <div class="card">
+<main>
+<div class="card-row" role="list">
+  <div class="card" role="listitem">
     <h2>Budgie 10.10 Wayland</h2>
     <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Built on Arch Linux</h2>
     <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Unified Design</h2>
     <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Private by Default</h2>
     <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
   </div>
@@ -1453,6 +1478,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
   </div>
 </section>
+</main>
 
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>

@@ -1,0 +1,28 @@
+name: "Monitor CachyOS Kernel"
+
+on:
+  schedule:
+    - cron: "0 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: "Check Latest Release"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          latest_release=$(gh api repos/CachyOS/linux-cachyos/releases/latest --jq '.tag_name' 2>/dev/null || echo "unknown")
+          echo "Latest CachyOS Kernel Release: $latest_release"
+
+          if [[ "$latest_release" == "unknown" ]]; then
+            echo "Falling back to tags..."
+            latest_release=$(gh api repos/CachyOS/linux-cachyos/tags --jq '.[0].name')
+            echo "Latest CachyOS Kernel Tag: $latest_release"
+          fi
