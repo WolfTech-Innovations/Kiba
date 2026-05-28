@@ -1061,7 +1061,15 @@ mkdir -p \
   "${SKEL}/.config/gtk-4.0" \
   "${SKEL}/.config/autostart" \
   "${SKEL}/.config/fastfetch"
-
+cat > "${SKEL}/.config/autostart/nemo-desktop.desktop" << 'NEMODESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Nemo Desktop
+Exec=nemo-desktop
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+NEMODESKTOP
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=Arc-Dark
@@ -1101,6 +1109,8 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
+gsettings set org.nemo.desktop ignored-desktop-handlers "['budgie-helper']"
+gsettings set org.nemo.desktop show-desktop-icons true
 gsettings set com.solus-project.budgie.panel enable-built-in-theme false
 gsettings set org.gnome.desktop.interface gtk-theme               'Arc-Dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
