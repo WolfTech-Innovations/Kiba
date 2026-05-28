@@ -1,0 +1,19 @@
+name: Audit Build Sh Desktop Entry Kiba
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q "kibaos-install.desktop" build.sh || (echo "Error: kibaos-install.desktop not found" && exit 1)

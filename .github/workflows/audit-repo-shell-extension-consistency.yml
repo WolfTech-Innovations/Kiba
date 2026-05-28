@@ -1,0 +1,19 @@
+name: Audit Repo Shell Extension Consistency
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          ! find scripts -type f -name "*.bash" | grep . && ! find scripts -type f -name "*.zsh" | grep .

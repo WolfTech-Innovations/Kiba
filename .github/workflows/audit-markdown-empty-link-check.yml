@@ -1,0 +1,19 @@
+name: Audit Markdown Empty Link Check
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          ! grep -rE "\\[[^]]*\\]\\(\\)" . --include="*.md" --exclude-dir=node_modules | grep .

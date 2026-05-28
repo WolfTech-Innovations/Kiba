@@ -1,0 +1,36 @@
+name: Audit Workflow Kebab Filenames Strict
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run audit
+        shell: python
+        run: |
+          import os, yaml, sys
+          all_passed = True
+          for root, dirs, files in os.walk('.github/workflows'):
+              for f in files:
+                  if f.endswith('.yml') or f.endswith('.yaml'):
+                      path = os.path.join(root, f)
+                      with open(path, 'r') as s:
+                          try:
+                              data = yaml.safe_load(s)
+                              fn = os.path.basename(path)
+                              if not all(c.islower() or c.isdigit() or c in '-.' for c in fn):
+                                  print(f"Invalid filename: {fn}")
+                                  all_passed = False
+                          except Exception as e:
+                              print(f"Error in {path}: {e}")
+                              all_passed = False
+          if not all_passed:
+              sys.exit(1)

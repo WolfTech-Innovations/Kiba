@@ -1,0 +1,43 @@
+name: Audit Workflow Unused Workflow Inputs
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run audit
+        shell: python
+        run: |
+          import os, yaml, sys
+          all_passed = True
+          for root, dirs, files in os.walk('.github/workflows'):
+              for f in files:
+                  if f.endswith('.yml') or f.endswith('.yaml'):
+                      path = os.path.join(root, f)
+                      with open(path, 'r') as s:
+                          try:
+                              data = yaml.safe_load(s)
+                              trigger = data.get('on', {})
+                              if isinstance(trigger, dict):
+                                  inputs = trigger.get('workflow_dispatch', {}).get('inputs', {})
+                              else:
+                                  inputs = {}
+                              with open(path, 'r') as r:
+                                  c = r.read()
+                                  for i in inputs:
+                                      if f"inputs.{i}" not in c:
+                                          print(f"Unused input {i} in {path}")
+                                          all_passed = False
+                          except Exception as e:
+                              print(f"Error in {path}: {e}")
+                              all_passed = False
+          if not all_passed:
+              sys.exit(1)
