@@ -2,6 +2,9 @@
 set -ex
 
 # ── Container deps ────────────────────────────────────────────────────────
+# Optimize host pacman performance
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
+
 pacman-key --init
 pacman-key --populate archlinux
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
@@ -603,6 +606,11 @@ SHELLPROC
 # ══════════════════════════════════════════════════════════════════════════
 PACMAN_CONF="${PROFILE}/pacman.conf"
 if [ -f "${PACMAN_CONF}" ]; then
+  # Speed up profile package installation
+  sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' "${PACMAN_CONF}"
+  grep -q '^ParallelDownloads' "${PACMAN_CONF}" || \
+    sed -i '/^\[options\]/a ParallelDownloads = 5' "${PACMAN_CONF}"
+
   grep -q 'NoExtract' "${PACMAN_CONF}" || \
     sed -i '/^\[options\]/a NoExtract  = usr/share/man/* usr/share/info/* usr/share/doc/*\nNoExtract  = usr/share/locale/* !usr/share/locale/en_US/* !usr/share/locale/en_GB/* !usr/share/locale/locale.alias' \
     "${PACMAN_CONF}"
@@ -763,7 +771,9 @@ for pkg in calamares arc-gtk-theme; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  # Parallelize AUR builds to speed up large packages like Calamares
+  export MAKEFLAGS="-j$(nproc)"
+  sudo -u builduser MAKEFLAGS="${MAKEFLAGS}" makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
