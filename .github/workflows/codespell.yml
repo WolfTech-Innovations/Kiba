@@ -1,0 +1,19 @@
+name: Codespell
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  codespell:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Codespell
+        uses: codespell-project/actions-codespell@v2
+        with:
+          ignore_words_file: .codespellignore
+          skip: "./.git,./node_modules,./pnpm-lock.yaml"
+          check_filenames: true
+          check_hidden: true

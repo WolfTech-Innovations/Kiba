@@ -1,0 +1,14 @@
+name: Auto Assign
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auto Assign
+        uses: kentaro-m/auto-assign-action@v2.0.0
+        with:
+          configuration-path: ".github/labeler.yml" # Reusing labeler config if it contains assignee info

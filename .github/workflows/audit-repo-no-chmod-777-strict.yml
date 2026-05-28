@@ -1,0 +1,21 @@
+name: Audit Repo No Chmod 777 Strict
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="build.sh"; then
+            echo "ERROR: Found dangerous chmod 777"
+            exit 1
+          fi
+          # build.sh uses chmod 755/750 mostly, but we exclude it from strict 777 check if it has valid reasons

@@ -1,0 +1,22 @@
+name: Audit build.sh Liveuser UID
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if [ -f "build.sh" ]; then
+            if grep -q "liveuser" build.sh && ! grep -q "1000:1000" build.sh; then
+              echo "ERROR: liveuser UID/GID 1000 not explicitly set"
+              exit 1
+            fi
+          fi

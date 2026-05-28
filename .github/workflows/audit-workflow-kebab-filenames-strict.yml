@@ -1,0 +1,22 @@
+name: Audit Workflow Kebab Filenames Strict
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          BAD_FILES=$(find .github/workflows -name "*_*" -o -name "*[A-Z]*" | grep -v "node_modules")
+          if [ -n "$BAD_FILES" ]; then
+            echo "ERROR: Workflow filenames must be lowercase-kebab-case:"
+            echo "$BAD_FILES"
+            exit 1
+          fi

@@ -1,0 +1,19 @@
+name: Audit build.sh Octopi Usage
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if [ -f "build.sh" ] && grep -qi "octopi" build.sh; then
+             echo "WARN: Octopi mentioned in build.sh. Ensure it is intentional for Budgie"
+          fi

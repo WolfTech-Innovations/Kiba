@@ -1,0 +1,17 @@
+name: Markdown Lint
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run markdownlint
+        uses: DavidAnson/github-py-markdownlint@v1
+        with:
+          search_glob: '**/*.md'
+          ignore_sample: true

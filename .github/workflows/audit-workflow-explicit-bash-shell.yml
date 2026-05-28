@@ -1,0 +1,20 @@
+name: Audit Workflow Explicit Bash Shell
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if grep -r "run:" .github/workflows/ | grep -v "shell: bash"; then
+            echo "WARN: Some workflows might be missing explicit shell: bash"
+          fi
+          # Note: This is a simple grep, might have false positives but good for audit

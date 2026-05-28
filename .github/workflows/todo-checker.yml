@@ -1,0 +1,16 @@
+name: TODO Checker
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  todo-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TODOs
+        shell: bash
+        run: |
+          grep -rE "TODO|FIXME" . --exclude-dir=.git --exclude-dir=node_modules || echo "No TODOs found"

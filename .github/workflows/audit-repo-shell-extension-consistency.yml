@@ -1,0 +1,19 @@
+name: Audit Repo Shell Extension Consistency
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if find scripts/ -type f ! -name "*.sh" | grep .; then
+            echo "WARN: Scripts without .sh extension found in scripts/"
+          fi

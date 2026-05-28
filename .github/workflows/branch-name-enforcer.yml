@@ -1,0 +1,17 @@
+name: Branch Name Enforcer
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check branch name
+        shell: bash
+        run: |
+          BRANCH_NAME="${{ github.head_ref }}"
+          if [[ ! $BRANCH_NAME =~ ^(feat|fix|docs|style|refactor|perf|test|chore|audit|bolt|sentinel|palette)/ ]]; then
+            echo "ERROR: Branch name '$BRANCH_NAME' does not follow convention (type/description)"
+            exit 1
+          fi

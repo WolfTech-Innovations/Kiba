@@ -1,0 +1,20 @@
+name: Audit Repo No Plaintext Chpasswd
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if grep -r "chpasswd" . --exclude="build.sh" | grep -vE "LIVE_HASH|openssl"; then
+             echo "ERROR: Found potential plaintext chpasswd usage"
+             exit 1
+          fi

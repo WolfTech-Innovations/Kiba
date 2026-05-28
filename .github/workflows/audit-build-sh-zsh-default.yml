@@ -1,0 +1,21 @@
+name: Audit build.sh Zsh Default
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if [ -f "build.sh" ] && grep -q "zsh" build.sh; then
+             if ! grep -q "chsh -s /usr/bin/zsh" build.sh; then
+               echo "WARN: Zsh present but not set as default for liveuser?"
+             fi
+          fi

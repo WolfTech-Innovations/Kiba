@@ -1,0 +1,19 @@
+name: Audit Workflow No Node 16 Actions
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Run audit
+        shell: bash
+        run: |
+          if grep -r "uses: actions/setup-node@v3" .github/workflows/; then
+            echo "WARN: actions/setup-node@v3 detected. Consider v4 for Node 20+ support"
+          fi
