@@ -4,6 +4,7 @@ set -ex
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 
 mkdir -p /var/cache/pacman/pkg
@@ -27,7 +28,7 @@ AIROOTFS="${PROFILE}/airootfs"
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
-sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+sed -i 's/^CheckSpace/#CheckSpace/; s/^#ParallelDownloads/ParallelDownloads/' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -647,10 +648,11 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -resize 256x256 -write "${LOGO_256}" \) \
+    \( -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -resize 48x48   -write "${LOGO_48}"  \) \
+    -resize 32x32 "${LOGO_32}"
   rm -f "${LOGO_SRC}"
 else
   for sz in 256 96 48 32; do
@@ -679,7 +681,8 @@ cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 # ══════════════════════════════════════════════════════════════════════════
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
-sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
+sed -i 's/^CheckSpace/#CheckSpace/; s/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+sed -i "s/^#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j\$(nproc)\"/" /etc/makepkg.conf
 # Before building calamares in customize_airootfs.sh, ensure deps:
 pacman -S --noconfirm --needed \
   kpmcore \
