@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=cutefish" alt="Desktop">
-  <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
+  <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme: Dracula color palette">
+  <img src="https://img.shields.io/badge/Desktop-Budgie-22a7f0?style=for-the-badge&logo=budgie" alt="Desktop Environment: Budgie">
+  <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="System Font: Inter">
 </p>
 
 ---
@@ -29,7 +29,7 @@ KibaOS is built with a focus on "modern simplicity." This document details the v
 - [Boot Branding](#boot-branding)
   - [Interface Components](#interface-components)
   - [Typography](#typography)
-- [Desktop Experience (Cutefish OS)](#desktop-experience-plasma-bigscreen)
+- [Desktop Experience (Budgie)](#desktop-experience-budgie)
   - [Window Management Polish](#window-management-polish)
   - [Desktop Layout](#desktop-layout)
 - [The Modern Terminal](#the-modern-terminal)
@@ -45,19 +45,19 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 ### Color Palette
 
-| Color            | Hex                 | Role                                                     |
-| :--------------- | :------------------ | :------------------------------------------------------- |
-| **Background**   | `\#`\hex 0x282a36`` | Primary window and desktop background                    |
-| **Current Line** | `\#`\hex #44475a``  | Highlight and secondary background                       |
-| **Foreground**   | `\#`\#f8f8f2``      | Primary text color                                       |
-| **Comment**      | `\#`\#6272a4``      | Secondary text and disabled elements                     |
-| **Purple**       | `\#`\#bd93f9``      | Accent color, selection background, and primary branding |
-| **Pink**         | `\#`\#ff79c6``      | Selection foreground and highlights                      |
-| **Green**        | `\#`\#50fa7b``      | Success states and active terminal elements              |
+| Color            | Hex       | Role                                                     |
+| :--------------- | :-------- | :------------------------------------------------------- |
+| **Background**   | `#282a36` | Primary window and desktop background                    |
+| **Current Line** | `#44475a` | Highlight and secondary background                       |
+| **Foreground**   | `#f8f8f2` | Primary text color                                       |
+| **Comment**      | `#6272a4` | Secondary text and disabled elements                     |
+| **Purple**       | `#bd93f9` | Accent color, selection background, and primary branding |
+| **Pink**         | `#ff79c6` | Selection foreground and highlights                      |
+| **Green**        | `#50fa7b` | Success states and active terminal elements              |
 
 ### Look and Feel
 
-- **Desktop Environment:** Cutefish OS.
+- **Desktop Environment:** Budgie Desktop Environment.
 - **Global Theme:** A customized version of **Ant-Dark**.
 - **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
 - **Icons:** **Kora** icon theme for a colorful and modern look.
@@ -123,9 +123,9 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-## Desktop Experience (Cutefish OS)
+## Desktop Experience (Budgie)
 
-KibaOS leverages the power of **Cutefish OS** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of the **Budgie Desktop Environment** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
@@ -155,7 +155,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+| `pacman`        | **`pacman`**         | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 
