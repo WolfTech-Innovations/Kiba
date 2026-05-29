@@ -585,7 +585,10 @@ mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
-
+# Start dbus session for the whole script
+dbus-uuidgen > /etc/machine-id
+eval $(dbus-launch --sh-syntax)
+export DBUS_SESSION_BUS_ADDRESS
 # ── alpm user ──────────────────────────────────────────────────────────────
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
@@ -700,7 +703,7 @@ pacman -S --noconfirm --needed \
   kpmcore
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares arc-gtk-theme; do
+for pkg in calamares arc-gtk-theme crystal-dock; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -1109,6 +1112,8 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
+dconf write "${PANEL_PATH}position" "'TOP'"
+gsettings set com.solus-project.budgie.panel panels-with-applets "[]" 2>/dev/null || true
 gsettings set org.nemo.desktop ignored-desktop-handlers "['budgie-helper']"
 gsettings set org.nemo.desktop show-desktop-icons true
 gsettings set com.solus-project.budgie.panel enable-built-in-theme false
@@ -1160,7 +1165,15 @@ Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 AUTOCFG
-
+cat > "${SKEL}/.config/autostart/crystal-dock.desktop" << 'CRYSTALDOCK'
+[Desktop Entry]
+Type=Application
+Name=Crystal Dock
+Exec=crystal-dock
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+CRYSTALDOCK
 cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
