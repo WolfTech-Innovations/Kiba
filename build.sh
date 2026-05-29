@@ -647,10 +647,13 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  # Consolidate resizing into a single command to avoid redundant decoding of the source image.
+  # Processing from largest to smallest for efficiency.
+  magick "${LOGO_SRC}" -filter Lanczos \
+    -resize 256x256 -write "${LOGO_256}" \
+    -resize 96x96   -write "${LOGO_96}" \
+    -resize 48x48   -write "${LOGO_48}" \
+    -resize 32x32   "${LOGO_32}"
   rm -f "${LOGO_SRC}"
 else
   for sz in 256 96 48 32; do
