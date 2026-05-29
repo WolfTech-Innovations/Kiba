@@ -1,0 +1,26 @@
+name: "Check TODO format"
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Check TODO format
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          ! grep -r "TODO" . --exclude-dir=.git | grep -vE "TODO\([a-z-]+\):" || (echo "Bad TODO format" && exit 1)

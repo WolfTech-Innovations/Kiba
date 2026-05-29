@@ -1,0 +1,29 @@
+name: "PR description validator"
+on:
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: PR description validator
+        env:
+          BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            if [ ${#PR_BODY} -lt 20 ]; then
+              echo "PR description too short."
+              exit 1
+            fi
+          fi
