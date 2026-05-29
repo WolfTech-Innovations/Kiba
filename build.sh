@@ -679,6 +679,8 @@ cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 # ══════════════════════════════════════════════════════════════════════════
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
+# Import NicoHood PGP key for arc-gtk-theme
+sudo -u builduser gpg --keyserver keyserver.ubuntu.com --recv-keys 31743CDF250EF641E57503E5FAEDBC4FB5AA3B17
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 # Before building calamares in customize_airootfs.sh, ensure deps:
 pacman -S --noconfirm --needed \
@@ -705,7 +707,12 @@ for pkg in calamares arc-gtk-theme; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  if [ "${pkg}" = "calamares" ]; then
+    # Calamares PKGBUILD doesn't use PGP signatures
+    sudo -u builduser makepkg -si --noconfirm
+  else
+    sudo -u builduser makepkg -si --noconfirm
+  fi
   cd /
 done
 
