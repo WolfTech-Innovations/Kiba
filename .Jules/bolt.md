@@ -4,5 +4,11 @@
 **Action:** Always prefer `CSafeLoader` with a fallback for YAML-heavy scripts in this environment.
 
 ## 2026-05-14 - [Semantic YAML Parsing for Performance]
+
 **Learning:** While `awk` or `grep` can be extremely fast for simple text scanning, they are unreliable for structured formats like YAML where property order and context (comments, script blocks) matter. A single-process Python script with `yaml.CSafeLoader` provides the best balance of speed (~300x faster than `yq` loops) and semantic correctness.
 **Action:** Replace shell-based loops calling CLI parsers (`yq`, `jq`) with single-execution Python scripts for bulk metadata validation.
+
+## 2026-05-15 - [ImageMagick Batch Processing]
+
+**Learning:** Sequential calls to `magick` for the same source file cause redundant disk I/O and image decoding. Consolidating into a single command with `-clone` and `-write` keeps the source image in memory, significantly reducing processing overhead.
+**Action:** Use parenthetical processing and `-clone` when generating multiple output sizes from a single source image.
