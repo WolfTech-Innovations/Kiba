@@ -28,6 +28,7 @@ cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+sed -i '/^#ParallelDownloads/s/^#//; s/ParallelDownloads = .*/ParallelDownloads = 5/' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -650,18 +651,24 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  # Consolidate resizing into a single command to avoid redundant decoding
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -clone 0 -resize 256x256 -write "${LOGO_256}" \) \
+    \( -clone 0 -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -clone 0 -resize 48x48   -write "${LOGO_48}"  \) \
+    \( -clone 0 -resize 32x32   -write "${LOGO_32}"  \) \
+    null:
   rm -f "${LOGO_SRC}"
 else
-  for sz in 256 96 48 32; do
-    magick -size ${sz}x${sz} xc:none \
-      -fill '#0099cc' -draw "circle $((sz/2)),$((sz/2)) $((sz/2)),1" \
-      -fill white -pointsize $((sz/2)) -gravity Center -annotate 0 'K' \
-      "/usr/share/kibaos/logo-${sz}.png"
-  done
+  # Generate all logo sizes in a single pass
+  magick -size 256x256 xc:none \
+    -fill '#0099cc' -draw "circle 128,128 128,1" \
+    -fill white -pointsize 128 -gravity Center -annotate 0 'K' \
+    -write "${LOGO_256}" \
+    -resize 96x96  -write "${LOGO_96}" \
+    -resize 48x48  -write "${LOGO_48}" \
+    -resize 32x32  -write "${LOGO_32}" \
+    null:
 fi
 
 cp "${LOGO_256}" /usr/share/pixmaps/kibaos.png
@@ -683,6 +690,7 @@ cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
+sed -i '/^#ParallelDownloads/s/^#//; s/ParallelDownloads = .*/ParallelDownloads = 5/' /etc/pacman.conf
 # Before building calamares in customize_airootfs.sh, ensure deps:
 pacman -S --noconfirm --needed \
   kpmcore \
@@ -699,8 +707,7 @@ pacman -S --noconfirm --needed \
   kpackage \
   kdeclarative \
   kiconthemes \
-  kwidgetsaddons \
-  kpmcore
+  kwidgetsaddons
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 for pkg in calamares arc-gtk-theme crystal-dock; do
