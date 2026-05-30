@@ -120,7 +120,6 @@ debugedit
 base-devel
 wine
 wine-mono
-libinput-gestures
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
@@ -598,6 +597,8 @@ set -e
 dbus-uuidgen > /etc/machine-id
 eval $(dbus-launch --sh-syntax)
 export DBUS_SESSION_BUS_ADDRESS
+sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+pacman -Syy --noconfirm
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
 ---
 defaultGroups:
@@ -789,7 +790,7 @@ pacman -S --noconfirm --needed \
   kpmcore
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares arc-gtk-theme crystal-dock-git; do
+for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
