@@ -11,6 +11,7 @@ chmod 755 /etc
 chmod 755 /var/cache/pacman
 chmod 755 /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+grep -q "ParallelDownloads" /etc/pacman.conf || sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
@@ -28,6 +29,7 @@ cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+sed -i '/^\[options\]/a ParallelDownloads = 5' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -594,6 +596,7 @@ useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+sed -i '/^\[options\]/a ParallelDownloads = 5' /etc/pacman.conf
 
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
@@ -616,7 +619,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -650,10 +653,12 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -clone 0 -resize 256x256 -write "${LOGO_256}" \) \
+    \( -clone 0 -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -clone 0 -resize 48x48   -write "${LOGO_48}"  \) \
+    \( -clone 0 -resize 32x32   -write "${LOGO_32}"  \) \
+    null:
   rm -f "${LOGO_SRC}"
 else
   for sz in 256 96 48 32; do
@@ -699,8 +704,7 @@ pacman -S --noconfirm --needed \
   kpackage \
   kdeclarative \
   kiconthemes \
-  kwidgetsaddons \
-  kpmcore
+  kwidgetsaddons
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 for pkg in calamares arc-gtk-theme crystal-dock; do
