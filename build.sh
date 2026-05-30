@@ -85,12 +85,15 @@ linux
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
+earlyoom
 fakeroot
 grub
 efibootmgr
 bluez
 sudo
 bash
+irqbalance
+zram-generator
 nano
 curl
 wget
@@ -115,6 +118,11 @@ budgie-session
 gcc
 debugedit
 base-devel
+wine
+wine-mono
+libinput-gestures
+lib32-mesa
+lib32-vulkan-icd-loader
 pkg-config
 labwc
 sddm
@@ -130,6 +138,7 @@ gtklock
 wlopm
 wdisplays
 nemo
+ufw
 nemo-fileroller
 gnome-terminal
 gnome-system-monitor
@@ -589,12 +598,89 @@ set -e
 dbus-uuidgen > /etc/machine-id
 eval $(dbus-launch --sh-syntax)
 export DBUS_SESSION_BUS_ADDRESS
+cat > /etc/calamares/modules/users.conf << 'USERSCONF'
+---
+defaultGroups:
+  - users
+  - wheel
+  - audio
+  - video
+  - input
+  - network
+  - storage
+  - power
+autologinGroup: autologin
+sudoersGroup: wheel
+setRootPassword: false
+USERSCONF
 # ── alpm user ──────────────────────────────────────────────────────────────
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+# ── Silent Wine wrapper ────────────────────────────────────────────────────
+cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
+#!/usr/bin/env bash
+# Transparent .exe launcher — zero fingerprint, no console noise
+export WINEDEBUG=-all
+export WINEPREFIX="${HOME}/.wine"
+export WINEARCH=win64
+export QT_QPA_PLATFORM=wayland
+export GDK_BACKEND=wayland
+systemctl enable earlyoom
+# Init prefix silently on first run
+if [ ! -d "${WINEPREFIX}" ]; then
+  wineboot --init 2>/dev/null
+fi
 
+exec wine "$@" 2>/dev/null
+WINEWRAPPER
+chmod +x /usr/local/bin/wine-silent
+cat > /etc/sysctl.d/99-kibaos.conf << 'SYSCTL'
+# Prefer keeping apps in RAM over disk cache — desktop feel
+vm.swappiness=10
+vm.vfs_cache_pressure=50
+# Reduce dirty page writeback latency — snappier file saves
+vm.dirty_ratio=10
+vm.dirty_background_ratio=5
+# More inotify watches — needed for IDEs, file managers, large projects
+fs.inotify.max_user_watches=524288
+# Faster network
+net.core.netdev_max_backlog=16384
+SYSCTL
+# ── binfmt_misc: .exe files run transparently via wine-silent ──────────────
+mkdir -p /etc/binfmt.d
+cat > /etc/binfmt.d/wine.conf << 'BINFMT'
+:DOSWin:M::MZ::/usr/local/bin/wine-silent:
+BINFMT
+
+# ── Nemo file association: double-click .exe → wine-silent ─────────────────
+mkdir -p /usr/share/applications
+cat > /usr/share/applications/wine-exe.desktop << 'WINEDESKTOP'
+[Desktop Entry]
+Name=Windows Program
+Exec=/usr/local/bin/wine-silent %f
+MimeType=application/x-ms-dos-executable;application/x-msdos-program;application/x-msdownload;
+Type=Application
+NoDisplay=true
+StartupNotify=false
+WINEDESKTOP
+
+# Register MIME type
+mkdir -p /usr/share/mime/packages
+cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+  <mime-type type="application/x-ms-dos-executable">
+    <comment>Windows Executable</comment>
+    <glob pattern="*.exe"/>
+    <glob pattern="*.EXE"/>
+    <glob pattern="*.msi"/>
+    <glob pattern="*.MSI"/>
+  </mime-type>
+</mime-info>
+WINEXML
+update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
@@ -703,7 +789,7 @@ pacman -S --noconfirm --needed \
   kpmcore
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares arc-gtk-theme crystal-dock; do
+for pkg in calamares arc-gtk-theme crystal-dock-git; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -1112,11 +1198,8 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
-dconf write "${PANEL_PATH}position" "'TOP'"
-gsettings set com.solus-project.budgie.panel panels-with-applets "[]" 2>/dev/null || true
-gsettings set org.nemo.desktop ignored-desktop-handlers "['budgie-helper']"
-gsettings set org.nemo.desktop show-desktop-icons true
-gsettings set com.solus-project.budgie.panel enable-built-in-theme false
+
+# ── Appearance ─────────────────────────────────────────────────────────────
 gsettings set org.gnome.desktop.interface gtk-theme               'Arc-Dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
@@ -1126,36 +1209,68 @@ gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
 gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
+gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
 
-gsettings set org.gnome.desktop.background picture-uri       'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-uri-dark  'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-options   'zoom'
-gsettings set org.gnome.desktop.background primary-color     '#0d1b2a'
+# ── Wallpaper ──────────────────────────────────────────────────────────────
+gsettings set org.gnome.desktop.background picture-uri      'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-options  'zoom'
+gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
+# ── Window manager — macOS feel ────────────────────────────────────────────
+gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
+gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
+gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
+
+# ── Input ──────────────────────────────────────────────────────────────────
+gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click   true
+gsettings set org.gnome.desktop.peripherals.touchpad natural-scroll  true
+gsettings set org.gnome.desktop.peripherals.touchpad two-finger-scrolling-enabled true
+gsettings set org.gnome.desktop.peripherals.mouse    natural-scroll  false
+gsettings set org.gnome.desktop.peripherals.mouse    accel-profile   'adaptive'
+
+# ── Nemo ───────────────────────────────────────────────────────────────────
+gsettings set org.nemo.desktop show-desktop-icons              true
+gsettings set org.nemo.desktop ignored-desktop-handlers        "['budgie-helper']"
+gsettings set org.nemo.preferences show-hidden-files           false
+gsettings set org.nemo.preferences default-folder-viewer       'icon-view'
+gsettings set org.nemo.icon-view default-zoom-level            'standard'
+gsettings set org.nemo.preferences show-location-entry         false
+
+# ── Budgie panel — bottom floating pill ───────────────────────────────────
 PANEL_UUID=$(gsettings get com.solus-project.budgie.panel panels 2>/dev/null | \
   tr -d "[]' " | cut -d',' -f1)
 if [ -n "${PANEL_UUID}" ]; then
   PANEL_PATH="/com/solus-project/budgie/panel/panels/${PANEL_UUID}/"
-  dconf write "${PANEL_PATH}position"     "'BOTTOM'"
-  dconf write "${PANEL_PATH}size"         "40"
-  dconf write "${PANEL_PATH}transparency" "'DYNAMIC'"
-  dconf write "${PANEL_PATH}shadow"       "true"
+  dconf write "${PANEL_PATH}position"              "'BOTTOM'"
+  dconf write "${PANEL_PATH}size"                  "42"
+  dconf write "${PANEL_PATH}transparency"          "'DYNAMIC'"
+  dconf write "${PANEL_PATH}shadow"                "true"
+  dconf write "${PANEL_PATH}enable-built-in-theme" "false"
 fi
 
-gsettings set org.gnome.desktop.wm.preferences button-layout                ':minimize,maximize,close'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font                 'Noto Sans Medium 10'
-gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar  'toggle-maximize'
-gsettings set org.gnome.desktop.wm.preferences num-workspaces                4
-
-gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click   true
-gsettings set org.gnome.desktop.peripherals.touchpad natural-scroll  true
-gsettings set org.gnome.desktop.peripherals.mouse    natural-scroll  false
-gsettings set org.gnome.desktop.peripherals.mouse    accel-profile   'adaptive'
+# ── Crystal Dock config ────────────────────────────────────────────────────
+mkdir -p "${HOME}/.crystal-dock-2"
+cat > "${HOME}/.crystal-dock-2/general.conf" << 'CDCONF'
+[General]
+autoHide=false
+showTaskManager=true
+showClock=true
+showDesktop=true
+position=Bottom
+screenEdgeMargin=8
+iconSize=52
+minIconSize=32
+maxIconSize=72
+backgroundAlpha=180
+tooltipDelay=300
+CDCONF
 
 touch "${STAMP}"
 FIRSTLOGIN
 chmod +x /usr/local/bin/kibaos-first-login
-
 cat > "${SKEL}/.config/autostart/kibaos-configure.desktop" << 'AUTOCFG'
 [Desktop Entry]
 Type=Application
@@ -1165,6 +1280,72 @@ Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 AUTOCFG
+mkdir -p /etc/systemd/zram-generator.conf.d
+cat > /etc/systemd/zram-generator.conf << 'ZRAM'
+[zram0]
+zram-size = ram / 2
+compression-algorithm = zstd
+ZRAM
+# ── .config/labwc/environment env vars ───────────────────
+mkdir -p "${SKEL}/.config/labwc"
+cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
+GTK_THEME=Arc-Dark
+QT_STYLE_OVERRIDE=kvantum
+XCURSOR_THEME=Adwaita
+XCURSOR_SIZE=24
+QT_AUTO_SCREEN_SCALE_FACTOR=1
+MOZ_ENABLE_WAYLAND=1
+WINEDEBUG=-all
+LABWCENV
+mkdir -p "${SKEL}/.config"
+cat > "${SKEL}/.config/libinput-gestures.conf" << 'GESTURES'
+gesture swipe left  3  dbus-send --session --type=method_call \
+  --dest=org.gnome.Shell /org/gnome/Shell \
+  org.gnome.Shell.Eval string:'Main.wm.actionMoveWorkspaceRight()'
+gesture swipe right 3  dbus-send --session --type=method_call \
+  --dest=org.gnome.Shell /org/gnome/Shell \
+  org.gnome.Shell.Eval string:'Main.wm.actionMoveWorkspaceLeft()'
+gesture swipe up    4  /usr/local/bin/kibaos-expose
+gesture pinch in    2  xdotool key super+d
+GESTURES
+# ── .config/fontconfig — sharper font rendering ────────────────
+mkdir -p "${SKEL}/.config/fontconfig"
+cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <match target="font">
+    <edit name="antialias" mode="assign"><bool>true</bool></edit>
+    <edit name="hinting" mode="assign"><bool>true</bool></edit>
+    <edit name="hintstyle" mode="assign"><const>hintslight</const></edit>
+    <edit name="rgba" mode="assign"><const>rgb</const></edit>
+    <edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit>
+    <edit name="embeddedbitmap" mode="assign"><bool>false</bool></edit>
+  </match>
+  <!-- Prefer Noto, fall back gracefully -->
+  <alias>
+    <family>sans-serif</family>
+    <prefer><family>Noto Sans</family></prefer>
+  </alias>
+  <alias>
+    <family>monospace</family>
+    <prefer><family>Noto Sans Mono</family></prefer>
+  </alias>
+</fontconfig>
+FONTCONF
+
+# ── .config/electron-flags.conf — Wayland-native Electron apps ───────────
+cat > "${SKEL}/.config/electron-flags.conf" << 'ELECTRONFLAGS'
+--enable-features=UseOzonePlatform
+--ozone-platform=wayland
+--enable-wayland-ime
+ELECTRONFLAGS
+
+# ── .config/chrome-flags.conf — same for Chromium ─────────────────────────
+cat > "${SKEL}/.config/chrome-flags.conf" << 'CHROMEFLAGS'
+--enable-features=UseOzonePlatform
+--ozone-platform=wayland
+CHROMEFLAGS
 cat > "${SKEL}/.config/autostart/crystal-dock.desktop" << 'CRYSTALDOCK'
 [Desktop Entry]
 Type=Application
@@ -1183,7 +1364,15 @@ Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 POLKIT
-
+cat > "${SKEL}/.config/autostart/libinput-gestures.desktop" << 'GESTURESAUTO'
+[Desktop Entry]
+Type=Application
+Name=Libinput Gestures
+Exec=libinput-gestures-setup start
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+GESTURESAUTO
 cat > "${SKEL}/.config/autostart/kiba-welcome.desktop" << 'WELCOME_AUTO'
 [Desktop Entry]
 Type=Application
@@ -1203,6 +1392,13 @@ alias grep='grep --color=auto'
 alias install='sudo calamares'
 alias update='sudo pacman -Syu'
 fastfetch 2>/dev/null || true
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_STATE_HOME="$HOME/.local/state"
+# Keep $HOME clean
+export WINEPREFIX="$XDG_DATA_HOME/wine"
+export HISTFILE="$XDG_STATE_HOME/bash/history"
 BASHRC
 
 mkdir -p "${SKEL}/.config/fastfetch"
@@ -1237,7 +1433,20 @@ FFCONF
 cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
-
+dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
+ufw default deny incoming
+ufw default allow outgoing  
+ufw enable
+systemctl enable ufw
+mkdir -p /etc/systemd/resolved.conf.d
+cat > /etc/systemd/resolved.conf.d/dns.conf << 'DNSCONF'
+[Resolve]
+DNS=1.1.1.1#cloudflare-dns.com 9.9.9.9#dns.quad9.net
+DNSOverTLS=yes
+DNSSEC=yes
+DNSCONF
+systemctl enable systemd-resolved
+ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 # ══════════════════════════════════════════════════════════════════════════
 # DESKTOP SHORTCUTS
 # ══════════════════════════════════════════════════════════════════════════
