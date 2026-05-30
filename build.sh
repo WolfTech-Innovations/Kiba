@@ -627,7 +627,6 @@ export WINEPREFIX="${HOME}/.wine"
 export WINEARCH=win64
 export QT_QPA_PLATFORM=wayland
 export GDK_BACKEND=wayland
-systemctl enable earlyoom
 # Init prefix silently on first run
 if [ ! -d "${WINEPREFIX}" ]; then
   wineboot --init 2>/dev/null
@@ -636,6 +635,7 @@ fi
 exec wine "$@" 2>/dev/null
 WINEWRAPPER
 chmod +x /usr/local/bin/wine-silent
+systemctl enable earlyoom
 cat > /etc/sysctl.d/99-kibaos.conf << 'SYSCTL'
 # Prefer keeping apps in RAM over disk cache — desktop feel
 vm.swappiness=10
