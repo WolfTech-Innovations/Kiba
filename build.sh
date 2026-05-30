@@ -1450,8 +1450,9 @@ DNS=1.1.1.1#cloudflare-dns.com 9.9.9.9#dns.quad9.net
 DNSOverTLS=yes
 DNSSEC=yes
 DNSCONF
+rm -f /etc/resolv.conf
+ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 systemctl enable systemd-resolved
-ln -sfn /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
 # ══════════════════════════════════════════════════════════════════════════
 # DESKTOP SHORTCUTS
 # ══════════════════════════════════════════════════════════════════════════
