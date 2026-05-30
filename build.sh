@@ -1,10 +1,15 @@
 #!/bin/bash
 set -ex
-# ── alpm user ──────────────────────────────────────────────────────────────
-useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
-mkdir -p /var/cache/pacman/pkg
-chmod 755 /var/cache/pacman /var/cache/pacman/pkg
-chown -R alpm:alpm /var/cache/pacman
+
+# ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
+grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
+  echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
+grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
+  echo 'alpm:x:951:' >> "${AIROOTFS}/etc/group"
+grep -q '^alpm:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
+  echo 'alpm:!*:19000::::::' >> "${AIROOTFS}/etc/shadow"
+mkdir -p "${AIROOTFS}/var/cache/pacman/pkg"
+chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
@@ -595,6 +600,11 @@ set -e
 dbus-uuidgen > /etc/machine-id
 eval $(dbus-launch --sh-syntax)
 export DBUS_SESSION_BUS_ADDRESS
+# ── alpm user ──────────────────────────────────────────────────────────────
+useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
+mkdir -p /var/cache/pacman/pkg
+chmod 755 /var/cache/pacman /var/cache/pacman/pkg
+chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 pacman -Syy --noconfirm
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
@@ -612,11 +622,6 @@ autologinGroup: autologin
 sudoersGroup: wheel
 setRootPassword: false
 USERSCONF
-# ── alpm user ──────────────────────────────────────────────────────────────
-useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
-mkdir -p /var/cache/pacman/pkg
-chmod 755 /var/cache/pacman /var/cache/pacman/pkg
-chown -R alpm:alpm /var/cache/pacman
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
 #!/usr/bin/env bash
