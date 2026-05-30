@@ -1,0 +1,24 @@
+name: Release Notes Generator
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Release Notes Generator
+        shell: bash
+        run: |
+          bash scripts/save_release_notes.sh test

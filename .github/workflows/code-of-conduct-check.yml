@@ -1,0 +1,24 @@
+name: Code of Conduct Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run Code of Conduct Check
+        shell: bash
+        run: |
+          ls CODE_OF_CONDUCT.md

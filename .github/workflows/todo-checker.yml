@@ -1,0 +1,12 @@
+name: TODO Checker
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  todo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TODOs
+        run: |
+          grep -r "TODO" . && echo "Found TODOs" || echo "No TODOs found"

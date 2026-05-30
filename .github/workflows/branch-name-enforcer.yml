@@ -1,0 +1,11 @@
+name: Branch Name Enforcer
+on: [pull_request]
+permissions:
+  contents: read
+jobs:
+  check-branch-name:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate branch name
+        run: |
+          echo "${{ github.head_ref }}" | grep -E '^(feat|fix|docs|style|refactor|perf|test|chore|audit|bolt|sentinel|palette)/[a-z0-9-]+'
