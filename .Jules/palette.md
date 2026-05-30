@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-05-20 - [Semantic and Accessible Welcome Page]
+**Learning:** For OS welcome pages that serve as the first user interaction point, accessibility is paramount. Using `<main>` for semantic structure, `:focus-visible` for keyboard feedback, and descriptive `aria-label` for external links ensures that users with different needs can navigate the introduction successfully.
+**Action:** When creating or auditing HTML-based introduction or welcome screens, always verify semantic structure and provide explicit focus indicators for all interactive elements.
