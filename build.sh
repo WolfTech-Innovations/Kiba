@@ -2,6 +2,9 @@
 set -ex
 
 # ── Container deps ────────────────────────────────────────────────────────
+# Enable parallel downloads for host to speed up initial package installation
+[ -f /etc/pacman.conf ] && sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+
 pacman-key --init
 pacman-key --populate archlinux
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
@@ -28,6 +31,8 @@ cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+# Enable parallel downloads for the ISO build profile
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -596,6 +601,9 @@ chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 
 # ── Keyring + package DB ───────────────────────────────────────────────────
+# Enable parallel downloads inside chroot
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
+
 pacman-key --init
 pacman-key --populate archlinux
 pacman -Syy --noconfirm
