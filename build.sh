@@ -1,16 +1,13 @@
 #!/bin/bash
 set -ex
-
+# ── alpm user ──────────────────────────────────────────────────────────────
+useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
+mkdir -p /var/cache/pacman/pkg
+chmod 755 /var/cache/pacman /var/cache/pacman/pkg
+chown -R alpm:alpm /var/cache/pacman
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
-
-mkdir -p /var/cache/pacman/pkg
-chmod 755 /etc
-chmod 755 /var/cache/pacman
-chmod 755 /var/cache/pacman/pkg
-chown -R alpm:alpm /var/cache/pacman
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
