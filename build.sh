@@ -815,7 +815,124 @@ pacman -Rns --noconfirm \
     automake
 pacman -Qtdq | pacman -Rns --noconfirm -
 echo "=== AUR packages installed ==="
+# ══════════════════════════════════════════════════════════════════════════
+# DARLING — macOS compatibility layer
+# Userspace baked in, kernel module via DKMS on first boot (unavoidable)
+# ══════════════════════════════════════════════════════════════════════════
 
+# ── Build dependencies ─────────────────────────────────────────────────────
+pacman -S --noconfirm --needed \
+  clang cmake make ninja bison flex git git-lfs \
+  fuse2 libcap python \
+  gcc-multilib lib32-gcc-libs \
+  icu glu cairo libtiff mesa llvm \
+  libxrandr libxcursor libxext libxkbcommon libxkbfile \
+  ffmpeg libbsd dbus openssl \
+  dkms linux-headers
+
+# ── Clone darling with all submodules ──────────────────────────────────────
+DARLING_SRC="/usr/src/darling"
+DARLING_VER="0.1"
+
+git clone --depth=1 --recurse-submodules \
+  https://github.com/darlinghq/darling.git "${DARLING_SRC}"
+
+# ── Build userspace only (no kernel module yet — kernel unknown at ISO time)
+mkdir -p "${DARLING_SRC}/build"
+cd "${DARLING_SRC}/build"
+cmake .. \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_INSTALL_PREFIX=/usr \
+  -DDARLING_NO_KERNEL_MODULE=ON \
+  -DTARGET_i386=OFF \
+  -GNinja
+ninja -j$(nproc)
+ninja install
+
+# ── Stage LKM source for DKMS ──────────────────────────────────────────────
+# DKMS needs the kernel module source at /usr/src/<name>-<version>/
+DKMS_SRC="/usr/src/darling-mach-${DARLING_VER}"
+mkdir -p "${DKMS_SRC}"
+
+# Copy the LKM source tree
+cp -r "${DARLING_SRC}/src/external/lkm/." "${DKMS_SRC}/"
+
+# ── Write dkms.conf ────────────────────────────────────────────────────────
+cat > "${DKMS_SRC}/dkms.conf" << 'DKMSCONF'
+PACKAGE_NAME="darling-mach"
+PACKAGE_VERSION="0.1"
+MAKE[0]="make -C /lib/modules/${kernelver}/build M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build"
+CLEAN="make -C /lib/modules/${kernelver}/build M=${dkms_tree}/${PACKAGE_NAME}/${PACKAGE_VERSION}/build clean"
+BUILT_MODULE_NAME[0]="darling-mach"
+BUILT_MODULE_LOCATION[0]=""
+DEST_MODULE_LOCATION[0]="/kernel/drivers/darling/"
+AUTOINSTALL="yes"
+DKMSCONF
+
+# Register with DKMS (don't build yet — no kernel headers in chroot)
+dkms add darling-mach/${DARLING_VER} 2>/dev/null || true
+
+# ── First-boot service — builds and loads the kernel module silently ───────
+cat > /etc/systemd/system/darling-init.service << 'DARLINGSVC'
+[Unit]
+Description=Initialize Darling macOS compatibility layer
+ConditionPathExists=!/lib/modules/%v/kernel/drivers/darling/darling-mach.ko.zst
+ConditionPathExists=!/lib/modules/%v/kernel/drivers/darling/darling-mach.ko
+After=systemd-modules-load.service
+Before=graphical.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/dkms install darling-mach/0.1 --kernelsourcedir=/lib/modules/%v/build
+ExecStartPost=/usr/bin/modprobe darling-mach
+ExecStartPost=/usr/bin/systemctl disable darling-init.service
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+DARLINGSVC
+systemctl enable darling-init.service
+
+# ── Load module on every subsequent boot once built ────────────────────────
+cat > /etc/modules-load.d/darling.conf << 'MODLOAD'
+# Load Darling macOS kernel module
+darling-mach
+MODLOAD
+
+# ── Initialize default DPREFIX skeleton ────────────────────────────────────
+# Pre-seed the prefix structure so first launch is instant
+cat > /usr/local/bin/darling-init-prefix << 'DPREFIXINIT'
+#!/usr/bin/env bash
+# Called on first darling use per user
+DPREFIX="${HOME}/.darling"
+[ -d "${DPREFIX}" ] && exit 0
+mkdir -p "${DPREFIX}"
+darling shell exit 2>/dev/null || true
+DPREFIXINIT
+chmod +x /usr/local/bin/darling-init-prefix
+
+# Add to skel autostart so prefix initializes on first login
+mkdir -p /etc/skel/.config/autostart
+cat > /etc/skel/.config/autostart/darling-init.desktop << 'DARLINGAUTO'
+[Desktop Entry]
+Type=Application
+Name=Darling Prefix Init
+Exec=/usr/local/bin/darling-init-prefix
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+DARLINGAUTO
+
+# ── Clean build artifacts to save ISO space ───────────────────────────────
+rm -rf "${DARLING_SRC}/build"
+# Keep source tree — DKMS needs it for rebuilds on kernel updates
+# but strip unnecessary files
+find "${DARLING_SRC}" -name "*.o" -delete 2>/dev/null || true
+find "${DARLING_SRC}" -name "*.a" -delete 2>/dev/null || true
+
+echo "=== Darling userspace installed, DKMS module staged for first boot ==="
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH
 # ══════════════════════════════════════════════════════════════════════════
