@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-11-21 - [Semantic Structure in System Welcome Pages]
+**Learning:** System welcome pages, often generated as static HTML in build scripts, are frequently overlooked for accessibility. Applying semantic `<main>` tags and explicit `role="list"`/`role="listitem"` attributes to feature grids ensures that screen reader users can navigate and understand the system's value proposition immediately upon first boot.
+**Action:** Always wrap primary content in `<main>` and utilize ARIA list roles for repeated informational cards in system-level onboarding interfaces.
