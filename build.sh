@@ -1487,7 +1487,7 @@ chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
