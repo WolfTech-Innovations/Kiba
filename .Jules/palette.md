@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-06-01 - [Unified Accessibility & Scannability for Onboarding]
+
+**Learning:** UX and accessibility standards for the KibaOS Welcome page require a multi-layered approach: semantic `<main>` containers for landmarks, `:focus-visible` indicators for keyboard navigation, `:focus-within` for interactive card elevation, and secure external link attributes (`target='_blank'`, `rel='noopener noreferrer'`) with descriptive ARIA labels. Prepending high-contrast emojis to action buttons further improves visual scannability and anchor points.
+**Action:** When updating onboarding or welcome interfaces, always implement this "accessible-by-default" pattern to ensure landmarks, focus states, link security, and visual scannability are addressed simultaneously.
