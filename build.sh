@@ -748,7 +748,6 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -1487,7 +1486,7 @@ chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1761,6 +1760,7 @@ rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 chown -R 1000:1000 /home/liveuser
 sudo systemctl enable NetworkManager
 echo "=== customize_airootfs.sh complete ==="
+rm /root/customize_airootfs.sh
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 

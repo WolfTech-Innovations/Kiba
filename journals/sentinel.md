@@ -11,3 +11,8 @@
 **Vulnerability:** Use of GitHub context variables (e.g., `${{ github.base_ref }}`) directly in `run` steps.
 **Learning:** GitHub context variables can contain malicious shell characters or CLI flags if not properly sanitized or mapped to environment variables.
 **Prevention:** Always map GitHub context variables to environment variables before using them in shell scripts within workflows. Use the `--` separator for CLI tools to prevent flag injection where applicable.
+
+## 2025-05-31 - [Redundant Plaintext Password Configuration]
+**Vulnerability:** Redundant `chpasswd` call with a plaintext password in `build.sh` despite a secure SHA-512 hash already being configured in `/etc/shadow`.
+**Learning:** Legacy or redundant configuration steps in complex build scripts can inadvertently re-introduce security weaknesses that were previously addressed by more secure methods.
+**Prevention:** Regularly audit build scripts for duplicate logic and enforce the use of secure password hashing, avoiding any plaintext credential handling even for default accounts.
