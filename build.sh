@@ -622,6 +622,22 @@ autologinGroup: autologin
 sudoersGroup: wheel
 setRootPassword: false
 USERSCONF
+mkdir -p /etc/xdg/crystal-dock
+cat > /etc/xdg/crystal-dock/General.conf << 'CDCONF'
+[General]
+autoHide=false
+showTaskManager=true
+showClock=true
+showDesktop=true
+position=Bottom
+screenEdgeMargin=8
+iconSize=52
+minIconSize=32
+maxIconSize=72
+backgroundAlpha=180
+tooltipDelay=300
+CDCONF
+
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
 #!/usr/bin/env bash
@@ -1194,7 +1210,12 @@ gtk-xft-hinting=1
 gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
 GTK2SKEL
-
+dconf write /com/solus-project/budgie-panel/panels "@as []"
+cat > /usr/share/glib-2.0/schemas/99-kibaos-budgie.gschema.override << 'EOF'
+[com.solus-project.budgie-panel]
+panels=@as []
+EOF
+glib-compile-schemas /usr/share/glib-2.0/schemas/
 # ══════════════════════════════════════════════════════════════════════════
 # FIRST-LOGIN SCRIPT
 # Sets gsettings on first login. Runs once via autostart, stamps ~/.config.
