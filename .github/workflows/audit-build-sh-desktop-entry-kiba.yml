@@ -1,0 +1,21 @@
+name: "Audit Build SH Desktop Entry Kiba"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        run: bash scripts/repo_audit.sh --audit-build-sh-desktop-entry-kiba
