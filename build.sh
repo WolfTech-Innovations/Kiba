@@ -1236,9 +1236,9 @@ gtk-xft-hinting=1
 gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
 GTK2SKEL
-dconf write /com/solus-project/budgie-panel/panels "@as []"
+dconf write /com/solus-project/budgie/panel/panels "@as []"
 cat > /usr/share/glib-2.0/schemas/99-kibaos-budgie.gschema.override << 'EOF'
-[com.solus-project.budgie-panel]
+[com.solus-project.budgie.panel]
 panels=@as []
 EOF
 glib-compile-schemas /usr/share/glib-2.0/schemas/
@@ -1485,7 +1485,6 @@ FFCONF
 cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
-dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
 ufw default deny incoming
 ufw default allow outgoing  
 ufw enable
@@ -1760,6 +1759,13 @@ rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser
 sudo systemctl enable NetworkManager
+# After liveuser's home exists, at the end of customize_airootfs.sh:
+install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
+sudo -u liveuser dbus-run-session -- bash -c '
+  dconf write /com/solus-project/budgie/panel/panels "@as []"
+  dconf write /com/solus-project/budgie/panel/panels-changed "$(date +%s)"
+  dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
+'
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
