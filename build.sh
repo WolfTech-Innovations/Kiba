@@ -532,7 +532,32 @@ branding: kibaos
 prompt-install: false
 dont-chroot: false
 CALA_SETTINGS
+cat > "${AIROOTFS}/etc/calamares/modules/welcome.conf" << 'WELCOMECONF'
+---
+showSupportUrl:       true
+showKnownIssuesUrl:   true
+showReleaseNotesUrl:  false
 
+requirements:
+  requiredStorage: 10.0
+  requiredRam:     1.0
+  internetCheckUrl: http://example.com
+
+  check:
+    - storage
+    - ram
+    - root
+
+  required:
+    - storage
+    - ram
+    - root
+
+geoip:
+  style:    "none"
+  url:      ""
+  selector: ""
+WELCOMECONF
 cat > "${AIROOTFS}/etc/calamares/modules/unpackfs.conf" << 'UNPACKFS'
 ---
 unpack:
