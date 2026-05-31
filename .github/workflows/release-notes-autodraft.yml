@@ -1,0 +1,26 @@
+name: "Release Notes Autodraft"
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  save-notes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: "Checkout repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Save release notes"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ github.event.release.id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          # The script handles git commit and push to main
+          bash scripts/save_release_notes.sh
