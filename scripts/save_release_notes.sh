@@ -66,15 +66,15 @@ save_release_notes() {
   y_val=$(echo "$vars" | cut -d' ' -f3)
   m_val=$(echo "$vars" | cut -d' ' -f4)
 
-  # Remove leading zeros to avoid octal interpretation in arithmetic
-  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
-  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
+  # Removing leading zeros using preferred $((10#$var)) syntax
+  h_idx=$((10#$h_val))
+  m_idx=$((10#$m_val))
 
   hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
+  h=$(echo "$hours" | cut -c "$((h_idx + 1))")
   y=$(echo "$y_val" | cut -c 2)
   months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
+  m=$(echo "$months" | cut -c "$((m_idx))")
 
   filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
