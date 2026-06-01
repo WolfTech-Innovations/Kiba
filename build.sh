@@ -114,7 +114,6 @@ gnome-clocks
 gnome-calculator
 sof-firmware
 thermald
-network-manager-applet
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -1486,7 +1485,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════

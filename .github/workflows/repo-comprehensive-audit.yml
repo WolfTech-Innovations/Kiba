@@ -1,0 +1,29 @@
+name: KibaOS Repository Comprehensive Audit
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: "Audit: ${{ matrix.check }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        check: ["build-sh-customize-set-e", "build-sh-pacman-populate", "build-sh-paperde-ldconfig", "build-sh-liveuser-uid", "build-sh-octopi-usage", "build-sh-zsh-default", "build-sh-relative-symlinks", "build-sh-desktop-entry-kiba", "build-sh-sudoers-perms", "build-sh-wallpaper-consistency", "build-sh-pacman-su", "build-sh-no-duplicate-packages", "repo-no-chmod-777-strict", "repo-no-plaintext-chpasswd", "repo-gitkeep-no-extension", "repo-shell-extension-consistency", "repo-trailing-whitespace-all", "repo-no-nested-git-dir", "repo-license-sanity", "repo-readme-badge-https", "repo-readme-toc-required", "repo-lowercase-directories", "repo-snake-case-scripts", "repo-no-temp-files", "repo-no-backup-files", "markdown-empty-link-check", "markdown-anchor-links", "markdown-no-tabs", "markdown-no-fixme", "markdown-inclusive-language", "markdown-header-punctuation", "workflow-checkout-v4", "workflow-no-node-16-actions", "workflow-explicit-bash-shell", "workflow-no-empty-run-blocks", "workflow-job-permissions-only", "workflow-timeout-reasonable", "workflow-kebab-filenames-strict", "workflow-no-absolute-script-paths", "workflow-unused-workflow-inputs", "workflow-no-github-token-leak", "zenity-dimensions-strict", "zenity-standard-dimensions", "build-welcome-apps", "build-welcome-screenshot-help"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit check
+        run: bash scripts/repo_audit.sh --audit-${{ matrix.check }}
