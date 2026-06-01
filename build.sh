@@ -13,8 +13,7 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
-pacman -Su  --noconfirm
+pacman -Syu --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
@@ -630,8 +629,11 @@ useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+# ── Keyring + package DB ───────────────────────────────────────────────────
+pacman-key --init
+pacman-key --populate archlinux
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
-pacman -Syy --noconfirm
+pacman -Syu --noconfirm
 mkdir -p /etc/calamares/modules/
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
 ---
@@ -727,10 +729,6 @@ cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
 </mime-info>
 WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
-# ── Keyring + package DB ───────────────────────────────────────────────────
-pacman-key --init
-pacman-key --populate archlinux
-pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -782,10 +780,13 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  # Single magick call to reduce process startup and decoding overhead
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -clone 0 -resize 256x256 -write "${LOGO_256}" \) \
+    \( -clone 0 -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -clone 0 -resize 48x48   -write "${LOGO_48}"  \) \
+    \( -clone 0 -resize 32x32   -write "${LOGO_32}"  \) \
+    null:
   rm -f "${LOGO_SRC}"
 else
   for sz in 256 96 48 32; do
@@ -831,8 +832,7 @@ pacman -S --noconfirm --needed \
   kpackage \
   kdeclarative \
   kiconthemes \
-  kwidgetsaddons \
-  kpmcore
+  kwidgetsaddons
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
@@ -1486,7 +1486,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1733,10 +1733,6 @@ chmod +x /usr/local/bin/calamares-launch
 systemctl enable sddm
 systemctl enable NetworkManager.service
 
-# ── Fix ownership ──────────────────────────────────────────────────────────
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
-
 # ── Size reduction ─────────────────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*
 rm -rf /usr/share/man/* /usr/share/info/* /usr/share/doc/*
@@ -1757,8 +1753,6 @@ rm -rf /usr/include/* 2>/dev/null || true
 find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
-chown -R 1000:1000 /home/liveuser
-sudo systemctl enable NetworkManager
 # After liveuser's home exists, at the end of customize_airootfs.sh:
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 sudo -u liveuser dbus-run-session -- bash -c '
