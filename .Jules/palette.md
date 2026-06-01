@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-06-01 - [Accessible and Semantic Welcome Page]
+**Learning:** UX and accessibility standards for the KibaOS Welcome page (`welcome.html`) in `build.sh` require semantic `<main>` containers, `:focus-visible` indicators for buttons, `:focus-within` for card elevation, and secure external link attributes (`target='_blank'`, `rel='noopener noreferrer'`) accompanied by descriptive ARIA labels.
+**Action:** When modifying embedded HTML in build scripts, always prioritize semantic structure and keyboard navigation indicators (focus-visible/within) to ensure accessibility in live environments.
