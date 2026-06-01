@@ -1,21 +1,10 @@
 #!/bin/bash
 set -ex
 
-# ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
-grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
-  echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
-grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
-  echo 'alpm:x:951:' >> "${AIROOTFS}/etc/group"
-grep -q '^alpm:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
-  echo 'alpm:!*:19000::::::' >> "${AIROOTFS}/etc/shadow"
-mkdir -p "${AIROOTFS}/var/cache/pacman/pkg"
-chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
-pacman -Su  --noconfirm
-pacman -S --noconfirm --needed \
+pacman -Syu --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
@@ -29,6 +18,16 @@ AIROOTFS="${PROFILE}/airootfs"
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
+
+# ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
+grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
+  echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
+grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
+  echo 'alpm:x:951:' >> "${AIROOTFS}/etc/group"
+grep -q '^alpm:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
+  echo 'alpm:!*:19000::::::' >> "${AIROOTFS}/etc/shadow"
+mkdir -p "${AIROOTFS}/var/cache/pacman/pkg"
+chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
 
@@ -631,7 +630,6 @@ mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
-pacman -Syy --noconfirm
 mkdir -p /etc/calamares/modules/
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
 ---
@@ -730,7 +728,7 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
+pacman -Sy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -782,18 +780,20 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  magick "${LOGO_SRC}" -filter Lanczos \
+    -resize 256x256 -write "${LOGO_256}" \
+    -resize 96x96   -write "${LOGO_96}"  \
+    -resize 48x48   -write "${LOGO_48}"  \
+    -resize 32x32   "${LOGO_32}"
   rm -f "${LOGO_SRC}"
 else
-  for sz in 256 96 48 32; do
-    magick -size ${sz}x${sz} xc:none \
-      -fill '#0099cc' -draw "circle $((sz/2)),$((sz/2)) $((sz/2)),1" \
-      -fill white -pointsize $((sz/2)) -gravity Center -annotate 0 'K' \
-      "/usr/share/kibaos/logo-${sz}.png"
-  done
+  magick -size 256x256 xc:none \
+    -fill '#0099cc' -draw "circle 128,128 128,1" \
+    -fill white -pointsize 128 -gravity Center -annotate 0 'K' \
+    -write "/usr/share/kibaos/logo-256.png" \
+    -resize 96x96 -write "/usr/share/kibaos/logo-96.png" \
+    -resize 48x48 -write "/usr/share/kibaos/logo-48.png" \
+    -resize 32x32 "/usr/share/kibaos/logo-32.png"
 fi
 
 cp "${LOGO_256}" /usr/share/pixmaps/kibaos.png
@@ -1486,7 +1486,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
