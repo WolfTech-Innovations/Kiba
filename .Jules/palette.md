@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-05-30 - [Semantic and Accessible Welcome Page Elements]
+
+**Learning:** Enhancing the "Welcome" page with semantic HTML (e.g., `<main>` containers), high-contrast `:focus-visible` indicators, and descriptive `aria-label` attributes for external links significantly improves accessibility for screen-reader and keyboard-only users. Informing users when a link opens in a new tab via ARIA labels is a critical micro-UX pattern for trust and predictability.
+**Action:** When modifying embedded HTML templates, always wrap content in semantic containers, provide explicit focus states, and use descriptive ARIA labels for external or icon-only links.
