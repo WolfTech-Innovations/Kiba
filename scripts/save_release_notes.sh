@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set -eu
+set -euo pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
@@ -52,6 +52,13 @@ save_release_notes() {
     printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
     return 1
   fi
+
+  if ! command -v jq >/dev/null 2>&1; then
+    printf "Error: jq is not installed.\n" >&2
+    return 1
+  fi
+
+  printf "Starting release notes save for release ID: %s in repo: %s\n" "$release_id" "$repo"
 
   # 1. Generate filename: NTE-DDHYM
   # Optimization: Single date call reduces process spawning.
