@@ -1486,7 +1486,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1582,7 +1582,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     border:1px solid var(--border);
     transition: transform .15s, box-shadow .15s;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:hover, .card:focus-within { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); outline:none; }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
 
@@ -1608,6 +1608,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: background .12s;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1657,9 +1658,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Open KibaOS Wiki in a new tab">📖 Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report an issue on GitHub">🐞 Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="Visit KibaOS GitHub repository">💻 GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>

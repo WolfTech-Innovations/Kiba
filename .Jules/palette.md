@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-05-30 - [Verifying Embedded HTML Heredocs]
+
+**Learning:** When UI components like `welcome.html` are embedded as heredocs within shell scripts (like `build.sh`), they are difficult to verify visually. Extracting the heredoc content to a temporary `.html` file and using Playwright with the `file://` protocol allows for automated visual regression testing and accessibility verification without a full OS build.
+**Action:** To verify UI changes for HTML content embedded in `build.sh`, extract the heredoc to a temporary file and use Playwright to validate responsiveness, accessibility, and focus states.
