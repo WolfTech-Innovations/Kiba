@@ -1,0 +1,27 @@
+name: Workflow Best Practices Audit
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit
+        shell: bash
+        run: |
+          bash scripts/repo_audit.sh --audit-workflow-checkout-v4
+          bash scripts/repo_audit.sh --audit-workflow-no-node-16-actions
+          bash scripts/repo_audit.sh --audit-workflow-no-empty-run-blocks
+          bash scripts/repo_audit.sh --audit-workflow-job-permissions-only
+          bash scripts/repo_audit.sh --audit-workflow-timeout-reasonable
+          bash scripts/repo_audit.sh --audit-workflow-kebab-filenames-strict
+          bash scripts/repo_audit.sh --audit-workflow-no-github-token-leak

@@ -1,0 +1,21 @@
+name: Docs Image Alt Text Audit
+on:
+  push:
+    paths:
+      - 'README.md'
+      - 'WIKI.md'
+      - 'docs/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for missing alt text
+        shell: bash
+        run: |
+          grep -rE "!\[\]\(.*\)" . --include="*.md" && exit 1 || exit 0

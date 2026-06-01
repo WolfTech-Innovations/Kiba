@@ -1,0 +1,26 @@
+name: Calamares Config Linter
+on:
+  push:
+    paths:
+      - 'build.sh'
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - 'build.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract and Lint YAML
+        shell: bash
+        run: |
+          # Extract Calamares modules from build.sh
+          grep -A 50 "cat > .*conf" build.sh | grep -v "cat >" | grep -v "EOF" > module_test.yml || true
+          if [ -s module_test.yml ]; then
+            python3 -c "import yaml; yaml.safe_load(open('module_test.yml'))"
+          fi

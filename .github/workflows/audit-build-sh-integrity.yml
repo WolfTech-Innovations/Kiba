@@ -1,0 +1,29 @@
+name: Audit build.sh Integrity
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Integrity Audit
+        shell: bash
+        run: |
+          bash scripts/repo_audit.sh --audit-build-sh-customize-set-e
+          bash scripts/repo_audit.sh --audit-build-sh-pacman-populate
+          bash scripts/repo_audit.sh --audit-build-sh-relative-symlinks
+          bash scripts/repo_audit.sh --audit-build-sh-paperde-ldconfig
+          bash scripts/repo_audit.sh --audit-build-sh-desktop-entry-kiba
+          bash scripts/repo_audit.sh --audit-build-sh-sudoers-perms
+          bash scripts/repo_audit.sh --audit-build-sh-liveuser-uid
+          bash scripts/repo_audit.sh --audit-build-sh-wallpaper-consistency
+          bash scripts/repo_audit.sh --audit-build-sh-zsh-default

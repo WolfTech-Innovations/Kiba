@@ -1,0 +1,27 @@
+name: Dependency Updates
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update pnpm dependencies
+        shell: bash
+        run: |
+          corepack enable
+          pnpm update
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: update dependencies"
+          title: "chore: monthly dependency updates"
+          body: "Automated monthly dependency updates via pnpm."
+          branch: "automation/dep-updates"

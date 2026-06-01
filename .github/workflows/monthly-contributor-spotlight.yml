@@ -1,0 +1,18 @@
+name: Monthly Contributor Spotlight
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+
+permissions:
+  contents: read
+
+jobs:
+  spotlight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Spotlight
+        shell: bash
+        run: |
+          echo "Top contributors for the month:"
+          git log --since="1 month ago" --format='%aN' | sort | uniq -c | sort -rn | head -5

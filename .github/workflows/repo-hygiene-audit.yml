@@ -1,0 +1,20 @@
+name: Repo Hygiene Audit
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Hygiene Audit
+        shell: bash
+        run: |
+          bash scripts/repo_audit.sh --audit-repo-trailing-whitespace-all
+          bash scripts/repo_audit.sh --audit-repo-gitkeep-no-extension
+          bash scripts/repo_audit.sh --audit-repo-no-nested-git-dir

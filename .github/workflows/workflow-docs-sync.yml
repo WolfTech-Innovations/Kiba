@@ -1,0 +1,35 @@
+name: Workflow Documentation Sync
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Documentation
+        shell: bash
+        run: |
+          echo "# GitHub Workflows Manual" > WORKFLOWS.md
+          echo "Generated on $(date)" >> WORKFLOWS.md
+          echo "" >> WORKFLOWS.md
+          echo "| Workflow Name | File Path |" >> WORKFLOWS.md
+          echo "|---------------|-----------|" >> WORKFLOWS.md
+          for f in .github/workflows/*.yml; do
+            name=$(grep "^name:" "$f" | head -1 | cut -d":" -f2- | xargs)
+            echo "| $name | \`$f\` |" >> WORKFLOWS.md
+          done
+      - name: Commit changes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add WORKFLOWS.md
+          git commit -m "docs: sync workflows manual" || exit 0
+          git push

@@ -1,0 +1,18 @@
+name: Workflow Timeout Enforcer
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Enforcer
+        shell: bash
+        run: bash scripts/repo_audit.sh --audit-workflow-timeout-reasonable
