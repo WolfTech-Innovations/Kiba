@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-01 - [Accessible Design for Embedded Web Utilities]
+
+**Learning:** Embedded HTML utilities like the KibaOS Welcome screen require explicit accessibility features to match the desktop's native standards. Adding a semantic `<main>` landmark, implementing `:focus-visible` for keyboard users, and providing `aria-label` for links that open in new tabs ensures that the "first-run" experience is inclusive for all users.
+**Action:** When building or updating web-based system utilities, always include a `<main>` container, visible focus indicators, and descriptive ARIA labels for external links.
