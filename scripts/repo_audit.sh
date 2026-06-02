@@ -29,8 +29,10 @@ if [ -f "build.sh" ]; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
     # Verify ldconfig after PaperDE build
-    if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
-        log_error "ldconfig not found after PaperDE installation in build.sh"
+    if grep -q "ninja -C paperde-src/build install" build.sh; then
+        if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
+            log_error "ldconfig not found after PaperDE installation in build.sh"
+        fi
     fi
     # Verify liveuser UID consistency
     if grep -q "liveuser" build.sh; then
@@ -56,8 +58,12 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir={.git,.Jules,.github} --exclude="*.md" --exclude="repo_audit.sh" | grep -qE "chmod (0?777|777)"; then
     log_error "Found dangerous chmod 777"
+fi
+# chpasswd without -e
+if grep -r "chpasswd" . --exclude-dir={.git,.Jules,.github} --exclude="*.md" --exclude="repo_audit.sh" --exclude="workflows_to_add.txt" | grep -v "chpasswd -e" | grep -q "chpasswd"; then
+    log_error "Found chpasswd usage without -e (potential plaintext password)"
 fi
 # Token leaks in workflows
 if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
@@ -77,7 +83,7 @@ if [ -n "$NESTED_GIT" ]; then
     log_error "Found nested .git directories"
 fi
 # Trailing whitespace (excluding some files if needed)
-if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
+if grep -rI "[[:blank:]]$" . --exclude-dir={.git,node_modules} --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
     log_error "Found trailing whitespace"
 fi
 

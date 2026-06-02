@@ -748,7 +748,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+echo 'liveuser:$6$UcRyPTObLn2X.Olv$aaO7Kb4Q39aQWG/vNxGJoyDpqPLVHR.s9E3U28R0QAQ0AZQonJ1Wz//aFZIZ.DVYmMiytzG4oYFbaHSCGffoS1' | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -1486,7 +1486,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
