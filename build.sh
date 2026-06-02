@@ -752,8 +752,6 @@ echo "liveuser:live" | chpasswd
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
 
 # ── systemd tunables ───────────────────────────────────────────────────────
 sed -i 's/#Storage=auto/Storage=volatile/'                    /etc/systemd/journald.conf
@@ -1483,10 +1481,8 @@ FFCONF
 
 # ── Apply skeleton to liveuser ─────────────────────────────────────────────
 cp -aT "${SKEL}/" /home/liveuser/
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1734,6 +1730,8 @@ systemctl enable sddm
 systemctl enable NetworkManager.service
 
 # ── Fix ownership ──────────────────────────────────────────────────────────
+# PERFORMANCE: Consolidating multiple recursive chown calls to a single location
+# at the end of the script to minimize redundant disk I/O operations.
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
@@ -1757,7 +1755,6 @@ rm -rf /usr/include/* 2>/dev/null || true
 find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
-chown -R 1000:1000 /home/liveuser
 sudo systemctl enable NetworkManager
 # After liveuser's home exists, at the end of customize_airootfs.sh:
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
