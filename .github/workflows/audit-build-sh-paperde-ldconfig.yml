@@ -1,0 +1,22 @@
+name: Audit Build Sh Paperde Ldconfig
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit check
+        shell: bash
+        run: ./scripts/repo_audit.sh --audit-build-sh-paperde-ldconfig

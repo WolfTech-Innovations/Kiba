@@ -25,6 +25,7 @@ jobs:
 
       - name: Run build in Docker
         run: |
+        shell: bash
           docker run --rm --privileged \
             -v "$PWD:/w" \
             -e RUN_NUM="${{ github.run_number }}" \
@@ -37,6 +38,7 @@ jobs:
           SF_USER: ${{ secrets.SF_USER }}
           SSHPASS: ${{ secrets.SF_PASS }}
         run: |
+        shell: bash
           if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
             echo "SourceForge credentials not configured. Skipping upload."
             exit 0
