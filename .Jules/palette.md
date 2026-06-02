@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-01 - [Enhanced Welcome Screen Accessibility and Scannability]
+
+**Learning:** Prepending descriptive emojis to action buttons (e.g., 📖 Wiki, 🐞 Report Issue) improves visual scannability. For external links, using `target="_blank"` must be accompanied by `rel="noopener noreferrer"` for security and an `aria-label` that explicitly informs screen reader users that the link opens in a new tab.
+**Action:** When adding external links to the Welcome Screen or other web-based UI, always include security attributes and descriptive ARIA labels, and use emojis to enhance scannability.
