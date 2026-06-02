@@ -82,15 +82,15 @@ The system undergoes aggressive footprint reduction during the build process:
 
 KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component               | Choice               |
-| ----------------------- | -------------------- |
-| **Desktop Environment** | **Cutefish OS** |
-| **Global Theme**        | **Ant-Dark**         |
-| **Color Scheme**        | **Dracula**          |
-| **Icon Theme**          | **Kora**             |
-| **Cursor Theme**        | **Vimix**            |
-| **System Font**         | **Inter**            |
-| **Monospace Font**      | **JetBrains Mono**   |
+| Component               | Choice             |
+| ----------------------- | ------------------ |
+| **Desktop Environment** | **Cutefish OS**    |
+| **Global Theme**        | **Ant-Dark**       |
+| **Color Scheme**        | **Dracula**        |
+| **Icon Theme**          | **Kora**           |
+| **Cursor Theme**        | **Vimix**          |
+| **System Font**         | **Inter**          |
+| **Monospace Font**      | **JetBrains Mono** |
 
 ### Shell Experience
 

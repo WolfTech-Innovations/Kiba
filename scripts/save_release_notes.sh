@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set -eu
+set -euo pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
