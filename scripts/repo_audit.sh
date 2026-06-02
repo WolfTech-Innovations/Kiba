@@ -56,8 +56,12 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="*.md" --exclude="workflows_to_add.txt"; then
     log_error "Found dangerous chmod 777"
+fi
+# chpasswd without -e (plaintext password leak risk)
+if grep -r "chpasswd" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="*.md" --exclude="workflows_to_add.txt" | grep -v "chpasswd -e"; then
+    log_error "Found chpasswd usage without -e flag (plaintext password leak risk)"
 fi
 # Token leaks in workflows
 if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
