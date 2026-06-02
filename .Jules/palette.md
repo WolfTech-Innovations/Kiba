@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-02 - Enhancing Welcome Screen Accessibility and README Hero Description
+**Learning:** Generic `alt` text on hero images and missing focus indicators in embedded OS welcome screens are common accessibility barriers that significantly degrade the experience for screen reader and keyboard users. Prepending emojis to action buttons improves visual scannability, but must be accompanied by explicit `aria-label` attributes to ensure clear screen reader interpretation.
+**Action:** Always provide descriptive `alt` text for project banners in `README.md`. For embedded HTML components like `welcome.html`, ensure semantic structure (`<main>`), visible focus states (`:focus-visible`), and descriptive ARIA labels for icon-heavy buttons.
