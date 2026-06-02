@@ -1,0 +1,40 @@
+name: "Monitor CachyOS Kernel"
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+
+      - name: "Check Latest CachyOS Kernel"
+        id: check
+        shell: bash
+        run: |
+          LATEST_VERSION=$(curl -s https://mirror.cachyos.org/repo/x86_64/cachyos/ | grep -o 'linux-cachyos-[0-9][^"]*' | sort -V | tail -n 1 | sed 's/linux-cachyos-//;s/.pkg.tar.zst.*//')
+          echo "Latest CachyOS Kernel: $LATEST_VERSION"
+          echo "version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: "Compare and Trigger Build"
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Simple hook: trigger build if manual or on schedule
+          # In a more advanced setup, we would compare with a VERSION file
+          echo "Hook triggered for version ${{ steps.check.outputs.version }}"
+
+          # Trigger build workflow if it's main branch
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            gh workflow run build.yml
+          fi
