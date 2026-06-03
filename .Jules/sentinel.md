@@ -1,0 +1,4 @@
+## 2026-06-03 - Insecure Plaintext Password and Audit False Positives
+**Vulnerability:** Redundant and insecure plaintext 'chpasswd' call was found in 'build.sh' for the 'liveuser', even though the password was already securely hashed in '/etc/shadow'. Additionally, the repository audit script had several false positives that masked real issues.
+**Learning:** Hardcoded passwords in scripts are often redundant when standard system configuration files (like /etc/shadow) are already being managed correctly. Relying on 'grep' for security audits requires careful exclusion of non-source files and the audit script itself to remain effective.
+**Prevention:** Remove redundant 'chpasswd' calls and prioritize secure hashing in configuration files. Enhance audit scripts with robust exclusion patterns and conditional checks to maintain high signal-to-noise ratio in security reporting.
