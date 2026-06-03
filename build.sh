@@ -13,7 +13,16 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+# Add CachyOS repo for optimized build tools if needed, but primarily for ISO profile
+pacman-key --recv-keys F3B607488DB35A47
+pacman-key --lsign-key F3B607488DB35A47
+cat >> /etc/pacman.conf << 'CACHYOS'
+
+[cachyos]
+Server = https://mirror.cachyos.org/repo/x86_64/cachyos/
+CACHYOS
 pacman -Syy --noconfirm
+pacman -S --noconfirm cachyos-keyring
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
@@ -30,7 +39,13 @@ cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+cat >> "${PROFILE}/pacman.conf" << 'CACHYOS'
+
+[cachyos]
+Server = https://mirror.cachyos.org/repo/x86_64/cachyos/
+CACHYOS
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -82,9 +97,11 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
+cachyos-keyring
 syslinux
 base
-linux
+linux-cachyos
+linux-cachyos-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -193,11 +210,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -213,15 +230,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -233,8 +250,8 @@ if [ -f "${SYSLINUX_CFG}" ]; then
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -597,6 +614,7 @@ grep -q '^liveuser:' "${AIROOTFS}/etc/group"   2>/dev/null || \
 grep -q '^liveuser:' "${AIROOTFS}/etc/shadow"  2>/dev/null || \
   echo "liveuser:${LIVE_HASH}:19000:0:99999:7:::" >> "${AIROOTFS}/etc/shadow"
 mkdir -p "${AIROOTFS}/home/liveuser"
+# Initial ownership set via profiledef.sh, avoiding redundant chown/chmod here.
 mkdir -p "${AIROOTFS}/etc/sudoers.d"
 echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > "${AIROOTFS}/etc/sudoers.d/liveuser"
 chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
@@ -630,6 +648,7 @@ useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+sed -i 's/^#ParallelDownloads/ParallelDownloads/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 pacman -Syy --noconfirm
 mkdir -p /etc/calamares/modules/
@@ -730,6 +749,14 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+pacman-key --recv-keys F3B607488DB35A47
+pacman-key --lsign-key F3B607488DB35A47
+# CachyOS repo also in ISO's pacman.conf
+cat >> /etc/pacman.conf << 'CACHYOS'
+
+[cachyos]
+Server = https://mirror.cachyos.org/repo/x86_64/cachyos/
+CACHYOS
 pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
@@ -748,12 +775,10 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+echo "liveuser:$(openssl passwd -6 "live")" | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
 
 # ── systemd tunables ───────────────────────────────────────────────────────
 sed -i 's/#Storage=auto/Storage=volatile/'                    /etc/systemd/journald.conf
@@ -782,10 +807,12 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -clone 0 -resize 256x256 -write "${LOGO_256}" \) \
+    \( -clone 0 -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -clone 0 -resize 48x48   -write "${LOGO_48}"  \) \
+    \( -clone 0 -resize 32x32   -write "${LOGO_32}"  \) \
+    null:
   rm -f "${LOGO_SRC}"
 else
   for sz in 256 96 48 32; do
@@ -890,7 +917,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux 2>/dev/null || true
+mkinitcpio -p linux-cachyos 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -1483,10 +1510,8 @@ FFCONF
 
 # ── Apply skeleton to liveuser ─────────────────────────────────────────────
 cp -aT "${SKEL}/" /home/liveuser/
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1605,9 +1630,12 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     display:inline-block; background:var(--accent); color:#fff;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, outline .12s;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { outline-color: var(--accent); }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1633,20 +1661,20 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
-<div class="card-row">
-  <div class="card">
+<div class="card-row" role="list">
+  <div class="card" role="listitem">
     <h2>Budgie 10.10 Wayland</h2>
     <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Built on Arch Linux</h2>
     <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Unified Design</h2>
     <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Private by Default</h2>
     <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
   </div>
@@ -1663,10 +1691,10 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+  <div class="design-pills" role="list">
+    <span class="pill" role="listitem">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
+    <span class="pill" role="listitem">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
+    <span class="pill" role="listitem">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
   </div>
 </section>
 
@@ -1734,8 +1762,7 @@ systemctl enable sddm
 systemctl enable NetworkManager.service
 
 # ── Fix ownership ──────────────────────────────────────────────────────────
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
+# Redundant call removed — handled by consolidate call below.
 
 # ── Size reduction ─────────────────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*
@@ -1757,7 +1784,15 @@ rm -rf /usr/include/* 2>/dev/null || true
 find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
+# Final recursive operation for liveuser home directory
 chown -R 1000:1000 /home/liveuser
+chmod 750 /home/liveuser
+
+# Record the kernel version built for automation state persistence
+KVER=$(pacman -Q linux-cachyos | awk '{print $2}')
+mkdir -p "${WORKDIR}/Notes"
+echo "$KVER" > "${WORKDIR}/Notes/last_cachyos_kernel.txt"
+
 sudo systemctl enable NetworkManager
 # After liveuser's home exists, at the end of customize_airootfs.sh:
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf

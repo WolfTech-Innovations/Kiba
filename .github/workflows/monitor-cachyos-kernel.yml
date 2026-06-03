@@ -1,0 +1,40 @@
+name: "Monitor CachyOS Kernel"
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Every hour
+  workflow_dispatch:
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get latest CachyOS kernel version
+        id: cachyos
+        run: |
+          VERSION=$(curl -s https://mirror.cachyos.org/repo/x86_64/cachyos/ | grep -oP 'linux-cachyos-\K[0-9]+\.[0-9]+\.[0-9]+(\.[a-z0-9]+)?-[0-9]+' | head -n 1)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Detected CachyOS Kernel: $VERSION"
+
+      - name: Get last built version
+        id: last
+        run: |
+          if [ -f "Notes/last_cachyos_kernel.txt" ]; then
+            LAST_VERSION=$(cat Notes/last_cachyos_kernel.txt)
+          else
+            LAST_VERSION="none"
+          fi
+          echo "version=$LAST_VERSION" >> $GITHUB_OUTPUT
+          echo "Last built version: $LAST_VERSION"
+
+      - name: Trigger Build if new version detected
+        if: steps.cachyos.outputs.version != steps.last.outputs.version
+        run: |
+          echo "New kernel detected: ${{ steps.cachyos.outputs.version }}. Triggering KibaOS Build..."
+          # No manual gh workflow run needed here as build.yml has workflow_run trigger
