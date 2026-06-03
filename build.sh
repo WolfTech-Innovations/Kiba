@@ -31,6 +31,8 @@ cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+# Enable parallel downloads for faster package installation
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -782,10 +784,13 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  # Consolidate resizing into a single magick call to reduce I/O and process overhead
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -clone 0 -resize 256x256 -write "${LOGO_256}" \) \
+    \( -clone 0 -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -clone 0 -resize 48x48   -write "${LOGO_48}"  \) \
+    \( -clone 0 -resize 32x32   -write "${LOGO_32}"  \) \
+    null:
   rm -f "${LOGO_SRC}"
 else
   for sz in 256 96 48 32; do
