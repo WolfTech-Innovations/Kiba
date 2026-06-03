@@ -1,0 +1,25 @@
+name: Audit Build Sh Magick Optimization
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Run Build Sh Magick Optimization Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run audit script
+        shell: bash
+        run: |
+          bash scripts/repo_audit.sh --audit-build-sh-magick-optimization
