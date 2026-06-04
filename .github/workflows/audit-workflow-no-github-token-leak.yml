@@ -1,0 +1,17 @@
+name: Audit Workflow No Github Token Leak
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit
+        shell: bash
+        run: bash scripts/repo_audit.sh --audit-workflow-no-github-token-leak
