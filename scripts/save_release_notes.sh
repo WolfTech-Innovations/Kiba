@@ -29,64 +29,63 @@ trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 # Convention: NTE-DDHYM.md
 
 save_release_notes() {
-  if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
-    printf "Usage: %s [release_id]\n" "$0" >&2
+  # Support both env var and argument for RELEASE_ID
+  local rid="${1:-${RELEASE_ID:-}}"
+  local token="${GH_TOKEN:-}"
+  local repository="${GITHUB_REPOSITORY:-}"
+
+  if [ -z "$rid" ]; then
+    printf "Error: RELEASE_ID is required.\n" >&2
     exit 1
   fi
 
-  release_id="${1:-${RELEASE_ID:-}}"
-  github_token="${GH_TOKEN:-}"
-  repo="${GITHUB_REPOSITORY:-}"
-
-  if [ -z "$release_id" ]; then
-    printf "Error: RELEASE_ID environment variable or argument is required.\n" >&2
-    return 1
+  if [ -z "$token" ]; then
+    printf "Error: GH_TOKEN is required.\n" >&2
+    exit 1
   fi
 
-  if [ -z "$github_token" ]; then
-    printf "Error: GH_TOKEN environment variable is required.\n" >&2
-    return 1
-  fi
-
-  if [ -z "$repo" ]; then
-    printf "Error: GITHUB_REPOSITORY environment variable is required.\n" >&2
-    return 1
+  if [ -z "$repository" ]; then
+    printf "Error: GITHUB_REPOSITORY is required.\n" >&2
+    exit 1
   fi
 
   # 1. Generate filename: NTE-DDHYM
-  # Optimization: Single date call reduces process spawning.
   # DD: Day of month (01-31)
   # H: Hour of day (0-N for 0-23)
-  # Y: Last digit of year
+  # Y: Last digit of year (e.g., 6 for 2026)
   # M: Month (1-C for 1-12)
 
+  local dd h y m vars h_val y_val m_val h_idx m_idx
   vars=$(date "+%d %H %y %m")
   dd=$(echo "$vars" | cut -d' ' -f1)
   h_val=$(echo "$vars" | cut -d' ' -f2)
   y_val=$(echo "$vars" | cut -d' ' -f3)
   m_val=$(echo "$vars" | cut -d' ' -f4)
 
-  # Remove leading zeros to avoid octal interpretation in arithmetic
-  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
-  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
+  # Remove leading zeros for arithmetic
+  h_idx=$(echo "$h_val" | sed 's/^0//'); h_idx="${h_idx:-0}"
+  m_idx=$(echo "$m_val" | sed 's/^0//'); m_idx="${m_idx:-0}"
 
-  hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
+  local hours="0123456789ABCDEFGHIJKLMN"
+  h=$(echo "$hours" | cut -c "$((h_idx + 1))")
+
   y=$(echo "$y_val" | cut -c 2)
-  months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
 
-  filename="Notes/NTE-${dd}${h}${y}${m}.md"
+  local months="123456789ABC"
+  m=$(echo "$months" | cut -c "$((m_idx))")
+
+  local filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [ ! -f Notes/.gitkeep ]; then
-    touch Notes/.gitkeep
+  if [ ! -f "Notes/.gitkeep" ] || [ -s "Notes/.gitkeep" ]; then
+    : > Notes/.gitkeep
   fi
 
-  # 3. Fetch release body using curl -fsS and jq
-  api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
-  body=$(curl -fsS -H "Authorization: token ${github_token}" \
+  # 3. Fetch release body
+  local api_url="https://api.github.com/repos/${repository}/releases/${rid}"
+  local body
+  body=$(curl -fsS -H "Authorization: token ${token}" \
               -H "Accept: application/vnd.github.v3+json" \
               "$api_url" | jq -r '.body')
 
@@ -97,17 +96,7 @@ save_release_notes() {
     printf "%s\n" "$body" > "$filename"
   fi
 
-  # 5. Git operations
-  git config user.name "github-actions[bot]"
-  git config user.email "github-actions[bot]@users.noreply.github.com"
-  git add "$filename" Notes/.gitkeep
-
-  if git commit -m "docs: add release notes $filename [skip ci]"; then
-    git pull --rebase origin main
-    git push origin main
-  else
-    printf "No changes to commit\n"
-  fi
+  printf "Successfully saved release notes to %s\n" "$filename"
 }
 
-(save_release_notes "$@")
+save_release_notes "$@"
