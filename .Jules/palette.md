@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-04 - [Visual Scannability with Emojis in Feature Cards]
+
+**Learning:** Prepending descriptive emojis to feature card titles (e.g., 🚀, 🏗️, 🎨, 🛡️) significantly improves visual scannability and provides intuitive anchor points for users. This reduces cognitive load when scanning for specific information in dense layouts, similar to their effect in menu lists.
+**Action:** Prepend high-contrast, descriptive emojis to titles in feature card grids and semantic lists to enhance visual scannability.
