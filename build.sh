@@ -748,7 +748,8 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+# Live user password is 'live'
+echo 'liveuser:$6$.Ys5uoriIfH5WcJR$Y6T5pPjLjReN50sv91oWXIr/sqJcsEKZ443elPJAk0vuq6S/e4Vod65EtS7rgZjbyQohHJGDXpuykygLIVRsD/' | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
