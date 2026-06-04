@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1430" height="892" alt="image" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
+<img width="1430" height="892" alt="KibaOS Budgie Desktop environment with a neon purple and pink sunset wallpaper and a bottom taskbar" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
 
 </p>
 

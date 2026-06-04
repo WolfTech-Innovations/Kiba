@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-04 - Accessibility in Generated System UI
+**Learning:** System-level UI components generated via shell heredocs (like `welcome.html` or Calamares `show.qml`) frequently lack standard web accessibility features like ARIA roles and keyboard focus states because they are often treated as static "screens" rather than interactive applications.
+**Action:** Always audit embedded HTML/QML heredocs in build scripts for semantic roles and focus visibility, as these are high-impact surfaces for a user's first impression of the OS.

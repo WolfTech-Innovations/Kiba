@@ -421,6 +421,8 @@ Item {
                 anchors.centerIn: parent; source: "logo.png"
                 width: 88; height: 88
                 fillMode: Image.PreserveAspectFit; smooth: true
+                Accessible.role: Accessible.Graphic
+                Accessible.name: "KibaOS Logo"
             }
         }
 
@@ -1608,6 +1610,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: background .12s;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { outline: 2px solid var(--accent-dark); outline-offset: 2px; }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1620,6 +1623,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     border-radius:100px; padding:5px 14px; font-size:.82rem;
     color:var(--sub);
   }
+  .pill:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   footer {
     text-align:center; padding:24px; color:var(--sub); font-size:.8rem;
@@ -1633,20 +1637,20 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
-<div class="card-row">
-  <div class="card">
+<div class="card-row" role="list">
+  <div class="card" role="listitem">
     <h2>Budgie 10.10 Wayland</h2>
     <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Built on Arch Linux</h2>
     <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Unified Design</h2>
     <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
   </div>
-  <div class="card">
+  <div class="card" role="listitem">
     <h2>Private by Default</h2>
     <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
   </div>
@@ -1663,10 +1667,10 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+  <div class="design-pills" role="list">
+    <span class="pill" role="listitem" tabindex="0">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
+    <span class="pill" role="listitem" tabindex="0">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
+    <span class="pill" role="listitem" tabindex="0">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
   </div>
 </section>
 
