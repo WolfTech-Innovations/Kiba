@@ -752,7 +752,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+echo 'liveuser:__LIVE_HASH__' | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1740,6 +1740,9 @@ systemctl enable NetworkManager.service
 # ── Fix ownership ──────────────────────────────────────────────────────────
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
+
+# ── Substitute liveuser password hash ──────────────────────────────────────
+sed -i "s|__LIVE_HASH__|${LIVE_HASH}|" "${AIROOTFS}/root/customize_airootfs.sh"
 
 # ── Size reduction ─────────────────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*

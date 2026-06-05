@@ -28,9 +28,11 @@ if [ -f "build.sh" ]; then
     if ! grep -q "pacman-key --populate archlinux" build.sh; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
-    # Verify ldconfig after PaperDE build
-    if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
-        log_error "ldconfig not found after PaperDE installation in build.sh"
+    # Verify ldconfig after PaperDE build (only if PaperDE build is present)
+    if grep -q "ninja -C paperde-src/build install" build.sh; then
+        if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
+            log_error "ldconfig not found after PaperDE installation in build.sh"
+        fi
     fi
     # Verify liveuser UID consistency
     if grep -q "liveuser" build.sh; then
@@ -56,8 +58,12 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh"; then
     log_error "Found dangerous chmod 777"
+fi
+# chpasswd without -e (implies plaintext passwords)
+if grep -r "chpasswd" . --exclude-dir={.git,.github,.Jules} --exclude={repo_audit.sh,workflows_to_add.txt} --exclude="*.md" | grep -v "chpasswd -e"; then
+    log_error "Found chpasswd usage without -e flag (potential plaintext password)"
 fi
 # Token leaks in workflows
 if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
