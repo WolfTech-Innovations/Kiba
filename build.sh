@@ -786,18 +786,23 @@ echo "=== Downloading KibaOS logo ==="
 curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
-  magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 96x96  "${LOGO_96}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 48x48  "${LOGO_48}"
-  magick "${LOGO_SRC}" -filter Lanczos -resize 32x32  "${LOGO_32}"
+  # Consolidate multiple resizes into one process to save CPU/IO
+  magick "${LOGO_SRC}" -filter Lanczos \
+    \( -clone 0 -resize 256x256 -write "${LOGO_256}" \) \
+    \( -clone 0 -resize 96x96   -write "${LOGO_96}"  \) \
+    \( -clone 0 -resize 48x48   -write "${LOGO_48}"  \) \
+    -resize 32x32 "${LOGO_32}"
   rm -f "${LOGO_SRC}"
 else
-  for sz in 256 96 48 32; do
-    magick -size ${sz}x${sz} xc:none \
-      -fill '#0099cc' -draw "circle $((sz/2)),$((sz/2)) $((sz/2)),1" \
-      -fill white -pointsize $((sz/2)) -gravity Center -annotate 0 'K' \
-      "/usr/share/kibaos/logo-${sz}.png"
-  done
+  # Generate high-res master and derive others in a single pipe
+  magick -size 256x256 xc:none \
+    -fill '#0099cc' -draw "circle 128,128 128,1" \
+    -fill white -pointsize 128 -gravity Center -annotate 0 'K' \
+    -write "${LOGO_256}" \
+    -filter Lanczos \
+    \( -clone 0 -resize 96x96 -write "${LOGO_96}" \) \
+    \( -clone 0 -resize 48x48 -write "${LOGO_48}" \) \
+    -resize 32x32 "${LOGO_32}"
 fi
 
 cp "${LOGO_256}" /usr/share/pixmaps/kibaos.png
@@ -1490,7 +1495,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
