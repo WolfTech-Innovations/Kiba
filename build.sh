@@ -16,8 +16,7 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
-pacman -Su  --noconfirm
+pacman -Syu --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
@@ -734,7 +733,6 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -837,6 +835,11 @@ pacman -S --noconfirm --needed \
   kiconthemes \
   kwidgetsaddons \
   kpmcore
+# ── makepkg optimization ───────────────────────────────────────────────────
+# Enable parallel compilation and skip package compression for speed
+sed -i "s/^#MAKEFLAGS=\"-j2\"/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
+sed -i "s/^PKGEXT='.pkg.tar.zst'/PKGEXT='.pkg.tar'/" /etc/makepkg.conf
+
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
 for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
@@ -1490,7 +1493,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
