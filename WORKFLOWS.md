@@ -646,6 +646,7 @@ Generated on Tue May 26 02:15:18 UTC 2026
 | Repo Symlink Target Validity | `.github/workflows/repo-symlink-target-validity.yml` |
 | Repo Topics Validator | `.github/workflows/repo-topics-validator.yml` |
 | Repo Trailing Newline Audit | `.github/workflows/repo-trailing-newline-audit.yml` |
+| Save Release Notes | `.github/workflows/save-release-notes.yml` |
 | Scan PR Secrets Proactive | `.github/workflows/scan-pr-secrets-proactive.yml` |
 | Scan Repo Vulnerabilities | `.github/workflows/scan-repo-vulnerabilities.yml` |
 | Scorecard supply-chain security | `.github/workflows/scorecards.yml` |
