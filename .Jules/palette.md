@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-04 - [Context-Aware Focus Management]
+**Learning:** Adding `tabindex="0"` to static text elements (like design pills) is an accessibility anti-pattern. It creates unnecessary tab stops for keyboard users without providing any interactive functionality. Focus indicators should only be applied to interactive elements (buttons, links) or semantic containers that benefit from being a focus group.
+**Action:** Always verify that `tabindex="0"` is only applied to elements that the user can actually interact with, and use semantic ARIA roles like `role="listitem"` to provide structure without forcing unnecessary focus stops.
