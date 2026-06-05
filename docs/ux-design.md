@@ -155,7 +155,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+| `pacman`        | **`pacman`**         | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 
