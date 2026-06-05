@@ -80,9 +80,7 @@ save_release_notes() {
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [ ! -f Notes/.gitkeep ]; then
-    touch Notes/.gitkeep
-  fi
+  truncate -s 0 Notes/.gitkeep
 
   # 3. Fetch release body using curl -fsS and jq
   api_url="https://api.github.com/repos/${repo}/releases/${release_id}"

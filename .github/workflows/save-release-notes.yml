@@ -1,0 +1,25 @@
+name: Save Release Notes
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  save-notes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Save release notes
+        env:
+          RELEASE_ID: ${{ github.event.release.id }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          ./scripts/save_release_notes.sh
