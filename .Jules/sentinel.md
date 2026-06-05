@@ -1,0 +1,4 @@
+## 2026-06-04 - Hardening live user password in build.sh
+**Vulnerability:** Live user password was set using plaintext `chpasswd` in a single-quoted heredoc, which is bad practice if the password was intended to be variable, though it was "live" here. More importantly, it was visible in the script.
+**Learning:** Hardening the password by pre-calculating a hash with `openssl passwd -6` on the host and then using a placeholder (e.g., `__LIVE_HASH__`) and `sed` for post-generation substitution in a single-quoted heredoc is a secure way to inject sensitive data into chroot scripts without host-side shell expansion issues or plaintext exposure in the final script.
+**Prevention:** Avoid plaintext passwords in scripts; use pre-hashed values or secure injection mechanisms like `sed` with placeholders.
