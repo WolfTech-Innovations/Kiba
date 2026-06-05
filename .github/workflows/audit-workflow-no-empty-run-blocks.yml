@@ -1,0 +1,24 @@
+name: Audit Workflow No Empty Run Blocks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  audit:
+    name: Run Audit Workflow No Empty Run Blocks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          chmod +x scripts/repo_audit.sh
+          ./scripts/repo_audit.sh --audit-workflow-no-empty-run-blocks

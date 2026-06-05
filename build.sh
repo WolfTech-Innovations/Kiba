@@ -594,6 +594,7 @@ fi
 # liveuser account
 # ══════════════════════════════════════════════════════════════════════════
 LIVE_HASH=$(openssl passwd -6 "live")
+sed -i "s|__LIVE_HASH__|${LIVE_HASH}|g" "${AIROOTFS}/root/customize_airootfs.sh"
 grep -q '^liveuser:' "${AIROOTFS}/etc/passwd"  2>/dev/null || \
   echo 'liveuser:x:1000:1000:KibaOS Live User:/home/liveuser:/bin/bash' >> "${AIROOTFS}/etc/passwd"
 grep -q '^liveuser:' "${AIROOTFS}/etc/group"   2>/dev/null || \
@@ -752,7 +753,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+echo "liveuser:__LIVE_HASH__" | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -937,7 +938,7 @@ GTK3RC
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /etc/gtk-4.0
 cat > /etc/gtk-4.0/gtk.css << 'GTK4CSS'
-/* KibaOS unified GTK4 override — DDE+Paper+Cutefish fusion */
+/* KibaOS unified GTK4 override — Budgie desktop experience */
 
 @define-color accent_color #0099cc;
 @define-color accent_bg_color #0099cc;
@@ -1128,7 +1129,7 @@ LABWCRC
 mkdir -p /usr/share/themes/kibaos/openbox-3
 
 cat > /usr/share/themes/kibaos/openbox-3/themerc << 'THEMERC'
-# KibaOS labwc theme — DDE+Paper+Cutefish fusion
+# KibaOS labwc theme — Budgie desktop experience
 
 border.width: 1
 window.client.padding.width: 0
@@ -1490,7 +1491,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1648,7 +1649,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   </div>
   <div class="card">
     <h2>Unified Design</h2>
-    <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
+    <p>Inspired by modern, clean, and airy floating aesthetics.</p>
   </div>
   <div class="card">
     <h2>Private by Default</h2>
