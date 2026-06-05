@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Manager-KibaStore-purple?style=for-the-badge" alt="KibaStore">
-  <img src="https://img.shields.io/badge/CLI-Pacman-blue?style=for-the-badge" alt="Pacman">
-  <img src="https://img.shields.io/badge/Package-Flatpak-orange?style=for-the-badge" alt="Flatpak">
+  <img src="https://img.shields.io/badge/Manager-KibaStore-purple?style=for-the-badge" alt="Manager: KibaStore">
+  <img src="https://img.shields.io/badge/CLI-Pacman-blue?style=for-the-badge" alt="CLI: Pacman">
+  <img src="https://img.shields.io/badge/Package-Flatpak-orange?style=for-the-badge" alt="Package: Flatpak">
 </p>
 
 ---
@@ -50,14 +50,14 @@ For those who prefer the command line, KibaOS defaults to **Pacman** — a moder
 
 ### Common Commands
 
-| Task                     | Command                                                        |
-| :----------------------- | :------------------------------------------------------------- |
+| Task                     | Command                                   |
+| :----------------------- | :---------------------------------------- |
 | **Update system**        | `update` _(Alias for `sudo pacman -Syu`)_ |
-| **Search for a package** | `search <name>`                                                |
-| **Install a package**    | `install <name>`                                               |
-| **Remove a package**     | `remove <name>`                                                |
-| **View history**         | `pacman -Qi`                                                 |
-| **Undo an operation**    | `sudo pacman -Qi undo <ID>`                                  |
+| **Search for a package** | `search <name>`                           |
+| **Install a package**    | `install <name>`                          |
+| **Remove a package**     | `remove <name>`                           |
+| **View history**         | `pacman -Qi`                              |
+| **Undo an operation**    | `sudo pacman -Qi undo <ID>`               |
 
 > [!NOTE]
 

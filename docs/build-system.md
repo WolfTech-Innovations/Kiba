@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/CI-GitHub`%20Actions-2088FF?style=for-the-badge&logo=github-actions" alt="CI">
-  <img src="https://img.shields.io/badge/Tool-live--build-blue?style=for-the-badge" alt="live-build">
-  <img src="https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker" alt="Docker">
+  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=for-the-badge&logo=github-actions" alt="CI: GitHub Actions">
+  <img src="https://img.shields.io/badge/Tool-live--build-blue?style=for-the-badge" alt="Tool: live-build">
+  <img src="https://img.shields.io/badge/Container-Docker-2496ED?style=for-the-badge&logo=docker" alt="Container: Docker">
 </p>
 
 ---
@@ -56,7 +56,7 @@ _Executed inside the temporary system environment._
 | **`0055-bazaar-native.hook.chroot`**        | Builds **KibaStore** (Bazaar) from source and configures the desktop entry.        |
 | **`0056-ungoogled-chromium.hook.chroot`**   | Integrates Ungoogled Chromium via an OBS repository.                               |
 | **`0090-extreme-minimization.hook.chroot`** | Purges documentation, help files, and non-English locales.                         |
-| **`0100-customize.hook.chroot`**            | Applies Dracula theme, Plasma settings, shell aliases, and system identity.        |
+| **`0100-customize.hook.chroot`**            | Applies Dracula theme, Budgie settings, shell aliases, and system identity.        |
 | **`0110-calamares-branding.hook.chroot`**   | Configures the Calamares installer with KibaOS branding and the age-verify module. |
 
 ### Binary Hooks

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Helpful-blue?style=for-the-badge" alt="Helpful">
+  <img src="https://img.shields.io/badge/Status-Helpful-blue?style=for-the-badge" alt="Status: Helpful">
 </p>
 
 ---
@@ -14,7 +14,7 @@
 
 ### What is KibaOS
 
-KibaOS is a modern, lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Cutefish OS** and the **CachyOS kernel**. It is designed to be simple, beautiful, and ready to use out-of-the-box.
+KibaOS is a modern, lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop** and the **CachyOS kernel**. It is designed to be simple, beautiful, and ready to use out-of-the-box.
 
 ### Why "Kiba"
 
@@ -30,7 +30,7 @@ KibaOS is designed for beginners who want a beautiful and fast system, as well a
 
 ### Why Arch Linux Rolling (Testing)
 
-We use **Arch Linux Rolling** to provide users with modern software like Cutefish OS and the latest toolchains, while still benefiting from Arch Linux's legendary stability and massive package repository.
+We use **Arch Linux Rolling** to provide users with modern software like Budgie Desktop and the latest toolchains, while still benefiting from Arch Linux's legendary stability and massive package repository.
 
 ### What is the CachyOS Kernel
 
@@ -42,7 +42,7 @@ You can update through **KibaStore** (graphical) or simply by typing **`update`*
 
 ### Can I change the theme
 
-Absolutely! While KibaOS comes pre-configured with the **Dracula** theme, it is a standard Cutefish OS system. You can change the global theme, icons, and colors in **System Settings**.
+Absolutely! While KibaOS comes pre-configured with the **Dracula** theme, it is a standard Budgie Desktop system. You can change the global theme, icons, and colors in **Budgie Control Center**.
 
 ---
 

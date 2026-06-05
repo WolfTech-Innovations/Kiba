@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture">
-  <img src="https://img.shields.io/badge/Base-Arch Linux-1793D1?style=for-the-badge&logo=archlinux" alt="Base">
-  <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel">
+  <img src="https://img.shields.io/badge/Architecture-amd64-blue?style=for-the-badge" alt="Architecture: amd64">
+  <img src="https://img.shields.io/badge/Base-Arch Linux-1793D1?style=for-the-badge&logo=archlinux" alt="Base: Arch Linux">
+  <img src="https://img.shields.io/badge/Kernel-CachyOS-orange?style=for-the-badge" alt="Kernel: CachyOS">
 </p>
 
 ---
@@ -45,7 +45,7 @@ graph TD
     C --> D[Arch Linux Rolling Base]
     D --> E[Systemd Init]
     E --> F[Wayland / X11]
-    F --> G[Cutefish OS]
+    F --> G[Budgie Desktop]
     G --> H[KibaOS UX]
 ```
 
@@ -55,7 +55,7 @@ graph TD
 
 ### Arch Linux base (Rolling)
 
-KibaOS is built upon the **Arch Linux base (Rolling)** testing branch. This allows us to offer cutting-edge software packages (like Cutefish OS) while inheriting the robust package management and security infrastructure of Arch Linux.
+KibaOS is built upon the **Arch Linux base (Rolling)** testing branch. This allows us to offer cutting-edge software packages (like Budgie Desktop) while inheriting the robust package management and security infrastructure of Arch Linux.
 
 ### CachyOS Kernel
 
@@ -92,7 +92,7 @@ We only keep **`en`** and **`en_US`** locales. All other translations are remove
 
 ### Dependency Pruning
 
-We avoid meta-packages like `kde-plasma-desktop`. Instead, we install `plasma-bigscreen` and `plasma-workspace` and manually add only the essential KDE components required for a functional desktop.
+We avoid heavy meta-packages like `budgie-desktop-group`. Instead, we manually add only the essential components required for a functional and beautiful desktop.
 
 ---
 
@@ -123,7 +123,7 @@ To save space, KibaOS limits system locales to only `en` and `en_US`. All other 
 
 ### Dependency Pruning (Optimized)
 
-We avoid heavy meta-packages. For example, instead of `kde-plasma-desktop`, we install a hand-picked minimal set including `plasma-bigscreen` and `plasma-workspace`, adding only the necessary components for a functional and beautiful desktop.
+We avoid heavy meta-packages. For example, instead of large desktop groups, we install a hand-picked minimal set, adding only the necessary components for a functional and beautiful desktop.
 
 ### Binary Compression
 

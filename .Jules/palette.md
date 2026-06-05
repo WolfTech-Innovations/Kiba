@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-04 - [Holistic Documentation Accessibility & Consistency]
+
+**Learning:** UX excellence extends beyond hero images to every visual element in documentation. Shield badges and technical diagrams often carry critical system state info (e.g., current architecture or desktop environment) that must be captured in descriptive `alt` text. Furthermore, documentation "orphans" (legacy guides for deprecated architectures) degrade the UX by providing misleading instructions; they should be purged or archived during major migrations like the shift from Cutefish to Budgie.
+**Action:** Always audit all documentation assets (including badges/shields) for descriptive `alt` attributes and ensure that manual compilation guides or architecture deep-dives are synchronized with the current system state.

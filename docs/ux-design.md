@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=cutefish" alt="Desktop">
-  <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
+  <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme: Dracula">
+  <img src="https://img.shields.io/badge/Desktop-Budgie-1793D1?style=for-the-badge&logo=linux" alt="Desktop: Budgie">
+  <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font: Inter">
 </p>
 
 ---
@@ -29,7 +29,7 @@ KibaOS is built with a focus on "modern simplicity." This document details the v
 - [Boot Branding](#boot-branding)
   - [Interface Components](#interface-components)
   - [Typography](#typography)
-- [Desktop Experience (Cutefish OS)](#desktop-experience-plasma-bigscreen)
+- [Desktop Experience (Budgie Desktop)](#desktop-experience-budgie-desktop)
   - [Window Management Polish](#window-management-polish)
   - [Desktop Layout](#desktop-layout)
 - [The Modern Terminal](#the-modern-terminal)
@@ -57,18 +57,18 @@ The KibaOS aesthetic is built around the official **Dracula** color palette, pro
 
 ### Look and Feel
 
-- **Desktop Environment:** Cutefish OS.
+- **Desktop Environment:** Budgie Desktop.
 - **Global Theme:** A customized version of **Ant-Dark**.
-- **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
+- **Color Scheme:** **Dracula**, applied system-wide to widgets, window decorations, and applications.
 - **Icons:** **Kora** icon theme for a colorful and modern look.
 - **Cursors:** **Vimix** cursor theme.
 - **Fonts:** **Inter** for the system UI and **JetBrains Mono** for monospace/terminal text.
 
 ### Window Management
 
-- **Rounded Corners:** KWin is configured to provide 16px rounded corners for all windows.
+- **Rounded Corners:** 16px rounded corners are provided for all windows.
 - **Glass Effects:** Blur and contrast effects are enabled for an elegant, translucent look.
-- **Floating Panel:** The Plasma panel is configured to be floating and rounded by default.
+- **Floating Panel:** The Budgie panel is configured to be floating and rounded by default.
 
 ## Shell Experience
 
@@ -123,13 +123,13 @@ The branding experience starts from the moment the system boots:
 
 ---
 
-## Desktop Experience (Cutefish OS)
+## Desktop Experience (Budgie Desktop)
 
-KibaOS leverages the power of **Cutefish OS** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of **Budgie Desktop** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
-- **Rounded Corners:** Custom **KWin** rules apply 16px rounded corners to all windows.
+- **Rounded Corners:** 16px rounded corners are applied to all windows.
 - **Glass Effects:** Background blur and translucency are enabled for an elegant, layered look.
 - **Floating Panel:** The system panel is configured to be floating and rounded by default, located at the bottom of the screen.
 
@@ -155,7 +155,7 @@ KibaOS provides one of the most powerful terminal experiences of any distributio
 | `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
 | `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
 | `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+| `pacman`        | **`pacman`**         | Parallel downloads and clear transaction history. |
 
 ### Shell Configuration (Zsh)
 

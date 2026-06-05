@@ -5,8 +5,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge" alt="Welcome">
-  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge" alt="Status: Welcome">
+  <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License: MIT">
 </p>
 
 ---
