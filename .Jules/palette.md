@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-05-28 - [Accessible Retrofitting for Static HTML]
+
+**Learning:** When retrofitting accessibility into legacy static HTML (like embedded shell heredocs), applying ARIA roles (`role="list"`, `role="listitem"`) and `tabindex="0"` to non-semantic container elements (like `div` cards) provides immediate keyboard and screen reader support without breaking existing CSS dependencies on specific tag hierarchies. Combining this with high-contrast emojis creates a multi-modal "quick scan" experience for all users.
+**Action:** Use `role="list"`/`role="listitem"` and `tabindex="0"` for interactive container layouts and prepend high-contrast emojis to primary feature labels to ensure cohesive accessibility and delight.
