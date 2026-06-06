@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-05 - [Semantic Accessibility in Embedded Web Views]
+**Learning:** Applying ARIA list roles (`role="list"` and `role="listitem"`) to non-semantic container layouts (like feature cards or design pills) in embedded system web views (like `welcome.html`) significantly improves screen reader navigation without breaking existing CSS that depends on specific `div` or `span` hierarchies.
+**Action:** Use ARIA roles and semantic landmark tags like `<main>` to provide document structure in embedded HTML assets.
