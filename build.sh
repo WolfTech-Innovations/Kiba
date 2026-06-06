@@ -16,6 +16,12 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+# ── CachyOS Repo ──────────────────────────────────────────────────────────
+curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
+tar xvf cachyos-repo.tar.xz
+cd cachyos-repo && ./cachyos-repo.sh
+cd .. && rm -rf cachyos-repo cachyos-repo.tar.xz
+
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
@@ -35,6 +41,12 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+# Append CachyOS repo to profile pacman.conf
+cat >> "${PROFILE}/pacman.conf" << 'CACHYREPO'
+
+[cachyos]
+Include = /etc/pacman.d/cachyos-mirrorlist
+CACHYREPO
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -88,7 +100,7 @@ cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
 base
-linux
+linux-cachyos
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -197,11 +209,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -217,15 +229,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -237,8 +249,8 @@ if [ -f "${SYSLINUX_CFG}" ]; then
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -425,6 +437,8 @@ Item {
                 anchors.centerIn: parent; source: "logo.png"
                 width: 88; height: 88
                 fillMode: Image.PreserveAspectFit; smooth: true
+                Accessible.role: Accessible.Graphic
+                Accessible.name: "KibaOS Logo"
             }
         }
 
@@ -545,7 +559,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://cloudflare.com/generate_204
 
   check:
     - storage
@@ -894,7 +908,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux 2>/dev/null || true
+mkinitcpio -p linux-cachyos 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -1490,7 +1504,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1612,6 +1626,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: background .12s;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible {
+    outline: 3px solid var(--text);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px var(--accent);
+  }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1637,42 +1656,44 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
-<div class="card-row">
-  <div class="card">
-    <h2>Budgie 10.10 Wayland</h2>
-    <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+<main>
+  <div class="card-row" role="list">
+    <div class="card" role="listitem">
+      <h2>Budgie 10.10 Wayland</h2>
+      <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+    </div>
+    <div class="card" role="listitem">
+      <h2>Built on Arch Linux</h2>
+      <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
+    </div>
+    <div class="card" role="listitem">
+      <h2>Unified Design</h2>
+      <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
+    </div>
+    <div class="card" role="listitem">
+      <h2>Private by Default</h2>
+      <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
+    </div>
   </div>
-  <div class="card">
-    <h2>Built on Arch Linux</h2>
-    <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
-  </div>
-  <div class="card">
-    <h2>Unified Design</h2>
-    <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
-  </div>
-  <div class="card">
-    <h2>Private by Default</h2>
-    <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
-  </div>
-</div>
 
-<section>
-  <h2>Ready to Install?</h2>
-  <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
-  <div class="tip"><code>sudo calamares</code></div>
-  <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <section>
+    <h2>Ready to Install?</h2>
+    <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
+    <div class="tip"><code>sudo calamares</code></div>
+    <br>
+    <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">📖 Wiki</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">🐛 Report Issue</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">🐙 GitHub</a>
 
-  <h2>Design Language</h2>
-  <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
-  </div>
-</section>
+    <h2>Design Language</h2>
+    <p>KibaOS's visual identity draws from three reference desktops:</p>
+    <div class="design-pills" role="list">
+      <span class="pill" role="listitem">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
+      <span class="pill" role="listitem">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
+      <span class="pill" role="listitem">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+    </div>
+  </section>
+</main>
 
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>

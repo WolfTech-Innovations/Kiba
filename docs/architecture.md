@@ -20,7 +20,7 @@ This document provides a technical overview of the KibaOS architectural stack, f
 
 - [System Stack](#system-stack)
 - [Core Foundation](#core-foundation)
-  - [Arch Linux base (Rolling)](#debian-13-trixie)
+  - [Arch Linux base (Rolling)](#arch-linux-base-rolling)
   - [CachyOS Kernel](#cachyos-kernel)
   - [Init & Display](#init--display)
 - [Extreme Minimization](#extreme-minimization)
@@ -59,7 +59,7 @@ KibaOS is built upon the **Arch Linux base (Rolling)** testing branch. This allo
 
 ### CachyOS Kernel
 
-We replace the stock Arch Linux kernel with the **CachyOS Kernel** (integrated via `linux-cachyos-deb`).
+We replace the stock Arch Linux kernel with the **CachyOS Kernel** (integrated via `linux-cachyos`).
 
 - **BORE Scheduler:** Optimized for desktop responsiveness.
 - **Improved Performance:** Built with modern compiler optimizations.
