@@ -1,6 +1,12 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
@@ -22,12 +28,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -752,7 +752,8 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+# Use pre-calculated hash to avoid plaintext exposure in chroot
+echo "liveuser:__LIVE_HASH__" | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -1490,7 +1491,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1779,6 +1780,9 @@ chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 # ══════════════════════════════════════════════════════════════════════════
 cd "${WORKDIR}"
 rm -rf "${WORKDIR}/work"
+# Apply live hash to customize_airootfs.sh
+sed -i "s|__LIVE_HASH__|${LIVE_HASH}|g" "${AIROOTFS}/root/customize_airootfs.sh"
+
 mkarchiso -v -w work -o out "${PROFILE}/"
 
 if ls out/*.iso 1>/dev/null 2>&1; then

@@ -28,9 +28,12 @@ if [ -f "build.sh" ]; then
     if ! grep -q "pacman-key --populate archlinux" build.sh; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
-    # Verify ldconfig after PaperDE build
-    if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
-        log_error "ldconfig not found after PaperDE installation in build.sh"
+    # Verify ldconfig after PaperDE build (conditional)
+    PAPERDE_LINE=$(grep -n "ninja -C paperde-src/build install" build.sh | cut -d: -f1 || true)
+    if [ -n "$PAPERDE_LINE" ]; then
+        if ! tail -n +"$PAPERDE_LINE" build.sh | head -n 21 | grep -q "ldconfig"; then
+            log_error "ldconfig not found after PaperDE installation in build.sh"
+        fi
     fi
     # Verify liveuser UID consistency
     if grep -q "liveuser" build.sh; then
@@ -43,8 +46,10 @@ fi
 # 2. Markdown Hygiene
 echo "--- Auditing Markdown files ---"
 # Empty links
-if grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules"; then
-    log_error "Found empty markdown targets"
+EMPTY_LINKS=$(grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules" || true)
+if [ -n "$EMPTY_LINKS" ]; then
+    log_error "Found empty markdown targets:"
+    echo "$EMPTY_LINKS"
 fi
 # Internal anchors format (should be lowercase-kebab)
 BAD_ANCHORS=$(grep -rhE "\[[^]]+\]\(#[^)]+\)" . --include="*.md" | grep -vE "\(#[a-z0-9-]+\)" || true)
@@ -55,13 +60,36 @@ fi
 
 # 3. Security Checks
 echo "--- Auditing Security ---"
+# Common exclusions for security greps
+EXCLUDE_ARGS=(
+    --exclude-dir=.git
+    --exclude-dir=.github
+    --exclude-dir=.Jules
+    --exclude-dir=node_modules
+    --exclude="*.md"
+    --exclude="workflows_to_add.txt"
+    --exclude="repo_audit.sh"
+)
+
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
-    log_error "Found dangerous chmod 777"
+CHMOD_777=$(grep -rE "chmod (0?777|777)" . "${EXCLUDE_ARGS[@]}" || true)
+if [ -n "$CHMOD_777" ]; then
+    log_error "Found dangerous chmod 777:"
+    echo "$CHMOD_777"
 fi
+
+# chpasswd without -e
+CHPASSWD_PLAIN=$(grep -r "chpasswd" . "${EXCLUDE_ARGS[@]}" | grep -v "chpasswd -e" || true)
+if [ -n "$CHPASSWD_PLAIN" ]; then
+    log_error "Found chpasswd without -e (plaintext risk):"
+    echo "$CHPASSWD_PLAIN"
+fi
+
 # Token leaks in workflows
-if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
-    log_error "Potential GitHub Token/Secret leak via echo in workflows"
+TOKEN_LEAKS=$(grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/ || true)
+if [ -n "$TOKEN_LEAKS" ]; then
+    log_error "Potential GitHub Token/Secret leak via echo in workflows:"
+    echo "$TOKEN_LEAKS"
 fi
 
 # 4. Repository Hygiene
@@ -77,15 +105,21 @@ if [ -n "$NESTED_GIT" ]; then
     log_error "Found nested .git directories"
 fi
 # Trailing whitespace (excluding some files if needed)
-if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
-    log_error "Found trailing whitespace"
+TRAILING_WHITESPACE=$(grep -rIn "[[:blank:]]$" . \
+    --exclude-dir=.git --exclude-dir=.github --exclude-dir=.Jules --exclude-dir=node_modules \
+    --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg" --exclude="*.md" --exclude="workflows_to_add.txt" --exclude="repo_audit.sh" || true)
+if [ -n "$TRAILING_WHITESPACE" ]; then
+    log_error "Found trailing whitespace:"
+    echo "$TRAILING_WHITESPACE"
 fi
 
 # 5. Workflow Best Practices
 echo "--- Auditing Workflows ---"
 # actions/checkout version
-if grep -r "uses: actions/checkout@" .github/workflows/ | grep -vE "@v4|@[a-f0-9]{40}"; then
-    log_error "Outdated actions/checkout version (upgrade to @v4)"
+OUTDATED_CHECKOUT=$(grep -r "uses: actions/checkout@" .github/workflows/ | grep -vE "@v4|@[a-f0-9]{40}" || true)
+if [ -n "$OUTDATED_CHECKOUT" ]; then
+    log_error "Outdated actions/checkout version (upgrade to @v4):"
+    echo "$OUTDATED_CHECKOUT"
 fi
 
 echo "=== Audit Complete ==="
