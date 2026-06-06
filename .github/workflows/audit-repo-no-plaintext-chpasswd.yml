@@ -1,0 +1,21 @@
+name: Audit Repo No Plaintext Chpasswd
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run audit function
+        run: bash scripts/repo_audit.sh --audit-repo-no-plaintext-chpasswd
