@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-05-28 - [Accessible Non-Semantic Lists & High-Contrast Focus]
+
+**Learning:** When using non-semantic `div` or `span` tags for layout-critical components (like cards or pills), accessibility can be maintained by explicitly applying `role="list"` and `role="listitem"`. Additionally, a multi-layered `box-shadow` for `:focus-visible` (using a background-colored inner ring and an accent-colored outer ring) provides a high-contrast focus indicator that is more visually cohesive than default browser outlines.
+**Action:** Use ARIA list roles for `div`-based collections and implement layered `box-shadow` focus rings for all interactive elements in web views.
