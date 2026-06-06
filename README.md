@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1430" height="892" alt="image" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
+<img width="1430" height="892" alt="KibaOS Desktop: A sleek Budgie environment with Dracula theme and floating panel." src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
 
 </p>
 
@@ -177,7 +177,7 @@ KibaOS ships the **Dracula** color scheme system-wide using the official palette
 | Pink       | `#ff79c6` | Selection    |
 | Green      | `#50fa7b` | Success      |
 
-The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The scheme is applied to **Budgie Desktop**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
 
 ### System Requirements
 
