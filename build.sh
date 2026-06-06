@@ -752,7 +752,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+echo "liveuser:__LIVE_HASH__" | chpasswd -e
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1763,6 +1763,7 @@ rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser
 sudo systemctl enable NetworkManager
+
 # After liveuser's home exists, at the end of customize_airootfs.sh:
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 sudo -u liveuser dbus-run-session -- bash -c '
@@ -1772,6 +1773,7 @@ sudo -u liveuser dbus-run-session -- bash -c '
 '
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
+sed -i "s|__LIVE_HASH__|${LIVE_HASH}|g" "${AIROOTFS}/root/customize_airootfs.sh"
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
 # ══════════════════════════════════════════════════════════════════════════
