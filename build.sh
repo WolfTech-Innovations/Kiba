@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1585,15 +1585,23 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     flex:1; min-width:200px; box-shadow:var(--shadow);
     border:1px solid var(--border);
     transition: transform .15s, box-shadow .15s;
+    cursor: pointer;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:hover, .card:focus-visible {
+    transform:translateY(-3px);
+    box-shadow:0 8px 32px rgba(0,100,160,0.14);
+    outline: none;
+  }
+  .card:focus-visible {
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--accent);
+  }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
 
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 {
     font-size:1.2rem; font-weight:600; margin:28px 0 12px;
-    color:var(--accent);
+    color:var(--accent-dark);
   }
   .tip {
     background:#e6f6fc; border-left:3px solid var(--accent);
@@ -1610,8 +1618,12 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
     transition: background .12s;
+    outline: none;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible {
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--accent);
+  }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1637,42 +1649,44 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
-<div class="card-row">
-  <div class="card">
-    <h2>Budgie 10.10 Wayland</h2>
-    <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+<main>
+  <div class="card-row" role="list">
+    <div class="card" role="listitem" tabindex="0">
+      <h2>Budgie 10.10 Wayland</h2>
+      <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+    </div>
+    <div class="card" role="listitem" tabindex="0">
+      <h2>Built on Arch Linux</h2>
+      <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
+    </div>
+    <div class="card" role="listitem" tabindex="0">
+      <h2>Unified Design</h2>
+      <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
+    </div>
+    <div class="card" role="listitem" tabindex="0">
+      <h2>Private by Default</h2>
+      <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
+    </div>
   </div>
-  <div class="card">
-    <h2>Built on Arch Linux</h2>
-    <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
-  </div>
-  <div class="card">
-    <h2>Unified Design</h2>
-    <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
-  </div>
-  <div class="card">
-    <h2>Private by Default</h2>
-    <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
-  </div>
-</div>
 
-<section>
-  <h2>Ready to Install?</h2>
-  <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
-  <div class="tip"><code>sudo calamares</code></div>
-  <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <section>
+    <h2>Ready to Install?</h2>
+    <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
+    <div class="tip"><code>sudo calamares</code></div>
+    <br>
+    <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">📖 Wiki</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">🐛 Report Issue</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">🐙 GitHub</a>
 
-  <h2>Design Language</h2>
-  <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
-  </div>
-</section>
+    <h2>Design Language</h2>
+    <p>KibaOS's visual identity draws from three reference desktops:</p>
+    <div class="design-pills" role="list">
+      <span class="pill" role="listitem">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
+      <span class="pill" role="listitem">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
+      <span class="pill" role="listitem">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+    </div>
+  </section>
+</main>
 
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>
