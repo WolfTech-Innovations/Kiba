@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set -eu
+set -euo pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
@@ -66,22 +66,19 @@ save_release_notes() {
   y_val=$(echo "$vars" | cut -d' ' -f3)
   m_val=$(echo "$vars" | cut -d' ' -f4)
 
-  # Remove leading zeros to avoid octal interpretation in arithmetic
-  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
-  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
-
+  # Use 10# prefix to force base-10 interpretation and avoid octal errors
   hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
+  h=$(echo "$hours" | cut -c "$(( 10#$h_val + 1 ))")
   y=$(echo "$y_val" | cut -c 2)
   months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
+  m=$(echo "$months" | cut -c "$(( 10#$m_val ))")
 
   filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
   if [ ! -f Notes/.gitkeep ]; then
-    touch Notes/.gitkeep
+    : > Notes/.gitkeep
   fi
 
   # 3. Fetch release body using curl -fsS and jq
