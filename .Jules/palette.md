@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-06-07 - [Dracula Theme Contrast and Accessibility]
+
+**Learning:** When applying the Dracula theme to UI components (like feature cards), avoid using the 'Comment' color (#6272a4) for text against the 'Current Line' background (#44475a) due to insufficient contrast. High-contrast combinations like 'Foreground' (#f8f8f2) for body text and 'Purple' (#bd93f9) for headings should be used to ensure WCAG compliance and legibility.
+**Action:** Always verify color contrast when using the Dracula palette, specifically avoiding #6272a4 for small text on #44475a surfaces.
