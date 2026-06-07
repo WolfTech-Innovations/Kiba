@@ -4,6 +4,13 @@ set -ex
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
+# ── CachyOS Repository: Optimized packages and kernel ──────────────────────
+curl -L https://mirror.cachyos.org/cachyos-repo.tar.xz -o cachyos-repo.tar.xz
+tar xvf cachyos-repo.tar.xz
+pushd cachyos-repo
+./cachyos-repo.sh
+popd
+
 # ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
@@ -35,6 +42,10 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+
+# Add CachyOS repositories to profile pacman.conf
+# We place them at the top as recommended by CachyOS
+sed -i '1i [cachyos]\nInclude = /etc/pacman.d/cachyos-mirrorlist\n' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -86,9 +97,14 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
+cachyos-keyring
+cachyos-mirrorlist
+cachyos-v3-mirrorlist
+cachyos-v4-mirrorlist
 syslinux
 base
-linux
+linux-cachyos
+linux-cachyos-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -197,11 +213,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -217,15 +233,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -233,12 +249,14 @@ SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
+  sed -i 's/vmlinuz-linux/vmlinuz-linux-cachyos/g' "${SYSLINUX_CFG}"
+  sed -i 's/initramfs-linux.img/initramfs-linux-cachyos.img/g' "${SYSLINUX_CFG}"
   cat >> "${SYSLINUX_CFG}" << 'SYSLINUX_SAFE'
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -752,7 +770,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+usermod -p "LIVE_PASSWORD_HASH_PLACEHOLDER" liveuser
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -1490,7 +1508,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1612,6 +1630,10 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: background .12s;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 6px var(--accent);
+  }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1637,42 +1659,44 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 
-<div class="card-row">
-  <div class="card">
-    <h2>Budgie 10.10 Wayland</h2>
-    <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+<main>
+  <div class="card-row" role="list">
+    <div class="card" role="listitem">
+      <h2>Budgie 10.10 Wayland</h2>
+      <p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p>
+    </div>
+    <div class="card" role="listitem">
+      <h2>Built on Arch Linux</h2>
+      <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
+    </div>
+    <div class="card" role="listitem">
+      <h2>Unified Design</h2>
+      <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
+    </div>
+    <div class="card" role="listitem">
+      <h2>Private by Default</h2>
+      <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
+    </div>
   </div>
-  <div class="card">
-    <h2>Built on Arch Linux</h2>
-    <p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p>
-  </div>
-  <div class="card">
-    <h2>Unified Design</h2>
-    <p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p>
-  </div>
-  <div class="card">
-    <h2>Private by Default</h2>
-    <p>Full disk encryption support. No telemetry. Your data stays yours.</p>
-  </div>
-</div>
 
-<section>
-  <h2>Ready to Install?</h2>
-  <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
-  <div class="tip"><code>sudo calamares</code></div>
-  <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <section aria-labelledby="install-heading">
+    <h2 id="install-heading">Ready to Install?</h2>
+    <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
+    <div class="tip"><code>sudo calamares</code></div>
+    <br>
+    <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">📖 Wiki</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">🐛 Report Issue</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">🐙 GitHub</a>
 
-  <h2>Design Language</h2>
-  <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
-  </div>
-</section>
+    <h2 id="design-heading">Design Language</h2>
+    <p>KibaOS's visual identity draws from three reference desktops:</p>
+    <div class="design-pills" role="list" aria-labelledby="design-heading">
+      <span class="pill" role="listitem">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
+      <span class="pill" role="listitem">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
+      <span class="pill" role="listitem">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+    </div>
+  </section>
+</main>
 
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>
@@ -1772,6 +1796,7 @@ sudo -u liveuser dbus-run-session -- bash -c '
 '
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
+sed -i "s|LIVE_PASSWORD_HASH_PLACEHOLDER|${LIVE_HASH}|" "${AIROOTFS}/root/customize_airootfs.sh"
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
 # ══════════════════════════════════════════════════════════════════════════
