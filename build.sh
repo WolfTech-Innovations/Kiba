@@ -16,6 +16,13 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+# ── CachyOS Repo Setup (Host) ──────────────────────────────────────────────
+curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
+tar xpvf cachyos-repo.tar.xz
+cd cachyos-repo
+./cachyos-repo.sh
+cd ..
+rm -rf cachyos-repo cachyos-repo.tar.xz
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
@@ -35,6 +42,10 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+# ── CachyOS Repo Setup (Profile) ───────────────────────────────────────────
+mkdir -p "${PROFILE}/pacman.d"
+cp /etc/pacman.d/cachyos-mirrorlist "${PROFILE}/pacman.d/"
+sed -i '/\[core\]/i \[cachyos\]\nInclude = /etc/pacman.d/cachyos-mirrorlist\n' "${PROFILE}/pacman.conf"
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -88,7 +99,7 @@ cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
 base
-linux
+linux-cachyos
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -197,11 +208,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -217,15 +228,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -233,12 +244,14 @@ SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
+  sed -i 's/vmlinuz-linux/vmlinuz-linux-cachyos/g' "${SYSLINUX_CFG}"
+  sed -i 's/initramfs-linux.img/initramfs-linux-cachyos.img/g' "${SYSLINUX_CFG}"
   cat >> "${SYSLINUX_CFG}" << 'SYSLINUX_SAFE'
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -599,7 +612,8 @@ grep -q '^liveuser:' "${AIROOTFS}/etc/passwd"  2>/dev/null || \
 grep -q '^liveuser:' "${AIROOTFS}/etc/group"   2>/dev/null || \
   echo 'liveuser:x:1000:liveuser' >> "${AIROOTFS}/etc/group"
 grep -q '^liveuser:' "${AIROOTFS}/etc/shadow"  2>/dev/null || \
-  echo "liveuser:${LIVE_HASH}:19000:0:99999:7:::" >> "${AIROOTFS}/etc/shadow"
+  echo "liveuser:LIVE_HASH_PLACEHOLDER:19000:0:99999:7:::" >> "${AIROOTFS}/etc/shadow"
+sed -i "s|LIVE_HASH_PLACEHOLDER|${LIVE_HASH}|" "${AIROOTFS}/etc/shadow"
 mkdir -p "${AIROOTFS}/home/liveuser"
 mkdir -p "${AIROOTFS}/etc/sudoers.d"
 echo 'liveuser ALL=(ALL) NOPASSWD: ALL' > "${AIROOTFS}/etc/sudoers.d/liveuser"
@@ -752,7 +766,7 @@ for g in users wheel audio video input network storage power; do
   groupadd -r "$g" 2>/dev/null || true
   usermod -aG "$g" liveuser 2>/dev/null || true
 done
-echo "liveuser:live" | chpasswd
+usermod -p 'LIVE_HASH_PLACEHOLDER' liveuser
 grep -qx '/bin/bash' /etc/shells || echo '/bin/bash' >> /etc/shells
 
 cp -aT /etc/skel/ /home/liveuser/ 2>/dev/null || true
@@ -894,7 +908,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux 2>/dev/null || true
+mkinitcpio -p linux-cachyos 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -1490,7 +1504,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1768,10 +1782,11 @@ install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 sudo -u liveuser dbus-run-session -- bash -c '
   dconf write /com/solus-project/budgie/panel/panels "@as []"
   dconf write /com/solus-project/budgie/panel/panels-changed "$(date +%s)"
-  dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
+  dconf write /com/solus-project/budgie/panel/applets/budgie-menu/key-combination "'Super_L'"
 '
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
+sed -i "s|LIVE_HASH_PLACEHOLDER|${LIVE_HASH}|" "${AIROOTFS}/root/customize_airootfs.sh"
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 
 # ══════════════════════════════════════════════════════════════════════════
