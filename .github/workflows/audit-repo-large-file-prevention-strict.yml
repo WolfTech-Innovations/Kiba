@@ -1,0 +1,19 @@
+name: Audit Repo Large File Prevention Strict
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Repo Large File Prevention Strict
+        run: bash scripts/repo_audit.sh --check repo_large_file_prevention_strict
+        shell: bash

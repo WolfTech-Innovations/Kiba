@@ -1,0 +1,19 @@
+name: Audit Workflow Kebab Filenames Strict
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Workflow Kebab Filenames Strict
+        run: bash scripts/repo_audit.sh --check workflow_kebab_filenames_strict
+        shell: bash

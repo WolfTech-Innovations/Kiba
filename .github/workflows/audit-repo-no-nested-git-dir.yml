@@ -1,0 +1,19 @@
+name: Audit Repo No Nested Git Dir
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Repo No Nested Git Dir
+        run: bash scripts/repo_audit.sh --check repo_no_nested_git_dir
+        shell: bash

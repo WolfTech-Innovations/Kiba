@@ -1,0 +1,19 @@
+name: Audit Package Private Enforcement
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Package Private Enforcement
+        run: bash scripts/repo_audit.sh --check package_private_enforcement
+        shell: bash

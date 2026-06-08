@@ -1,0 +1,19 @@
+name: Audit Shell Script Trap Err Cleanup
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Shell Script Trap Err Cleanup
+        run: bash scripts/repo_audit.sh --check shell_script_trap_err_cleanup
+        shell: bash

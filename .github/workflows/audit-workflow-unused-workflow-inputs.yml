@@ -1,0 +1,19 @@
+name: Audit Workflow Unused Workflow Inputs
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Workflow Unused Workflow Inputs
+        run: bash scripts/repo_audit.sh --check workflow_unused_workflow_inputs
+        shell: bash

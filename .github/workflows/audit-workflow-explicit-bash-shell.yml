@@ -1,0 +1,19 @@
+name: Audit Workflow Explicit Bash Shell
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Workflow Explicit Bash Shell
+        run: bash scripts/repo_audit.sh --check workflow_explicit_bash_shell
+        shell: bash

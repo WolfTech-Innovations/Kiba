@@ -1,0 +1,19 @@
+name: Audit Build SH Relative Symlinks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Build SH Relative Symlinks
+        run: bash scripts/repo_audit.sh --check build_sh_relative_symlinks
+        shell: bash

@@ -1,0 +1,19 @@
+name: Audit Repo Lowercase Directories
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Repo Lowercase Directories
+        run: bash scripts/repo_audit.sh --check repo_lowercase_directories
+        shell: bash

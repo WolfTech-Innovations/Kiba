@@ -1,0 +1,19 @@
+name: Audit Build SH Zsh Default
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Build SH Zsh Default
+        run: bash scripts/repo_audit.sh --check build_sh_zsh_default
+        shell: bash

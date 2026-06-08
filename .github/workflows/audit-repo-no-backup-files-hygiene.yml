@@ -1,0 +1,19 @@
+name: Audit Repo No Backup Files Hygiene
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Repo No Backup Files Hygiene
+        run: bash scripts/repo_audit.sh --check repo_no_backup_files_hygiene
+        shell: bash

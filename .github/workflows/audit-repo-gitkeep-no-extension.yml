@@ -1,0 +1,19 @@
+name: Audit Repo Gitkeep No Extension
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Audit Repo Gitkeep No Extension
+        run: bash scripts/repo_audit.sh --check repo_gitkeep_no_extension
+        shell: bash
