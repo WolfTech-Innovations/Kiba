@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-06-08 - [Semantic Structure in Layout Containers]
+
+**Learning:** When using non-semantic layout elements (like `div` and `span`) to create complex UI components like cards or pills, screen reader users lose the contextual relationship between items. Applying `role="list"` to containers and `role="listitem"` to children restores this structural information without requiring changes to CSS selectors that might be sensitive to specific HTML tags.
+**Action:** Always apply ARIA list roles to groups of interactive or informative items that use non-semantic container layouts to ensure structural accessibility.
