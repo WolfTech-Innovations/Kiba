@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1430" height="892" alt="image" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
+<img width="1430" height="892" alt="KibaOS Desktop Preview showing the Budgie environment with the Arc-Dark theme and floating pill panel." src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
 
 </p>
 
@@ -19,7 +19,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop Enviroment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
+KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop Environment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
 
 <p align="center">
   <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
@@ -67,11 +67,11 @@ The goal of KibaOS is to provide a clean, modern, and visually consistent out-of
 For a more in-depth look at KibaOS, check out our detailed documentation:
 
 - [**Architecture**](./docs/architecture.md): Base system, kernel, and minimization strategies.
-- [**UX & Design**](./docs/ux-design.md): The Dracula aesthetic and terminal experience.
+- [**UX & Design**](./docs/ux-design.md): Modern aesthetic and terminal experience.
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaOS.
-- [**Manual Compilation**](./docs/manual-compilation.md): Building the Budgie Desktop Enviroment from source.
+- [**Manual Compilation**](./docs/manual-compilation.md): Building the Budgie Desktop Environment from source.
 - [**FAQ**](./docs/faq.md): Frequently asked questions.
 - [**WIKI**](./WIKI.md): Comprehensive technical manual.
 
@@ -81,9 +81,9 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 
 - **Arch Linux Base:** Built on **Arch Linux Rolling**
 - **Deep Cloud Integration:** System-wide file and setting sync powered by Cloud Services. Built on **Arch Linux Rolling** (supported until 2030).
-- **Modern Desktop:** **Budgie Desktop Enviroment** with **Wayland** as the default session.
-- **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
-- **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
+- **Modern Desktop:** **Budgie Desktop Environment** with **Wayland** as the default session.
+- **Modern Aesthetic:** **Arc-Dark** theme and **Papirus-Dark** icons applied system-wide — terminal, widgets, window decorations, and the panel.
+- **Polished UI:** Floating rounded taskbar and 14px rounded window corners via **labwc** compositor.
 - **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
 - **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
 - **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
@@ -166,18 +166,18 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 ### Theme
 
-<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
+<img src="https://img.shields.io/badge/Theme-Arc--Dark-5294e2?style=flat-square&logo=linux&logoColor=white" alt="Theme: Arc-Dark">
 
-KibaOS ships the **Dracula** color scheme system-wide using the official palette
+KibaOS ships the **Arc-Dark** GTK theme and **Papirus-Dark** icon theme system-wide.
 
-| Color      | Hex       | Role         |
-| ---------- | --------- | ------------ |
-| Background | `#282a36` | Primary BG   |
-| Purple     | `#bd93f9` | Accent Color |
-| Pink       | `#ff79c6` | Selection    |
-| Green      | `#50fa7b` | Success      |
+| Component  | Choice         | Role                 |
+| ---------- | -------------- | -------------------- |
+| GTK Theme  | `Arc-Dark`     | Unified app styling  |
+| Icon Theme | `Papirus-Dark` | Desktop & menu icons |
+| Accent     | `#0099cc`      | Primary highlight    |
+| Background | `#1e2430`      | Main window surface  |
 
-The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The theme is applied to the **Budgie Desktop**, **Gnome Terminal**, **Nemo**, and **Plymouth**.
 
 ### System Requirements
 
