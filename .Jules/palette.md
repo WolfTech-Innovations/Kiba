@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-06-08 - [Keyboard Focus & ARIA Roles in System Web Views]
+
+**Learning:** Accessible "out-of-the-box" experiences require high-contrast keyboard focus indicators and semantic context even in non-semantic layouts. A custom `:focus-visible` style (e.g., `box-shadow`) provides focus feedback without affecting mouse interactions, while ARIA list roles (`role="list"`, `role="listitem"`) ensure screen readers correctly interpret card-based information grids.
+**Action:** Always implement `:focus-visible` indicators and ARIA list roles in embedded HTML system views like `welcome.html`.
