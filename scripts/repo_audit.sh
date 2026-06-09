@@ -42,6 +42,10 @@ fi
 
 # 2. Markdown Hygiene
 echo "--- Auditing Markdown files ---"
+# Typo check: Enviroment
+if grep -r "Enviroment" . --include="*.md" | grep -v "node_modules"; then
+    log_error "Found typo 'Enviroment' (should be 'Environment')"
+fi
 # Empty links
 if grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules"; then
     log_error "Found empty markdown targets"
@@ -56,7 +60,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh"; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
