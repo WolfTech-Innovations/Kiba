@@ -81,7 +81,7 @@ save_release_notes() {
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
   if [ ! -f Notes/.gitkeep ]; then
-    touch Notes/.gitkeep
+    truncate -s 0 Notes/.gitkeep
   fi
 
   # 3. Fetch release body using curl -fsS and jq
