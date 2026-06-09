@@ -1,0 +1,32 @@
+name: TODO Report
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  todo_report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan for TODOs
+        run: |
+          grep -rE "TODO|FIXME" . --exclude-dir=.git > todo_list.txt || true
+      - name: Create Issue
+        if: hashFiles('todo_list.txt') != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const todos = fs.readFileSync('todo_list.txt', 'utf8');
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Monthly TODO/FIXME Report',
+              body: 'The following TODOs and FIXMEs were found in the codebase:\n\n```\n' + todos + '\n```'
+            })

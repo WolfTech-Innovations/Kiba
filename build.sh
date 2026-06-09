@@ -1,4 +1,5 @@
 #!/bin/bash
+# License: MIT
 set -ex
 
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
@@ -1490,7 +1491,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════

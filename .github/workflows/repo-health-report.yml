@@ -1,0 +1,30 @@
+name: Repo Health Report
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  health_report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run All Audits
+        run: bash scripts/repo_audit.sh > audit_report.txt 2>&1 || true
+      - name: Create Health Report
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const audit = fs.readFileSync('audit_report.txt', 'utf8');
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Weekly Repository Health Report',
+              body: '### Automated Audit Results\n\n```\n' + audit + '\n```'
+            })
