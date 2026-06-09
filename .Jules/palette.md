@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-05-22 - [Semantic & Accessible Welcome Page Structure]
+**Learning:** For single-page web views like the KibaOS Welcome screen, using the `<main>` tag and ARIA list roles (`role="list"`, `role="listitem"`) provides essential semantic structure for screen readers without requiring a full layout redesign. Adding `:focus-visible` ensures that keyboard users have clear navigation indicators while maintaining a clean look for mouse users.
+**Action:** Always wrap primary app content in `<main>`, use ARIA roles for list-like components built with generic tags, and pair hover states with `:focus-visible` for consistent accessibility.
