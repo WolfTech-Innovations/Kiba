@@ -4,5 +4,11 @@
 **Action:** Always prefer `CSafeLoader` with a fallback for YAML-heavy scripts in this environment.
 
 ## 2026-05-14 - [Semantic YAML Parsing for Performance]
+
 **Learning:** While `awk` or `grep` can be extremely fast for simple text scanning, they are unreliable for structured formats like YAML where property order and context (comments, script blocks) matter. A single-process Python script with `yaml.CSafeLoader` provides the best balance of speed (~300x faster than `yq` loops) and semantic correctness.
 **Action:** Replace shell-based loops calling CLI parsers (`yq`, `jq`) with single-execution Python scripts for bulk metadata validation.
+
+## 2026-06-09 - [Optimizing AUR Build Performance]
+
+**Learning:** During ISO builds, compressing intermediate packages with Zstd is a significant bottleneck. Since these packages are installed immediately into the chroot and then discarded, compression adds unnecessary CPU overhead. Multi-core compilation via `MAKEFLAGS` is also essential for maximizing throughput on multi-core CI runners.
+**Action:** Always set `PKGEXT='.pkg.tar'` and `MAKEFLAGS="-j$(nproc)"` when running `makepkg` in a performance-critical build environment.
