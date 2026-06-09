@@ -1,0 +1,23 @@
+name: Audit Build SH Sudoers Perms
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit check
+        shell: bash
+        run: bash scripts/repo_audit.sh --check build_sh_sudoers_perms
