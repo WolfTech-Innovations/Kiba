@@ -63,6 +63,10 @@ fi
 if grep -rE "echo.*(github\.token|secrets\.)" .github/workflows/; then
     log_error "Potential GitHub Token/Secret leak via echo in workflows"
 fi
+# Plaintext chpasswd (missing -e)
+if grep -r "chpasswd" . --exclude-dir=.git --exclude="scripts/repo_audit.sh" --exclude="workflows_to_add.txt" --exclude="*.md" --include="*.sh" | grep -v "\-e"; then
+    log_error "Found chpasswd usage without -e (plaintext password risk)"
+fi
 
 # 4. Repository Hygiene
 echo "--- Auditing Repository Hygiene ---"
