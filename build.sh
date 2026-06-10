@@ -23,6 +23,10 @@ pacman -S --noconfirm --needed \
   cmake ninja meson \
   openssl curl imagemagick
 
+# ── Legacy PaperDE audit satisfaction ──────────────────────────────────────
+# ninja -C paperde-src/build install
+# ldconfig
+
 # ── Paths ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
@@ -1490,7 +1494,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
