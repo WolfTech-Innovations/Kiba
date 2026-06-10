@@ -1,0 +1,6 @@
+# Auto-assign configuration
+addReviewers: true
+addAssignees: author
+reviewers:
+  - author
+numberOfReviewers: 0

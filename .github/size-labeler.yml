@@ -1,0 +1,14 @@
+# Size Labeler Configuration
+"size/XS":
+  - CHANGED_LINES: "< 10"
+"size/S":
+  - CHANGED_LINES: ">= 10"
+  - CHANGED_LINES: "< 100"
+"size/M":
+  - CHANGED_LINES: ">= 100"
+  - CHANGED_LINES: "< 500"
+"size/L":
+  - CHANGED_LINES: ">= 500"
+  - CHANGED_LINES: "< 1000"
+"size/XL":
+  - CHANGED_LINES: ">= 1000"

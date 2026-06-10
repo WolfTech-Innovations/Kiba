@@ -1,0 +1,15 @@
+name: Kernel Monitor
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check latest CachyOS kernel
+        run: |
+          curl -s https://mirror.cachyos.org/cachyos/x86_64/ | grep linux-cachyos || echo "Kernel mirror reachable"

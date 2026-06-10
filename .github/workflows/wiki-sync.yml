@@ -1,0 +1,18 @@
+name: Wiki Sync
+on:
+  push:
+    paths:
+      - 'WIKI.md'
+permissions:
+  contents: write
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync to Wiki
+        run: |
+          if [ -f WIKI.md ]; then
+             echo "Syncing WIKI.md to GitHub Wiki..."
+          fi

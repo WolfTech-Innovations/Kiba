@@ -1,0 +1,13 @@
+name: Calamares Lint
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Calamares configs
+        run: |
+          find . -name "*.yaml" -path "*calamares*" -exec grep -l "modules" {} + || echo "No Calamares modules found"

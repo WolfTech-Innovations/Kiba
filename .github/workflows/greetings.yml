@@ -1,0 +1,13 @@
+name: Greetings
+on: [pull_request_target]
+permissions:
+  pull-requests: write
+jobs:
+  greeting:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - uses: actions/first-interaction@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        pr-message: 'Welcome to the KibaOS repository! Thank you for your contribution.'

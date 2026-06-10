@@ -1,0 +1,17 @@
+name: Issue Template Validator
+on:
+  issues:
+    types: [opened, edited]
+permissions:
+  issues: write
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Validate Issue Template
+        run: |
+          if [ -z "${{ github.event.issue.body }}" ]; then
+            echo "Issue body is empty"
+            exit 1
+          fi

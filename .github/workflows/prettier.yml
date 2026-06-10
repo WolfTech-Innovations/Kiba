@@ -1,0 +1,20 @@
+name: Prettier
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+      - run: pnpm install
+      - name: Run Prettier
+        run: pnpm exec prettier --check .

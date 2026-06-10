@@ -1,0 +1,13 @@
+name: ISO Size Monitor
+on: [workflow_run]
+permissions:
+  contents: read
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Check ISO size
+        run: |
+          find . -name "*.iso" -exec du -h {} + || echo "No ISO generated in this run"

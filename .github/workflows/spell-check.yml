@@ -1,0 +1,14 @@
+name: Spell Check
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  spellcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Spell Check
+        uses: streetsidesoftware/cspell-action@v6
+        with:
+          files: "**/*.md"

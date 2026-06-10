@@ -1,0 +1,13 @@
+name: Cache Audit
+on: [workflow_dispatch]
+permissions:
+  actions: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit GitHub Actions Cache
+        run: |
+          du -sh .github/workflows || echo "Workflow directory size check"

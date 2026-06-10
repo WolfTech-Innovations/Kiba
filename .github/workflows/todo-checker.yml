@@ -1,0 +1,13 @@
+name: TODO Checker
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  todo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TODOs
+        run: |
+          grep -rE "TODO|FIXME" . --exclude-dir=.git --exclude=pnpm-lock.yaml || echo "No TODOs found"

@@ -1,0 +1,16 @@
+name: Workflow Permissions Audit
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for explicit permissions in workflows
+        run: |
+          if grep -rL "permissions:" .github/workflows/; then
+            echo "Some workflows are missing explicit permissions"
+            exit 1
+          fi

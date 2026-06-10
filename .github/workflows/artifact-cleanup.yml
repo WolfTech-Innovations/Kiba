@@ -1,0 +1,15 @@
+name: Artifact Cleanup
+on:
+  schedule:
+    - cron: '0 0 * * *'
+permissions:
+  actions: write
+jobs:
+  delete-artifacts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: Kolpav/purge-artifacts-action@v1
+        with:
+          keep_last: 5
+          expire_in: 7days

@@ -1,0 +1,18 @@
+name: Branch Naming Audit
+on: [push]
+permissions:
+  contents: read
+jobs:
+  branch-naming:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check Branch Name
+        run: |
+          BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          if [[ ! "$BRANCH_NAME" =~ ^(feat|fix|docs|style|refactor|perf|test|chore|bolt|palette|sentinel)/ ]]; then
+            if [ "$BRANCH_NAME" != "main" ]; then
+              echo "Invalid branch name: $BRANCH_NAME. Must start with a prefix like feat/, fix/, bolt/, etc."
+              exit 1
+            fi
+          fi

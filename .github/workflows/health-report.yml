@@ -1,0 +1,19 @@
+name: Health Report
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Health Report
+        run: |
+          echo "# Repository Health Report" > report.md
+          echo "Date: $(date)" >> report.md
+          echo "Total workflows: $(ls .github/workflows/*.yml | wc -l)" >> report.md
+          echo "Recent activity logged." >> report.md

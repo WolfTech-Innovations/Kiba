@@ -1,0 +1,16 @@
+name: Branding Audit
+on:
+  push:
+    paths:
+      - 'branding/**'
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check branding assets
+        run: |
+          ls branding/kibaos_banner.png branding/forest-k.png branding/boot.png

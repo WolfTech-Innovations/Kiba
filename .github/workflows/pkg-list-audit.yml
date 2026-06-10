@@ -1,0 +1,13 @@
+name: Package List Audit
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit package list in build.sh
+        run: |
+          grep -E "pacman -S" build.sh || echo "No direct pacman install found"

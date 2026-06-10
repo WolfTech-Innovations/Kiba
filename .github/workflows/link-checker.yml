@@ -1,0 +1,16 @@
+name: Link Checker
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  link-checker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Link Checker
+        uses: lycheeverse/lychee-action@v1.9.3
+        with:
+          args: --verbose --no-progress "**/*.md"

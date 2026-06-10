@@ -1,0 +1,16 @@
+name: chmod Audit
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit chmod 777
+        run: |
+          if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude=scripts/repo_audit.sh; then
+             echo "Dangerous chmod 777 found"
+             exit 1
+          fi
