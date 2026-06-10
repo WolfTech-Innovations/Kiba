@@ -849,6 +849,8 @@ for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
 done
 
 cd /; rm -rf "${AUR_BUILD}"
+# ninja -C paperde-src/build install
+ldconfig
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 pacman -Rns --noconfirm \
@@ -1490,7 +1492,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════

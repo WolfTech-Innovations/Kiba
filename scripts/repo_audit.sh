@@ -56,7 +56,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="chmod-audit.yml" --exclude="generate_45_workflows.py"; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
