@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1618,6 +1618,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   }
   .btn.secondary:hover { background:#e6f6fc; }
 
+  .btn:focus-visible {
+    outline: 2px solid #0077aa;
+    outline-offset: 2px;
+  }
+
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill {
     background:var(--surface-2); border:1px solid var(--border);
@@ -1661,9 +1666,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">📖 Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">🐞 Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">🐙 GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
@@ -1792,3 +1797,5 @@ else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
 fi
+# ninja -C paperde-src/build install
+ldconfig

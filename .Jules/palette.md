@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-06-10 - [Accessibility & Scannability on Welcome Page]
+**Learning:** The KibaOS welcome page lacked focus indicators, hindering keyboard navigation. Additionally, plain text buttons had lower scannability compared to those with descriptive emojis. However, major color theme overhauls (e.g., to Dracula) are restricted and require explicit approval to maintain brand consistency.
+**Action:** Always include `:focus-visible` styles and descriptive emojis for interactive elements on the welcome page, but adhere strictly to the existing brand color palette unless instructed otherwise.
