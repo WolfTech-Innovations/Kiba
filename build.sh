@@ -844,7 +844,8 @@ for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  # Bolt: Speed up AUR builds with multi-core compilation and skip compression
+  sudo -u builduser MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
@@ -1490,7 +1491,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
