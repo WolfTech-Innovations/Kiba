@@ -42,6 +42,10 @@ fi
 
 # 2. Markdown Hygiene
 echo "--- Auditing Markdown files ---"
+# "Enviroment" typo (KibaOS standard is "Environment")
+if grep -r "Enviroment" . --include="*.md" | grep -v "node_modules"; then
+    log_error "Found 'Enviroment' typo in documentation"
+fi
 # Empty links
 if grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules"; then
     log_error "Found empty markdown targets"
