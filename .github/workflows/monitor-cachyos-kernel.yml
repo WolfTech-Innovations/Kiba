@@ -1,0 +1,41 @@
+name: "Monitor CachyOS Kernel"
+
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  check-and-trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch latest kernel version
+        id: kernel
+        run: |
+          # Parse the file list from CachyOS mirror
+          VERSION=$(curl -s https://mirror.cachyos.org/cachyos/x86_64/ | \
+            grep -oP 'linux-cachyos-\d+\.\d+\.\d+-\d+-x86_64\.pkg\.tar\.zst' | \
+            head -n 1 | sed -E 's/linux-cachyos-(.*)-x86_64\.pkg\.tar\.zst/\1/')
+
+          if [ -z "$VERSION" ]; then
+            echo "Error: Could not determine latest kernel version."
+            exit 1
+          fi
+
+          echo "Latest version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Trigger KibaOS Build
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'build.yml',
+              ref: 'main'
+            });

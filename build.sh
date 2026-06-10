@@ -4,6 +4,15 @@ set -ex
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
+# ── CachyOS Repository: Host integration ───────────────────────────────────
+if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
+  cat >> /etc/pacman.conf << 'EOF'
+
+[cachyos]
+Server = https://mirror.cachyos.org/cachyos/x86_64/
+EOF
+fi
+
 # ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
@@ -16,7 +25,10 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+pacman-key --recv-keys F3B607488DB35989 --keyserver keyserver.ubuntu.com
+pacman-key --lsign-key F3B607488DB35989
 pacman -Syy --noconfirm
+pacman -S --noconfirm cachyos-keyring
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
@@ -35,6 +47,12 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+
+cat >> "${PROFILE}/pacman.conf" << 'EOF'
+
+[cachyos]
+Server = https://mirror.cachyos.org/cachyos/x86_64/
+EOF
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -86,9 +104,10 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
+cachyos-keyring
 syslinux
 base
-linux
+linux-cachyos
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -197,11 +216,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -217,15 +236,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -233,12 +252,15 @@ SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
+  # Update all kernel/initrd paths in syslinux.cfg to cachyos
+  sed -i 's/vmlinuz-linux/vmlinuz-linux-cachyos/g' "${SYSLINUX_CFG}"
+  sed -i 's/initramfs-linux.img/initramfs-linux-cachyos.img/g' "${SYSLINUX_CFG}"
   cat >> "${SYSLINUX_CFG}" << 'SYSLINUX_SAFE'
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -635,7 +657,21 @@ mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+
+  # ── CachyOS Repository: Chroot integration ─────────────────────────────────
+  if ! grep -q "\[cachyos\]" /etc/pacman.conf; then
+    cat >> /etc/pacman.conf << 'EOF'
+
+[cachyos]
+Server = https://mirror.cachyos.org/cachyos/x86_64/
+EOF
+  fi
+  pacman-key --init
+  pacman-key --populate archlinux
+  pacman-key --recv-keys F3B607488DB35989 --keyserver keyserver.ubuntu.com
+  pacman-key --lsign-key F3B607488DB35989
 pacman -Syy --noconfirm
+  pacman -S --noconfirm cachyos-keyring
 mkdir -p /etc/calamares/modules/
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
 ---
@@ -734,7 +770,10 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+pacman-key --recv-keys F3B607488DB35989 --keyserver keyserver.ubuntu.com
+pacman-key --lsign-key F3B607488DB35989
 pacman -Syy --noconfirm
+pacman -S --noconfirm cachyos-keyring
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -848,6 +887,11 @@ for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
   cd /
 done
 
+# Fix: Audit requirement for ldconfig after PaperDE build
+# Legacy audit hook for paperde-src/build install
+# ninja -C paperde-src/build install
+ldconfig
+
 cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
@@ -894,7 +938,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux 2>/dev/null || true
+mkinitcpio -p linux-cachyos 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -1490,7 +1534,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1556,67 +1600,72 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
-    --bg: #f0f6fa;
-    --surface: #fff;
-    --surface-2: #f7fbfd;
-    --text: #0d1b2a;
-    --sub: #4a5a70;
-    --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
+    --accent: #bd93f9;
+    --accent-dark: #9a6fd6;
+    --bg: #282a36;
+    --surface: #44475a;
+    --surface-2: #3a3c4e;
+    --text: #f8f8f2;
+    --sub: #6272a4;
+    --border: #44475a;
+    --shadow: 0 4px 24px rgba(0,0,0,0.40);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); line-height: 1.6; }
 
   header {
-    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
-    color:#fff; padding:52px 32px 72px; text-align:center;
+    background: linear-gradient(135deg, #282a36 0%, #44475a 100%);
+    color:var(--text); padding:64px 32px; text-align:center;
+    border-bottom: 1px solid var(--sub);
   }
-  header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
-  header p  { font-size:1rem; opacity:.72; margin-top:8px; }
+  header h1 { font-size:2.5rem; font-weight:300; letter-spacing:1.5px; color: var(--accent); }
+  header p  { font-size:1.1rem; opacity:.85; margin-top:12px; }
 
   .card-row {
-    display:flex; gap:18px; flex-wrap:wrap;
-    padding:28px 32px; max-width:920px; margin:-32px auto 0;
+    display:flex; gap:20px; flex-wrap:wrap;
+    padding:40px 32px; max-width:1000px; margin:0 auto;
   }
   .card {
-    background:var(--surface); border-radius:18px; padding:24px 22px;
-    flex:1; min-width:200px; box-shadow:var(--shadow);
-    border:1px solid var(--border);
-    transition: transform .15s, box-shadow .15s;
+    background:var(--surface); border-radius:16px; padding:28px;
+    flex:1; min-width:240px; box-shadow:var(--shadow);
+    border:1px solid rgba(255,255,255,0.05);
+    transition: transform .2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .2s;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
-  .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
-  .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
+  .card:hover { transform:translateY(-5px); box-shadow:0 12px 40px rgba(0,0,0,0.50); }
+  .card h2 { font-size:1.1rem; font-weight:600; margin-bottom:10px; color:var(--accent); }
+  .card p  { font-size:.95rem; color:var(--text); opacity: 0.9; }
 
-  section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
+  section { max-width:1000px; margin:0 auto; padding:20px 32px 60px; }
   section h2 {
-    font-size:1.2rem; font-weight:600; margin:28px 0 12px;
+    font-size:1.4rem; font-weight:600; margin:40px 0 16px;
     color:var(--accent);
   }
   .tip {
-    background:#e6f6fc; border-left:3px solid var(--accent);
-    border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px;
-    font-size:.9rem; color:var(--text);
+    background:var(--surface-2); border-left:4px solid var(--accent);
+    border-radius:4px 12px 12px 4px; padding:18px 24px; margin:20px 0;
+    font-size:1rem; color:var(--text);
   }
   .tip code {
-    background:#cde8f5; padding:2px 7px; border-radius:5px;
-    font-family:'Noto Sans Mono',monospace; font-size:.88em;
+    background:rgba(0,0,0,0.3); padding:4px 10px; border-radius:6px;
+    font-family:'Noto Sans Mono',monospace; font-size:.9em; color: #ff79c6;
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#fff;
-    border-radius:10px; padding:9px 20px; text-decoration:none;
-    font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    display:inline-block; background:var(--accent); color:#282a36;
+    border-radius:12px; padding:12px 28px; text-decoration:none;
+    font-size:.95rem; font-weight:700; margin:10px 12px 0 0;
+    transition: all .2s;
+    border: none;
+    cursor: pointer;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background:#d1b3ff; transform: scale(1.02); }
+  .btn:focus-visible { outline: 3px solid #f8f8f2; outline-offset: 3px; }
+
   .btn.secondary {
-    background:var(--surface); color:var(--accent);
-    border:1.5px solid var(--border);
+    background:var(--surface); color:var(--text);
+    border:2px solid var(--sub);
   }
-  .btn.secondary:hover { background:#e6f6fc; }
+  .btn.secondary:hover { background:var(--sub); color: #fff; }
 
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill {
@@ -1661,9 +1710,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <nav aria-label="Quick Links">
+    <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Read the KibaOS Wiki">📖 Wiki</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue on GitHub">🐞 Report Issue</a>
+    <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="Visit KibaOS GitHub Repository">🐙 GitHub</a>
+  </nav>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
