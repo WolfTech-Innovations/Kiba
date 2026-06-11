@@ -1,0 +1,14 @@
+name: Integrity Manifest Generator
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  manifest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate manifest
+        run: find . -type f -not -path "./.git/*" -exec sha256sum {} + > manifest.sha256

@@ -1,0 +1,21 @@
+name: Issue Template Validator
+on:
+  push:
+    paths:
+      - '.github/ISSUE_TEMPLATE/**'
+  pull_request:
+    paths:
+      - '.github/ISSUE_TEMPLATE/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate YAML
+        run: |
+          for f in .github/ISSUE_TEMPLATE/*.yml; do
+            [ -e "$f" ] || continue
+            python3 -c "import yaml, sys; yaml.safe_load(open('$f'))" || exit 1
+          done

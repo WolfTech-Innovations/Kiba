@@ -1,0 +1,18 @@
+name: Repo Stats
+on:
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Generate stats
+        run: |
+          echo "Commits: $(git rev-list --count HEAD)"
+          echo "Files: $(find . -type f | wc -l)"

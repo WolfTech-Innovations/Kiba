@@ -21,6 +21,8 @@ pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
+  # ninja -C paperde-src/build install
+  ldconfig \
   openssl curl imagemagick
 
 # ── Paths ─────────────────────────────────────────────────────────────────
@@ -1490,7 +1492,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════

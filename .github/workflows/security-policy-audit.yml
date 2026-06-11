@@ -1,0 +1,13 @@
+name: Audit Security Policy
+on: [push, pull_request]
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SECURITY.md
+        run: |
+          grep -i "vulnerability" SECURITY.md
+          grep -i "reporting" SECURITY.md

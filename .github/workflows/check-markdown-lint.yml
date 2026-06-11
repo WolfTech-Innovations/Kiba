@@ -1,0 +1,13 @@
+name: Markdown Lint
+on: [push, pull_request]
+
+jobs:
+  markdown-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: markdownlint-cli
+        uses: nosoterry/markdownlint-action@v3
+        with:
+          config: .github/markdownlint.json

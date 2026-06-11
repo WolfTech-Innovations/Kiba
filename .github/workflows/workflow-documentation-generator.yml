@@ -1,0 +1,21 @@
+name: Workflow Documentation Generator
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run update script
+        run: python3 scripts/update_workflow_md.py
+      - name: Commit changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add WORKFLOWS.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "docs: update WORKFLOWS.md"

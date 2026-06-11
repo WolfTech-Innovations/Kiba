@@ -1,0 +1,11 @@
+name: Python Syntax Check
+on: [push, pull_request]
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile check
+        run: python3 -m py_compile scripts/*.py *.py

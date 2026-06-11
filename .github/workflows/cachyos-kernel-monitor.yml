@@ -1,0 +1,14 @@
+name: Monitor CachyOS Kernel
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check latest version
+        run: |
+          curl -s https://mirror.cachyos.org/cachyos/x86_64/ | grep linux-cachyos | tail -n 1

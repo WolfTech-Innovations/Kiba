@@ -1,0 +1,13 @@
+name: Desktop Entry Validator
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: desktop-file-validate
+        run: |
+          sudo apt-get update && sudo apt-get install -y desktop-file-utils
+          find . -name "*.desktop" -exec desktop-file-validate {} +

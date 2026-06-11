@@ -1,0 +1,13 @@
+name: Branding Assets Validator
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check assets
+        run: |
+          ls branding/boot.png
+          ls branding/forest-k.png

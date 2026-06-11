@@ -1,0 +1,12 @@
+name: Package JSON Mandatory Metadata
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check required fields
+        run: |
+          jq -e '.name and .version and .private and .engines' package.json

@@ -1,0 +1,12 @@
+name: Calamares Config Linter
+on: [push, pull_request]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: YAML check
+        run: |
+          find . -name "*.conf" -exec python3 -c "import yaml, sys; yaml.safe_load(open('{}'))" ";"

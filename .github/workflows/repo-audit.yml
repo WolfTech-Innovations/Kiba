@@ -1,0 +1,15 @@
+name: Repository Comprehensive Audit
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run repo_audit.sh
+        run: bash scripts/repo_audit.sh
