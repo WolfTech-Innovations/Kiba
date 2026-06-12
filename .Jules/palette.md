@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-05-30 - [Surgicality in UX Contributions]
+
+**Learning:** When implementing micro-UX improvements in KibaOS, it is critical to avoid bundling unrelated repository hygiene fixes (like whitespace cleanup or audit script adjustments) even if they cause pre-existing audit failures. Reviewers prioritize surgical, persona-aligned PRs over global repository health during UX tasks. Bundling "noise" can lead to PR rejection.
+**Action:** Focus exclusively on the UX enhancement. If audit failures exist, document them or address them in a separate, persona-appropriate task rather than bundling them.
