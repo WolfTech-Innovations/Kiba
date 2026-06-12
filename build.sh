@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1788,6 +1788,8 @@ if ls out/*.iso 1>/dev/null 2>&1; then
   echo "║  KibaOS Budgie build complete!       ║"
   echo "║  ${ISO}.iso            ║"
   echo "╚══════════════════════════════════════╝"
+  # ninja -C paperde-src/build install
+  ldconfig
 else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1

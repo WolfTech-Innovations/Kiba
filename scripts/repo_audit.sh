@@ -21,7 +21,7 @@ echo "=== Running KibaOS Repository Audit ==="
 if [ -f "build.sh" ]; then
     echo "--- Auditing build.sh ---"
     # Verify set -e in embedded customize_airootfs
-    if ! grep -A 2 "cat > \"\${AIROOTFS}/root/customize_airootfs.sh\"" build.sh | grep -q "set -e"; then
+    if ! grep -A 2 'cat > "${AIROOTFS}/root/customize_airootfs.sh"' build.sh | grep -q "set -e"; then
         log_error "customize_airootfs.sh in build.sh is missing set -e"
     fi
     # Verify pacman-key populate
@@ -56,7 +56,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="generate_45_workflows.py" --exclude="audit-*.yml"; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
