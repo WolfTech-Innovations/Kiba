@@ -1556,22 +1556,25 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
-    --bg: #f0f6fa;
-    --surface: #fff;
-    --surface-2: #f7fbfd;
-    --text: #0d1b2a;
-    --sub: #4a5a70;
-    --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
+    --accent: #bd93f9;
+    --accent-dark: #a37cf0;
+    --bg: #282a36;
+    --surface: #44475a;
+    --surface-2: #383a59;
+    --text: #f8f8f2;
+    --sub: #6272a4;
+    --border: #6272a4;
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
   header {
-    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
-    color:#fff; padding:52px 32px 72px; text-align:center;
+    background: linear-gradient(135deg, #282a36 0%, #44475a 100%);
+    color: #fff;
+    padding: 52px 32px 72px;
+    text-align: center;
+    border-bottom: 2px solid var(--accent);
   }
   header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
   header p  { font-size:1rem; opacity:.72; margin-top:8px; }
@@ -1586,9 +1589,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     border:1px solid var(--border);
     transition: transform .15s, box-shadow .15s;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:hover { transform:translateY(-3px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
-  .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
+  .card p  { font-size:.88rem; color:var(--text); opacity: 0.8; line-height:1.55; }
 
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 {
@@ -1596,27 +1599,31 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     color:var(--accent);
   }
   .tip {
-    background:#e6f6fc; border-left:3px solid var(--accent);
-    border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px;
-    font-size:.9rem; color:var(--text);
+    background: var(--surface-2); border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0; padding: 14px 18px; margin-top: 10px;
+    font-size: .9rem; color: var(--text);
   }
   .tip code {
-    background:#cde8f5; padding:2px 7px; border-radius:5px;
-    font-family:'Noto Sans Mono',monospace; font-size:.88em;
+    background: rgba(255, 255, 255, 0.1); padding: 2px 7px; border-radius: 5px;
+    font-family: 'Noto Sans Mono', monospace; font-size: .88em;
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#fff;
-    border-radius:10px; padding:9px 20px; text-decoration:none;
-    font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    display: inline-block; background: var(--accent); color: #282a36;
+    border-radius: 10px; padding: 9px 20px; text-decoration: none;
+    font-size: .88rem; font-weight: 600; margin: 6px 6px 0 0;
+    transition: background 0.12s, transform 0.1s, outline 0.1s;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background: var(--accent-dark); }
+  .btn:active { transform: scale(0.98); }
+  .btn:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+
   .btn.secondary {
-    background:var(--surface); color:var(--accent);
-    border:1.5px solid var(--border);
+    background: var(--surface); color: var(--text);
+    border: 1.5px solid var(--border);
   }
-  .btn.secondary:hover { background:#e6f6fc; }
+  .btn.secondary:hover { background: var(--surface-2); }
+  .btn.secondary:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
 
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill {
@@ -1661,9 +1668,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Read the KibaOS Wiki">📖 Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue on GitHub">🐞 Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View source code on GitHub">🐙 GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
@@ -1674,7 +1681,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   </div>
 </section>
 
-<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
+<footer style="text-align:center; padding:24px; color:var(--sub); font-size:.8rem; border-top:1px solid var(--border); margin-top:16px;">
+  KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba
+</footer>
 </body>
 </html>
 WELCOMEHTML
