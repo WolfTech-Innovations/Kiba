@@ -6,3 +6,7 @@
 ## 2026-05-14 - [Semantic YAML Parsing for Performance]
 **Learning:** While `awk` or `grep` can be extremely fast for simple text scanning, they are unreliable for structured formats like YAML where property order and context (comments, script blocks) matter. A single-process Python script with `yaml.CSafeLoader` provides the best balance of speed (~300x faster than `yq` loops) and semantic correctness.
 **Action:** Replace shell-based loops calling CLI parsers (`yq`, `jq`) with single-execution Python scripts for bulk metadata validation.
+
+## 2026-05-15 - [AUR Build Parallelization]
+**Learning:** Building AUR packages in a loop during ISO creation is a major bottleneck. By default, `makepkg` might not use all cores or might waste time on compression for packages that are immediately installed and discarded.
+**Action:** Inject `MAKEFLAGS="-j$(nproc)"` and `PKGEXT='.pkg.tar'` directly into the `makepkg` call within the build loop to maximize throughput and minimize overhead.
