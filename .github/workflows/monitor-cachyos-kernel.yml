@@ -1,0 +1,33 @@
+name: "Monitor CachyOS Kernel"
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Get latest kernel version
+        id: kernel
+        run: |
+          VERSION=$(curl -sL https://mirror.cachyos.org/cachyos/x86_64/ | grep -o 'linux-cachyos-[0-9][^"]*' | sort -V | tail -n 1 || echo "unknown")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Cache kernel version
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: kernel-version.txt
+          key: kernel-${{ steps.kernel.outputs.version }}
+
+      - name: Trigger Build
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          echo "${{ steps.kernel.outputs.version }}" > kernel-version.txt
+          gh workflow run build.yml
+        env:
+          GH_TOKEN: ${{ github.token }}

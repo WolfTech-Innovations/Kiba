@@ -16,6 +16,10 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
+# CachyOS repo for kernel
+curl -O https://mirror.cachyos.org/cachyos-repo.tar.xz
+tar xvf cachyos-repo.tar.xz && cd cachyos-repo
+./cachyos-repo.sh && cd ..
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
@@ -35,6 +39,12 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+
+# Add CachyOS repo to profile
+cat >> "${PROFILE}/pacman.conf" << 'CACHY'
+[cachyos]
+Include = /etc/pacman.d/cachyos-mirrorlist
+CACHY
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -86,9 +96,13 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
+cachyos-keyring
+cachyos-mirrorlist
+cachyos-settings
 syslinux
 base
-linux
+linux-cachyos
+linux-cachyos-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -197,11 +211,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -217,15 +231,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -237,8 +251,8 @@ if [ -f "${SYSLINUX_CFG}" ]; then
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -621,6 +635,8 @@ ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.targe
 # ══════════════════════════════════════════════════════════════════════════
 # customize_airootfs.sh — runs inside chroot at build time
 # ══════════════════════════════════════════════════════════════════════════
+# ninja -C paperde-src/build install
+ldconfig
 mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
@@ -635,6 +651,13 @@ mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+
+# CachyOS repo in chroot
+cat >> /etc/pacman.conf << 'CACHY'
+[cachyos]
+Include = /etc/pacman.d/cachyos-mirrorlist
+CACHY
+
 pacman -Syy --noconfirm
 mkdir -p /etc/calamares/modules/
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
@@ -894,7 +917,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux 2>/dev/null || true
+mkinitcpio -p linux-cachyos 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -1490,7 +1513,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1556,21 +1579,21 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
-    --bg: #f0f6fa;
-    --surface: #fff;
-    --surface-2: #f7fbfd;
-    --text: #0d1b2a;
-    --sub: #4a5a70;
-    --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
+    --accent: #bd93f9;
+    --accent-dark: #ff79c6;
+    --bg: #282a36;
+    --surface: #44475a;
+    --surface-2: #383a59;
+    --text: #f8f8f2;
+    --sub: #6272a4;
+    --border: #44475a;
+    --shadow: 0 4px 24px rgba(0,0,0,0.30);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
   header {
-    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
+    background: linear-gradient(135deg, #282a36 0%, #44475a 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
   }
   header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
@@ -1586,7 +1609,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     border:1px solid var(--border);
     transition: transform .15s, box-shadow .15s;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,0,0,0.40); }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
 
@@ -1596,27 +1619,32 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     color:var(--accent);
   }
   .tip {
-    background:#e6f6fc; border-left:3px solid var(--accent);
+    background:var(--surface-2); border-left:3px solid var(--accent);
     border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px;
     font-size:.9rem; color:var(--text);
   }
   .tip code {
-    background:#cde8f5; padding:2px 7px; border-radius:5px;
+    background:var(--bg); padding:2px 7px; border-radius:5px;
     font-family:'Noto Sans Mono',monospace; font-size:.88em;
+    color: var(--accent);
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#fff;
+    display:inline-block; background:var(--accent); color:#282a36;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, transform 0.1s;
+    outline-offset: 3px;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background:var(--accent-dark); color: #fff; }
+  .btn:active { transform: scale(0.98); }
+  .btn:focus-visible { outline: 3px solid var(--accent); }
+
   .btn.secondary {
-    background:var(--surface); color:var(--accent);
+    background:var(--surface); color:var(--text);
     border:1.5px solid var(--border);
   }
-  .btn.secondary:hover { background:#e6f6fc; }
+  .btn.secondary:hover { background:var(--surface-2); border-color: var(--accent); }
 
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill {
@@ -1661,9 +1689,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Read the KibaOS Wiki">📖 Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an Issue">🐛 Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="Visit KibaOS on GitHub">🐙 GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
