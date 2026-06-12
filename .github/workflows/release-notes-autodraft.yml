@@ -1,0 +1,27 @@
+name: Release Notes Autodraft
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  save-notes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure Notes Directory
+        run: |
+          mkdir -p Notes
+          touch Notes/.gitkeep
+
+      - name: Save Release Notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ github.event.release.id }}
+        run: bash scripts/save_release_notes.sh

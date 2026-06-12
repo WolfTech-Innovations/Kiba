@@ -21,12 +21,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set -eu
+set -euo pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
 # Centralized script to save release notes to the Notes/ folder
-# Convention: NTE-DDHYM.md
+# Convention: NTE-DDHYM
 
 save_release_notes() {
   if [ "$#" -ne 1 ] && [ -z "${RELEASE_ID:-}" ]; then
@@ -55,6 +55,7 @@ save_release_notes() {
 
   # 1. Generate filename: NTE-DDHYM
   # Optimization: Single date call reduces process spawning.
+  # NTE: Static prefix
   # DD: Day of month (01-31)
   # H: Hour of day (0-N for 0-23)
   # Y: Last digit of year
@@ -76,15 +77,18 @@ save_release_notes() {
   months="123456789ABC"
   m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
 
-  filename="Notes/NTE-${dd}${h}${y}${m}.md"
+  # Use the exact format "NTE-DDHYM" without .md extension as requested
+  filename="Notes/NTE-${dd}${h}${y}${m}"
 
   # 2. Ensure Notes directory and .gitkeep exist
+  printf "Ensuring Notes/ directory and .gitkeep exist...\n"
   mkdir -p Notes
   if [ ! -f Notes/.gitkeep ]; then
     touch Notes/.gitkeep
   fi
 
   # 3. Fetch release body using curl -fsS and jq
+  printf "Fetching release notes for release ID: %s...\n" "$release_id"
   api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
   body=$(curl -fsS -H "Authorization: token ${github_token}" \
               -H "Accept: application/vnd.github.v3+json" \
@@ -98,6 +102,7 @@ save_release_notes() {
   fi
 
   # 5. Git operations
+  printf "Committing and pushing release notes: %s...\n" "$filename"
   git config user.name "github-actions[bot]"
   git config user.email "github-actions[bot]@users.noreply.github.com"
   git add "$filename" Notes/.gitkeep
@@ -105,8 +110,9 @@ save_release_notes() {
   if git commit -m "docs: add release notes $filename [skip ci]"; then
     git pull --rebase origin main
     git push origin main
+    printf "Successfully pushed release notes.\n"
   else
-    printf "No changes to commit\n"
+    printf "No changes to commit.\n"
   fi
 }
 
