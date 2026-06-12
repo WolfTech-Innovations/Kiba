@@ -1,0 +1,20 @@
+name: Advanced Issue Triage
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Auto-label issues
+        uses: andymckay/labeler@master
+        with:
+          add-labels: "triage"
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

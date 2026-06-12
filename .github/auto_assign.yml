@@ -1,0 +1,6 @@
+# Configuration for auto-assign-action
+addReviewers: true
+reviewers:
+  - WolfTech-Innovations
+addAssignees: author
+numberOfReviewers: 0

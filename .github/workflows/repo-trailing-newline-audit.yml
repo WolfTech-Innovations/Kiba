@@ -1,0 +1,18 @@
+name: Repo Trailing Newline Audit
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trailing-newline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for trailing newlines
+        run: |
+          find . -type f -not -path "./.git/*" -not -path "./node_modules/*" -exec sh -c '[ -n "$(tail -c 1 "{}" | tr -d "\r\n")" ] && echo "Missing trailing newline in {}" && exit 1' \; || exit 0

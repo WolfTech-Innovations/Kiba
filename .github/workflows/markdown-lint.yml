@@ -1,0 +1,23 @@
+name: Markdown Lint
+on:
+  push:
+    paths:
+      - '**.md'
+  pull_request:
+    paths:
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run markdownlint
+        uses: nosotroscode/markdownlint-action@v3
+        with:
+          ignore: 'node_modules'

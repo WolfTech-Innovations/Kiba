@@ -1,0 +1,19 @@
+name: Lock Threads
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: dessant/lock-threads-action@v5
+        with:
+          issue-inactive-days: '30'
+          pr-inactive-days: '30'

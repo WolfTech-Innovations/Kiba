@@ -1,0 +1,18 @@
+name: Repo Case Collision Check
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  case-collision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for case collisions
+        run: |
+          find . -not -path "./.git/*" | tr '[:upper:]' '[:lower:]' | sort | uniq -d | grep . && echo "Case collision detected!" && exit 1 || exit 0
