@@ -1,0 +1,21 @@
+name: "Audit Build SH Desktop Entry Kiba"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q 'kiba-welcome.desktop' build.sh || (echo "::error::Kiba welcome desktop entry missing in build.sh" && exit 1)

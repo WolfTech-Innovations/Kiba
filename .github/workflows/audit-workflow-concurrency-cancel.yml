@@ -1,0 +1,21 @@
+name: "Audit Workflow Concurrency Cancel"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -r 'concurrency:' .github/workflows/ -A 5 | grep -q 'cancel-in-progress' || (echo "::error::Concurrency should have cancel-in-progress" && exit 1)

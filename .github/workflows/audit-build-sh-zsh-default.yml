@@ -1,0 +1,21 @@
+name: "Audit Build SH Zsh Default"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q 'chsh -s /usr/bin/zsh' build.sh || (echo "::error::Zsh not set as default shell in build.sh" && exit 1)

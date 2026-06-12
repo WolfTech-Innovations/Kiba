@@ -1,0 +1,21 @@
+name: "Audit Build SH Pacman Populate"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q 'pacman-key --populate archlinux' build.sh || (echo "::error::Missing 'pacman-key --populate archlinux' in build.sh" && exit 1)

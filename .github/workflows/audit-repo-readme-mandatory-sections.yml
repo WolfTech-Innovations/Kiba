@@ -1,0 +1,21 @@
+name: "Audit Repo README Mandatory Sections"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q '## Table of Contents' README.md || (echo "::error::README missing Table of Contents" && exit 1)

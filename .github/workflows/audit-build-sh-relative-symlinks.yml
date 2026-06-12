@@ -1,0 +1,21 @@
+name: "Audit Build SH Relative Symlinks"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! grep -q 'ln -s /' build.sh || (echo "::error::Absolute symlinks found in build.sh (use relative)" && exit 1)

@@ -1,0 +1,21 @@
+name: "Audit Workflow Checkout V4"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! grep -r 'uses: actions/checkout@' .github/workflows/ | grep -vE '@v4|@[a-f0-9]{40}' | grep . || (echo "::error::actions/checkout should use v4" && exit 1)

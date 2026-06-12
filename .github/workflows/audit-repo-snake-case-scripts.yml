@@ -1,0 +1,21 @@
+name: "Audit Repo Snake Case Scripts"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! find . -name '*.sh' -not -path './node_modules/*' | grep -E '[A-Z-]' | grep . || (echo "::error::Shell scripts should use snake_case" && exit 1)

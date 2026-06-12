@@ -1,0 +1,21 @@
+name: "Audit Workflow Explicit Bash"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! grep -r 'run:' .github/workflows/ | grep -v 'shell: bash' | grep . || (echo "::error::Explicit 'shell: bash' recommended for run blocks" && exit 1)

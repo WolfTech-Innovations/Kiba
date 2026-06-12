@@ -1,0 +1,21 @@
+name: "Check Security Contact Info"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q 'security@' SECURITY.md || (echo "::error::SECURITY.md missing contact email" && exit 1)

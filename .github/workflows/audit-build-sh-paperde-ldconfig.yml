@@ -1,0 +1,21 @@
+name: "Audit Build SH PaperDE ldconfig"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -A 20 'ninja -C paperde-src/build install' build.sh | grep -q 'ldconfig' || (echo "::error::Missing 'ldconfig' after PaperDE installation in build.sh" && exit 1)

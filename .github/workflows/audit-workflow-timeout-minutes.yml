@@ -1,0 +1,21 @@
+name: "Audit Workflow Timeout Minutes"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -r 'jobs:' .github/workflows/ -A 20 | grep -q 'timeout-minutes' || (echo "::error::Jobs should have timeout-minutes" && exit 1)

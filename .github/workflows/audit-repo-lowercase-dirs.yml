@@ -1,0 +1,21 @@
+name: "Audit Repo Lowercase Directories"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! find . -maxdepth 2 -type d -name '*[A-Z]*' --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=Notes | grep . || (echo "::error::Directories should be lowercase" && exit 1)

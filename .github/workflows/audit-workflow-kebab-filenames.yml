@@ -1,0 +1,21 @@
+name: "Audit Workflow Kebab Filenames"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! find .github/workflows -name '*_*' | grep . || (echo "::error::Workflow filenames should use kebab-case" && exit 1)

@@ -1,0 +1,21 @@
+name: "Audit Markdown Internal Anchors"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          ! grep -rhE '\[[^]]+\]\(#[^)]+\)' . --include='*.md' --exclude-dir=node_modules | grep -vE '\(#[a-z0-9-]+\)' | grep . || (echo "::error::Internal anchors should be #lowercase-kebab" && exit 1)

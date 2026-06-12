@@ -1,0 +1,21 @@
+name: "Audit Build SH Liveuser UID"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep 'liveuser' build.sh | grep -q '1000:1000' || (echo "::error::Liveuser UID/GID is not 1000 in build.sh" && exit 1)
