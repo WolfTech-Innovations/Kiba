@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1556,15 +1556,15 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
-    --bg: #f0f6fa;
-    --surface: #fff;
-    --surface-2: #f7fbfd;
-    --text: #0d1b2a;
-    --sub: #4a5a70;
-    --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
+    --bg: #282a36;
+    --surface: #44475a;
+    --surface-2: #383a59;
+    --text: #f8f8f2;
+    --sub: #6272a4;
+    --accent: #bd93f9;
+    --accent-dark: #a277e3;
+    --border: #6272a4;
+    --shadow: 0 4px 24px rgba(0,0,0,0.4);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
@@ -1612,6 +1612,8 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: background .12s;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:active { transform: scale(0.98); }
+  .btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
@@ -1661,9 +1663,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Read the KibaOS Wiki">📖 Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue on GitHub">🐞 Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View source code on GitHub">🐙 GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
@@ -1792,3 +1794,7 @@ else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
 fi
+# ninja -C paperde-src/build install
+ldconfig
+# ninja -C paperde-src/build install
+ldconfig
