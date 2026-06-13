@@ -634,6 +634,8 @@ useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+# Bolt: Enable parallel downloads in chroot for faster package installation
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 pacman -Syy --noconfirm
 mkdir -p /etc/calamares/modules/
@@ -844,7 +846,8 @@ for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  # Bolt: Optimize AUR build by using all cores and skipping compression
+  sudo -u builduser MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
