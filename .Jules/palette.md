@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-06-13 - [Tactile Feedback and Focus States in Embedded HTML]
+
+**Learning:** Interactive elements in embedded system components (like `welcome.html` in `build.sh`) often lack modern web affordances. Adding `:focus-visible` outlines and `:active` scale transforms (e.g., `scale(0.98)`) provides essential tactile feedback for keyboard and mouse users, making the system feel more responsive and "premium".
+**Action:** Always include `.btn:focus-visible` for keyboard accessibility and `.btn:active { transform: scale(0.98); }` for click feedback in embedded HTML components.
