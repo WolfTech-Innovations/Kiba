@@ -1,0 +1,19 @@
+name: Markdownlint
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run markdownlint
+        uses: nosoterry/github-action-markdown-cli@v3.3.0
+        with:
+          files: .

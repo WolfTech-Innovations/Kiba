@@ -1,0 +1,17 @@
+name: Notify SourceForge Release
+on:
+  workflow_run:
+    workflows: ["Build KibaOS"]
+    types:
+      - completed
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - name: Notify Release
+        run: echo "ISO Build successful and presumably uploaded to SourceForge."
