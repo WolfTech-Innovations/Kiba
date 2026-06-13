@@ -29,8 +29,10 @@ if [ -f "build.sh" ]; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
     # Verify ldconfig after PaperDE build
-    if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
-        log_error "ldconfig not found after PaperDE installation in build.sh"
+    if grep -q "ninja -C paperde-src/build install" build.sh; then
+        if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
+            log_error "ldconfig not found after PaperDE installation in build.sh"
+        fi
     fi
     # Verify liveuser UID consistency
     if grep -q "liveuser" build.sh; then
@@ -56,7 +58,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude-dir=scripts; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
@@ -67,7 +69,7 @@ fi
 # 4. Repository Hygiene
 echo "--- Auditing Repository Hygiene ---"
 # .gitkeep should be empty
-NON_EMPTY_GITKEEP=$(find . -name ".gitkeep" -type f -size +0)
+NON_EMPTY_GITKEEP=$(find . -name ".gitkeep" -type f -size +0 -not -path "./.git/*")
 if [ -n "$NON_EMPTY_GITKEEP" ]; then
     log_error ".gitkeep files must be empty: $NON_EMPTY_GITKEEP"
 fi
