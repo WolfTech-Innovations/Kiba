@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-13 - [Tactile Feedback and Accessible Navigation in Embedded HTML]
+
+**Learning:** For embedded "Welcome" screens (heredocs), accessibility and tactile feedback can be significantly improved with three surgical additions: `:focus-visible` for keyboard navigation, `:active` transforms for click feedback, and descriptive `aria-label` attributes on emoji-rich buttons. This ensures the first-run experience is accessible to screen readers and pleasant for keyboard/mouse users alike.
+**Action:** When updating embedded HTML components, always include `:focus-visible` rings, `:active` scale transforms (0.98), and `aria-label` attributes for interactive elements.
