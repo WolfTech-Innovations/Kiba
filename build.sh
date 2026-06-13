@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1606,14 +1606,17 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#fff;
+    display:inline-block; background:var(--accent-dark); color:#fff;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, transform .1s;
+    outline: none;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background:var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .btn:active { transform: scale(0.98); }
   .btn.secondary {
-    background:var(--surface); color:var(--accent);
+    background:var(--surface); color:var(--accent-dark);
     border:1.5px solid var(--border);
   }
   .btn.secondary:hover { background:#e6f6fc; }
@@ -1661,9 +1664,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Read the KibaOS Wiki">📖 Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue on GitHub">🐞 Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View source code on GitHub">🐙 GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>

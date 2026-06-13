@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-13 - [Tactile & Accessible Welcome Experience]
+**Learning:** For web-based "Welcome" screens in desktop environments, combining descriptive emojis with `aria-label` attributes improves both visual scannability and screen reader clarity. Additionally, using `:focus-visible` ensures keyboard accessibility without cluttering the UI for mouse users, and `transform: scale(0.98)` on `:active` provides a native-like tactile feel.
+**Action:** Always pair emojis with `aria-label` for icon/text buttons, and implement `:focus-visible` for keyboard-centric accessibility in system tools.
