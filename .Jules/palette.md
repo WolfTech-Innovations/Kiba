@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-05-30 - [Tactile Feedback and Accessible Focus for Web UI]
+
+**Learning:** For web-based components in KibaOS (like the welcome page), user interactions feel significantly more responsive when buttons provide tactile feedback via a subtle scale transform (`0.98`) on `:active`. Accessibility is best maintained by using `:focus-visible` to provide high-contrast outlines for keyboard users without adding visual noise for mouse users.
+**Action:** Always implement `:active { transform: scale(0.98); }` and `:focus-visible` outlines on interactive web elements to maintain KibaOS UX standards.
