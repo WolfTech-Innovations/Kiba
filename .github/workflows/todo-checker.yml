@@ -1,0 +1,18 @@
+name: TODO Checker
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  todo-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for TODO comments
+        shell: bash
+        run: |
+          grep -r "TODO" . --exclude-dir=.git --exclude=".github/workflows/todo-checker.yml"

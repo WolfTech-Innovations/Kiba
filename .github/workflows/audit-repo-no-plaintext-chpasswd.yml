@@ -1,0 +1,18 @@
+name: Audit Repo No Plaintext Chpasswd
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prohibit plaintext chpasswd
+        shell: bash
+        run: |
+          ! grep -rE "echo \".+:\" | chpasswd" . --exclude-dir=.git --exclude="audit-repo-no-plaintext-chpasswd.yml"

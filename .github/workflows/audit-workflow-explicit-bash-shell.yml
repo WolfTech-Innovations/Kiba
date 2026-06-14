@@ -1,0 +1,37 @@
+name: Audit Workflow Explicit Bash Shell
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce explicit bash shell
+        shell: bash
+        run: |
+          # Robust check for 'shell: bash' in all workflows that have 'run:' steps
+          # We use awk to find 'run:' blocks and check if they are preceded or followed by 'shell: bash' in the same job/step context
+          # For simplicity in this environment, we'll check per-file existence if any 'run:' is present.
+          ERRORS=0
+          for f in .github/workflows/*.yml; do
+            # Skip checking this file if it doesn't have 'run:'
+            if ! grep -q "^[[:space:]]\+run:" "$f"; then
+              continue
+            fi
+            # Check if 'shell: bash' exists in the file
+            if ! grep -q "^[[:space:]]\+shell: bash" "$f"; then
+              echo "Error: $f contains 'run:' steps but is missing 'shell: bash'"
+              ERRORS=1
+            fi
+          done
+          exit $ERRORS

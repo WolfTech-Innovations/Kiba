@@ -1,0 +1,23 @@
+name: Audit Build SH Sudoers Perms
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify sudoers permissions
+        shell: bash
+        run: |
+          grep -q 'chmod 0440 "${AIROOTFS}/etc/sudoers.d/' build.sh
+          grep -q 'chmod 0440 /etc/sudoers.d/' build.sh

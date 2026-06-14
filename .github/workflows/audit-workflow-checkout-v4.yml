@@ -1,0 +1,24 @@
+name: Audit Workflow Checkout V4
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce actions/checkout@v4
+        shell: bash
+        run: |
+          grep -r "uses: actions/checkout@" .github/workflows/ | grep -vE "@v4|@[a-f0-9]{40}" && exit 1 || exit 0

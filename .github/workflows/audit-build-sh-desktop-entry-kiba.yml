@@ -1,0 +1,23 @@
+name: Audit Build SH Desktop Entry Kiba
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Kiba desktop entry
+        shell: bash
+        run: |
+          grep -q "Name=Install KibaOS" build.sh
+          grep -q "Exec=/usr/local/bin/calamares-launch" build.sh

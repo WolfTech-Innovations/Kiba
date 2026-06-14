@@ -1,0 +1,18 @@
+name: Audit Workflow Kebab Filenames Strict
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce kebab-case workflow filenames
+        shell: bash
+        run: |
+          ls .github/workflows | grep -vE "^[a-z0-9-]+(\.yml|\.yaml)$" && exit 1 || exit 0

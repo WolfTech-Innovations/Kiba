@@ -1,0 +1,22 @@
+name: Audit Workflow No Node 16 Actions
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prohibit Node.js 16 based actions
+        shell: bash
+        run: |
+          grep -r "uses: actions/" .github/workflows/ | grep -vE "@v4|@[a-f0-9]{40}" && exit 1 || exit 0

@@ -1,0 +1,23 @@
+name: Audit Build SH Liveuser UID
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify liveuser UID
+        shell: bash
+        run: |
+          grep -q '1000:1000' build.sh
+          grep -q 'liveuser:x:1000:1000' build.sh

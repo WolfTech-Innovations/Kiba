@@ -1,0 +1,30 @@
+name: Audit Workflow Timeout Reasonable
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify reasonable timeouts
+        shell: bash
+        run: |
+          ERRORS=0
+          for f in .github/workflows/*.yml; do
+            # Every workflow should have timeout-minutes either at job or step level
+            if ! grep -q "timeout-minutes:" "$f"; then
+               echo "Error: $f is missing 'timeout-minutes'"
+               ERRORS=1
+            fi
+          done
+          exit $ERRORS

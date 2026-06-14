@@ -1,0 +1,27 @@
+name: Actionlint
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+      - '.github/workflows/*.yaml'
+  workflow_dispatch:
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download actionlint
+        shell: bash
+        run: |
+          bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+      - name: Run actionlint
+        shell: bash
+        run: ./actionlint -color

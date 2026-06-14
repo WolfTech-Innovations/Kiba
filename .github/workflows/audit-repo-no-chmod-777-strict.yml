@@ -1,0 +1,24 @@
+name: Audit Repo No Chmod 777 Strict
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prohibit dangerous chmod 777
+        shell: bash
+        run: |
+          # Find chmod 777, excluding self, the main audit script, and node_modules
+          BAD_FILES=$(grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude-dir=node_modules --exclude="audit-repo-no-chmod-777-strict.yml" --exclude="repo_audit.sh" || true)
+          if [ -n "$BAD_FILES" ]; then
+            echo "Found dangerous chmod 777 in:"
+            echo "$BAD_FILES"
+            exit 1
+          fi

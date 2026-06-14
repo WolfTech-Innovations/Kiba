@@ -1,0 +1,26 @@
+name: Audit Workflow Job Permissions Only
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enforce job-level permissions
+        shell: bash
+        run: |
+          # Ensure top-level permissions don't have 'write'
+          if grep -Pzo "(?s)^permissions:.*?\n\n" .github/workflows/*.yml | grep -q "write"; then
+            echo "Error: Found top-level 'write' permissions"
+            exit 1
+          fi

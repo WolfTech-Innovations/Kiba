@@ -1,0 +1,22 @@
+name: Audit Markdown Empty Link Check
+on:
+  push:
+    paths:
+      - '**/*.md'
+  pull_request:
+    paths:
+      - '**/*.md'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find empty markdown targets
+        shell: bash
+        run: |
+          ! grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules"

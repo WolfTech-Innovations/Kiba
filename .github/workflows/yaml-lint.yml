@@ -1,0 +1,30 @@
+name: YAML Lint
+on:
+  push:
+    paths:
+      - '**.yml'
+      - '**.yaml'
+  pull_request:
+    paths:
+      - '**.yml'
+      - '**.yaml'
+  workflow_dispatch:
+
+jobs:
+  yaml-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PyYAML
+        shell: bash
+        run: pip install PyYAML
+      - name: Run check_workflows.py
+        shell: bash
+        run: python3 check_workflows.py

@@ -1,0 +1,22 @@
+name: Audit Workflow No Absolute Script Paths
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yml'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prohibit absolute script paths
+        shell: bash
+        run: |
+          ! grep -rE "run: .*/scripts/.*\.sh" .github/workflows/

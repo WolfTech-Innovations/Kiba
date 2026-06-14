@@ -1,0 +1,24 @@
+name: Bandit
+on:
+  push:
+    paths:
+      - '**.py'
+  pull_request:
+    paths:
+      - '**.py'
+  workflow_dispatch:
+
+jobs:
+  bandit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Bandit
+        uses: pyupio/bandit-action@v1
+        with:
+          setup-python: true
+          python-version: '3.12'
+          args: '-r .'

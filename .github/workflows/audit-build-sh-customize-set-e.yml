@@ -1,0 +1,22 @@
+name: Audit Build SH Customize Set E
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify set -e in customize_airootfs
+        shell: bash
+        run: |
+          grep -A 2 'cat > "${AIROOTFS}/root/customize_airootfs.sh"' build.sh | grep -q 'set -e'

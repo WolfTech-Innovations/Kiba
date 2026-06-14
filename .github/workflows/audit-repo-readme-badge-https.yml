@@ -1,0 +1,22 @@
+name: Audit Repo README Badge HTTPS
+on:
+  push:
+    paths:
+      - 'README.md'
+  pull_request:
+    paths:
+      - 'README.md'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify HTTPS for README badges
+        shell: bash
+        run: |
+          ! grep -E "!\[.*\]\(http://img.shields.io" README.md

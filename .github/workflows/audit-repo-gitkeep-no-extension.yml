@@ -1,0 +1,22 @@
+name: Audit Repo Gitkeep No Extension
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure .gitkeep files have no extension
+        shell: bash
+        run: |
+          INVALID=$(find . -name ".gitkeep.*")
+          if [ -n "$INVALID" ]; then
+            echo "Found .gitkeep files with extensions: $INVALID"
+            exit 1
+          fi

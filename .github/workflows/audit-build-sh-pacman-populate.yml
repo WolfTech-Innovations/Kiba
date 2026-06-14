@@ -1,0 +1,22 @@
+name: Audit Build SH Pacman Populate
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pacman-key populate
+        shell: bash
+        run: |
+          grep -q 'pacman-key --populate archlinux' build.sh

@@ -1,0 +1,23 @@
+name: Audit Build SH Wallpaper Consistency
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify wallpaper consistency
+        shell: bash
+        run: |
+          grep -q 'WALLPAPER_URL=' build.sh
+          grep -q 'WALLPAPER_DEST="/usr/share/kibaos/wallpaper.png"' build.sh

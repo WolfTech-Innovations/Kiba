@@ -1,0 +1,22 @@
+name: Audit Build SH Relative Symlinks
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify relative symlinks
+        shell: bash
+        run: |
+          ! grep -E "ln -s /[^ ]+ [^ ]+" build.sh | grep -vE "ln -sf /usr/lib/systemd/system/|ln -sf /usr/share/pixmaps/"

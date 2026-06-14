@@ -1,0 +1,24 @@
+name: Audit Build SH Zsh Default
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify zsh default shell
+        shell: bash
+        run: |
+          if grep -qi 'zsh' build.sh; then
+            grep -q '/bin/zsh' build.sh
+          fi
