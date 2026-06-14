@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2026-06-14 - [Dracula Palette Accessibility & Branding Alignment]
+**Learning:** Aligning embedded system pages (like `welcome.html`) with the core Dracula aesthetic requires careful contrast management. Using #282a36 (Dark) text on #bd93f9 (Purple) ensures WCAG AA compliance for primary buttons, while `:focus-visible` with matching accent outlines maintains keyboard accessibility without visual noise for mouse users.
+**Action:** Use the official Dracula palette hex codes and ensure dark text on light/purple accents for interactive elements to maintain accessibility standards.
