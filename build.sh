@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1557,7 +1557,8 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <style>
   :root {
     --accent: #0099cc;
-    --accent-dark: #0077aa;
+    --accent-dark: #0070a0;
+    --accent-hover: #005d8a;
     --bg: #f0f6fa;
     --surface: #fff;
     --surface-2: #f7fbfd;
@@ -1593,7 +1594,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 {
     font-size:1.2rem; font-weight:600; margin:28px 0 12px;
-    color:var(--accent);
+    color:var(--accent-dark);
   }
   .tip {
     background:#e6f6fc; border-left:3px solid var(--accent);
@@ -1606,14 +1607,15 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#fff;
+    display:inline-block; background:var(--accent-dark); color:#fff;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, outline .12s;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background: var(--accent-hover); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn.secondary {
-    background:var(--surface); color:var(--accent);
+    background:var(--surface); color:var(--accent-dark);
     border:1.5px solid var(--border);
   }
   .btn.secondary:hover { background:#e6f6fc; }

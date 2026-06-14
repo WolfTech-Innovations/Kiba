@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-12-05 - [Contrast Compliance for Normal Text]
+**Learning:** The brand primary accent color (#0099cc) provides insufficient contrast (3.27:1) for normal text against white backgrounds. To achieve WCAG AA compliance (4.5:1), a darker variant like #0070a0 must be used for text-based interactive elements, while reserving the brand color for decorative elements or larger UI components.
+**Action:** Always verify contrast ratios for text-carrying components and use high-contrast variants for links, buttons, and headings to ensure accessibility.
