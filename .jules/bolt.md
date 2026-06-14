@@ -1,0 +1,3 @@
+## 2025-05-15 - Optimizing Arch Linux ISO builds
+**Learning:** For transient build environments (like GitHub Actions or Docker containers), compressing packages built from AUR is redundant overhead since they are installed immediately and the build artifacts are discarded. Additionally, enabling parallel downloads and multi-core compilation significantly reduces the total build time.
+**Action:** Use `PKGEXT='.pkg.tar'` and `MAKEFLAGS="-j$(nproc)"` in `makepkg` calls during ISO builds to skip compression and enable parallel compilation. Always ensure `ParallelDownloads` is enabled in `pacman.conf` within the chroot.
