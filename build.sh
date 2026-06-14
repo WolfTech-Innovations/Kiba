@@ -1490,7 +1490,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1556,8 +1556,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
+    --accent: #0070a0;
+    --accent-light: #0099cc;
+    --accent-hover: #005d8a;
     --bg: #f0f6fa;
     --surface: #fff;
     --surface-2: #f7fbfd;
@@ -1609,9 +1610,10 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     display:inline-block; background:var(--accent); color:#fff;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: all 0.2s ease;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background:var(--accent-hover); }
+  .btn:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);

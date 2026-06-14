@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-05-21 - [Accessible Color Contrast for Primary Actions]
+
+**Learning:** The KibaOS primary accent color (#0099cc) fails WCAG AA contrast against white text (2.9:1). Using a darker variant (#0070a0) achieves a 5:1 ratio, meeting accessibility standards for normal text while maintaining the brand's blue identity. Pairing this with a `:focus-visible` outline in the original lighter accent ensures both high contrast for readability and high visibility for keyboard navigation.
+**Action:** Use #0070a0 for primary action backgrounds with white text, and use #0099cc for focus outlines or non-text decorative elements.
