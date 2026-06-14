@@ -545,7 +545,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
 
   check:
     - storage
@@ -625,6 +625,11 @@ mkdir -p "${AIROOTFS}/root"
 cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
+# ── Keyring + package DB ───────────────────────────────────────────────────
+pacman-key --init
+pacman-key --populate archlinux
+pacman -Syy --noconfirm
+
 # Start dbus session for the whole script
 dbus-uuidgen > /etc/machine-id
 eval $(dbus-launch --sh-syntax)
@@ -732,9 +737,8 @@ cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
 WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
-pacman-key --init
-pacman-key --populate archlinux
-pacman -Syy --noconfirm
+# Keyring initialized at start of script to prevent redundant syncs
+pacman -Sy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -844,7 +848,7 @@ for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  sudo -u builduser MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
@@ -1490,7 +1494,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
