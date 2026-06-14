@@ -88,7 +88,8 @@ cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
 syslinux
 base
-linux
+linux-cachyos
+linux-cachyos-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -197,11 +198,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-cachyos'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-cachyos.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -217,15 +218,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux
-initrd  /arch/boot/x86_64/initramfs-linux.img
+linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
+initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -237,8 +238,8 @@ if [ -f "${SYSLINUX_CFG}" ]; then
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux
-  INITRD boot/x86_64/initramfs-linux.img
+  LINUX boot/x86_64/vmlinuz-linux-cachyos
+  INITRD boot/x86_64/initramfs-linux-cachyos.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -731,9 +732,13 @@ cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
 </mime-info>
 WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
-# ── Keyring + package DB ───────────────────────────────────────────────────
+# ── CachyOS Repository + Keyring ───────────────────────────────────────────
+curl https://mirror.cachyos.org/cachyos-repo.tar.xz -o cachyos-repo.tar.xz
+tar xf cachyos-repo.tar.xz
+./cachyos-repo.sh
+rm cachyos-repo.tar.xz cachyos-repo.sh
 pacman-key --init
-pacman-key --populate archlinux
+pacman-key --populate archlinux cachyos
 pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
@@ -894,7 +899,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux 2>/dev/null || true
+mkinitcpio -p linux-cachyos 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -1490,7 +1495,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
@@ -1556,15 +1561,15 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
-    --bg: #f0f6fa;
-    --surface: #fff;
-    --surface-2: #f7fbfd;
-    --text: #0d1b2a;
-    --sub: #4a5a70;
-    --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
+    --accent: #bd93f9;
+    --accent-dark: #a371f7;
+    --bg: #282a36;
+    --surface: #44475a;
+    --surface-2: #383a59;
+    --text: #f8f8f2;
+    --sub: #9ea8c7;
+    --border: #44475a;
+    --shadow: 0 4px 24px rgba(0,0,0,0.30);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
@@ -1606,17 +1611,22 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#fff;
+    display:inline-block; background:var(--accent); color:#282a36;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, outline .1s;
+    outline: 2px solid transparent;
+    outline-offset: 2px;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible {
+    outline-color: var(--accent);
+  }
   .btn.secondary {
-    background:var(--surface); color:var(--accent);
+    background:var(--surface); color:var(--text);
     border:1.5px solid var(--border);
   }
-  .btn.secondary:hover { background:#e6f6fc; }
+  .btn.secondary:hover { background:var(--surface-2); }
 
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill {
@@ -1661,9 +1671,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Read the KibaOS Wiki">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue on GitHub">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View the KibaOS source code on GitHub">GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>

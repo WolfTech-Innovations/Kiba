@@ -1,0 +1,21 @@
+name: "CachyOS Kernel Monitor"
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for new kernel
+        id: check
+        run: bash scripts/check_kernel.sh
+
+      - name: Log kernel version
+        run: |
+          echo "Current CachyOS Kernel version: ${{ steps.check.outputs.version }}"
