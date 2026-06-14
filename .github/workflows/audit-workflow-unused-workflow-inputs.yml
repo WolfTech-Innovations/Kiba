@@ -1,0 +1,22 @@
+name: "Audit Workflow Unused Workflow Inputs"
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          for f in .github/workflows/*.yml; do inputs=$(grep -A 20 "inputs:" "$f" | grep -E "^  [a-zA-Z0-9_-]+:" | awk -F: '{print $1}' | tr -d " "); for i in $inputs; do if ! grep -q "github.event.inputs.$i" "$f"; then echo "Unused input $i in $f"; exit 1; fi; done; done

@@ -1,0 +1,22 @@
+name: "Audit Build Sh Wallpaper Consistency"
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q "WALLPAPER_DEST" build.sh && grep -q "WALLPAPER_URL" build.sh

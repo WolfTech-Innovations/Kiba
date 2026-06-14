@@ -1,0 +1,22 @@
+name: "Audit Build Sh Desktop Entry Kiba"
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run audit
+        shell: bash
+        run: |
+          grep -q "Icon=kibaos" build.sh

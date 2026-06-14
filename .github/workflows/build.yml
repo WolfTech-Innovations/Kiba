@@ -24,6 +24,7 @@ jobs:
           rmz_version: "3.1.1"
 
       - name: Run build in Docker
+        shell: bash
         run: |
           docker run --rm --privileged \
             -v "$PWD:/w" \
@@ -33,6 +34,7 @@ jobs:
 
       - name: Upload to SourceForge
         if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+        shell: bash
         env:
           SF_USER: ${{ secrets.SF_USER }}
           SSHPASS: ${{ secrets.SF_PASS }}
