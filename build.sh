@@ -1556,8 +1556,8 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #0099cc;
-    --accent-dark: #0077aa;
+    --accent: #0077aa;
+    --accent-light: #0099cc;
     --bg: #f0f6fa;
     --surface: #fff;
     --surface-2: #f7fbfd;
@@ -1611,7 +1611,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
     transition: background .12s;
   }
-  .btn:hover { background:var(--accent-dark); }
+  .btn:hover { background:var(--accent-light); }
+  .btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);
