@@ -635,6 +635,9 @@ mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
+pacman-key --init
+pacman-key --populate archlinux
 pacman -Syy --noconfirm
 mkdir -p /etc/calamares/modules/
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
@@ -731,10 +734,6 @@ cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
 </mime-info>
 WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
-# ── Keyring + package DB ───────────────────────────────────────────────────
-pacman-key --init
-pacman-key --populate archlinux
-pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
@@ -844,7 +843,7 @@ for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  sudo -u builduser MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
@@ -1490,7 +1489,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
