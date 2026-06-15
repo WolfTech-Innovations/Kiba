@@ -6,9 +6,9 @@
     "node": ">=20"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.0.1",
-    "@commitlint/config-conventional": "^21.0.1",
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
     "jsonlint": "^1.6.3",
-    "prettier": "^3.8.3"
+    "prettier": "^3.8.4"
   }
 }
