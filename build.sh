@@ -1609,9 +1609,12 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     display:inline-block; background:var(--accent); color:#fff;
     border-radius:10px; padding:9px 20px; text-decoration:none;
     font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
-    transition: background .12s;
+    transition: background .12s, transform .1s;
+    cursor:pointer;
   }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .btn:active { transform:scale(0.96); }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
     border:1.5px solid var(--border);

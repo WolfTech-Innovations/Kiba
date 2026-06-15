@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2024-11-20 - [Tactile Button Interactivity & Accessibility]
+
+**Learning:** Standard interactivity for KibaOS buttons includes `cursor: pointer`, `:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }`, and `:active { transform: scale(0.96); }` with a subtle `transition`. This provides clear keyboard affordance and tactile feedback for mouse users, making the interface feel more responsive and accessible.
+**Action:** Always include focus-visible and active states for interactive elements in the KibaOS UI to ensure keyboard accessibility and tactile delight.
