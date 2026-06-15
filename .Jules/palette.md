@@ -23,3 +23,8 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-05-30 - [Automated Accessibility Guardrails]
+
+**Learning:** Manual accessibility audits are prone to regressions during architectural shifts. Implementing automated guardrails in repository audit scripts (e.g., checking for generic "image" or "screenshot" alt text) ensures that accessibility becomes a hard requirement for all contributors, preserving a high-quality first impression for screen-reader users.
+**Action:** Always integrate generic alt text detection into the repository's CI/audit scripts when fixing accessibility documentation issues.

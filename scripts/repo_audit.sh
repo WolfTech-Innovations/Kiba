@@ -46,6 +46,10 @@ echo "--- Auditing Markdown files ---"
 if grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules"; then
     log_error "Found empty markdown targets"
 fi
+# Generic alt text
+if grep -riE "alt=\"(image|screenshot)\"|!\[(image|screenshot)\]" . --include="*.md" | grep -v "node_modules"; then
+    log_error "Found generic alt text (e.g., alt=\"image\") in Markdown files"
+fi
 # Internal anchors format (should be lowercase-kebab)
 BAD_ANCHORS=$(grep -rhE "\[[^]]+\]\(#[^)]+\)" . --include="*.md" | grep -vE "\(#[a-z0-9-]+\)" || true)
 if [ -n "$BAD_ANCHORS" ]; then
@@ -56,7 +60,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh"; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
