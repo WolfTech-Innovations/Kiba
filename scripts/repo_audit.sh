@@ -28,9 +28,11 @@ if [ -f "build.sh" ]; then
     if ! grep -q "pacman-key --populate archlinux" build.sh; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
-    # Verify ldconfig after PaperDE build
-    if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
-        log_error "ldconfig not found after PaperDE installation in build.sh"
+    # Verify ldconfig after PaperDE build (only if PaperDE build is present)
+    if grep -q "ninja -C paperde-src/build install" build.sh; then
+        if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
+            log_error "ldconfig not found after PaperDE installation in build.sh"
+        fi
     fi
     # Verify liveuser UID consistency
     if grep -q "liveuser" build.sh; then
@@ -43,7 +45,7 @@ fi
 # 2. Markdown Hygiene
 echo "--- Auditing Markdown files ---"
 # Empty links
-if grep -rE "\[[^]]*\]\(\)" . --include="*.md" | grep -v "node_modules"; then
+if grep -rE "\[[^]]*\]\(\)" . --include="*.md" --exclude-dir=node_modules; then
     log_error "Found empty markdown targets"
 fi
 # Internal anchors format (should be lowercase-kebab)
@@ -56,7 +58,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude-dir=node_modules --exclude="repo_audit.sh" --exclude-dir=.github; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
@@ -67,17 +69,17 @@ fi
 # 4. Repository Hygiene
 echo "--- Auditing Repository Hygiene ---"
 # .gitkeep should be empty
-NON_EMPTY_GITKEEP=$(find . -name ".gitkeep" -type f -size +0)
+NON_EMPTY_GITKEEP=$(find . -name ".gitkeep" -type f -size +0 -not -path "./node_modules/*")
 if [ -n "$NON_EMPTY_GITKEEP" ]; then
     log_error ".gitkeep files must be empty: $NON_EMPTY_GITKEEP"
 fi
 # Nested .git dirs
-NESTED_GIT=$(find . -mindepth 2 -name ".git" -type d)
+NESTED_GIT=$(find . -mindepth 2 -name ".git" -type d -not -path "./node_modules/*")
 if [ -n "$NESTED_GIT" ]; then
     log_error "Found nested .git directories"
 fi
 # Trailing whitespace (excluding some files if needed)
-if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
+if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude-dir=node_modules --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
     log_error "Found trailing whitespace"
 fi
 
