@@ -1,0 +1,18 @@
+name: Repo Stats
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Stats
+        run: |
+          echo "Lines of code:"
+          find . -type f -name "*.sh" -o -name "*.py" -o -name "*.js" | xargs wc -l

@@ -1,0 +1,13 @@
+name: Check Python Syntax
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  py-compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Python files
+        run: python3 -m compileall scripts/

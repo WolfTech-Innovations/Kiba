@@ -1,0 +1,17 @@
+name: Repository Audit
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Repository Audit
+        run: bash scripts/repo_audit.sh
