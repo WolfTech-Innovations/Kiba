@@ -156,14 +156,13 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
 firefox
 sassc
-network-manager-applet
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -185,7 +184,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -823,7 +822,7 @@ sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 pacman -S --noconfirm --needed \
   kpmcore \
   python \
-  python-yaml \
+  python-pyyaml \
   python-jsonschema \
   qt5-wayland \
   qt5-xmlpatterns \
@@ -1490,7 +1489,7 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 ufw default deny incoming
-ufw default allow outgoing  
+ufw default allow outgoing
 ufw enable
 systemctl enable ufw
 # ══════════════════════════════════════════════════════════════════════════
