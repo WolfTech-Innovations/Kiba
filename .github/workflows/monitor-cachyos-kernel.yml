@@ -1,0 +1,36 @@
+name: Monitor CachyOS Kernel
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check latest kernel
+        id: kernel_check
+        shell: bash
+        run: bash scripts/check_kernel.sh
+
+      - name: Cache Kernel Version
+        id: cache-kernel
+        uses: actions/cache@v4
+        with:
+          path: latest_kernel.txt
+          key: kernel-version-${{ steps.kernel_check.outputs.latest_version }}
+
+      - name: Trigger Build if New
+        if: steps.cache-kernel.outputs.cache-hit != 'true'
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          event-type: kernel-update
+          client-payload: '{"version": "${{ steps.kernel_check.outputs.latest_version }}"}'
