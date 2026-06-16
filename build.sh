@@ -17,9 +17,8 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
-pacman -Su  --noconfirm
-pacman -S --noconfirm --needed \
+# Performance: Consolidate database sync, upgrade, and installation into one transaction
+pacman -Syu --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
@@ -637,6 +636,9 @@ useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
+# Performance: Initialize keys and enable multilib before a single database sync
+pacman-key --init
+pacman-key --populate archlinux
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 pacman -Syy --noconfirm
 
@@ -713,10 +715,6 @@ cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
 </mime-info>
 WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
-
-pacman-key --init
-pacman-key --populate archlinux
-pacman -Syy --noconfirm
 
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen
@@ -806,7 +804,9 @@ for pkg in calamares arc-gtk-theme libinput-gestures; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  # Performance: Enable parallel compilation and skip package compression for ephemeral build environment
+  MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' \
+    sudo -u builduser -E makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 cd /; rm -rf "${AUR_BUILD}"
