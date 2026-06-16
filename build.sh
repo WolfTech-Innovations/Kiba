@@ -16,13 +16,6 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-# Add CachyOS Repo to host for building
-curl -L https://mirror.cachyos.org/cachyos-repo.tar.xz -o cachyos-repo.tar.xz
-tar xvf cachyos-repo.tar.xz
-cd cachyos-repo
-./cachyos-repo.sh
-cd ..
-rm -rf cachyos-repo.tar.xz cachyos-repo
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
@@ -42,13 +35,6 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
-
-# ── Add CachyOS Repo to Profile ───────────────────────────────────────────
-cat >> "${PROFILE}/pacman.conf" << 'CACHY_REPO'
-
-[cachyos]
-Include = /etc/pacman.d/cachyos-mirrorlist
-CACHY_REPO
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -100,12 +86,9 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
-cachyos-keyring
-cachyos-mirrorlist
 syslinux
 base
-linux-cachyos
-linux-cachyos-headers
+linux
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -173,8 +156,8 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gnome-text-editor
-loupe
+gedit
+eog
 evince
 papirus-icon-theme
 accountsservice
@@ -202,7 +185,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-mesa-utils
+eglinfo
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -214,11 +197,11 @@ HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesyst
 INITRAMFS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
-cat > "${AIROOTFS}/etc/mkinitcpio.d/linux-cachyos.preset" << 'PRESET'
+cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux-cachyos'
+ALL_kver='/boot/vmlinuz-linux'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux-cachyos.img'
+archiso_image='/boot/initramfs-linux.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -234,15 +217,15 @@ LOADER
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
-linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
-initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
+linux   /arch/boot/x86_64/vmlinuz-linux
+initrd  /arch/boot/x86_64/initramfs-linux.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
-linux   /arch/boot/x86_64/vmlinuz-linux-cachyos
-initrd  /arch/boot/x86_64/initramfs-linux-cachyos.img
+linux   /arch/boot/x86_64/vmlinuz-linux
+initrd  /arch/boot/x86_64/initramfs-linux.img
 options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 ENTRY_SAFE
 
@@ -254,8 +237,8 @@ if [ -f "${SYSLINUX_CFG}" ]; then
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
-  LINUX boot/x86_64/vmlinuz-linux-cachyos
-  INITRD boot/x86_64/initramfs-linux-cachyos.img
+  LINUX boot/x86_64/vmlinuz-linux
+  INITRD boot/x86_64/initramfs-linux.img
   APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
 SYSLINUX_SAFE
 fi
@@ -562,7 +545,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: https://www.google.com
+  internetCheckUrl: http://example.com
 
   check:
     - storage
@@ -652,14 +635,6 @@ mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
-
-# ── CachyOS Repo ───────────────────────────────────────────────────────────
-cat >> /etc/pacman.conf << 'CACHY_REPO'
-
-[cachyos]
-Include = /etc/pacman.d/cachyos-mirrorlist
-CACHY_REPO
-
 pacman -Syy --noconfirm
 mkdir -p /etc/calamares/modules/
 cat > /etc/calamares/modules/users.conf << 'USERSCONF'
@@ -677,21 +652,6 @@ autologinGroup: autologin
 sudoersGroup: wheel
 setRootPassword: false
 USERSCONF
-mkdir -p /etc/xdg/crystal-dock
-cat > /etc/xdg/crystal-dock/General.conf << 'CDCONF'
-[General]
-autoHide=false
-showTaskManager=true
-showClock=true
-showDesktop=true
-position=Bottom
-screenEdgeMargin=8
-iconSize=52
-minIconSize=32
-maxIconSize=72
-backgroundAlpha=180
-tooltipDelay=300
-CDCONF
 
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
@@ -758,7 +718,7 @@ WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
 # ── Keyring + package DB ───────────────────────────────────────────────────
 pacman-key --init
-pacman-key --populate archlinux cachyos
+pacman-key --populate archlinux
 pacman -Syy --noconfirm
 
 # ── Locale + hostname ──────────────────────────────────────────────────────
@@ -839,16 +799,15 @@ gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 
 # ══════════════════════════════════════════════════════════════════════════
-# AUR PACKAGES: calamares + arc-gtk-theme
+# AUR PACKAGES: calamares + arc-gtk-theme + libinput-gestures
 # ══════════════════════════════════════════════════════════════════════════
 useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-# Before building calamares in customize_airootfs.sh, ensure deps:
 pacman -S --noconfirm --needed \
   kpmcore \
   python \
-  python-pyyaml \
+  python-yaml \
   python-jsonschema \
   qt5-wayland \
   qt5-xmlpatterns \
@@ -864,7 +823,7 @@ pacman -S --noconfirm --needed \
   kpmcore
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares arc-gtk-theme crystal-dock-git libinput-gestures; do
+for pkg in calamares arc-gtk-theme libinput-gestures; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -887,7 +846,6 @@ pacman -Rns --noconfirm \
 pacman -Qtdq | pacman -Rns --noconfirm -
 echo "=== AUR packages installed ==="
 
-echo "=== Darling userspace installed, DKMS module staged for first boot ==="
 # ══════════════════════════════════════════════════════════════════════════
 # PLYMOUTH
 # ══════════════════════════════════════════════════════════════════════════
@@ -919,7 +877,7 @@ cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
 plymouth-set-default-theme kibaos 2>/dev/null || \
   plymouth-set-default-theme spinner 2>/dev/null || true
 
-mkinitcpio -p linux-cachyos 2>/dev/null || true
+mkinitcpio -p linux 2>/dev/null || true
 
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
@@ -957,6 +915,48 @@ gtk-xft-hintstyle=hintslight
 gtk-xft-rgba=rgb
 GTK3RC
 
+# ── GTK3 panel CSS — liquid glass pill ────────────────────────────────────
+# Budgie's panel is GTK3, so panel styling goes in gtk-3.0/gtk.css
+mkdir -p /etc/gtk-3.0
+cat >> /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
+/* === KibaOS: Floating liquid glass pill panel (GTK3) === */
+.budgie-panel {
+    margin: 0 120px 8px 120px;
+    border-radius: 999px;
+    background-image: none;
+    background-color: rgba(12, 20, 35, 0.55);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+    box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.55),
+        0 2px 8px  rgba(0, 0, 0, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+    padding: 0 10px;
+}
+.budgie-panel .budgie-applet-button,
+.budgie-panel button.flat {
+    border-radius: 999px;
+    background: transparent;
+    transition: background 150ms ease;
+}
+.budgie-panel .budgie-applet-button:hover,
+.budgie-panel button.flat:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+.budgie-panel .budgie-applet-button:active,
+.budgie-panel button.flat:active {
+    background-color: rgba(0, 153, 204, 0.25);
+}
+.budgie-panel .launcher:checked,
+.budgie-panel .launcher.running {
+    border-bottom: 2px solid #0099cc;
+    border-radius: 0;
+}
+GTK3PANEL
+
 # ══════════════════════════════════════════════════════════════════════════
 # GTK4 CSS OVERRIDE
 # ══════════════════════════════════════════════════════════════════════════
@@ -976,43 +976,7 @@ cat > /etc/gtk-4.0/gtk.css << 'GTK4CSS'
 @define-color sidebar_bg_color #1a2030;
 @define-color headerbar_bg_color #1a2030;
 @define-color headerbar_fg_color #dde5ef;
-/* === KibaOS: Floating pill panel === */
 
-/* The outer container — give it breathing room from screen edges */
-.budgie-panel {
-    margin: 6px 12px;              /* lifts it off the bottom edge */
-    border-radius: 999px;          /* full pill shape */
-    background-image: none;
-    background-color: rgba(15, 22, 38, 0.72);  /* semi-transparent navy */
-    border: 1px solid rgba(0, 153, 204, 0.18); /* subtle cyan rim */
-    box-shadow:
-        0 4px 32px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255,255,255,0.06);  /* inner highlight = glass depth */
-    padding: 0 8px;
-}
-
-/* Applet buttons inside the panel */
-.budgie-panel .budgie-applet-button,
-.budgie-panel button.flat {
-    border-radius: 999px;
-    background: transparent;
-    transition: background 0.15s ease;
-}
-.budgie-panel .budgie-applet-button:hover,
-.budgie-panel button.flat:hover {
-    background: rgba(0, 153, 204, 0.15);
-}
-.budgie-panel .budgie-applet-button:active,
-.budgie-panel button.flat:active {
-    background: rgba(0, 153, 204, 0.28);
-}
-
-/* Active window indicators (tasklist underlines) */
-.budgie-panel .launcher:checked,
-.budgie-panel .launcher.running {
-    border-bottom: 2px solid #0099cc;
-    border-radius: 0;
-}
 window, .window-frame          { border-radius: 16px; }
 headerbar                      { border-radius: 16px 16px 0 0; }
 .card, frame, .frame           { border-radius: 14px; }
@@ -1040,10 +1004,6 @@ GTK4CSS
 
 # ══════════════════════════════════════════════════════════════════════════
 # SDDM CONFIGURATION
-# FIX: [Wayland] CompositorCommand=labwc added — without this SDDM in
-# Wayland mode produces a black screen with a blinking underscore cursor
-# and never starts the greeter.
-# FIX: /var/lib/sddm created and owned — required for greeter user.
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
@@ -1057,7 +1017,6 @@ CompositorCommand=labwc
 Current=
 
 [Autologin]
-# Uncomment for instant live-session boot:
 User=liveuser
 Session=budgie-desktop
 SDDMCONF
@@ -1068,9 +1027,6 @@ chmod 750 /var/lib/sddm
 
 # ══════════════════════════════════════════════════════════════════════════
 # LABWC CONFIG
-# Placed in /etc/xdg/labwc/ as a system-wide default.
-# Budgie's labwc-bridge overlays ~/.config/budgie-desktop/labwc/ on top,
-# so Budgie keybinds still take precedence.
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /etc/xdg/labwc
 
@@ -1217,8 +1173,7 @@ osd.unhilight.bg.color: #2e3a4a
 THEMERC
 
 # ══════════════════════════════════════════════════════════════════════════
-# SKELETON — every new account created by Calamares or adduser inherits
-# the full KibaOS theme without a settings app.
+# SKELETON
 # ══════════════════════════════════════════════════════════════════════════
 SKEL="/etc/skel"
 mkdir -p \
@@ -1250,6 +1205,8 @@ gtk-menu-images=1
 gtk-enable-animations=1
 GTK3SKEL
 
+# Copy pill panel CSS into per-user gtk-3.0 too so it applies in the session
+cp /etc/gtk-3.0/gtk.css "${SKEL}/.config/gtk-3.0/gtk.css"
 cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
@@ -1273,7 +1230,6 @@ EOF
 glib-compile-schemas /usr/share/glib-2.0/schemas/
 # ══════════════════════════════════════════════════════════════════════════
 # FIRST-LOGIN SCRIPT
-# Sets gsettings on first login. Runs once via autostart, stamps ~/.config.
 # ══════════════════════════════════════════════════════════════════════════
 cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 #!/usr/bin/env bash
@@ -1331,23 +1287,6 @@ if [ -n "${PANEL_UUID}" ]; then
   dconf write "${PANEL_PATH}shadow"                "true"
   dconf write "${PANEL_PATH}enable-built-in-theme" "false"
 fi
-
-# ── Crystal Dock config ────────────────────────────────────────────────────
-mkdir -p "${HOME}/.crystal-dock-2"
-cat > "${HOME}/.crystal-dock-2/general.conf" << 'CDCONF'
-[General]
-autoHide=false
-showTaskManager=true
-showClock=true
-showDesktop=true
-position=Bottom
-screenEdgeMargin=8
-iconSize=52
-minIconSize=32
-maxIconSize=72
-backgroundAlpha=180
-tooltipDelay=300
-CDCONF
 
 touch "${STAMP}"
 FIRSTLOGIN
@@ -1427,15 +1366,6 @@ cat > "${SKEL}/.config/chrome-flags.conf" << 'CHROMEFLAGS'
 --enable-features=UseOzonePlatform
 --ozone-platform=wayland
 CHROMEFLAGS
-cat > "${SKEL}/.config/autostart/crystal-dock.desktop" << 'CRYSTALDOCK'
-[Desktop Entry]
-Type=Application
-Name=Crystal Dock
-Exec=crystal-dock
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-CRYSTALDOCK
 cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
@@ -1581,22 +1511,21 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <title>Welcome to KibaOS</title>
 <style>
   :root {
-    --accent: #bd93f9;
-    --accent-dark: #a371f7;
-    --bg: #282a36;
-    --surface: #44475a;
-    --surface-2: #383a59;
-    --text: #f8f8f2;
-    --sub: #9ea8c7;
-    --border: rgba(189, 147, 249, 0.2);
-    --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    --accent: #0099cc;
+    --accent-dark: #0077aa;
+    --bg: #f0f6fa;
+    --surface: #fff;
+    --surface-2: #f7fbfd;
+    --text: #0d1b2a;
+    --sub: #4a5a70;
+    --border: #d4e8f2;
+    --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); line-height: 1.6; }
+  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
 
   header {
-    background: linear-gradient(135deg, #282a36 0%, #44475a 100%);
-    border-bottom: 2px solid var(--accent);
+    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
   }
   header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
@@ -1612,9 +1541,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     border:1px solid var(--border);
     transition: transform .15s, box-shadow .15s;
   }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,0,0,0.4); border-color: var(--accent); }
-  .card h2 { font-size:1.1rem; font-weight:600; margin-bottom:8px; color:var(--accent); }
-  .card p  { font-size:.9rem; color:var(--sub); line-height:1.6; }
+  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
+  .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
 
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 {
@@ -1622,35 +1551,27 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     color:var(--accent);
   }
   .tip {
-    background:var(--surface-2); border-left:3px solid var(--accent);
+    background:#e6f6fc; border-left:3px solid var(--accent);
     border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px;
-    font-size:.95rem; color:var(--text);
+    font-size:.9rem; color:var(--text);
   }
   .tip code {
-    background:rgba(255,255,255,0.05); padding:2px 7px; border-radius:5px;
-    font-family:'JetBrains Mono',monospace; font-size:.9em;
+    background:#cde8f5; padding:2px 7px; border-radius:5px;
+    font-family:'Noto Sans Mono',monospace; font-size:.88em;
   }
 
   .btn {
-    display:inline-block; background:var(--accent); color:#282a36;
-    border-radius:10px; padding:10px 24px; text-decoration:none;
-    font-size:.9rem; font-weight:600; margin:8px 8px 0 0;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
-    cursor: pointer;
-    border: none;
+    display:inline-block; background:var(--accent); color:#fff;
+    border-radius:10px; padding:9px 20px; text-decoration:none;
+    font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
+    transition: background .12s;
   }
-  .btn:hover { background:var(--accent-dark); transform: translateY(-1px); }
-  .btn:active { transform: scale(0.98); }
-  .btn:focus-visible {
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(189, 147, 249, 0.5);
-  }
-
+  .btn:hover { background:var(--accent-dark); }
   .btn.secondary {
     background:var(--surface); color:var(--accent);
-    border: 1px solid var(--accent);
+    border:1.5px solid var(--border);
   }
-  .btn.secondary:hover { background:var(--surface-2); }
+  .btn.secondary:hover { background:#e6f6fc; }
 
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill {
@@ -1695,9 +1616,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
 
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
@@ -1708,7 +1629,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   </div>
 </section>
 
-<footer>KibaOS Rolling — WolfTech Innovations — <a href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: none;">github.com/WolfTech-Innovations/Kiba</a></footer>
+<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
 </body>
 </html>
 WELCOMEHTML
@@ -1754,8 +1675,6 @@ Built by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
 MOTD
 cat > /usr/local/bin/calamares-launch << 'EOF'
 #!/usr/bin/env bash
-# Pass the live user's Wayland socket to root's calamares process.
-# We need the *user's* XDG_RUNTIME_DIR, not root's /tmp/runtime-root.
 LIVE_UID=1000
 LIVE_RUNTIME="/run/user/${LIVE_UID}"
 
@@ -1796,8 +1715,7 @@ find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser
-sudo systemctl enable NetworkManager
-# After liveuser's home exists, at the end of customize_airootfs.sh:
+systemctl enable NetworkManager
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 sudo -u liveuser dbus-run-session -- bash -c '
   dconf write /com/solus-project/budgie/panel/panels "@as []"
