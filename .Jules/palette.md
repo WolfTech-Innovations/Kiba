@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2025-06-20 - [Keyboard Discoverability for Welcome Screen Cards]
+**Learning:** In simple, static "Welcome" screens, making informational cards focusable with `tabindex="0"` and providing high-visibility focus indicators (like `box-shadow` instead of standard outlines) significantly improves the experience for keyboard and screen reader users. It transforms a "look-only" component into a navigable structure that feels integrated into the desktop environment.
+**Action:** Always ensure informational UI cards are keyboard-discoverable via `tabindex` and have distinct, theme-consistent `:focus-visible` styles.
