@@ -17,9 +17,8 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
-pacman -Su  --noconfirm
-pacman -S --noconfirm --needed \
+# Consolidation: Combine database sync, upgrade, and installation into one call
+pacman -Syu --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
@@ -716,7 +715,7 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
+# Optimization: Database was already synchronized at the start of customize_airootfs.sh
 
 sed -i 's/#en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen
 locale-gen
@@ -806,7 +805,8 @@ for pkg in calamares arc-gtk-theme libinput-gestures; do
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
-  sudo -u builduser makepkg -si --noconfirm --skippgpcheck
+  # Performance: Enable parallel compilation and skip compression for transient builds
+  sudo -u builduser MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 cd /; rm -rf "${AUR_BUILD}"

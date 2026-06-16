@@ -10,3 +10,7 @@
 ## 2025-06-15 - Kernel Build Performance with CachyOS
 **Learning:** Migrating to CachyOS kernel requires proper repository configuration at the host level in the build script to avoid 'package not found' errors during mkarchiso execution.
 **Action:** Ensure custom repositories are added to both /etc/pacman.conf and the profile's pacman.conf before building the ISO.
+
+## 2024-05-20 - [Optimizing Arch ISO Build Performance]
+**Learning:** Consolidating `pacman` commands reduces transaction overhead. For AUR builds, `MAKEFLAGS="-j$(nproc)"` is critical for parallel compilation, and `PKGEXT='.pkg.tar'` saves time by skipping compression for packages installed immediately during the build process.
+**Action:** Always parallelize `makepkg` and skip redundant compression in transient build environments.
