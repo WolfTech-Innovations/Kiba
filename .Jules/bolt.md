@@ -10,3 +10,7 @@
 ## 2025-06-15 - Kernel Build Performance with CachyOS
 **Learning:** Migrating to CachyOS kernel requires proper repository configuration at the host level in the build script to avoid 'package not found' errors during mkarchiso execution.
 **Action:** Ensure custom repositories are added to both /etc/pacman.conf and the profile's pacman.conf before building the ISO.
+
+## 2025-06-16 - Path Initialization Reliability
+**Learning:** Defining path variables at the very beginning of a build script ensures they are available for all subsequent commands, preventing "file not found" errors or host system contamination when running as root.
+**Action:** Always declare WORKDIR, AIROOTFS, and other critical paths immediately after the shebang.

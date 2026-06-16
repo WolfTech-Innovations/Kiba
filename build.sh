@@ -1,6 +1,12 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
@@ -23,12 +29,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -157,8 +157,8 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
@@ -186,10 +186,11 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
+inter-font
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -549,7 +550,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram
@@ -794,7 +795,7 @@ useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 pacman -S --noconfirm --needed \
-  kpmcore python python-yaml python-jsonschema \
+  kpmcore python python-pyyaml python-jsonschema \
   qt5-wayland qt5-xmlpatterns solid kcoreaddons \
   ki18n kio kservice kpackage kdeclarative \
   kiconthemes kwidgetsaddons
@@ -1801,7 +1802,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter','Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -1815,14 +1816,18 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: transform .15s, box-shadow .15s;
   }
   .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:active { transform: scale(0.96); transition: transform 0s; }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
   .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
+  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s, transform .1s; }
   .btn:hover { background:var(--accent-dark); }
+  .btn:active { transform: scale(0.96); transition: transform 0s; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
   .btn.secondary:hover { background:#e6f6fc; }
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
@@ -1836,19 +1841,19 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 <div class="card-row">
-  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
-  <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
-  <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
-  <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
+  <div class="card" tabindex="0"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
+  <div class="card" tabindex="0"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
+  <div class="card" tabindex="0"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
+  <div class="card" tabindex="0"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
   <h2>Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Open KibaOS Wiki in a new tab">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report an issue on GitHub in a new tab">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="View KibaOS source code on GitHub in a new tab">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
