@@ -2,7 +2,7 @@
 # Monitor CachyOS kernel version by scraping the mirror
 set -e
 
-MIRROR_URL="https://mirror.cachyos.org/repo/x86_64/main/"
+MIRROR_URL="https://mirror.cachyos.org/repo/x86_64/cachyos/"
 # Regex to match linux-cachyos-x.y.z-a-x86_64.pkg.tar.zst and extract version
 # We look for something like linux-cachyos-6.17.9-1-x86_64.pkg.tar.zst
 # Updated regex to be more robust based on typical Arch package naming
