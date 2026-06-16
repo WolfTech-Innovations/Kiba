@@ -1,0 +1,20 @@
+name: "Audit: Sudo No Passwd"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Sudo No Passwd"
+        run: |
+          grep -r "NOPASSWD" . --exclude-dir=.git --exclude-dir=.github && { echo 'Error: NOPASSWD found in sudoers configuration'; exit 1; } || exit 0

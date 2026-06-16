@@ -1,0 +1,20 @@
+name: "Audit: Audio Stack"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Audio Stack"
+        run: |
+          grep -q "pipewire" build.sh || { echo 'Error: Pipewire audio stack missing in build.sh'; exit 1; }

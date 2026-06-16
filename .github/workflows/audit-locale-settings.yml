@@ -1,0 +1,20 @@
+name: "Audit: Locale Settings"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Locale Settings"
+        run: |
+          grep -q "LOCALE" build.sh || { echo 'Error: LOCALE configuration missing in build.sh'; exit 1; }

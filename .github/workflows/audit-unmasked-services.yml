@@ -1,0 +1,20 @@
+name: "Audit: Unmasked Services"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Unmasked Services"
+        run: |
+          grep -r "systemctl unmask" . --exclude-dir=.git --exclude-dir=.github && { echo 'Error: Explicit unmasking of services found'; exit 1; } || exit 0

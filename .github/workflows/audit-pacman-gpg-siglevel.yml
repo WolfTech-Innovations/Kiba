@@ -1,0 +1,20 @@
+name: "Audit: Pacman GPG SigLevel"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Pacman GPG SigLevel"
+        run: |
+          if [ -f "pacman.conf" ]; then grep "SigLevel" pacman.conf | grep -qv "Required" && { echo 'Error: Pacman SigLevel must be Required'; exit 1; }; fi

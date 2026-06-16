@@ -1,0 +1,20 @@
+name: "Audit: Hardcoded URLs"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Hardcoded URLs"
+        run: |
+          grep -rE "http://[a-zA-Z0-9.-]+" build.sh && { echo 'Error: Unencrypted HTTP URLs found in build.sh'; exit 1; } || exit 0

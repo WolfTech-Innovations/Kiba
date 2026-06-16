@@ -1,0 +1,20 @@
+name: "Audit: HTML Security"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: HTML Security"
+        run: |
+          grep -r "target=\"_blank\"" . --include="*.html" | grep -v "rel=\"noopener\"" && { echo 'Error: External links missing rel="noopener"'; exit 1; } || exit 0

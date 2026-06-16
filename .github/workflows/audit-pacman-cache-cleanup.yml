@@ -1,0 +1,20 @@
+name: "Audit: Pacman Cache Cleanup"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Pacman Cache Cleanup"
+        run: |
+          grep -q "pacman -Scc" build.sh || { echo 'Error: build.sh must include pacman -Scc for image size optimization'; exit 1; }

@@ -1,0 +1,21 @@
+name: "Audit: Systemd Syntax"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install systemd
+        run: sudo apt-get update && sudo apt-get install -y systemd
+      - name: "Audit: Systemd Syntax"
+        run: |
+          find . -name "*.service" -exec systemd-analyze verify {} +

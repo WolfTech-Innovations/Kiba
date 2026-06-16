@@ -1,0 +1,20 @@
+name: "Audit: Deprecated Arch Packages"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Deprecated Arch Packages"
+        run: |
+          grep -E "net-tools|wireless_tools" build.sh && { echo 'Error: Deprecated Arch packages (net-tools/wireless_tools) found'; exit 1; } || exit 0

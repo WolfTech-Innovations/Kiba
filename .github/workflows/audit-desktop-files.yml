@@ -1,0 +1,21 @@
+name: "Audit: Desktop Files"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install desktop-file-utils
+        run: sudo apt-get update && sudo apt-get install -y desktop-file-utils
+      - name: "Audit: Desktop Files"
+        run: |
+          find . -name "*.desktop" -exec desktop-file-validate {} +

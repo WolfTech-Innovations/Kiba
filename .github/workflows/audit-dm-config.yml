@@ -1,0 +1,20 @@
+name: "Audit: DM Config"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: DM Config"
+        run: |
+          find . -name "lightdm.conf" -o -name "gdm.conf" | grep . || { echo 'Error: Display Manager configuration missing'; exit 1; }

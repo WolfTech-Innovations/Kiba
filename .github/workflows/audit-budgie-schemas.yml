@@ -1,0 +1,20 @@
+name: "Audit: Budgie Schemas"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Budgie Schemas"
+        run: |
+          find . -name "*.gschema.override" | grep -q "budgie" || { echo 'Error: Budgie gschema overrides missing'; exit 1; }

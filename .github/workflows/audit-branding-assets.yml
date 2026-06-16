@@ -1,0 +1,20 @@
+name: "Audit: Branding Assets"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Branding Assets"
+        run: |
+          test -f branding/logo.png && test -f branding/wallpaper.jpg

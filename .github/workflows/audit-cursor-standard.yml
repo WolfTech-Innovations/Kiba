@@ -1,0 +1,20 @@
+name: "Audit: Cursor Standard"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Cursor Standard"
+        run: |
+          grep -q "vimix-cursor-theme" build.sh || { echo 'Error: Vimix cursor theme missing in build.sh'; exit 1; }

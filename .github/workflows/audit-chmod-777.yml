@@ -1,0 +1,20 @@
+name: "Audit: Chmod 777"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Chmod 777"
+        run: |
+          grep -r "chmod 777" . --exclude-dir=.git --exclude-dir=.github --exclude="repo_audit.sh" --exclude="generate_45_workflows.py" && { echo 'Error: chmod 777 is forbidden'; exit 1; } || exit 0

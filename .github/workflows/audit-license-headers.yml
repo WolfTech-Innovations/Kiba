@@ -1,0 +1,20 @@
+name: "Audit: License Headers"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: License Headers"
+        run: |
+          MISSING=$(grep -L "License" *.sh ota/*.sh scripts/*.sh || true); if [ -n "$MISSING" ]; then echo "Missing license in: $MISSING"; exit 1; fi

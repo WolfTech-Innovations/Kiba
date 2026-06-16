@@ -1,0 +1,20 @@
+name: "Audit: Fstab Logic"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Fstab Logic"
+        run: |
+          grep -q "genfstab" build.sh || { echo 'Error: genfstab usage missing in build process'; exit 1; }

@@ -1,0 +1,20 @@
+name: "Audit: Pip Usage"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Pip Usage"
+        run: |
+          grep -r "pip install" . --exclude-dir=.git --exclude-dir=.github && { echo 'Error: Use pacman instead of pip for system-wide packages'; exit 1; } || exit 0

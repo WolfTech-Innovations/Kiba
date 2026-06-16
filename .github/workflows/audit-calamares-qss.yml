@@ -1,0 +1,20 @@
+name: "Audit: Calamares QSS"
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Audit: Calamares QSS"
+        run: |
+          find . -name "*.qss" -exec grep -q "background" {} + || { echo 'Error: Calamares QSS files must define background properties'; exit 1; }
