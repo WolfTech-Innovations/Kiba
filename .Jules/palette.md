@@ -27,3 +27,8 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2026-06-16 - [Keyboard Accessibility and Modern Typography in Welcome Screens]
+
+**Learning:** Embedded UI components like the KibaOS `welcome.html` must prioritize keyboard accessibility by using `tabindex="0"` on informational cards and providing visible `:focus-visible` indicators. Additionally, standardizing typography to modern stacks like 'Inter' enhances readability and aesthetic consistency.
+**Action:** Always include `tabindex="0"` and focus styles for interactive/informational cards and ensure 'Inter' is the primary font in UI CSS.

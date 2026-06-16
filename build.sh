@@ -113,6 +113,7 @@ xdg-user-dirs
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
+inter-font
 bluez-utils
 gnome-weather
 gnome-clocks
@@ -549,7 +550,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram
@@ -1801,7 +1802,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter', 'Noto Sans', system-ui, sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -1814,6 +1815,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     flex:1; min-width:200px; box-shadow:var(--shadow); border:1px solid var(--border);
     transition: transform .15s, box-shadow .15s;
   }
+  .card:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
   .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
@@ -1836,19 +1838,19 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 <div class="card-row">
-  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
-  <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
-  <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
-  <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
+  <div class="card" tabindex="0"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
+  <div class="card" tabindex="0"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
+  <div class="card" tabindex="0"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
+  <div class="card" tabindex="0"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
   <h2>Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Visit the KibaOS Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report an issue on GitHub (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="View KibaOS source code on GitHub (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">

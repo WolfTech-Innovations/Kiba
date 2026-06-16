@@ -10,3 +10,8 @@
 ## 2025-06-15 - Kernel Build Performance with CachyOS
 **Learning:** Migrating to CachyOS kernel requires proper repository configuration at the host level in the build script to avoid 'package not found' errors during mkarchiso execution.
 **Action:** Ensure custom repositories are added to both /etc/pacman.conf and the profile's pacman.conf before building the ISO.
+
+## 2026-06-16 - [Robust Mirror Monitoring for Build Workflows]
+
+**Learning:** CachyOS kernel monitoring scripts rely on scraping HTML mirrors. These mirrors can change paths (e.g., from `/main/` to `/cachyos/`). Using a correct and specific sub-repository URL prevents build workflow failures and ensures the latest stable kernel is always detected.
+**Action:** Periodically verify mirror URLs in automated monitoring scripts to prevent silent detection failures.
