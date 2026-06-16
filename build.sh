@@ -113,6 +113,7 @@ xdg-user-dirs
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
+inter-font
 bluez-utils
 gnome-weather
 gnome-clocks
@@ -157,14 +158,13 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
 firefox
 sassc
-network-manager-applet
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -186,7 +186,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -292,7 +292,7 @@ cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
 QWidget {
     background-color: #f0f6fa;
     color: #1a2030;
-    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+    font-family: "Inter", "Noto Sans", sans-serif;
     font-size: 13px;
 }
 QStackedWidget, QFrame#mainContent {
@@ -794,7 +794,7 @@ useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 pacman -S --noconfirm --needed \
-  kpmcore python python-yaml python-jsonschema \
+  kpmcore python python-pyyaml python-jsonschema \
   qt5-wayland qt5-xmlpatterns solid kcoreaddons \
   ki18n kio kservice kpackage kdeclarative \
   kiconthemes kwidgetsaddons
@@ -854,7 +854,7 @@ mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
 gtk-theme-name = "Arc-Dark"
 gtk-icon-theme-name = "Papirus-Dark"
-gtk-font-name = "Noto Sans 11"
+gtk-font-name = "Inter 11"
 gtk-cursor-theme-size = 24
 gtk-toolbar-style = GTK_TOOLBAR_ICONS
 gtk-button-images = 1
@@ -870,7 +870,7 @@ cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
 gtk-theme-name=Arc-Dark
 gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-font-name=Inter 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -992,11 +992,11 @@ cat > /etc/xdg/labwc/rc.xml << 'LABWCRC'
     <name>kibaos</name>
     <cornerRadius>14</cornerRadius>
     <font place="ActiveWindow">
-      <name>Noto Sans</name><size>10</size>
+      <name>Inter</name><size>10</size>
       <weight>medium</weight><slant>normal</slant>
     </font>
     <font place="InactiveWindow">
-      <name>Noto Sans</name><size>10</size>
+      <name>Inter</name><size>10</size>
       <weight>normal</weight><slant>normal</slant>
     </font>
     <titlebar>
@@ -1480,7 +1480,7 @@ cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=Arc-Dark
 gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-font-name=Inter 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -1497,7 +1497,7 @@ cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="Arc-Dark"
 gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 11"
+gtk-font-name="Inter 11"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
 gtk-button-images=1
@@ -1527,8 +1527,8 @@ gsettings set org.gnome.desktop.interface gtk-theme               'Arc-Dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
 gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
@@ -1540,7 +1540,7 @@ gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
 gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Inter Medium 10'
 gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
 gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
 gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
@@ -1628,7 +1628,7 @@ cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
   </match>
   <alias>
     <family>sans-serif</family>
-    <prefer><family>Noto Sans</family></prefer>
+    <prefer><family>Inter</family></prefer>
   </alias>
   <alias>
     <family>monospace</family>
@@ -1801,7 +1801,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter','Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;

@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2025-06-20 - [Modernizing KibaOS UI with Inter Font and GNOME Apps]
+**Learning:** Standardizing on the 'Inter' font and modern GNOME applications (like gnome-text-editor and loupe) provides a more cohesive and contemporary visual identity. Updating all configuration layers (GTK, GSettings, Fontconfig, and embedded HTML) simultaneously is crucial to maintain UI consistency across the entire distribution.
+**Action:** Always prioritize the 'Inter' font (package `inter-font`) and modern GNOME alternatives in `build.sh` and ensure all sub-configuration templates are updated in sync.
