@@ -801,7 +801,7 @@ pacman -S --noconfirm --needed \
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares arc-gtk-theme libinput-gestures; do
+for pkg in calamares libinput-gestures; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -809,6 +809,25 @@ for pkg in calamares arc-gtk-theme libinput-gestures; do
   sudo -u builduser makepkg -si --noconfirm --skippgpcheck
   cd /
 done
+
+# ── ChromeOS-theme: manual install to avoid gnome-shell dependency ─────────
+echo "=== Installing ChromeOS-theme ==="
+git clone --depth=1 "https://github.com/vinceliuice/ChromeOS-theme.git" "${AUR_BUILD}/ChromeOS-theme"
+cd "${AUR_BUILD}/ChromeOS-theme"
+# Install only the GTK theme files directly, bypassing the installer's
+# gnome-shell dependency check
+mkdir -p /usr/share/themes
+for variant in ChromeOS ChromeOS-Dark; do
+  [ -d "themes/${variant}" ] && \
+    cp -r "themes/${variant}" /usr/share/themes/ || true
+done
+# Fallback: run installer with --dest if theme dirs not pre-built
+if [ ! -d /usr/share/themes/ChromeOS-Dark ]; then
+  bash install.sh --dest /usr/share/themes --color dark 2>/dev/null || true
+  bash install.sh --dest /usr/share/themes --color light 2>/dev/null || true
+fi
+cd /
+
 cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
@@ -848,11 +867,11 @@ systemctl enable plymouth-quit-wait.service  2>/dev/null || true
 echo "=== Plymouth configured ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME — system-wide Arc-Dark
+# GTK THEME — system-wide ChromeOS-Dark + KibaOS pill panel override
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
-gtk-theme-name = "Arc-Dark"
+gtk-theme-name = "ChromeOS-Dark"
 gtk-icon-theme-name = "Papirus-Dark"
 gtk-font-name = "Noto Sans 11"
 gtk-cursor-theme-size = 24
@@ -868,7 +887,7 @@ GTK2RC
 mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
-gtk-theme-name=Arc-Dark
+gtk-theme-name=ChromeOS-Dark
 gtk-icon-theme-name=Papirus-Dark
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -878,9 +897,11 @@ gtk-xft-hintstyle=hintslight
 gtk-xft-rgba=rgb
 GTK3RC
 
-# ── GTK3 pill panel CSS — Budgie panel is GTK3 ────────────────────────────
+# ── GTK3 pill panel CSS — appended on top of ChromeOS-Dark ───────────────
+# ChromeOS-theme provides the base window/widget styling.
+# This overrides just the Budgie panel to be a floating liquid glass pill.
 cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
-/* === KibaOS: Floating liquid glass pill panel === */
+/* === KibaOS: Floating liquid glass pill panel (override on ChromeOS-Dark) === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
     border-radius: 999px;
@@ -917,6 +938,51 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
     border-radius: 0;
 }
 GTK3PANEL
+
+# Append pill CSS into ChromeOS-Dark's gtk.css so it takes effect even
+# when GTK loads the theme directory directly instead of /etc/gtk-3.0/gtk.css
+CHROMEOS_GTK3="/usr/share/themes/ChromeOS-Dark/gtk-3.0/gtk.css"
+if [ -f "${CHROMEOS_GTK3}" ]; then
+  cat >> "${CHROMEOS_GTK3}" << 'CHROMEOS_PILL_APPEND'
+
+/* === KibaOS pill panel override === */
+.budgie-panel {
+    margin: 0 120px 8px 120px;
+    border-radius: 999px;
+    background-image: none;
+    background-color: rgba(12, 20, 35, 0.55);
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+    border-left: 1px solid rgba(255, 255, 255, 0.10);
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+    box-shadow:
+        0 8px 40px rgba(0, 0, 0, 0.55),
+        0 2px 8px  rgba(0, 0, 0, 0.30),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+    padding: 0 10px;
+}
+.budgie-panel .budgie-applet-button,
+.budgie-panel button.flat {
+    border-radius: 999px;
+    background: transparent;
+    transition: background 150ms ease;
+}
+.budgie-panel .budgie-applet-button:hover,
+.budgie-panel button.flat:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+.budgie-panel .budgie-applet-button:active,
+.budgie-panel button.flat:active {
+    background-color: rgba(0, 153, 204, 0.25);
+}
+.budgie-panel .launcher:checked,
+.budgie-panel .launcher.running {
+    border-bottom: 2px solid #0099cc;
+    border-radius: 0;
+}
+CHROMEOS_PILL_APPEND
+fi
 
 # ── GTK4 CSS OVERRIDE ─────────────────────────────────────────────────────
 mkdir -p /etc/gtk-4.0
@@ -1478,7 +1544,7 @@ NEMODESKTOP
 
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
-gtk-theme-name=Arc-Dark
+gtk-theme-name=ChromeOS-Dark
 gtk-icon-theme-name=Papirus-Dark
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -1495,7 +1561,7 @@ cp /etc/gtk-3.0/gtk.css "${SKEL}/.config/gtk-3.0/gtk.css"
 cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
-gtk-theme-name="Arc-Dark"
+gtk-theme-name="ChromeOS-Dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Noto Sans 11"
 gtk-cursor-theme-size=24
@@ -1523,7 +1589,7 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
-gsettings set org.gnome.desktop.interface gtk-theme               'Arc-Dark'
+gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
@@ -1592,7 +1658,7 @@ ZRAM
 
 mkdir -p "${SKEL}/.config/labwc"
 cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
-GTK_THEME=Arc-Dark
+GTK_THEME=ChromeOS-Dark
 QT_STYLE_OVERRIDE=kvantum
 XCURSOR_THEME=Adwaita
 XCURSOR_SIZE=24
@@ -1873,7 +1939,7 @@ XDG_SESSION_TYPE=wayland
 QT_AUTO_SCREEN_SCALE_FACTOR=1
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-GTK_THEME=Arc-Dark
+GTK_THEME=ChromeOS-Dark
 MOZ_ENABLE_WAYLAND=1
 ELECTRON_OZONE_PLATFORM_HINT=wayland
 CLUTTER_BACKEND=wayland
@@ -1906,12 +1972,15 @@ cat > /usr/local/bin/calamares-launch << 'EOF'
 #!/usr/bin/env bash
 LIVE_UID=1000
 LIVE_RUNTIME="/run/user/${LIVE_UID}"
-exec sudo -E \
+LOG=/tmp/calamares-debug.log
+echo "=== Calamares launch $(date) ===" > "${LOG}"
+sudo -E \
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
   XDG_RUNTIME_DIR="${LIVE_RUNTIME}" \
   QT_QPA_PLATFORM=wayland \
   QT_WAYLAND_SHELL_INTEGRATION=layer-shell \
-  /usr/bin/calamares
+  /usr/bin/calamares -D 8 2>&1 | tee -a "${LOG}"
+echo "=== Calamares exited $? — full log at ${LOG} ===" | tee -a "${LOG}"
 EOF
 chmod +x /usr/local/bin/calamares-launch
 
