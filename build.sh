@@ -1720,7 +1720,7 @@ install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 sudo -u liveuser dbus-run-session -- bash -c '
   dconf write /com/solus-project/budgie/panel/panels "@as []"
   dconf write /com/solus-project/budgie/panel/panels-changed "$(date +%s)"
-  dconf write /com/solus-project/budgie/panel/applets/.../key-combination "'Super_L'"
+  
 '
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
