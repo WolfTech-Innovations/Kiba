@@ -37,150 +37,217 @@ jobs:
             archlinux:latest \
             /bin/bash /w/build.sh
 
-      - name: Upload ISO to SourceForge
-        if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+      - name: Extract airootfs from ISO for OTA diffing
+        run: |
+          sudo apt-get install -y squashfs-tools
+          ISO=$(ls *.iso | head -1)
+          echo "Mounting ISO: $ISO"
+
+          # Mount the ISO
+          mkdir -p /tmp/iso-mount
+          sudo mount -o loop "$ISO" /tmp/iso-mount
+
+          # Find and unsquash the airootfs
+          SFS=$(find /tmp/iso-mount -name 'airootfs.sfs' | head -1)
+          echo "Found squashfs: $SFS"
+          mkdir -p /tmp/airootfs-extracted
+          sudo unsquashfs -d /tmp/airootfs-extracted "$SFS"
+          sudo umount /tmp/iso-mount
+
+          echo "Extraction complete."
+          echo "Extracted file count: $(find /tmp/airootfs-extracted -type f | wc -l)"
+
+      - name: Download previous build manifest from SourceForge
         env:
           SF_USER: ${{ secrets.SF_USER }}
           SSHPASS: ${{ secrets.SF_PASS }}
         run: |
-          if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
-            echo "SourceForge credentials not configured. Skipping upload."
-            exit 0
-          fi
-          sudo apt-get update && sudo apt-get install -y sshpass rsync
+          sudo apt-get install -y sshpass rsync
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
-          for iso_file in *.iso; do
-            [ -f "$iso_file" ] || continue
-            echo "Uploading $iso_file to SourceForge..."
-            sshpass -e rsync -avP \
-              "$iso_file" \
-              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
-          done
 
-  ota-patch:
-    runs-on: ubuntu-latest
-    needs: build-and-upload
-    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Need full history to diff against last tag
+          # Try to fetch the last build's file manifest
+          sshpass -e rsync -avP \
+            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest.txt" \
+            ./last-build-manifest.txt 2>/dev/null || \
+            echo "No previous manifest found — this is a full baseline build."
 
-      - name: Install tools
+      - name: Generate current build manifest
         run: |
-          sudo apt-get update && sudo apt-get install -y gnupg sshpass rsync
+          PATCH_NUM="${{ github.run_number }}"
+          echo "Generating file manifest for patch ${PATCH_NUM}..."
 
-      - name: Import OTA signing key
-        env:
-          OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
-        run: |
-          echo "$OTA_SIGNING_KEY" | gpg --batch --import
-          gpg --batch --export ota@kibaos.wolftech.dev | gpg --batch --import
-          # Trust the key fully
-          KEY_FP=$(gpg --list-keys --with-colons ota@kibaos.wolftech.dev \
-            | awk -F: '/^fpr/{print $10; exit}')
-          echo "${KEY_FP}:6:" | gpg --import-ownertrust
+          find /tmp/airootfs-extracted -type f | while read -r f; do
+            REL="${f#/tmp/airootfs-extracted/}"
+            sha256sum "$f" | awk -v p="./${REL}" '{print $1"  "p}'
+          done > "current-build-manifest.txt"
 
-      - name: Determine changed files since last patch
-        id: changes
+          echo "Manifest entries: $(wc -l < current-build-manifest.txt)"
+
+      - name: Compute changed files vs previous build
+        id: diff
         run: |
-          # Find the last OTA tag, fall back to first commit
-          LAST_TAG=$(git tag -l 'ota-patch-*' | sort -V | tail -1)
-          if [ -z "$LAST_TAG" ]; then
-            echo "No previous OTA tag found — bundling all tracked files."
-            git ls-files > changed_files.txt
+          PATCH_NUM="${{ github.run_number }}"
+
+          if [ ! -f last-build-manifest.txt ]; then
+            echo "No previous manifest — skipping OTA patch generation for this baseline build."
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            # Store current manifest as the new baseline immediately
+            cp current-build-manifest.txt baseline-manifest.txt
           else
-            echo "Diffing against $LAST_TAG"
-            git diff --name-only "${LAST_TAG}" HEAD > changed_files.txt
-          fi
-          echo "Changed files:"
-          cat changed_files.txt
-          CHANGED_COUNT=$(wc -l < changed_files.txt)
-          echo "count=${CHANGED_COUNT}" >> $GITHUB_OUTPUT
+            echo "Diffing against previous build manifest..."
 
-      - name: Bundle patch
-        if: steps.changes.outputs.count > 0
+            # Build a lookup of previous hashes: path -> hash
+            declare -A PREV_HASHES
+            while IFS= read -r line; do
+              HASH=$(echo "$line" | awk '{print $1}')
+              PATH_=$(echo "$line" | awk '{print $2}')
+              PREV_HASHES["$PATH_"]="$HASH"
+            done < last-build-manifest.txt
+
+            # Find files that are new or have changed hashes
+            > changed_files.txt
+            while IFS= read -r line; do
+              HASH=$(echo "$line" | awk '{print $1}')
+              FPATH=$(echo "$line" | awk '{print $2}')
+              PREV="${PREV_HASHES[$FPATH]:-}"
+              if [ "$HASH" != "$PREV" ]; then
+                echo "$FPATH" >> changed_files.txt
+              fi
+            done < current-build-manifest.txt
+
+            CHANGED=$(wc -l < changed_files.txt)
+            echo "Changed files: $CHANGED"
+            cat changed_files.txt | head -20
+            [ "$CHANGED" -gt 20 ] && echo "... and $((CHANGED - 20)) more"
+
+            if [ "$CHANGED" -eq 0 ]; then
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            fi
+            cp current-build-manifest.txt baseline-manifest.txt
+          fi
+
+      - name: Bundle OTA patch from extracted airootfs
+        if: steps.diff.outputs.has_changes == 'true'
         run: |
           PATCH_NUM="${{ github.run_number }}"
           PATCH_DIR="ota-patch-${PATCH_NUM}"
           mkdir -p "${PATCH_DIR}"
 
-          # Copy changed files preserving directory structure
-          while IFS= read -r f; do
-            [ -f "$f" ] || continue
-            mkdir -p "${PATCH_DIR}/$(dirname $f)"
-            cp "$f" "${PATCH_DIR}/${f}"
+          echo "Bundling changed files from extracted airootfs..."
+          while IFS= read -r fpath; do
+            # fpath is like ./usr/share/kibaos/wallpaper.png
+            REL="${fpath#./}"
+            SRC="/tmp/airootfs-extracted/${REL}"
+            DST="${PATCH_DIR}/${REL}"
+            [ -f "$SRC" ] || continue
+            mkdir -p "$(dirname $DST)"
+            cp -a "$SRC" "$DST"
           done < changed_files.txt
 
-          # Write patch level file into bundle
+          # Inject the new patch level into the bundle
+          mkdir -p "${PATCH_DIR}/etc/kibaos"
           echo "${PATCH_NUM}" > "${PATCH_DIR}/etc/kibaos/patch-level"
 
-          # Generate SHA256 manifest
-          find "${PATCH_DIR}" -type f | while read -r file; do
-            REL="${file#${PATCH_DIR}/}"
-            sha256sum "${file}" | awk -v p="./${REL}" '{print $1"  "p}'
-          done > "manifest-${PATCH_NUM}.txt"
+          # Generate manifest of exactly what's in this patch
+          find "${PATCH_DIR}" -type f | while read -r f; do
+            REL="${f#${PATCH_DIR}/}"
+            sha256sum "$f" | awk -v p="./${REL}" '{print $1"  "p}'
+          done > "kibaos-ota-${PATCH_NUM}-manifest.txt"
 
-          echo "Manifest:"
-          cat "manifest-${PATCH_NUM}.txt"
+          echo "Patch manifest:"
+          cat "kibaos-ota-${PATCH_NUM}-manifest.txt"
 
-          # Create tarball
           tar czf "kibaos-ota-${PATCH_NUM}.tar.gz" "${PATCH_DIR}/"
-          echo "Patch bundle size: $(du -sh kibaos-ota-${PATCH_NUM}.tar.gz | cut -f1)"
+          echo "Patch size: $(du -sh kibaos-ota-${PATCH_NUM}.tar.gz | cut -f1)"
 
-      - name: Sign patch
-        if: steps.changes.outputs.count > 0
+      - name: Sign OTA patch
+        if: steps.diff.outputs.has_changes == 'true'
+        env:
+          OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
         run: |
+          echo "$OTA_SIGNING_KEY" | gpg --batch --import
+          gpg --batch --export ota@kiba.wolftech.tech | gpg --batch --import
+          KEY_FP=$(gpg --list-keys --with-colons ota@kiba.wolftech.tech \
+            | awk -F: '/^fpr/{print $10; exit}')
+          echo "${KEY_FP}:6:" | gpg --import-ownertrust
+
           PATCH_NUM="${{ github.run_number }}"
           gpg --batch --yes \
-              --local-user ota@kibaos.wolftech.dev \
+              --local-user ota@kiba.wolftech.tech \
               --detach-sign --armor \
               "kibaos-ota-${PATCH_NUM}.tar.gz"
-          echo "Signature created."
+
           gpg --verify "kibaos-ota-${PATCH_NUM}.tar.gz.asc" \
                        "kibaos-ota-${PATCH_NUM}.tar.gz" && \
-            echo "Signature self-verified OK." || \
-            { echo "Signature verification failed!"; exit 1; }
+            echo "Signature verified OK." || \
+            { echo "Signature self-check failed!"; exit 1; }
 
-      - name: Write latest-patch-level file
-        if: steps.changes.outputs.count > 0
+      - name: Write latest-patch-level
+        if: steps.diff.outputs.has_changes == 'true'
         run: echo "${{ github.run_number }}" > latest-patch-level
 
-      - name: Upload patch + manifest + level to SourceForge
-        if: steps.changes.outputs.count > 0
+      - name: Upload ISO to SourceForge
         env:
           SF_USER: ${{ secrets.SF_USER }}
           SSHPASS: ${{ secrets.SF_PASS }}
         run: |
           if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
-            echo "SourceForge credentials not configured. Skipping OTA upload."
+            echo "SourceForge credentials not configured. Skipping."
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+          for iso_file in *.iso; do
+            [ -f "$iso_file" ] || continue
+            echo "Uploading $iso_file..."
+            sshpass -e rsync -avP \
+              "$iso_file" \
+              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
+          done
+
+      - name: Upload OTA artifacts to SourceForge
+        env:
+          SF_USER: ${{ secrets.SF_USER }}
+          SSHPASS: ${{ secrets.SF_PASS }}
+        run: |
+          if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
+            echo "SourceForge credentials not configured. Skipping."
             exit 0
           fi
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
           PATCH_NUM="${{ github.run_number }}"
-          for f in \
-            "kibaos-ota-${PATCH_NUM}.tar.gz" \
-            "kibaos-ota-${PATCH_NUM}.tar.gz.asc" \
-            "manifest-${PATCH_NUM}.txt" \
-            "latest-patch-level"; do
-            echo "Uploading ${f}..."
-            sshpass -e rsync -avP \
-              "${f}" \
-              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/"
-          done
-          echo "OTA patch ${PATCH_NUM} uploaded."
 
-      - name: Tag this OTA release
-        if: steps.changes.outputs.count > 0
+          # Always upload the updated baseline manifest for next build to diff against
+          echo "Uploading baseline manifest..."
+          sshpass -e rsync -avP \
+            "baseline-manifest.txt" \
+            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest.txt"
+
+          # Upload patch artifacts only if there were changes
+          if [ "${{ steps.diff.outputs.has_changes }}" == "true" ]; then
+            for f in \
+              "kibaos-ota-${PATCH_NUM}.tar.gz" \
+              "kibaos-ota-${PATCH_NUM}.tar.gz.asc" \
+              "kibaos-ota-${PATCH_NUM}-manifest.txt" \
+              "latest-patch-level"; do
+              echo "Uploading ${f}..."
+              sshpass -e rsync -avP \
+                "${f}" \
+                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/"
+            done
+            echo "OTA patch ${PATCH_NUM} uploaded."
+          else
+            echo "No changes — only baseline manifest updated."
+          fi
+
+      - name: Tag this build
+        if: steps.diff.outputs.has_changes == 'true'
         run: |
           git config user.name  "KibaOS OTA Bot"
-          git config user.email "ota@kibaos.wolftech.dev"
+          git config user.email "ota@kiba.wolftech.tech"
           git tag "ota-patch-${{ github.run_number }}"
           git push origin "ota-patch-${{ github.run_number }}" 2>/dev/null || true
-
-      - name: Skip notice
-        if: steps.changes.outputs.count == 0
-        run: echo "No changed files detected. OTA patch skipped."
