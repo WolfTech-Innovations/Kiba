@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2025-06-16 - Tactile Feedback and Accessibility in Welcome Screen
+**Learning:** For web-based system components like the Welcome screen, adding `tabindex="0"` to informational cards allows keyboard users to "walk through" features. Combining this with a "snappy but smooth" tactile effect (scale-down on `:active` with `transition: transform 0s`) makes the interface feel significantly more responsive and polished.
+**Action:** Always ensure informational elements are keyboard-focusable if they have hover/active styles, and use the 0s active transition trick for immediate tactile feedback.
