@@ -1815,14 +1815,17 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     transition: transform .15s, box-shadow .15s;
   }
   .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:focus-visible { outline:none; box-shadow:0 0 0 3px var(--accent); transition: transform .15s, box-shadow .15s; }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
   .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
+  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s, transform .1s; }
   .btn:hover { background:var(--accent-dark); }
+  .btn:active { transform:scale(0.96); transition: transform 0s; }
+  .btn:focus-visible { outline:none; box-shadow:0 0 0 3px var(--accent); }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
   .btn.secondary:hover { background:#e6f6fc; }
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
@@ -1836,19 +1839,19 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 <div class="card-row">
-  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
-  <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
-  <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
-  <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
+  <div class="card" tabindex="0"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
+  <div class="card" tabindex="0"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
+  <div class="card" tabindex="0"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
+  <div class="card" tabindex="0"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
   <h2>Ready to Install?</h2>
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" aria-label="Open KibaOS Wiki">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" aria-label="Report an issue on GitHub">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" aria-label="View source code on GitHub">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
