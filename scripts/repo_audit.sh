@@ -79,7 +79,7 @@ if [ -n "$NESTED_GIT" ]; then
     log_error "Found nested .git directories"
 fi
 # Trailing whitespace (excluding some files if needed)
-if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
+if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=.github --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
     log_error "Found trailing whitespace"
 fi
 
