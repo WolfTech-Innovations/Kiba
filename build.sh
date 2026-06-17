@@ -110,6 +110,8 @@ mesa
 networkmanager
 power-profiles-daemon
 xdg-user-dirs
+inter-font
+ttf-jetbrains-mono
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
@@ -2110,9 +2112,9 @@ gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2123,7 +2125,7 @@ gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
 gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Inter Medium 10'
 gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
 gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
 gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
@@ -2384,7 +2386,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -2395,17 +2397,25 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   .card {
     background:var(--surface); border-radius:18px; padding:24px 22px;
     flex:1; min-width:200px; box-shadow:var(--shadow); border:1px solid var(--border);
-    transition: transform .15s, box-shadow .15s;
+    transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   }
   .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
+  .card:active { transform:translateY(-1px) scale(0.99); }
   .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
   .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
+  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:.88em; }
+  .btn {
+    display:inline-block; background:var(--accent); color:#fff; border-radius:10px;
+    padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600;
+    margin:6px 6px 0 0; cursor:pointer;
+    transition: background 0.2s, transform 0.1s;
+  }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { outline:none; box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+  .btn:active { transform:scale(0.96); transition:transform 0s; }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
   .btn.secondary:hover { background:#e6f6fc; }
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
@@ -2429,9 +2439,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="KibaOS Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report Issue on GitHub (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="KibaOS GitHub Repository (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
