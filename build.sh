@@ -190,6 +190,12 @@ eglinfo
 gnupg
 xdotool
 v4l2loopback-dkms
+xdg-utils
+gawk
+gnome-online-accounts
+gnome-online-accounts-gtk
+gvfs-goa
+gvfs-google
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -901,6 +907,32 @@ GTK3RC
 # ChromeOS-theme provides the base window/widget styling.
 # This overrides just the Budgie panel to be a floating liquid glass pill.
 cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
+/* ════════════════════════════════════════════════════════════════════════
+ * KibaOS Organic Motion Language
+ * Nothing alive moves with symmetric, linear timing — things settle into
+ * rest faster than they drift away from it. These three curves (named for
+ * documentation; GTK CSS has no custom-property/var() support, so the
+ * literal cubic-bezier values are repeated at each use site below) encode
+ * that asymmetry instead of using GTK's default flat "ease":
+ *
+ *   settle  cubic-bezier(0.22, 1, 0.36, 1)     — easeOutQuint. Entering a
+ *           state (hover, focus, opening). Quick, confident, no bounce.
+ *   fade    cubic-bezier(0.5, 0, 0.75, 0)       — easeInQuart. Leaving a
+ *           state. Slightly slower than settle — things drift off, they
+ *           don't snap off.
+ *   spring  cubic-bezier(0.34, 1.56, 0.64, 1)   — easeOutBack. Reserved
+ *           for ONE thing only: the physical switch knob, where a small
+ *           positional overshoot reads as a twig springing back rather
+ *           than a robotic snap. Used nowhere else — overusing overshoot
+ *           reads as cartoonish rather than organic.
+ *
+ * Caveat: this governs GTK widget-state transitions only. labwc itself
+ * does not animate (no compositor-level motion), and Raven/the Budgie
+ * Menu's open/close slide is driven by Budgie's own compiled animation
+ * code, not GTK CSS — the opacity transitions below are best-effort and
+ * may be superseded by that native motion. Verify visually.
+ * ════════════════════════════════════════════════════════════════════════ */
+
 /* === KibaOS: Floating liquid glass pill panel (override on ChromeOS-Dark) === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
@@ -922,20 +954,157 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 .budgie-panel button.flat {
     border-radius: 999px;
     background: transparent;
-    transition: background 150ms ease;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0); /* fade out */
 }
 .budgie-panel .budgie-applet-button:hover,
 .budgie-panel button.flat:hover {
     background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1); /* settle in */
 }
 .budgie-panel .budgie-applet-button:active,
 .budgie-panel button.flat:active {
     background-color: rgba(0, 153, 204, 0.25);
+    transition: background-color 90ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .budgie-panel .launcher:checked,
 .budgie-panel .launcher.running {
     border-bottom: 2px solid #0099cc;
     border-radius: 0;
+    transition: border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: Raven (notification + quick-settings sidebar) as a floating glass card === */
+frame.raven-frame,
+.raven-background {
+    margin: 8px 8px 8px 0;
+    border-radius: 22px;
+    background-color: rgba(16, 24, 40, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+        0 12px 48px rgba(0, 0, 0, 0.50),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    opacity: 1;
+    transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1); /* best-effort, see note above */
+}
+frame.raven-frame > border { border-style: none; box-shadow: none; }
+.raven-header,
+.raven-section-header {
+    color: #e8eef5;
+    font-weight: 600;
+    padding: 14px 18px 6px 18px;
+}
+/* notification + applet rows rendered as individual cards */
+.raven-background row,
+.raven-background list row {
+    margin: 5px 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.raven-background row:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* quick-toggle pills: wifi / bluetooth / focus / airplane mode, etc. */
+.raven-background button.toggle,
+.raven-background .quick-toggle {
+    border-radius: 16px;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0),
+                border-color    220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.raven-background button.toggle:checked,
+.raven-background .quick-toggle:checked {
+    background-color: rgba(0, 153, 204, 0.35);
+    border-color: rgba(0, 153, 204, 0.6);
+    transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color    160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+/* volume / brightness sliders as rounded pill tracks */
+.raven-background scale trough {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.10);
+    min-height: 6px;
+}
+.raven-background scale highlight {
+    border-radius: 999px;
+    background-color: #0099cc;
+    transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.raven-background scale slider {
+    background-color: #ffffff;
+    border-radius: 999px;
+    min-width: 14px;
+    min-height: 14px;
+}
+
+/* === KibaOS: Budgie Menu (app launcher popover) as a floating glass card === */
+popover.budgie-menu,
+.budgie-menu-window {
+    border-radius: 22px;
+    background-color: rgba(16, 24, 40, 0.80);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.50);
+    transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1); /* best-effort, see note above */
+}
+.budgie-menu-window entry,
+popover.budgie-menu entry {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    padding: 8px 16px;
+    color: #e8eef5;
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0),
+                border-color    200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.budgie-menu-window entry:focus,
+popover.budgie-menu entry:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(0, 153, 204, 0.6);
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color    140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+button.budgie-menu-launcher {
+    border-radius: 14px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+button.budgie-menu-launcher:hover {
+    background-color: rgba(0, 153, 204, 0.20);
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: GTK places sidebar (Nemo + GTK open/save dialogs) glass card === */
+placessidebar {
+    background-color: transparent;
+    border-radius: 18px;
+}
+placessidebar row {
+    border-radius: 12px;
+    margin: 2px 6px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+placessidebar row:selected {
+    background-color: rgba(0, 153, 204, 0.25);
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: switches everywhere (budgie-control-center, GTK apps) ========
+ * The one and only spot using the "spring" overshoot curve — the knob
+ * physically travels, so a little organic overshoot is visible motion,
+ * not just a colour flicker. */
+switch slider {
+    transition: margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+switch:checked {
+    background-color: rgba(0, 153, 204, 0.85);
+    transition: background-color 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+switch {
+    transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
 }
 GTK3PANEL
 
@@ -945,7 +1114,8 @@ CHROMEOS_GTK3="/usr/share/themes/ChromeOS-Dark/gtk-3.0/gtk.css"
 if [ -f "${CHROMEOS_GTK3}" ]; then
   cat >> "${CHROMEOS_GTK3}" << 'CHROMEOS_PILL_APPEND'
 
-/* === KibaOS pill panel override === */
+/* === KibaOS pill panel override (organic motion language — see primary
+ * gtk-3.0/gtk.css above for the full settle/fade/spring documentation) === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
     border-radius: 999px;
@@ -966,20 +1136,152 @@ if [ -f "${CHROMEOS_GTK3}" ]; then
 .budgie-panel button.flat {
     border-radius: 999px;
     background: transparent;
-    transition: background 150ms ease;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
 }
 .budgie-panel .budgie-applet-button:hover,
 .budgie-panel button.flat:hover {
     background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .budgie-panel .budgie-applet-button:active,
 .budgie-panel button.flat:active {
     background-color: rgba(0, 153, 204, 0.25);
+    transition: background-color 90ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .budgie-panel .launcher:checked,
 .budgie-panel .launcher.running {
     border-bottom: 2px solid #0099cc;
     border-radius: 0;
+    transition: border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: Raven (notification + quick-settings sidebar) as a floating glass card === */
+frame.raven-frame,
+.raven-background {
+    margin: 8px 8px 8px 0;
+    border-radius: 22px;
+    background-color: rgba(16, 24, 40, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow:
+        0 12px 48px rgba(0, 0, 0, 0.50),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    opacity: 1;
+    transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+frame.raven-frame > border { border-style: none; box-shadow: none; }
+.raven-header,
+.raven-section-header {
+    color: #e8eef5;
+    font-weight: 600;
+    padding: 14px 18px 6px 18px;
+}
+.raven-background row,
+.raven-background list row {
+    margin: 5px 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.raven-background row:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.raven-background button.toggle,
+.raven-background .quick-toggle {
+    border-radius: 16px;
+    background-color: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 10px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0),
+                border-color    220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.raven-background button.toggle:checked,
+.raven-background .quick-toggle:checked {
+    background-color: rgba(0, 153, 204, 0.35);
+    border-color: rgba(0, 153, 204, 0.6);
+    transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color    160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.raven-background scale trough {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.10);
+    min-height: 6px;
+}
+.raven-background scale highlight {
+    border-radius: 999px;
+    background-color: #0099cc;
+    transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.raven-background scale slider {
+    background-color: #ffffff;
+    border-radius: 999px;
+    min-width: 14px;
+    min-height: 14px;
+}
+
+/* === KibaOS: Budgie Menu (app launcher popover) as a floating glass card === */
+popover.budgie-menu,
+.budgie-menu-window {
+    border-radius: 22px;
+    background-color: rgba(16, 24, 40, 0.80);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.50);
+    transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.budgie-menu-window entry,
+popover.budgie-menu entry {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    padding: 8px 16px;
+    color: #e8eef5;
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0),
+                border-color    200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.budgie-menu-window entry:focus,
+popover.budgie-menu entry:focus {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(0, 153, 204, 0.6);
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color    140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+button.budgie-menu-launcher {
+    border-radius: 14px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+button.budgie-menu-launcher:hover {
+    background-color: rgba(0, 153, 204, 0.20);
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: GTK places sidebar (Nemo + GTK open/save dialogs) glass card === */
+placessidebar {
+    background-color: transparent;
+    border-radius: 18px;
+}
+placessidebar row {
+    border-radius: 12px;
+    margin: 2px 6px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+placessidebar row:selected {
+    background-color: rgba(0, 153, 204, 0.25);
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: switches everywhere — the one spot using the "spring"
+ * overshoot curve, since the knob's positional travel actually shows it === */
+switch slider {
+    transition: margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+switch:checked {
+    background-color: rgba(0, 153, 204, 0.85);
+    transition: background-color 220ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+switch {
+    transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
 }
 CHROMEOS_PILL_APPEND
 fi
@@ -1015,11 +1317,226 @@ button { box-shadow: none; -gtk-icon-shadow: none; }
 .suggested-action:hover { background: shade(@accent_bg_color, 0.88); }
 headerbar { padding: 8px 12px; min-height: 44px; }
 row        { padding: 4px 8px; }
+
+/* KibaOS organic motion — same settle/fade pair as GTK3 (see gtk-3.0/gtk.css
+ * for the full naming/rationale); GTK4 apps get the same asymmetric feel. */
+button, row, .sidebar-row, switch slider {
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0),
+                border-color    220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+button:hover, row:hover, .sidebar-row:hover {
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color    140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+switch slider { transition: margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
 GTK4CSS
 
+# ── Disable Budgie's "built-in theme" so the KibaOS GTK CSS above actually ──
+# ── renders on the panel / Raven / menu instead of being overridden by it ──
+mkdir -p /usr/share/glib-2.0/schemas
+cat > /usr/share/glib-2.0/schemas/zz-kibaos-budgie.gschema.override << 'BUDGIEOVERRIDE'
+[com.solus-project.budgie-panel]
+builtin-theme=false
+dark-theme=true
+BUDGIEOVERRIDE
+glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
+
 # ══════════════════════════════════════════════════════════════════════════
-# SDDM
+# SDDM — custom KibaOS frosted-glass greeter theme
 # ══════════════════════════════════════════════════════════════════════════
+SDDM_THEME_DIR="/usr/share/sddm/themes/kibaos"
+mkdir -p "${SDDM_THEME_DIR}"
+cp /usr/share/kibaos/wallpaper.png  "${SDDM_THEME_DIR}/background.png"  2>/dev/null || true
+cp /usr/share/kibaos/logo-256.png   "${SDDM_THEME_DIR}/logo.png"        2>/dev/null || true
+
+cat > "${SDDM_THEME_DIR}/metadata.desktop" << 'SDDMMETA'
+[SddmGreeterTheme]
+Name=KibaOS
+Description=KibaOS frosted-glass greeter
+Author=WolfTech Innovations
+Copyright=2026, WolfTech Innovations
+License=GPLv3
+Type=sddm-theme
+Version=1.0
+Website=https://github.com/WolfTech-Innovations/Kiba
+MainScript=Main.qml
+Font=Noto Sans
+QuickVersion=6
+SDDMMETA
+
+cat > "${SDDM_THEME_DIR}/Main.qml" << 'SDDMQML'
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+Rectangle {
+    id: root
+    width: Screen.width  > 0 ? Screen.width  : 1920
+    height: Screen.height > 0 ? Screen.height : 1080
+    color: "#0d1b2a"
+    focus: true
+
+    property int sessionIndex: sessionModel.lastIndex >= 0 ? sessionModel.lastIndex : 0
+
+    // ── Background wallpaper, darkened so the glass card pops ──────────────
+    Image {
+        anchors.fill: parent
+        source: "background.png"
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+    }
+    Rectangle {
+        anchors.fill: parent
+        color: "#0d1b2a"
+        opacity: 0.42
+    }
+
+    // ── Clock, top-right, matches KibaOS panel pill style ───────────────────
+    Rectangle {
+        anchors { top: parent.top; right: parent.right; margins: 28 }
+        width: clockCol.implicitWidth + 28; height: 56
+        radius: 18
+        color: "#1c2433"
+        opacity: 0.78
+        Column {
+            id: clockCol
+            anchors.centerIn: parent
+            spacing: 0
+            Text {
+                text: Qt.formatTime(new Date(), "h:mm AP")
+                color: "#ffffff"; font.pixelSize: 18; font.weight: Font.Medium
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+            Text {
+                text: Qt.formatDate(new Date(), "ddd, MMM d")
+                color: "#aebccd"; font.pixelSize: 11
+                anchors.horizontalCenter: parent.horizontalCenter
+            }
+        }
+        Timer { interval: 1000; running: true; repeat: true; onTriggered: clockCol.children[0].text = Qt.formatTime(new Date(), "h:mm AP") }
+    }
+
+    // ── Central frosted-glass login card ────────────────────────────────────
+    Rectangle {
+        id: card
+        anchors.centerIn: parent
+        width: 360
+        height: cardCol.implicitHeight + 56
+        radius: 26
+        color: "#101828"
+        opacity: 0.001
+        Rectangle {
+            anchors.fill: parent
+            radius: 26
+            color: "#101828"
+            opacity: 0.001
+        }
+        // emulated glass: solid translucent fill, no real blur (labwc has none)
+        Rectangle {
+            anchors.fill: parent
+            radius: 26
+            color: Qt.rgba(0.063, 0.094, 0.157, 0.72)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.14)
+        }
+
+        ColumnLayout {
+            id: cardCol
+            anchors { top: parent.top; left: parent.left; right: parent.right; margins: 28 }
+            spacing: 14
+
+            Image {
+                Layout.alignment: Qt.AlignHCenter
+                source: "logo.png"
+                width: 64; height: 64
+                fillMode: Image.PreserveAspectFit
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                text: userModel.count > 0 ? userModel.data(userModel.index(userList.currentIndex, 0), 257) : "User"
+                color: "#e8eef5"; font.pixelSize: 17; font.weight: Font.Medium
+            }
+
+            ListView {
+                id: userList
+                Layout.fillWidth: true
+                height: 0; visible: false  // names shown via combo below instead
+                model: userModel
+                currentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
+            }
+
+            ComboBox {
+                id: userBox
+                Layout.fillWidth: true
+                model: userModel
+                textRole: "name"
+                currentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
+                background: Rectangle { radius: 14; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
+                contentItem: Text { text: userBox.displayText; color: "#e8eef5"; padding: 10; verticalAlignment: Text.AlignVCenter }
+            }
+
+            TextField {
+                id: passwordField
+                Layout.fillWidth: true
+                placeholderText: "Password"
+                echoMode: TextInput.Password
+                color: "#e8eef5"
+                placeholderTextColor: "#8a99ad"
+                background: Rectangle { radius: 14; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
+                onAccepted: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
+                Keys.onReturnPressed: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
+            }
+
+            Button {
+                id: loginButton
+                Layout.fillWidth: true
+                text: "Sign In"
+                onClicked: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
+                background: Rectangle { radius: 14; color: "#0099cc" }
+                contentItem: Text { text: loginButton.text; color: "#ffffff"; font.weight: Font.DemiBold; horizontalAlignment: Text.AlignHCenter }
+            }
+
+            ComboBox {
+                Layout.fillWidth: true
+                model: sessionModel
+                textRole: "name"
+                currentIndex: root.sessionIndex
+                onActivated: root.sessionIndex = currentIndex
+                background: Rectangle { radius: 14; color: "transparent" }
+                contentItem: Text { text: parent.displayText; color: "#aebccd"; font.pixelSize: 11; padding: 6; horizontalAlignment: Text.AlignHCenter }
+            }
+        }
+    }
+
+    // ── Power row, bottom-right pill buttons ────────────────────────────────
+    Row {
+        anchors { bottom: parent.bottom; right: parent.right; margins: 28 }
+        spacing: 10
+        Repeater {
+            model: [
+                { label: "⏻", visible: sddm.canPowerOff, action: function(){ sddm.powerOff() } },
+                { label: "⟲", visible: sddm.canReboot,   action: function(){ sddm.reboot()   } }
+            ]
+            delegate: Rectangle {
+                visible: modelData.visible
+                width: 44; height: 44; radius: 14
+                color: "#1c2433"; opacity: 0.78
+                Text { anchors.centerIn: parent; text: modelData.label; color: "#e8eef5"; font.pixelSize: 18 }
+                MouseArea { anchors.fill: parent; onClicked: modelData.action() }
+            }
+        }
+    }
+
+    Connections {
+        target: sddm
+        function onLoginFailed() { passwordField.text = ""; passwordField.placeholderText = "Incorrect password"; }
+    }
+
+    Component.onCompleted: passwordField.forceActiveFocus()
+}
+SDDMQML
+
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [General]
@@ -1029,7 +1546,7 @@ DisplayServer=wayland
 CompositorCommand=labwc
 
 [Theme]
-Current=
+Current=kibaos
 
 [Autologin]
 User=liveuser
@@ -1921,6 +2438,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
     <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
     <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+    <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
   </div>
 </section>
 <footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
@@ -1974,12 +2492,32 @@ LIVE_UID=1000
 LIVE_RUNTIME="/run/user/${LIVE_UID}"
 LOG=/tmp/calamares-debug.log
 echo "=== Calamares launch $(date) ===" > "${LOG}"
+
+# Watchdog: every 15s, snapshot calamares' process tree into the log.
+# When a module "hangs forever", the last job line printed by calamares
+# tells you WHICH module, and this snapshot tells you WHICH child process
+# (parted/udevadm/systemctl/grub-install/etc.) is actually stuck.
+(
+  while true; do
+    sleep 15
+    {
+      echo "--- watchdog $(date +%T) ---"
+      ps --forest -o pid,stat,etimes,cmd -C calamares 2>/dev/null
+      pgrep -a -f 'udevadm|partprobe|parted|systemctl|grub-install|mkfs|blkid' 2>/dev/null
+    } >> "${LOG}"
+  done
+) &
+WATCHDOG_PID=$!
+trap 'kill "${WATCHDOG_PID}" 2>/dev/null' EXIT
+
 sudo -E \
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
   XDG_RUNTIME_DIR="${LIVE_RUNTIME}" \
   QT_QPA_PLATFORM=wayland \
   QT_WAYLAND_SHELL_INTEGRATION=layer-shell \
-  /usr/bin/calamares -D 8 2>&1 | tee -a "${LOG}"
+  /usr/bin/calamares -D 9 2>&1 \
+  | awk '{ print strftime("[%H:%M:%S]"), $0; fflush(); }' \
+  | tee -a "${LOG}"
 echo "=== Calamares exited $? — full log at ${LOG} ===" | tee -a "${LOG}"
 EOF
 chmod +x /usr/local/bin/calamares-launch
