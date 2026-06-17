@@ -1,0 +1,39 @@
+name: Release Notes Autodraft
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  save-release-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Notes Directory
+        run: |
+          mkdir -p Notes
+          touch Notes/.gitkeep
+
+      - name: Save Release Notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_ID: ${{ github.event.release.id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash scripts/save_release_notes.sh
+
+      - name: Commit and Push Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Notes/
+          if git commit -m "docs: auto-archive release notes [skip ci]"; then
+            git push origin main
+          else
+            echo "No changes to commit"
+          fi

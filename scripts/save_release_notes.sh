@@ -21,7 +21,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-set -eu
+set -euo pipefail
 
 trap 'printf "Interrupted. Cleaning up...\n" >&2' INT TERM
 
@@ -54,35 +54,29 @@ save_release_notes() {
   fi
 
   # 1. Generate filename: NTE-DDHYM
-  # Optimization: Single date call reduces process spawning.
+  # Optimization: Use Bash built-ins for parsing and indexing to minimize sub-processes.
   # DD: Day of month (01-31)
   # H: Hour of day (0-N for 0-23)
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  vars=$(date "+%d %H %y %m")
-  dd=$(echo "$vars" | cut -d' ' -f1)
-  h_val=$(echo "$vars" | cut -d' ' -f2)
-  y_val=$(echo "$vars" | cut -d' ' -f3)
-  m_val=$(echo "$vars" | cut -d' ' -f4)
+  read -r dd h_val y_val m_val <<< "$(date "+%d %H %y %m")"
 
-  # Remove leading zeros to avoid octal interpretation in arithmetic
-  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
-  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
+  # Remove leading zeros using parameter expansion
+  h_idx=${h_val#0}
+  m_idx=${m_val#0}
 
   hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
-  y=$(echo "$y_val" | cut -c 2)
+  h="${hours:h_idx:1}"
+  y="${y_val:1:1}"
   months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
+  m="${months:m_idx-1:1}"
 
   filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
   # 2. Ensure Notes directory and .gitkeep exist
   mkdir -p Notes
-  if [ ! -f Notes/.gitkeep ]; then
-    touch Notes/.gitkeep
-  fi
+  : > Notes/.gitkeep
 
   # 3. Fetch release body using curl -fsS and jq
   api_url="https://api.github.com/repos/${repo}/releases/${release_id}"
@@ -97,17 +91,7 @@ save_release_notes() {
     printf "%s\n" "$body" > "$filename"
   fi
 
-  # 5. Git operations
-  git config user.name "github-actions[bot]"
-  git config user.email "github-actions[bot]@users.noreply.github.com"
-  git add "$filename" Notes/.gitkeep
-
-  if git commit -m "docs: add release notes $filename [skip ci]"; then
-    git pull --rebase origin main
-    git push origin main
-  else
-    printf "No changes to commit\n"
-  fi
+  printf "Successfully saved release notes to %s\n" "$filename"
 }
 
-(save_release_notes "$@")
+save_release_notes "$@"

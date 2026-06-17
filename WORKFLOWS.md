@@ -1,5 +1,5 @@
 # GitHub Workflows Manual
-Generated on Sat Jun 13 15:43:02 UTC 2026
+Generated on Wed Jun 17 17:36:40 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
@@ -21,9 +21,11 @@ Generated on Sat Jun 13 15:43:02 UTC 2026
 | Labeler | `./.github/workflows/labeler.yml` |
 | Lock Threads | `./.github/workflows/lock-threads.yml` |
 | Markdownlint | `./.github/workflows/markdownlint.yml` |
+| Monitor CachyOS Kernel | `./.github/workflows/monitor-cachyos-kernel.yml` |
 | Notify SourceForge Release | `./.github/workflows/notify-release-sourceforge-upload.yml` |
 | Prettier | `./.github/workflows/prettier.yml` |
 | Release Drafter | `./.github/workflows/release-drafter.yml` |
+| Release Notes Autodraft | `./.github/workflows/release-notes-autodraft.yml` |
 | Repository Audit | `./.github/workflows/repo-audit.yml` |
 | Repo Stats | `./.github/workflows/repo-stats.yml` |
 | Scorecard supply-chain security | `./.github/workflows/scorecards.yml` |
