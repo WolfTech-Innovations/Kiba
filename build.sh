@@ -119,7 +119,6 @@ gnome-clocks
 gnome-calculator
 sof-firmware
 thermald
-network-manager-applet
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -130,10 +129,10 @@ wine
 wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
-pkg-config
+pkgconf
 labwc
 sddm
-budgie
+budgie-desktop
 budgie-desktop-view
 budgie-desktop-services
 budgie-control-center
@@ -157,10 +156,9 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
-papirus-icon-theme
 accountsservice
 firefox
 sassc
@@ -174,7 +172,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -186,7 +184,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -195,7 +193,8 @@ gawk
 gnome-online-accounts
 gnome-online-accounts-gtk
 gvfs-goa
-gvfs-google
+inter-font
+ttf-jetbrains-mono
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -298,7 +297,7 @@ cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
 QWidget {
     background-color: #f0f6fa;
     color: #1a2030;
-    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+    font-family: "Inter", "Noto Sans", sans-serif;
     font-size: 13px;
 }
 QStackedWidget, QFrame#mainContent {
@@ -807,7 +806,7 @@ pacman -S --noconfirm --needed \
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares libinput-gestures; do
+for pkg in calamares libinput-gestures kora-icon-theme vimix-cursors-git; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -878,8 +877,8 @@ echo "=== Plymouth configured ==="
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
 gtk-theme-name = "ChromeOS-Dark"
-gtk-icon-theme-name = "Papirus-Dark"
-gtk-font-name = "Noto Sans 11"
+gtk-icon-theme-name = "Kora"
+gtk-font-name = "Inter 11"
 gtk-cursor-theme-size = 24
 gtk-toolbar-style = GTK_TOOLBAR_ICONS
 gtk-button-images = 1
@@ -894,8 +893,8 @@ mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora
+gtk-font-name=Inter 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -1360,7 +1359,7 @@ Type=sddm-theme
 Version=1.0
 Website=https://github.com/WolfTech-Innovations/Kiba
 MainScript=Main.qml
-Font=Noto Sans
+Font=Inter
 QuickVersion=6
 SDDMMETA
 
@@ -1575,11 +1574,11 @@ cat > /etc/xdg/labwc/rc.xml << 'LABWCRC'
     <name>kibaos</name>
     <cornerRadius>14</cornerRadius>
     <font place="ActiveWindow">
-      <name>Noto Sans</name><size>10</size>
+      <name>Inter</name><size>10</size>
       <weight>medium</weight><slant>normal</slant>
     </font>
     <font place="InactiveWindow">
-      <name>Noto Sans</name><size>10</size>
+      <name>Inter</name><size>10</size>
       <weight>normal</weight><slant>normal</slant>
     </font>
     <titlebar>
@@ -2062,8 +2061,8 @@ NEMODESKTOP
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora
+gtk-font-name=Inter 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -2079,8 +2078,8 @@ cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="ChromeOS-Dark"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 11"
+gtk-icon-theme-name="Kora"
+gtk-font-name="Inter 11"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
 gtk-button-images=1
@@ -2107,12 +2106,12 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface icon-theme              'Kora'
+gsettings set org.gnome.desktop.interface cursor-theme            'Vimix'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2123,7 +2122,7 @@ gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
 gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Inter Medium 10'
 gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
 gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
 gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
@@ -2177,7 +2176,7 @@ mkdir -p "${SKEL}/.config/labwc"
 cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
 GTK_THEME=ChromeOS-Dark
 QT_STYLE_OVERRIDE=kvantum
-XCURSOR_THEME=Adwaita
+XCURSOR_THEME=Vimix
 XCURSOR_SIZE=24
 QT_AUTO_SCREEN_SCALE_FACTOR=1
 MOZ_ENABLE_WAYLAND=1
@@ -2211,11 +2210,11 @@ cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
   </match>
   <alias>
     <family>sans-serif</family>
-    <prefer><family>Noto Sans</family></prefer>
+    <prefer><family>Inter</family></prefer>
   </alias>
   <alias>
     <family>monospace</family>
-    <prefer><family>Noto Sans Mono</family></prefer>
+    <prefer><family>JetBrains Mono</family></prefer>
   </alias>
 </fontconfig>
 FONTCONF
@@ -2235,7 +2234,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -2384,7 +2383,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -2403,7 +2402,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
+  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:.88em; }
   .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
   .btn:hover { background:var(--accent-dark); }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }

@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2026-05-22 - [Unified Typography and Iconography Refresh]
+**Learning:** Transitioning to a unified set of modern, high-legibility fonts (Inter for UI, JetBrains Mono for code) and a consistent, high-contrast icon language (Kora) across all system layers (GTK, SDDM, Installer, Welcome Screen) significantly reduces visual friction and reinforces distribution branding. Decoupling from legacy defaults like Noto Sans ensures a distinct, modern identity.
+**Action:** Prioritize 'Inter' for interface, 'JetBrains Mono' for monospace, and 'Kora' for icons in all UI templates and system-wide configurations to maintain aesthetic cohesion.
