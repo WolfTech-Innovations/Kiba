@@ -60,21 +60,20 @@ save_release_notes() {
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  vars=$(date "+%d %H %y %m")
-  dd=$(echo "$vars" | cut -d' ' -f1)
-  h_val=$(echo "$vars" | cut -d' ' -f2)
-  y_val=$(echo "$vars" | cut -d' ' -f3)
-  m_val=$(echo "$vars" | cut -d' ' -f4)
+  # Optimization: Use Bash built-ins to avoid sub-process spawning (cut, sed, echo).
+  # read parses the output of date into variables in one step.
+  read -r dd h_val y_val m_val <<< "$(date "+%d %H %y %m")"
 
-  # Remove leading zeros to avoid octal interpretation in arithmetic
-  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
-  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
+  # Remove leading zeros to avoid octal interpretation in arithmetic using parameter expansion.
+  h_val_clean="${h_val#0}"; h_val_clean="${h_val_clean:-0}"
+  m_val_clean="${m_val#0}"; m_val_clean="${m_val_clean:-0}"
 
+  # Use shell string indexing ${var:offset:length} for faster character extraction.
   hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
-  y=$(echo "$y_val" | cut -c 2)
+  h="${hours:h_val_clean:1}"
+  y="${y_val:1:1}"
   months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
+  m="${months:m_val_clean-1:1}"
 
   filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
