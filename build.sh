@@ -1,6 +1,12 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM:-local}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
@@ -17,18 +23,10 @@ chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 # ── Container deps ────────────────────────────────────────────────────────
 pacman-key --init
 pacman-key --populate archlinux
-pacman -Syy --noconfirm
-pacman -Su  --noconfirm
-pacman -S --noconfirm --needed \
+pacman -Syu --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -157,9 +155,10 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
+kora-icon-theme
 papirus-icon-theme
 accountsservice
 firefox
@@ -174,7 +173,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -186,7 +185,10 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
+inter-font
+ttf-jetbrains-mono
+vimix-cursor-theme
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -408,7 +410,7 @@ Item {
         { heading: "Welcome to KibaOS",       body: "We're setting everything up for you. This usually takes 5 to 10 minutes." },
         { heading: "Built on Arch Linux",     body: "Rolling release. Always the latest software, straight from upstream." },
         { heading: "Budgie 10.10 Wayland",    body: "Fully Wayland-native. Fast, modern, and compositor-agnostic." },
-        { heading: "Designed with care",      body: "KibaOS blends the best of DDE, Paper, and Cutefish into one cohesive look." },
+        { heading: "Designed with care",      body: "KibaOS blends a clean, modern aesthetic with a highly functional desktop." },
         { heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
         { heading: "KibaOS by WolfTech",      body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
     ]
@@ -555,7 +557,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram
@@ -800,7 +802,7 @@ useradd -m -s /bin/bash builduser 2>/dev/null || true
 echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 pacman -S --noconfirm --needed \
-  kpmcore python python-yaml python-jsonschema \
+  kpmcore python python-pyyaml python-jsonschema \
   qt5-wayland qt5-xmlpatterns solid kcoreaddons \
   ki18n kio kservice kpackage kdeclarative \
   kiconthemes kwidgetsaddons
@@ -2107,12 +2109,12 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface icon-theme              'kora'
+gsettings set org.gnome.desktop.interface cursor-theme            'Vimix-cursors'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 10'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2235,7 +2237,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -2421,7 +2423,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
 <div class="card-row">
   <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
   <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
-  <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
+  <div class="card"><h2>Unified Design</h2><p>A clean, focused workspace with a modern aesthetic and refined typography.</p></div>
   <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
 </div>
 <section>
@@ -2433,11 +2435,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
   <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
   <h2>Design Language</h2>
-  <p>KibaOS's visual identity draws from three reference desktops:</p>
+  <p>KibaOS's visual identity focuses on clarity, performance, and organic motion:</p>
   <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
+    <span class="pill">Clean Geometry — smooth rounded corners and consistent spacing</span>
+    <span class="pill">Modern Palette — dark navy base with vibrant cyan accents</span>
+    <span class="pill">Glass Surfaces — translucent panels and floating UI elements</span>
     <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
   </div>
 </section>

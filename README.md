@@ -177,7 +177,7 @@ KibaOS ships the **Dracula** color scheme system-wide using the official palette
 | Pink       | `#ff79c6` | Selection    |
 | Green      | `#50fa7b` | Success      |
 
-The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The scheme is applied to **Budgie Desktop**, **Nemo**, **GNOME Terminal**, and **Plymouth**.
 
 ### System Requirements
 
