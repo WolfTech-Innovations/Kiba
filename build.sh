@@ -131,7 +131,8 @@ wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-labwc
+wayfire
+wcm
 sddm
 budgie
 budgie-desktop-view
@@ -195,7 +196,12 @@ gawk
 gnome-online-accounts
 gnome-online-accounts-gtk
 gvfs-goa
-
+gvfs-google
+gnome-calendar
+gnome-notes
+geary
+gnome-music
+gnome-todo
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -229,14 +235,14 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash nomodeset plymouth.enable=1 rd.plymouth=1
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.unit=multi-user.target systemd.log_level=info
 ENTRY_SAFE
 
 SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
@@ -249,7 +255,7 @@ LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
   LINUX boot/x86_64/vmlinuz-linux
   INITRD boot/x86_64/initramfs-linux.img
-  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.log_level=info
+  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.unit=multi-user.target systemd.log_level=info
 SYSLINUX_SAFE
 fi
 
@@ -926,11 +932,12 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
  *           than a robotic snap. Used nowhere else — overusing overshoot
  *           reads as cartoonish rather than organic.
  *
- * Caveat: this governs GTK widget-state transitions only. labwc itself
- * does not animate (no compositor-level motion), and Raven/the Budgie
- * Menu's open/close slide is driven by Budgie's own compiled animation
- * code, not GTK CSS — the opacity transitions below are best-effort and
- * may be superseded by that native motion. Verify visually.
+ * Caveat: this governs GTK widget-state transitions only — separate from
+ * Wayfire's wobbly plugin, which now provides real compositor-level window
+ * drag physics (see wayfire.ini). Raven/the Budgie Menu's open/close slide
+ * is still Budgie's own compiled animation code, not GTK CSS — the opacity
+ * transitions below are best-effort and may be superseded by that native
+ * motion. Verify visually.
  * ════════════════════════════════════════════════════════════════════════ */
 
 /* === KibaOS: Floating liquid glass pill panel (override on ChromeOS-Dark) === */
@@ -1335,9 +1342,8 @@ GTK4CSS
 # ── renders on the panel / Raven / menu instead of being overridden by it ──
 mkdir -p /usr/share/glib-2.0/schemas
 cat > /usr/share/glib-2.0/schemas/zz-kibaos-budgie.gschema.override << 'BUDGIEOVERRIDE'
-[com.solus-project.budgie-panel]
-builtin-theme=false
-dark-theme=true
+[com.solus-project.budgie.panel]
+enable-built-in-theme=false
 BUDGIEOVERRIDE
 glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 
@@ -1431,7 +1437,9 @@ Rectangle {
             color: "#101828"
             opacity: 0.001
         }
-        // emulated glass: solid translucent fill, no real blur (labwc has none)
+        // emulated glass: solid translucent fill. Wayfire has a real blur
+        // plugin now, but it's known not to apply behind semi-transparent
+        // layer-shell surfaces (panels) — see wayfire.ini notes.
         Rectangle {
             anchors.fill: parent
             radius: 26
@@ -1543,7 +1551,7 @@ cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 DisplayServer=wayland
 
 [Wayland]
-CompositorCommand=labwc
+CompositorCommand=wayfire
 
 [Theme]
 Current=kibaos
@@ -1558,108 +1566,85 @@ chown sddm:sddm /var/lib/sddm 2>/dev/null || true
 chmod 750 /var/lib/sddm
 
 # ══════════════════════════════════════════════════════════════════════════
-# LABWC CONFIG
+# WAYFIRE CONFIG
 # ══════════════════════════════════════════════════════════════════════════
-mkdir -p /etc/xdg/labwc
-cat > /etc/xdg/labwc/rc.xml << 'LABWCRC'
-<?xml version="1.0"?>
-<openbox_config xmlns="http://openbox.org/3.4/rc">
-  <core>
-    <decoration>server</decoration>
-    <gap>6</gap>
-    <adaptiveSync>yes</adaptiveSync>
-    <allowTearing>no</allowTearing>
-    <reuseOutputMode>no</reuseOutputMode>
-  </core>
-  <theme>
-    <name>kibaos</name>
-    <cornerRadius>14</cornerRadius>
-    <font place="ActiveWindow">
-      <name>Noto Sans</name><size>10</size>
-      <weight>medium</weight><slant>normal</slant>
-    </font>
-    <font place="InactiveWindow">
-      <name>Noto Sans</name><size>10</size>
-      <weight>normal</weight><slant>normal</slant>
-    </font>
-    <titlebar>
-      <layout>:iconify,max,close</layout>
-      <showTitle>yes</showTitle>
-    </titlebar>
-    <dropShadows>yes</dropShadows>
-  </theme>
-  <snapping>
-    <range>8</range><topMaximize>yes</topMaximize>
-    <notifyClient>always</notifyClient>
-    <overlay><enabled>yes</enabled><delay inner="500" outer="500"/></overlay>
-  </snapping>
-  <focus><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
-  <workspaces>
-    <popupTime>1000</popupTime>
-    <names><name>1</name><name>2</name><name>3</name><name>4</name></names>
-  </workspaces>
-  <windowRules>
-    <windowRule identifier="*"><serverDecoration>yes</serverDecoration></windowRule>
-    <windowRule type="dock"><serverDecoration>no</serverDecoration><shadow>no</shadow></windowRule>
-    <windowRule identifier="*notification*"><serverDecoration>no</serverDecoration><shadow>no</shadow></windowRule>
-  </windowRules>
-</openbox_config>
-LABWCRC
+# Switched from labwc to Wayfire for real compositor-level wobbly/jelly
+# window physics (labwc's philosophy explicitly excludes any animation).
+# Trade-off, stated plainly: Budgie 10.10 only ships an automatic
+# integration "bridge" (keybindings/theme sync) for labwc. No such bridge
+# exists for Wayfire — Budgie talks to it purely through standard wlroots
+# protocols (layer-shell, foreign-toplevel, etc.), which Wayfire does
+# implement, but this exact combination is genuinely less-tested than
+# Budgie+labwc. The single most important consequence: without an
+# explicit [autostart] entry below, nothing tells Wayfire to launch
+# budgie-desktop at all, so that line is load-bearing, not optional.
+#
+# Wayfire has no system-wide /etc/xdg config fallback the way labwc does —
+# it only reads $XDG_CONFIG_HOME/wayfire.ini (effectively ~/.config/wayfire.ini).
+# So the default lives in /etc/skel and gets copied into every new user's
+# home directory (liveuser, and any user Calamares creates) instead.
+mkdir -p "${SKEL}/.config"
+cat > "${SKEL}/.config/wayfire.ini" << 'WAYFIREINI'
+[core]
+vwidth = 4
+vheight = 1
+plugins = \
+    autostart \
+    decoration \
+    move \
+    resize \
+    wobbly \
+    grid \
+    place \
+    expo \
+    vswitch \
+    switcher \
+    fast-switcher \
+    foreign-toplevel \
+    gtk-shell \
+    idle \
+    wm-actions \
+    command \
+    session-lock \
+    shortcuts-inhibit \
+    blur
 
-mkdir -p /usr/share/themes/kibaos/openbox-3
-cat > /usr/share/themes/kibaos/openbox-3/themerc << 'THEMERC'
-border.width: 1
-window.client.padding.width: 0
-window.client.padding.height: 0
-window.active.title.bg:                  Flat solid
-window.active.title.bg.color:           #1a2030
-window.active.label.text.color:         #e8eef5
-window.active.label.text.font:          shadow=no
-window.inactive.title.bg:               Flat solid
-window.inactive.title.bg.color:        #232b3a
-window.inactive.label.text.color:      #6a7a90
-window.active.border.color:            #0099cc
-window.inactive.border.color:          #3a4455
-window.button.width:                     18
-window.button.height:                    18
-window.button.hover.bg.corner-radius:     9
-window.active.button.unpressed.bg:       Flat solid
-window.active.button.unpressed.bg.color: #1a2030
-window.active.button.unpressed.image.color: #8aacbe
-window.active.button.hover.bg:           Flat solid
-window.active.button.hover.bg.color:     #0099cc40
-window.active.button.hover.image.color:  #e8eef5
-window.active.button.pressed.bg:         Flat solid
-window.active.button.pressed.bg.color:   #00699990
-window.active.button.pressed.image.color: #ffffff
-window.inactive.button.unpressed.bg:     Flat solid
-window.inactive.button.unpressed.bg.color: #232b3a
-window.inactive.button.unpressed.image.color: #4a5a70
-shadow.size:          30
-shadow.inactive.size: 20
-shadow.color:          #00000070
-shadow.inactive.color: #00000040
-menu.border.width:  1
-menu.border.color:  #0099cc30
-menu.items.bg.color: #1e2430
-menu.items.text.color: #ccdae5
-menu.items.active.bg.color: #0099cc
-menu.items.active.text.color: #ffffff
-menu.separator.color: #2e3a4a
-menu.separator.width: 1
-menu.separator.padding.width:  4
-menu.separator.padding.height: 3
-osd.bg:                 Flat solid
-osd.bg.color:           #1a2030ee
-osd.border.color:       #0099cc60
-osd.border.width:       1
-osd.label.text.color:   #e8eef5
-osd.hilight.bg:         Flat solid
-osd.hilight.bg.color:   #0099cc
-osd.unhilight.bg:       Flat solid
-osd.unhilight.bg.color: #2e3a4a
-THEMERC
+# No labwc-style bridge exists for Wayfire — this is what actually starts
+# the Budgie shell. Without it, Wayfire boots to an empty compositor.
+[autostart]
+autostart_budgie = budgie-desktop
 
+# RGBA as four floats from 0.0-1.0 — Wayfire's decoration plugin does NOT
+# accept hex colors. #1a2030 -> 0.102 0.125 0.188 ; #232b3a -> 0.137 0.169 0.227
+[decoration]
+active_color   = 0.102 0.125 0.188 1.0
+inactive_color = 0.137 0.169 0.227 1.0
+border_size = 1
+
+# Tuned softer than Compiz's nostalgia-mode defaults (friction 3.0) so it
+# reads as an organic settle rather than cartoon jelly, matching the
+# settle/fade motion language already in the GTK theme. Key names confirmed
+# against Wayfire's own docs; exact feel is unverified until it boots —
+# tune by hand from there.
+[wobbly]
+friction = 4.5
+spring_k = 8.0
+grid_resolution = 6
+
+# Blur is a real Wayfire plugin (unlike labwc, which has none at all), but
+# a known upstream limitation (WayfireWM/wayfire#1399) means it historically
+# does NOT apply behind semi-transparent layer-shell surfaces like Budgie's
+# panel/Raven — so this will likely blur behind floating app windows
+# (e.g. a translucent terminal) but NOT produce real frosted-glass behind
+# the panel itself. The panel still relies on the alpha-transparency
+# illusion already built into the GTK theme. Verify visually either way.
+[blur]
+method = kawase
+mode = normal
+kawase_offset = 2
+kawase_degrade = 3
+kawase_iterations = 2
+WAYFIREINI
 # ══════════════════════════════════════════════════════════════════════════
 # OTA UPDATE SYSTEM
 # ══════════════════════════════════════════════════════════════════════════
@@ -1785,7 +1770,13 @@ while IFS= read -r line; do
   case "${FILEPATH}" in
     etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
       NEEDS_DISPLAY_RESTART=true ;;
-    etc/xdg/labwc*|usr/bin/labwc*)
+    usr/bin/wayfire*)
+      # Note: wayfire.ini now lives per-user (Wayfire has no system-wide
+      # /etc/xdg fallback), seeded from /etc/skel at account creation. An
+      # OTA patch to the skel copy only affects NEWLY created users from
+      # that point on — it can't retroactively update already-installed
+      # users' own ~/.config/wayfire.ini. Only the binary itself triggers
+      # a restart here.
       NEEDS_COMPOSITOR_RESTART=true ;;
   esac
 done < "${MANIFEST}"
@@ -1918,18 +1909,21 @@ rollback_patch() {
   fi
 }
 
-# ── Restart compositor silently if needed ─────────────────────────────────
+# ── Restart compositor: full session bounce, not in-place reconfigure ─────
+# Wayfire has documented crash-on-config-reload reports (no general
+# "reconfigure" signal equivalent to labwc's, and what reload support
+# exists is plugin-specific, not whole-compositor). Rather than gamble on
+# an in-place reload inside an unattended OTA patcher, this restarts the
+# whole greeter/session — slower, but it's not going to leave the user
+# stuck on a half-reloaded compositor.
 restart_compositor() {
-  log "Restarting compositor (labwc)..."
-  LIVE_UID=1000
-  sudo -u liveuser \
-    WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
-    XDG_RUNTIME_DIR="/run/user/${LIVE_UID}" \
-    labwc --reconfigure 2>/dev/null || \
-  pkill -HUP labwc 2>/dev/null || true
+  log "Restarting session (wayfire via sddm)..."
+  systemctl restart sddm 2>/dev/null || \
+  pkill -TERM wayfire 2>/dev/null || true
   sleep 1
-  log "Compositor restarted."
+  log "Session restarted."
 }
+
 
 # ── Restart display manager silently if needed ────────────────────────────
 restart_display_manager() {
@@ -2152,6 +2146,51 @@ if [ -n "${PANEL_UUID}" ]; then
   dconf write "${PANEL_PATH}enable-built-in-theme" "false"
 fi
 
+# ── Centered dock: pinned launchers, matching the mockup's icon order ──────
+# Budgie's icon-tasklist applet PERMANENTLY crashes the session on every
+# future login if pinned-launchers references a .desktop file that doesn't
+# exist (solus-project/budgie-desktop#1480 — confirmed, not theoretical).
+# So: probe the real filesystem for whichever desktop-id variant actually
+# shipped, rather than hardcoding a guess and hoping it's right.
+find_desktop_id() {
+  for candidate in "$@"; do
+    [ -f "/usr/share/applications/${candidate}" ] && { echo "${candidate}"; return 0; }
+  done
+  return 1
+}
+DOCK_LAUNCHERS=()
+for ids in \
+  "nemo.desktop" \
+  "org.gnome.Calendar.desktop gnome-calendar.desktop" \
+  "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
+  "org.gnome.eog.desktop eog.desktop" \
+  "org.gnome.Geary.desktop geary.desktop" \
+  "org.gnome.Music.desktop gnome-music.desktop" \
+  "org.gnome.Todo.desktop gnome-todo.desktop"
+do
+  FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
+done
+if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
+  LAUNCHERS_GVARIANT=$(printf "'%s', " "${DOCK_LAUNCHERS[@]}")
+  gsettings set com.solus-project.icon-tasklist pinned-launchers \
+    "[${LAUNCHERS_GVARIANT%, }]" 2>/dev/null || true
+fi
+# NOTE on the rest of the mockup's centered-dock layout (Budgie Menu as the
+# leftmost "search" icon, icon-tasklist in the center zone, clock pinned to
+# the end zone): the pinned-launchers list above is verified against this
+# script's own already-working schema conventions and is safe to ship.
+# The exact dconf keys for START/CENTER/END *zone* placement of applets are
+# NOT verified the same way — Budgie's docs describe the zones but I don't
+# have confirmed key names for this specific Budgie 10.10 build, and
+# guessing wrong here just leaves the panel under-populated rather than
+# crashing it, so it's a lower-stakes unknown than the pinned-launchers
+# crash bug above, but still worth flagging rather than faking confidence.
+# Fastest way to get the real ground truth: arrange the dock once by hand
+# in Budgie Desktop Settings on a running session, then run
+#   dconf dump /com/solus-project/budgie/
+# and send me the output — I'll wire the exact zone keys from that rather
+# than a second guess.
+
 touch "${STAMP}"
 FIRSTLOGIN
 chmod +x /usr/local/bin/kibaos-first-login
@@ -2172,17 +2211,6 @@ cat > /etc/systemd/zram-generator.conf << 'ZRAM'
 zram-size = ram / 2
 compression-algorithm = zstd
 ZRAM
-
-mkdir -p "${SKEL}/.config/labwc"
-cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
-GTK_THEME=ChromeOS-Dark
-QT_STYLE_OVERRIDE=kvantum
-XCURSOR_THEME=Adwaita
-XCURSOR_SIZE=24
-QT_AUTO_SCREEN_SCALE_FACTOR=1
-MOZ_ENABLE_WAYLAND=1
-WINEDEBUG=-all
-LABWCENV
 
 mkdir -p "${SKEL}/.config"
 cat > "${SKEL}/.config/libinput-gestures.conf" << 'GESTURES'
@@ -2419,7 +2447,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
 </header>
 <div class="card-row">
-  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by labwc for smooth, compositor-agnostic window management.</p></div>
+  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by Wayfire for wobbly windows and real compositor effects.</p></div>
   <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
   <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
   <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
@@ -2458,7 +2486,11 @@ QT_AUTO_SCREEN_SCALE_FACTOR=1
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 GTK_THEME=ChromeOS-Dark
+QT_STYLE_OVERRIDE=kvantum
+XCURSOR_THEME=Adwaita
+XCURSOR_SIZE=24
 MOZ_ENABLE_WAYLAND=1
+WINEDEBUG=-all
 ELECTRON_OZONE_PLATFORM_HINT=wayland
 CLUTTER_BACKEND=wayland
 SDL_VIDEODRIVER=wayland
