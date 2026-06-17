@@ -2578,4 +2578,3 @@ else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
 fi
-s
