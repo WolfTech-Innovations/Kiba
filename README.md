@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1430" height="892" alt="KibaOS Budgie Desktop showcase with Dracula theme and floating panel" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
+<img width="1430" height="892" alt="KibaOS Budgie Desktop showcase with a dark Budgie Desktop with a floating pill-shaped panel and rounded window corners" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
 
 </p>
 
@@ -67,7 +67,7 @@ The goal of KibaOS is to provide a clean, modern, and visually consistent out-of
 For a more in-depth look at KibaOS, check out our detailed documentation:
 
 - [**Architecture**](./docs/architecture.md): Base system, kernel, and minimization strategies.
-- [**UX & Design**](./docs/ux-design.md): The Dracula aesthetic and terminal experience.
+- [**UX & Design**](./docs/ux-design.md): The blue-accented aesthetic and terminal experience.
 - [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
 - [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
 - [**Build System**](./docs/build-system.md): How we build and release KibaOS.
@@ -82,11 +82,11 @@ For a more in-depth look at KibaOS, check out our detailed documentation:
 - **Arch Linux Base:** Built on **Arch Linux Rolling**
 - **Deep Cloud Integration:** System-wide file and setting sync powered by Cloud Services. Built on **Arch Linux Rolling** (supported until 2030).
 - **Modern Desktop:** **Budgie Desktop Environment** with **Wayland** as the default session.
-- **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
-- **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
-- **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
+- **KibaOS Aesthetic:** A clean, modern blue-accented design language applied system-wide.
+- **Polished UI:** Floating liquid glass pill panel and rounded window corners via the **labwc** compositor.
+- **Optimized Shell:** **Bash** as the default shell with a custom KibaOS prompt and essential aliases.
 - **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
-- **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
+- **Essential Apps:** **Firefox**, **Nemo**, **GNOME Terminal**, **GNOME Text Editor**, **Loupe**, **GParted** included.
 - **Performance:** No bloat — only what you need is installed.
 
 ---
@@ -149,14 +149,13 @@ sudo pacman -Syu
 
 ### Shell
 
-<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
+<img src="https://img.shields.io/badge/Shell-Bash-4EAA25?style=flat-square&logo=gnubash&logoColor=white" alt="Shell: Bash">
 
-KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
+KibaOS uses **Bash** by default with a pre-configured environment:
 
-- Shared history across sessions.
-- Tab completion with menu select.
-- Autosuggestions & syntax highlighting.
-- Minimalist Dracula-themed prompt.
+- Custom KibaOS branded prompt.
+- Pre-configured XDG base directory exports.
+- Fastfetch system information on terminal start.
 
 **Useful Aliases:**
 
@@ -166,18 +165,18 @@ KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/e
 
 ### Theme
 
-<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
+<img src="https://img.shields.io/badge/Theme-KibaOS-0099cc?style=flat-square" alt="Theme: KibaOS">
 
-KibaOS ships the **Dracula** color scheme system-wide using the official palette
+KibaOS ships a unified design language centered around the official blue palette:
 
-| Color      | Hex       | Role         |
-| ---------- | --------- | ------------ |
-| Background | `#282a36` | Primary BG   |
-| Purple     | `#bd93f9` | Accent Color |
-| Pink       | `#ff79c6` | Selection    |
-| Green      | `#50fa7b` | Success      |
+| Color      | Hex       | Role          |
+| ---------- | --------- | ------------- |
+| Background | `#0d1b2a` | Deep Navy BG  |
+| Accent     | `#0099cc` | Primary Blue  |
+| Surface    | `#ffffff` | Light Surface |
+| Sub-text   | `#4a5a70` | Low Contrast  |
 
-The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
+The design is applied system-wide to **Budgie**, **GTK3/4**, **labwc** decorations, **SDDM**, and **Plymouth**.
 
 ### System Requirements
 

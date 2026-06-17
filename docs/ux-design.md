@@ -5,14 +5,14 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=for-the-badge&logo=dracula" alt="Theme">
-  <img src="https://img.shields.io/badge/Desktop-KDE-22a7f0?style=for-the-badge&logo=cutefish" alt="Desktop">
+  <img src="https://img.shields.io/badge/Theme-KibaOS-0099cc?style=for-the-badge" alt="Theme">
+  <img src="https://img.shields.io/badge/Desktop-Budgie-22a7f0?style=for-the-badge" alt="Desktop">
   <img src="https://img.shields.io/badge/Font-Inter-white?style=for-the-badge" alt="Font">
 </p>
 
 ---
 
-KibaOS is built with a focus on "modern simplicity." This document details the visual identity, the Dracula-inspired aesthetic, and the highly optimized terminal experience.
+KibaOS is built with a focus on "modern simplicity." This document details the visual identity, the blue-accented aesthetic, and the highly optimized terminal experience.
 
 ---
 
@@ -23,115 +23,100 @@ KibaOS is built with a focus on "modern simplicity." This document details the v
   - [Look and Feel](#look-and-feel)
   - [Window Management](#window-management)
 - [Shell Experience](#shell-experience)
-  - [Starship Prompt](#starship-prompt)
+  - [KibaOS Prompt](#kibaos-prompt)
   - [Modern CLI Tools](#modern-cli-tools)
   - [System-wide Aliases](#system-wide-aliases)
 - [Boot Branding](#boot-branding)
   - [Interface Components](#interface-components)
   - [Typography](#typography)
-- [Desktop Experience (Cutefish OS)](#desktop-experience-plasma-bigscreen)
+- [Desktop Experience (Budgie Desktop)](#desktop-experience-budgie)
   - [Window Management Polish](#window-management-polish)
   - [Desktop Layout](#desktop-layout)
 - [The Modern Terminal](#the-modern-terminal)
-  - [Modern Alternative Comparison](#modern-alternative-comparison)
-  - [Shell Configuration (Zsh)](#shell-configuration-zsh)
+  - [Shell Configuration (Bash)](#shell-configuration-bash)
 - [Related Reading](#related-reading)
 
 ---
 
 ## Visual Identity
 
-The KibaOS aesthetic is built around the official **Dracula** color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
+The KibaOS aesthetic is built around the official blue color palette, providing a high-contrast, dark interface that reduces eye strain and looks modern.
 
 ### Color Palette
 
-| Color            | Hex                 | Role                                                     |
-| :--------------- | :------------------ | :------------------------------------------------------- |
-| **Background**   | `\#`\hex 0x282a36`` | Primary window and desktop background                    |
-| **Current Line** | `\#`\hex #44475a``  | Highlight and secondary background                       |
-| **Foreground**   | `\#`\#f8f8f2``      | Primary text color                                       |
-| **Comment**      | `\#`\#6272a4``      | Secondary text and disabled elements                     |
-| **Purple**       | `\#`\#bd93f9``      | Accent color, selection background, and primary branding |
-| **Pink**         | `\#`\#ff79c6``      | Selection foreground and highlights                      |
-| **Green**        | `\#`\#50fa7b``      | Success states and active terminal elements              |
+| Color          | Hex       | Role                                    |
+| :------------- | :-------- | :-------------------------------------- |
+| **Background** | `#0d1b2a` | Primary window and desktop background   |
+| **Surface**    | `#ffffff` | Light surface and card background       |
+| **Accent**     | `#0099cc` | Primary branding and interactive states |
+| **Sub-text**   | `#4a5a70` | Secondary text and disabled elements    |
 
 ### Look and Feel
 
-- **Desktop Environment:** Cutefish OS.
-- **Global Theme:** A customized version of **Ant-Dark**.
-- **Color Scheme:** **Dracula**, applied system-wide to Plasma widgets, window decorations, and applications.
+- **Desktop Environment:** Budgie Desktop.
+- **Global Theme:** **ChromeOS-Dark**.
+- **Color Scheme:** **KibaOS Blue**, applied system-wide to widgets and applications.
 - **Icons:** **Kora** icon theme for a colorful and modern look.
-- **Cursors:** **Vimix** cursor theme.
+- **Cursors:** **Vimix-Cursors** theme.
 - **Fonts:** **Inter** for the system UI and **JetBrains Mono** for monospace/terminal text.
 
 ### Window Management
 
-- **Rounded Corners:** KWin is configured to provide 16px rounded corners for all windows.
-- **Glass Effects:** Blur and contrast effects are enabled for an elegant, translucent look.
-- **Floating Panel:** The Plasma panel is configured to be floating and rounded by default.
+- **Rounded Corners:** **labwc** is configured to provide 14px rounded corners for all windows.
+- **Liquid Glass:** Panels and popovers use a floating, translucent liquid glass effect.
+- **Floating Panel:** The Budgie panel is configured as a floating liquid glass pill by default.
 
 ## Shell Experience
 
-KibaOS provides a highly optimized terminal experience using **Zsh** as the default shell for all users.
+KibaOS provides a highly optimized terminal experience using **Bash** as the default shell for all users.
 
-### Starship Prompt
+### KibaOS Prompt
 
-The **Starship** cross-shell prompt is pre-installed and configured with a minimalist Dracula-themed layout.
+A custom KibaOS branded prompt is pre-configured to be fast and minimalist.
 
 ### Modern CLI Tools
 
-We prefer modern, faster alternatives to classic Unix commands:
+We prefer high-performance tools and system utilities:
 
-- **`pacman`**: A beautiful and feature-rich frontend for `pacman`.
-- **`eza`**: A modern replacement for `ls` with icons and color-coding.
-- **`bat`**: A `cat` clone with syntax highlighting and Git integration.
 - **`fastfetch`**: A fast and highly customizable system information tool.
-- **`btop`**: An interactive resource monitor.
-- **`ripgrep` (`rg`)**: An extremely fast alternative to `grep`.
-- **`fd-find` (`fd`)**: A simple, fast, and user-friendly alternative to `find`.
-- **`tealdeer` (`tldr`)**: A fast implementation of `tldr` for simplified man pages.
+- **`gnupg`**: Full GPG integration for security.
+- **`imagemagick`**: Advanced image processing via the command line.
 
 ### System-wide Aliases
 
-Common aliases are configured in `/etc/zsh/zshrc` to improve workflow:
+Common aliases are configured to improve workflow:
 
-- `pacman` -> `pacman`
-- `ls` -> `eza`
-- `cat` -> `bat`
-- `grep` -> `ripgrep`
-- `update` -> `sudo pacman -Syu -y`
-- `edit` -> `micro` (System default editor)
-- `please` -> `sudo`
-- `cls` -> `clear`
-- `path` -> Multi-line `$PATH` overview
+- `ll` -> `ls -lah`
+- `update` -> `sudo pacman -Syu`
+- `install` -> `sudo pacman -S`
 
 ## Boot Branding
 
 The branding experience starts from the moment the system boots:
 
-- **Plymouth:** A custom "kibaos-spinner" theme with a Dracula-themed progress bar.
-- **Grub**
+- **Plymouth:** A custom "kibaos" theme with a blue-accented progress bar.
+- **Boot Menu:** Branded **Systemd-boot** or **GRUB** depending on your hardware.
 
 ### Interface Components
 
-- **Global Theme:** A customized **Ant-Dark** theme, providing a consistent base for all applications.
+- **Global Theme:** **ChromeOS-Dark**, providing a consistent base for all applications.
 - **Icons:** The **Kora** icon theme offers a colorful, modern, and high-resolution set of assets.
-- **Cursors:** **Vimix-cursors** are used for a sleek, high-visibility pointer experience.
+- **Cursors:** **Vimix-Cursors** are used for a sleek, high-visibility pointer experience.
 - **Typography:**
   - **System UI:** **Inter** (11pt) — A modern sans-serif designed for screens.
   - **Monospace:** **JetBrains Mono** (11pt) — Optimized for code and terminal legibility.
 
 ---
 
-## Desktop Experience (Cutefish OS)
+## Desktop Experience (Budgie Desktop)
 
-KibaOS leverages the power of **Cutefish OS** but configures it for a streamlined "out-of-the-box" experience.
+KibaOS leverages the power of **Budgie Desktop** but configures it for a streamlined "out-of-the-box" experience.
 
 ### Window Management Polish
 
-- **Rounded Corners:** Custom **KWin** rules apply 16px rounded corners to all windows.
-- **Glass Effects:** Background blur and translucency are enabled for an elegant, layered look.
-- **Floating Panel:** The system panel is configured to be floating and rounded by default, located at the bottom of the screen.
+- **Rounded Corners:** **labwc** applies 14px rounded corners to all windows.
+- **Liquid Glass:** Floating translucent panels and popovers with organic motion easing.
+- **Floating Panel:** The system panel is configured as a floating liquid glass pill at the bottom.
 
 ### Desktop Layout
 
@@ -144,27 +129,13 @@ KibaOS leverages the power of **Cutefish OS** but configures it for a streamline
 
 KibaOS provides one of the most powerful terminal experiences of any distribution, replacing aging Unix utilities with modern, faster, and more feature-rich alternatives.
 
-### Modern Alternative Comparison
+### Shell Configuration (Bash)
 
-| Classic Command | Modern Alternative   | Key Feature                                       |
-| :-------------- | :------------------- | :------------------------------------------------ |
-| `ls`            | **`eza`**            | Icons, Git status integration, and better colors. |
-| `cat`           | **`bat`**            | Syntax highlighting and Git integration.          |
-| `grep`          | **`ripgrep`** (`rg`) | Extremely fast recursive search.                  |
-| `find`          | **`fd`**             | Simple, fast, and user-friendly syntax.           |
-| `top`           | **`btop`**           | Beautiful interactive resource monitoring.        |
-| `df`            | **`duf`**            | Clear, color-coded disk usage overview.           |
-| `du`            | **`ncdu`**           | Interactive disk usage analyzer.                  |
-| `pacman`           | **`pacman`**           | Parallel downloads and clear transaction history. |
+**Bash** is the default shell for all users, pre-configured with:
 
-### Shell Configuration (Zsh)
-
-**Zsh** is the default shell for all users, pre-configured with:
-
-- **Starship Prompt:** A minimalist, fast, and informative cross-shell prompt.
-- **Autosuggestions:** Fish-like autosuggestions as you type.
-- **Syntax Highlighting:** Real-time highlighting of commands and arguments.
-- **FZF Integration:** Fuzzy finding for command history and file navigation.
+- **KibaOS Prompt:** A minimalist, fast, and branded shell prompt.
+- **XDG Standards:** Full compliance with XDG Base Directory Specification.
+- **Fastfetch:** Automatic system information display on login.
 
 ---
 

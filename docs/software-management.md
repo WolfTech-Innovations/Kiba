@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Manager-KibaStore-purple?style=for-the-badge" alt="KibaStore">
+  <img src="https://img.shields.io/badge/Manager-GNOME%20Software-blue?style=for-the-badge" alt="GNOME Software">
   <img src="https://img.shields.io/badge/CLI-Pacman-blue?style=for-the-badge" alt="Pacman">
   <img src="https://img.shields.io/badge/Package-Flatpak-orange?style=for-the-badge" alt="Flatpak">
 </p>
@@ -16,21 +16,13 @@ KibaOS provides a dual-layered approach to software management: a beginner-frien
 
 ---
 
-## KibaStore (Bazaar)
+## GNOME Software
 
-The primary graphical interface for managing software in KibaOS is **KibaStore**, which is a native implementation of **Bazaar**.
-
-### Native Build Philosophy
-
-Unlike other distributions that ship heavy, generic software centers, KibaStore is:
-
-- **Built from Source:** Compiled during the ISO build process using `meson` and `ninja`.
-- **Lightweight:** Designed specifically to manage **Flatpaks** without the overhead of the full GNOME or KDE software suites.
-- **Modern UI:** Built with **GTK4** and **Libadwaita**, providing a sleek and responsive user interface.
+The primary graphical interface for managing software in KibaOS is **GNOME Software**.
 
 ### Flatpak Integration
 
-KibaStore comes pre-configured with the **Flathub** remote. This gives you instant access to thousands of sandboxed applications like:
+GNOME Software comes pre-configured with the **Flathub** remote. This gives you instant access to thousands of sandboxed applications like:
 
 - **Productivity:** LibreOffice, Obsidian, Slack.
 - **Creative:** GIMP, Inkscape, OBS Studio.
@@ -40,55 +32,42 @@ KibaStore comes pre-configured with the **Flathub** remote. This gives you insta
 
 ## Terminal Package Management (Pacman)
 
-For those who prefer the command line, KibaOS defaults to **Pacman** — a modern frontend for `pacman` that makes package management beautiful and safer.
+For those who prefer the command line, KibaOS uses **Pacman**.
 
 ### Why Pacman
 
 - **Parallel Downloads:** Downloads multiple packages simultaneously to save time.
-- **Transaction History:** View every install/remove operation and easily **undo** changes.
-- **Beautiful Output:** Clearer, color-coded summaries of what will be installed or removed.
+- **Robustness:** The industry standard for Arch Linux package management.
 
 ### Common Commands
 
-| Task                     | Command                                                        |
-| :----------------------- | :------------------------------------------------------------- |
-| **Update system**        | `update` _(Alias for `sudo pacman -Syu`)_ |
-| **Search for a package** | `search <name>`                                                |
-| **Install a package**    | `install <name>`                                               |
-| **Remove a package**     | `remove <name>`                                                |
-| **View history**         | `pacman -Qi`                                                 |
-| **Undo an operation**    | `sudo pacman -Qi undo <ID>`                                  |
-
-> [!NOTE]
+| Task                     | Command                                         |
+| :----------------------- | :---------------------------------------------- |
+| **Update system**        | `update` _(Alias for `sudo pacman -Syu`)_       |
+| **Search for a package** | `pacman -Ss <name>`                             |
+| **Install a package**    | `install <name>` _(Alias for `sudo pacman -S`)_ |
+| **Remove a package**     | `sudo pacman -R <name>`                         |
+| **View info**            | `pacman -Qi <name>`                             |
 
 ---
 
 ## Specialized Repositories
 
-### Ungoogled Chromium
-
-KibaOS includes **Ungoogled Chromium** as a privacy-focused browser alternative. It is integrated into the system via a dedicated Open Build Service (OBS) repository to ensure regular updates directly from the source.
-
 ### Modern CLI Suite
 
-As detailed in the [UX Design](./ux-design.md) document, KibaOS ships with a suite of modern CLI tools like `eza`, `bat`, `btop`, and `yt-dlp` to provide a superior terminal experience.
-
-KibaOS includes **Ungoogled Chromium** as the default browser for users who prioritize privacy. It is integrated via a dedicated **OBS (Open Build Service)** repository, ensuring you receive timely security updates directly from the source.
+As detailed in the [UX Design](./ux-design.md) document, KibaOS ships with a suite of modern CLI tools like `fastfetch` to provide a superior terminal experience.
 
 ### Flatpak (CLI)
 
-While KibaStore is the preferred way to browse, you can manage Flatpaks directly from the terminal:
+You can manage Flatpaks directly from the terminal:
 
-````bash
-
+```bash
 ## Search for an app
-
 flatpak search <name>
 
 ## Install an app
-
 flatpak install flathub <app-id>
-```bash
+```
 
 ---
 
@@ -97,4 +76,3 @@ flatpak install flathub <app-id>
 - [**Architecture**](./architecture.md)
 - [**UX & Design**](./ux-design.md)
 - [**WIKI**](../WIKI.md)
-````

@@ -60,10 +60,10 @@ For more specific details on the various components of KibaOS, please refer to t
 
 KibaOS is built upon the **Arch Linux base (Rolling)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
 
-- **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
+- **Kernel:** **Linux Kernel** (Rolling).
 - **Init System:** **Systemd**.
-- **Display Server:** **Wayland** (default) with **X11** fallback.
-- **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems).
+- **Display Server:** **Wayland** (default) with **labwc** compositor.
+- **Bootloader:** **Systemd-boot** (default for UEFI) and **GRUB** (for BIOS).
 
 ### Extreme Minimization
 
@@ -71,7 +71,7 @@ The system undergoes aggressive footprint reduction during the build process:
 
 - **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
 - **Locale Optimization:** Only `en` and `en_US` locales are preserved.
-- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-bigscreen` + `plasma-workspace` combination.
+- **Dependency Pruning:** Heavy desktop environments are avoided in favor of a modular **Budgie Desktop** + **labwc** stack.
 - **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
 
 ---
@@ -80,37 +80,32 @@ The system undergoes aggressive footprint reduction during the build process:
 
 ### Visual Identity
 
-KibaOS follows the **Dracula** color palette for system-wide visual consistency.
+KibaOS follows a unified design language centered around the official blue palette.
 
-| Component               | Choice               |
-| ----------------------- | -------------------- |
-| **Desktop Environment** | **Cutefish OS** |
-| **Global Theme**        | **Ant-Dark**         |
-| **Color Scheme**        | **Dracula**          |
-| **Icon Theme**          | **Kora**             |
-| **Cursor Theme**        | **Vimix**            |
-| **System Font**         | **Inter**            |
-| **Monospace Font**      | **JetBrains Mono**   |
+| Component               | Choice             |
+| ----------------------- | ------------------ |
+| **Desktop Environment** | **Budgie Desktop** |
+| **Window Manager**      | **labwc**          |
+| **Global Theme**        | **ChromeOS-Dark**  |
+| **Color Scheme**        | **KibaOS Blue**    |
+| **Icon Theme**          | **Kora**           |
+| **Cursor Theme**        | **Vimix-Cursors**  |
+| **System Font**         | **Inter**          |
+| **Monospace Font**      | **JetBrains Mono** |
 
 ### Shell Experience
 
-**Zsh** is the default shell for all users, including `root`.
+**Bash** is the default shell for all users, including `root`.
 
-- **Prompt:** **Starship** (Pre-configured with a minimalist Dracula theme).
-- **Plugins:** Autosuggestions and Syntax Highlighting are enabled by default.
+- **Prompt:** Custom KibaOS branded prompt.
 - **Modern CLI Tools:**
-  - `pacman` (Beautiful frontend for `pacman`)
-  - `eza` (Modern `ls` replacement)
-  - `bat` (Syntax-highlighting `cat`)
   - `fastfetch` (System information)
-  - `btop` (Resource monitor)
-  - `ripgrep` (Fast search)
-  - `fd-find` (Fast file finder)
-  - `tealdeer` (`tldr` implementation)
+  - `grep` (Gnu Grep with color)
+  - `ls` (Gnu Ls with color)
 
 ### Boot & Branding
 
-- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
+- **Plymouth:** Custom "kibaos" theme with a blue-accented progress bar and logo.
 - **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
 
 ---
