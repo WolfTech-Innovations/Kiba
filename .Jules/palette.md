@@ -27,3 +27,8 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2024-06-17 - [Refining Accessibility and Interactivity for Web-based Welcome Screens]
+
+**Learning:** Adding `tabindex="0"` to non-interactive informational cards creates unnecessary tab stops (accessibility noise) for keyboard users. For external links, `aria-label` text like "(opens in a new tab)" must be backed by `target="_blank"` and `rel="noopener noreferrer"` to be factually accurate. Additionally, `box-shadow` should be used instead of `outline` for focus indicators when smooth transitions are required, as `outline` is not animatable in most modern browsers.
+**Action:** Audit informational components to ensure they are not focusable. Ensure external links include `target="_blank"`, `rel="noopener noreferrer"`, and matching `aria-label` metadata. Use `box-shadow` for focus-ring transitions.
