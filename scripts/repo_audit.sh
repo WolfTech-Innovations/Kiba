@@ -40,6 +40,16 @@ if [ -f "build.sh" ]; then
             log_error "liveuser found in build.sh but UID/GID 1000 is not explicitly set"
         fi
     fi
+    # Verify AIROOTFS is defined before first usage
+    AIROOTFS_DEF_LINE=$(grep -n "AIROOTFS=" build.sh | head -n 1 | cut -d: -f1)
+    AIROOTFS_USE_LINE=$(grep -n "\${AIROOTFS}" build.sh | head -n 1 | cut -d: -f1)
+    if [ -n "$AIROOTFS_USE_LINE" ] && [ -n "$AIROOTFS_DEF_LINE" ]; then
+        if [ "$AIROOTFS_USE_LINE" -lt "$AIROOTFS_DEF_LINE" ]; then
+            log_error "AIROOTFS is used in build.sh before it is defined (potential host contamination)"
+        fi
+    elif [ -n "$AIROOTFS_USE_LINE" ] && [ -z "$AIROOTFS_DEF_LINE" ]; then
+        log_error "AIROOTFS is used in build.sh but is never defined"
+    fi
 fi
 
 # 2. Markdown Hygiene
