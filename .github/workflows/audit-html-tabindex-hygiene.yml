@@ -1,0 +1,17 @@
+name: Audit Html Tabindex Hygiene
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Ensure no tabindex="0" on static cards
+        run: |
+          ! grep -r 'tabindex="0"' . --include="*.html"

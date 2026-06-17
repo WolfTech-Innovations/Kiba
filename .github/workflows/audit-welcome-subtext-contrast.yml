@@ -1,0 +1,17 @@
+name: Audit Welcome Subtext Contrast
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify welcome.html sub-text color contrast
+        run: |
+          grep -q '#4a5a70' build.sh

@@ -1,0 +1,17 @@
+name: Audit Labwc Corner Radius
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Ensure Labwc theme uses rounded corners (14px)
+        run: |
+          grep -q '<cornerRadius>14</cornerRadius>' build.sh

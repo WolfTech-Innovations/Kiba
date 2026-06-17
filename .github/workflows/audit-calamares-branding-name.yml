@@ -1,0 +1,17 @@
+name: Audit Calamares Branding Name
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify Calamares product name in build.sh
+        run: |
+          grep -q 'productName:.*KibaOS' build.sh

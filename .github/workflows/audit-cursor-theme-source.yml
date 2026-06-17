@@ -1,0 +1,17 @@
+name: Audit Cursor Theme Source
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify vimix-cursors-git AUR package
+        run: |
+          grep -q 'vimix-cursors-git' build.sh

@@ -1,0 +1,17 @@
+name: Audit Palette Consistency
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify KibaOS primary blue #0099cc accent color
+        run: |
+          grep -r '#0099cc' . --include="build.sh" --include="*.html"

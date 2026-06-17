@@ -1,0 +1,17 @@
+name: Audit Repo Files Existence
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify existence of core repository files
+        run: |
+          [ -f LICENSE ] && [ -f README.md ] && [ -f SECURITY.md ] && [ -f CONTRIBUTING.md ] && [ -f ACKNOWLEDGMENTS.md ]

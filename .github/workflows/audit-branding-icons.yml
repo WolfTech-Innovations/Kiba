@@ -1,0 +1,17 @@
+name: Audit Branding Icons
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check for Kora icon and Vimix cursor themes
+        run: |
+          grep -q 'kora-icon-theme' build.sh && grep -q 'vimix-cursor-theme' build.sh

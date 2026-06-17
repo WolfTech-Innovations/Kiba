@@ -1,0 +1,17 @@
+name: Audit Markdown Alt Text Quality
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check for generic placeholder alt text
+        run: |
+          ! grep -rEi "alt=\"(image|screenshot)\"" . --include="*.md"

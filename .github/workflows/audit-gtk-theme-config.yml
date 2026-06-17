@@ -1,0 +1,17 @@
+name: Audit Gtk Theme Config
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify ChromeOS-Dark as system-wide default
+        run: |
+          grep -q 'gtk-theme-name = "ChromeOS-Dark"' build.sh

@@ -1,0 +1,17 @@
+name: Audit Chmod Security
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check for dangerous chmod 777
+        run: |
+          ! grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude="audit-*.yml" --exclude="scripts/generate_45_workflows.py"

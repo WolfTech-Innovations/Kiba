@@ -1,0 +1,17 @@
+name: Audit Pacman Needed Flag
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Ensure --needed flag is used for pacman installations
+        run: |
+          grep -q 'pacman -S .* --needed' build.sh

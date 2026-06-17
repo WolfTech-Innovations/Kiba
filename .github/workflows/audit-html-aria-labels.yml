@@ -1,0 +1,17 @@
+name: Audit Html Aria Labels
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify external links have descriptive aria-labels
+        run: |
+          grep -r 'target="_blank"' . --include="*.html" | grep -vE 'aria-label=.*opens in a new tab' && exit 1 || exit 0

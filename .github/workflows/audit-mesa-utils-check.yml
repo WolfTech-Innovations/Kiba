@@ -1,0 +1,17 @@
+name: Audit Mesa Utils Check
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Ensure mesa-utils is used over eglinfo
+        run: |
+          grep -q 'mesa-utils' build.sh && ! grep -q 'eglinfo' build.sh

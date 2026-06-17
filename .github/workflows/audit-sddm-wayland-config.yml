@@ -1,0 +1,17 @@
+name: Audit Sddm Wayland Config
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify SDDM Wayland and labwc compositor config
+        run: |
+          grep -q 'DisplayServer=wayland' build.sh && grep -q 'CompositorCommand=labwc' build.sh

@@ -1,0 +1,17 @@
+name: Audit Pacman Parallel
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Ensure ParallelDownloads is optimized
+        run: |
+          grep -q 'ParallelDownloads = 10' build.sh

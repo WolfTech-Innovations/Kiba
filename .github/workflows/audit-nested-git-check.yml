@@ -1,0 +1,17 @@
+name: Audit Nested Git Check
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Check for nested .git directories
+        run: |
+          [ -z "$(find . -mindepth 2 -name '.git' -type d)" ]

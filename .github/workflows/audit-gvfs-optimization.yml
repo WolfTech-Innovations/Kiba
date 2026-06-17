@@ -1,0 +1,17 @@
+name: Audit Gvfs Optimization
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Ensure gvfs-goa is used and gvfs-google is absent
+        run: |
+          grep -q 'gvfs-goa' build.sh && ! grep -q 'gvfs-google' build.sh

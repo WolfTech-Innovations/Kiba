@@ -1,0 +1,17 @@
+name: Audit Html Security
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify target="_blank" implies rel="noopener noreferrer"
+        run: |
+          grep -r 'target="_blank"' . --include="*.html" | grep -v 'rel="noopener noreferrer"' && exit 1 || exit 0

@@ -1,0 +1,17 @@
+name: Audit Bolt Journal Format
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify bolt.md format compliance
+        run: |
+          grep -q '## [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\} - ' .Jules/bolt.md

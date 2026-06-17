@@ -1,0 +1,17 @@
+name: Audit Ota Signature Check
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify GPG signature verification in OTA script
+        run: |
+          grep -q 'gpg .* --verify' build.sh

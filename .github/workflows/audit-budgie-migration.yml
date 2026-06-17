@@ -1,0 +1,17 @@
+name: Audit Budgie Migration
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify no legacy KDE/Cutefish references
+        run: |
+          ! grep -riE 'kde|cutefish|plasma' . --exclude-dir=.git --exclude=build.sh --exclude=WORKFLOWS.md --exclude=README.md --exclude=WIKI.md
