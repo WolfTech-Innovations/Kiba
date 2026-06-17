@@ -1,10 +1,17 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM:-0}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
 # ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
+mkdir -p "${AIROOTFS}/etc"
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
 grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
@@ -23,12 +30,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -549,7 +550,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram

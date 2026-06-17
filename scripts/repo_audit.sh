@@ -40,6 +40,18 @@ if [ -f "build.sh" ]; then
             log_error "liveuser found in build.sh but UID/GID 1000 is not explicitly set"
         fi
     fi
+    # Verify AIROOTFS is defined before use
+    if head -n 15 build.sh | grep -q "AIROOTFS="; then
+        echo "AIROOTFS definition found in top of build.sh"
+    else
+        log_error "AIROOTFS must be defined at the top of build.sh to prevent host contamination"
+    fi
+    # Verify Calamares internetCheckUrl uses HTTPS
+    if grep -q "internetCheckUrl" build.sh; then
+        if grep "internetCheckUrl" build.sh | grep -q "http://"; then
+            log_error "Insecure internetCheckUrl (http) found in build.sh"
+        fi
+    fi
 fi
 
 # 2. Markdown Hygiene
