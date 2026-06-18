@@ -28,6 +28,12 @@ if [ -f "build.sh" ]; then
     if ! grep -q "pacman-key --populate archlinux" build.sh; then
         log_error "build.sh is missing pacman-key --populate archlinux"
     fi
+    # Verify AIROOTFS is defined before use to prevent host contamination
+    FIRST_AIROOTFS_USAGE=$(grep -n "AIROOTFS" build.sh | head -n 1 | cut -d: -f1)
+    AIROOTFS_DEFINITION=$(grep -n "^AIROOTFS=" build.sh | head -n 1 | cut -d: -f1)
+    if [ -z "$AIROOTFS_DEFINITION" ] || [ "$AIROOTFS_DEFINITION" -gt "$FIRST_AIROOTFS_USAGE" ]; then
+        log_error "AIROOTFS is used before being defined in build.sh (security risk)"
+    fi
     # Verify ldconfig after PaperDE build
     if grep -q "paperde-src" build.sh; then
         if ! grep -A 20 "ninja -C paperde-src/build install" build.sh | grep -q "ldconfig"; then
