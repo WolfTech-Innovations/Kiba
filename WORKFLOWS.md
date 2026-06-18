@@ -24,6 +24,7 @@ Generated on Sat Jun 13 15:43:02 UTC 2026
 | Notify SourceForge Release | `./.github/workflows/notify-release-sourceforge-upload.yml` |
 | Prettier | `./.github/workflows/prettier.yml` |
 | Release Drafter | `./.github/workflows/release-drafter.yml` |
+| Release Notes Autodraft | `./.github/workflows/release-notes-autodraft.yml` |
 | Repository Audit | `./.github/workflows/repo-audit.yml` |
 | Repo Stats | `./.github/workflows/repo-stats.yml` |
 | Scorecard supply-chain security | `./.github/workflows/scorecards.yml` |
