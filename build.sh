@@ -113,6 +113,8 @@ xdg-user-dirs
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
+inter-font
+ttf-jetbrains-mono
 bluez-utils
 gnome-weather
 gnome-clocks
@@ -158,8 +160,8 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
@@ -2442,7 +2444,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -2461,11 +2463,18 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
+  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:.88em; }
+  .btn {
+    display:inline-block; background:var(--accent); color:#fff; border-radius:10px;
+    padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600;
+    margin:6px 6px 0 0; cursor:pointer; transition:background .12s, transform .1s;
+  }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); outline: none; }
+  .btn:active { transform: scale(0.96); transition: transform 0s; }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
   .btn.secondary:hover { background:#e6f6fc; }
+  .btn.secondary:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); outline: none; }
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill { background:var(--surface-2); border:1px solid var(--border); border-radius:100px; padding:5px 14px; font-size:.82rem; color:var(--sub); }
   footer { text-align:center; padding:24px; color:var(--sub); font-size:.8rem; border-top:1px solid var(--border); margin-top:16px; }
@@ -2487,9 +2496,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report Issue (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
