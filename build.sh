@@ -196,7 +196,7 @@ gawk
 gnome-online-accounts
 gnome-online-accounts-gtk
 gvfs-goa
-
+gvfs-google
 gnome-calendar
 gnome-notes
 geary
@@ -1340,9 +1340,15 @@ GTK4CSS
 
 # ── Disable Budgie's "built-in theme" so the KibaOS GTK CSS above actually ──
 # ── renders on the panel / Raven / menu instead of being overridden by it ──
+# Schema id corrected to the verified-real "com.solus-project.budgie-panel"
+# (hyphenated — see the panel config block below for the source citation).
+# The key itself ("enable-built-in-theme") is NOT in the confirmed manager.vala
+# const dump, so it may live on a different schema (e.g. ThemeManager) or
+# under a different name — unknown gschema-override keys are silently
+# ignored rather than harmful, so this is left in as a no-risk best effort.
 mkdir -p /usr/share/glib-2.0/schemas
 cat > /usr/share/glib-2.0/schemas/zz-kibaos-budgie.gschema.override << 'BUDGIEOVERRIDE'
-[com.solus-project.budgie.panel]
+[com.solus-project.budgie-panel]
 enable-built-in-theme=false
 BUDGIEOVERRIDE
 glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
@@ -2085,9 +2091,9 @@ gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
 GTK2SKEL
 
-dconf write /com/solus-project/budgie/panel/panels "@as []"
+dconf write /com/solus-project/budgie-panel/panels "@as []"
 cat > /usr/share/glib-2.0/schemas/99-kibaos-budgie.gschema.override << 'EOF'
-[com.solus-project.budgie.panel]
+[com.solus-project.budgie-panel]
 panels=@as []
 EOF
 glib-compile-schemas /usr/share/glib-2.0/schemas/
@@ -2135,18 +2141,30 @@ gsettings set org.nemo.preferences default-folder-viewer       'icon-view'
 gsettings set org.nemo.icon-view default-zoom-level            'standard'
 gsettings set org.nemo.preferences show-location-entry         false
 
-PANEL_UUID=$(gsettings get com.solus-project.budgie.panel panels 2>/dev/null | \
+# ── Panel config, using the schema verified directly from upstream source ─
+# (src/panel/manager.vala, BuddiesOfBudgie/budgie-desktop main branch):
+#   ROOT_SCHEMA      = com.solus-project.budgie-panel          (hyphenated!)
+#   TOPLEVEL_PREFIX  = /com/solus-project/budgie-panel/panels
+#   PANEL_KEY_POSITION    = "location"       (not "position")
+#   PANEL_KEY_SHADOW      = "enable-shadow"  (not "shadow")
+#   PANEL_KEY_APPLETS     = "applets"        (flat ordered UUID list)
+# The previous version of this block used "com.solus-project.budgie.panel"
+# (dotted) with keys "position"/"shadow" — neither the schema nor those key
+# names exist upstream, so those dconf writes were very likely a silent
+# no-op the whole time, not actually configuring anything.
+PANEL_UUID=$(gsettings get com.solus-project.budgie-panel panels 2>/dev/null | \
   tr -d "[]' " | cut -d',' -f1)
-if [ -n "${PANEL_UUID}" ]; then
-  PANEL_PATH="/com/solus-project/budgie/panel/panels/${PANEL_UUID}/"
-  dconf write "${PANEL_PATH}position"              "'BOTTOM'"
-  dconf write "${PANEL_PATH}size"                  "42"
-  dconf write "${PANEL_PATH}transparency"          "'DYNAMIC'"
-  dconf write "${PANEL_PATH}shadow"                "true"
-  dconf write "${PANEL_PATH}enable-built-in-theme" "false"
+if [ -z "${PANEL_UUID}" ]; then
+  PANEL_UUID=$(uuidgen)
+  dconf write /com/solus-project/budgie-panel/panels "['${PANEL_UUID}']"
 fi
+PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
+dconf write "${PANEL_PATH}location"      "'BOTTOM'"
+dconf write "${PANEL_PATH}size"          "42"
+dconf write "${PANEL_PATH}transparency"  "'DYNAMIC'"
+dconf write "${PANEL_PATH}enable-shadow" "true"
 
-# ── Centered dock: pinned launchers, matching the mockup's icon order ──────
+# ── Centered dock: applets + pinned launchers, matching the mockup's order ─
 # Budgie's icon-tasklist applet PERMANENTLY crashes the session on every
 # future login if pinned-launchers references a .desktop file that doesn't
 # exist (solus-project/budgie-desktop#1480 — confirmed, not theoretical).
@@ -2170,26 +2188,38 @@ for ids in \
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
+
+# Each applet UUID needs two things written: (1) a generic "which plugin is
+# this UUID" lookup entry, and (2) that plugin's OWN settings at ITS OWN
+# settings-prefix. (1) is extrapolated by direct structural analogy to the
+# now-confirmed TOPLEVEL_SCHEMA/TOPLEVEL_PREFIX pattern above — I have not
+# directly observed this exact const in source the way I have for the panel
+# schema, so flag it as the one remaining inferential step if applets don't
+# show up. (2) for icon-tasklist specifically IS directly confirmed: Budgie's
+# own docs give the Budgie Menu applet's settings-prefix as
+# /com/solus-project/budgie-panel/instance/budgie-menu/{uuid} — same pattern
+# applies to icon-tasklist's instance path below.
+add_applet() {
+  local plugin_name="$1"
+  local uuid
+  uuid=$(uuidgen)
+  dconf write "/com/solus-project/budgie-panel/applets/${uuid}/name" "'${plugin_name}'"
+  echo "${uuid}"
+}
+
+MENU_UUID=$(add_applet "budgie-menu")
+TASKLIST_UUID=$(add_applet "icon-tasklist")
+CLOCK_UUID=$(add_applet "clock")
+
+ALL_APPLETS="['${MENU_UUID}', '${TASKLIST_UUID}', '${CLOCK_UUID}']"
+dconf write "${PANEL_PATH}applets" "${ALL_APPLETS}"
+
 if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
   LAUNCHERS_GVARIANT=$(printf "'%s', " "${DOCK_LAUNCHERS[@]}")
-  gsettings set com.solus-project.icon-tasklist pinned-launchers \
-    "[${LAUNCHERS_GVARIANT%, }]" 2>/dev/null || true
+  dconf write \
+    "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
+    "[${LAUNCHERS_GVARIANT%, }]"
 fi
-# NOTE on the rest of the mockup's centered-dock layout (Budgie Menu as the
-# leftmost "search" icon, icon-tasklist in the center zone, clock pinned to
-# the end zone): the pinned-launchers list above is verified against this
-# script's own already-working schema conventions and is safe to ship.
-# The exact dconf keys for START/CENTER/END *zone* placement of applets are
-# NOT verified the same way — Budgie's docs describe the zones but I don't
-# have confirmed key names for this specific Budgie 10.10 build, and
-# guessing wrong here just leaves the panel under-populated rather than
-# crashing it, so it's a lower-stakes unknown than the pinned-launchers
-# crash bug above, but still worth flagging rather than faking confidence.
-# Fastest way to get the real ground truth: arrange the dock once by hand
-# in Budgie Desktop Settings on a running session, then run
-#   dconf dump /com/solus-project/budgie/
-# and send me the output — I'll wire the exact zone keys from that rather
-# than a second guess.
 
 touch "${STAMP}"
 FIRSTLOGIN
@@ -2585,8 +2615,7 @@ systemctl enable NetworkManager
 
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 sudo -u liveuser dbus-run-session -- bash -c '
-  dconf write /com/solus-project/budgie/panel/panels "@as []"
-  dconf write /com/solus-project/budgie/panel/panels-changed "$(date +%s)"
+  dconf write /com/solus-project/budgie-panel/panels "@as []"
 '
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
