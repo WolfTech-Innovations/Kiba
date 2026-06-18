@@ -1,11 +1,6 @@
 name: "Build KibaOS"
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [kernel-update]
-  workflow_run:
-    workflows: ["Monitor CachyOS Kernel"]
-    types: [completed]
 
 jobs:
   build-and-upload:
