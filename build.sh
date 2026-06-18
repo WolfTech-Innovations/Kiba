@@ -561,7 +561,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram
