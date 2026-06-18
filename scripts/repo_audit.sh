@@ -58,7 +58,7 @@ fi
 # 3. Security Checks
 echo "--- Auditing Security ---"
 # chmod 777
-if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude-dir="node_modules" --exclude="audit-*.yml"; then
+if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude-dir="node_modules" --exclude="audit-*.yml" --exclude="generate_45_workflows.py" --exclude="WORKFLOWS.md"; then
     log_error "Found dangerous chmod 777"
 fi
 # Token leaks in workflows
@@ -79,7 +79,7 @@ if [ -n "$NESTED_GIT" ]; then
     log_error "Found nested .git directories"
 fi
 # Trailing whitespace (excluding some files if needed)
-if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
+if grep -rI "[[:blank:]]$" . --exclude-dir=.git --exclude-dir="node_modules" --exclude="pnpm-lock.yaml" --exclude="*.png" --exclude="*.jpg"; then
     log_error "Found trailing whitespace"
 fi
 

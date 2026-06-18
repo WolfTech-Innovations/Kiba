@@ -124,7 +124,7 @@ Boot from the USB drive to enter the live environment. The session logs in autom
 
 | Account | Password |
 | ------- | -------- |
-| `user`  | `live`   |
+| `liveuser`  | `live`   |
 | `root`  | `root`   |
 
 ### Installation

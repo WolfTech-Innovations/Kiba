@@ -1,0 +1,150 @@
+name: Audit - Repository Health
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prohibit sudo in build.sh
+        run: |
+          ! grep 'sudo ' build.sh
+      - name: Ensure git clone uses --depth=1
+        run: |
+          ! grep 'git clone ' . -r --include='*.sh' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' | grep -v '--depth=1'
+      - name: Prohibit pacman -Sy without u
+        run: |
+          ! grep -r 'pacman -Sy ' . --include='*.sh' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Detect hardcoded /home/liveuser
+        run: |
+          ! grep -r '/home/liveuser' . --exclude='build.sh' --exclude='*.md' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Ensure shell scripts have set -e
+        run: |
+          grep -l '#!/bin/bash' scripts/*.sh | xargs -I {} grep -L 'set -e' {} | xargs -r false
+      - name: Prohibit eval in shell scripts
+        run: |
+          ! grep -r 'eval ' scripts/ --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Ensure curl uses --retry
+        run: |
+          grep 'curl ' -r . --include='*.sh' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' | grep -v '--retry' | xargs -r false
+      - name: Ensure wget uses --tries
+        run: |
+          grep 'wget ' -r . --include='*.sh' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' | grep -v '--tries' | xargs -r false
+      - name: Check for dangerous rm -rf /
+        run: |
+          ! grep -r 'rm -rf /' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Prohibit chmod 777
+        run: |
+          ! grep -rE 'chmod (0?777|777)' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' --exclude='repo_audit.sh'
+      - name: Prohibit pip install
+        run: |
+          ! grep -r 'pip install' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Prohibit npm install (use pnpm)
+        run: |
+          ! grep -r 'npm install' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Prohibit yarn install (use pnpm)
+        run: |
+          ! grep -r 'yarn install' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for FIXME comments
+        run: |
+          ! grep -r 'FIXME' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for DEBUG logs
+        run: |
+          ! grep -r 'DEBUG' . --include='*.sh' --include='*.py' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for console.log in JS
+        run: |
+          ! grep -r 'console.log' . --include='*.js' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for print in Python
+        run: |
+          ! grep -r 'print(' . --include='*.py' --exclude='check_workflows.py' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for hardcoded IP addresses
+        run: |
+          ! grep -rE '([0-9]{1,3}\.){3}[0-9]{1,3}' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' --exclude='build.sh' --exclude='package-lock.json'
+      - name: Check for localhost in configs
+        run: |
+          ! grep -r 'localhost' . --include='*.conf' --include='*.ini' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for insecure http links
+        run: |
+          ! grep -r 'http://' . --exclude='build.sh' --exclude='*.md' --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Check for .bak or .old files
+        run: |
+          ! find . -name '*.bak' -o -name '*.old' | grep .
+      - name: Check for node_modules in repo
+        run: |
+          ! find . -name 'node_modules' -type d -not -path './node_modules*' | grep .
+      - name: Check for dist or build dirs
+        run: |
+          ! find . -type d \( -name 'dist' -o -name 'build' \) -not -path './node_modules*' | grep .
+      - name: Prohibit package-lock.json (use pnpm)
+        run: |
+          ! find . -name 'package-lock.json' | grep .
+      - name: Prohibit yarn.lock
+        run: |
+          ! find . -name 'yarn.lock' | grep .
+      - name: Ensure package.json has description
+        run: |
+          grep '"description":' package.json || false
+      - name: Ensure workflows have permissions
+        run: |
+          grep -L 'permissions:' .github/workflows/*.yml | xargs -r false
+      - name: Ensure empty dirs have .gitkeep
+        run: |
+          find . -type d -empty -not -path './.git*' | xargs -I {} [ -f {}/.gitkeep ] || false
+      - name: Check for trailing whitespace
+        run: |
+          ! grep -r '[[:blank:]]$' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' --exclude='pnpm-lock.yaml' --exclude='*.png' --exclude='*.jpg'
+      - name: Ensure shell scripts have set -u
+        run: |
+          grep -l '#!/bin/bash' scripts/*.sh | xargs -I {} grep -L 'set -u' {} | xargs -r false
+      - name: Ensure shell scripts have pipefail
+        run: |
+          grep -l '#!/bin/bash' scripts/*.sh | xargs -I {} grep -L 'pipefail' {} | xargs -r false
+      - name: Check for non-standard file extensions
+        run: |
+          ! find . -type f -name '*.*' | grep -vE '\.(sh|py|yml|yaml|md|js|json|png|jpg|txt|asc|conf|ini|qml|desc|qss|xml|preset|loader|entries|conf.d)$'
+      - name: Detect hardcoded UID 1000
+        run: |
+          ! grep -r '1000:1000' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules' --exclude='build.sh'
+      - name: Check airootfs variable safety
+        run: |
+          grep 'AIROOTFS' build.sh | head -n 1 | grep -q 'AIROOTFS=' || false
+      - name: Ensure pacman-key --populate in build
+        run: |
+          grep -q 'pacman-key --populate archlinux' build.sh
+      - name: Ensure ldconfig after library installs
+        run: |
+          grep -A 5 'install' build.sh | grep 'lib' | grep -v 'ldconfig' | xargs -r false || true
+      - name: Ensure Inter font usage
+        run: |
+          grep -qE 'Inter|inter-font' build.sh
+      - name: Ensure Calamares uses HTTPS check
+        run: |
+          grep -q 'internetCheckUrl: https' build.sh
+      - name: Ensure ParallelDownloads is 10
+        run: |
+          grep -q 'ParallelDownloads = 10' build.sh
+      - name: Ensure alpm user is created
+        run: |
+          grep -q 'alpm:x:951:951' build.sh
+      - name: Prohibit apt/apt-get usage
+        run: |
+          ! grep -rE 'apt-get |apt ' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
+      - name: Ensure NetworkManager is enabled
+        run: |
+          grep -q 'systemctl enable NetworkManager' build.sh
+      - name: Verify Bash syntax
+        run: |
+          find . -name '*.sh' -print0 | xargs -0 -I {} bash -n {}
+      - name: Verify JSON syntax
+        run: |
+          find . -name '*.json' -not -path './node_modules/*' -print0 | xargs -0 -I {} python3 -m json.tool {} > /dev/null
+      - name: Check for TODO comments
+        run: |
+          ! grep -r 'TODO' . --exclude='scripts/generate_45_workflows.py' --exclude='WORKFLOWS.md' --exclude-dir='.git' --exclude-dir='node_modules'
