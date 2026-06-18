@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2024-05-24 - [Tactile Feedback & Standardized Focus States]
+**Learning:** For a "polished" desktop feel, interactive elements (buttons, links) should provide tactile feedback via a subtle `:active` scale transform (0.96) and accessibility through standardized `:focus-visible` box-shadows. Using a short (0.1s) transition for the base transform ensures smooth recovery from the click state while maintaining responsiveness.
+**Action:** Always implement `:focus-visible` and `:active` scale states for interactive elements in KibaOS UI components, ensuring a 0.1s transition on the base element and `transition: transform 0s` on the active state.
