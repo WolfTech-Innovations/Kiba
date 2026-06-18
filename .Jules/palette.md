@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2026-06-18 - [Interactive Link Standards for Welcome Screens]
+**Learning:** External links in standalone "Welcome" screens (like those in KibaOS) require a specific pattern for UX and accessibility: `target="_blank"`, `rel="noopener noreferrer"`, and `aria-label="[Site] (opens in a new tab)"`. Furthermore, interactive elements must use `cursor: pointer` and a double-ring focus indicator (`box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); outline: none;`) to meet KibaOS accessibility standards.
+**Action:** When updating heredoc HTML in `build.sh`, always apply the standard KibaOS interactivity and external link patterns.
