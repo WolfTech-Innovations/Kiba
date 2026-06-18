@@ -1,6 +1,12 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
@@ -23,12 +29,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -110,6 +110,8 @@ mesa
 networkmanager
 power-profiles-daemon
 xdg-user-dirs
+inter-font
+ttf-jetbrains-mono
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
@@ -158,8 +160,8 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
@@ -175,7 +177,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -187,7 +189,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -196,7 +198,6 @@ gawk
 gnome-online-accounts
 gnome-online-accounts-gtk
 gvfs-goa
-gvfs-google
 gnome-calendar
 gnome-notes
 geary
@@ -561,7 +562,7 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: http://example.com
+  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram
@@ -813,7 +814,7 @@ pacman -S --noconfirm --needed \
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares libinput-gestures; do
+for pkg in calamares libinput-gestures kora-icon-theme vimix-cursors-git; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -884,8 +885,8 @@ echo "=== Plymouth configured ==="
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
 gtk-theme-name = "ChromeOS-Dark"
-gtk-icon-theme-name = "Papirus-Dark"
-gtk-font-name = "Noto Sans 11"
+gtk-icon-theme-name = "Kora-Dark"
+gtk-font-name = "Inter 11"
 gtk-cursor-theme-size = 24
 gtk-toolbar-style = GTK_TOOLBAR_ICONS
 gtk-button-images = 1
@@ -900,8 +901,8 @@ mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora-Dark
+gtk-font-name=Inter 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -2062,8 +2063,8 @@ NEMODESKTOP
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora-Dark
+gtk-font-name=Inter 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -2079,8 +2080,8 @@ cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="ChromeOS-Dark"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 11"
+gtk-icon-theme-name="Kora-Dark"
+gtk-font-name="Inter 11"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
 gtk-button-images=1
@@ -2107,12 +2108,12 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface icon-theme              'Kora-Dark'
+gsettings set org.gnome.desktop.interface cursor-theme            'Vimix-Cursors'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2269,11 +2270,11 @@ cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
   </match>
   <alias>
     <family>sans-serif</family>
-    <prefer><family>Noto Sans</family></prefer>
+    <prefer><family>Inter</family></prefer>
   </alias>
   <alias>
     <family>monospace</family>
-    <prefer><family>Noto Sans Mono</family></prefer>
+    <prefer><family>JetBrains Mono</family></prefer>
   </alias>
 </fontconfig>
 FONTCONF
@@ -2293,7 +2294,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -2461,9 +2462,11 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
+  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'JetBrains Mono',monospace; font-size:.88em; }
+  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition: transform 0.1s, background 0.12s; cursor: pointer; }
   .btn:hover { background:var(--accent-dark); }
+  .btn:active { transform: scale(0.96); transition: transform 0s; }
+  .btn:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); outline: none; }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
   .btn.secondary:hover { background:#e6f6fc; }
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
@@ -2487,9 +2490,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="KibaOS Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report Issue on GitHub (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="KibaOS GitHub Repository (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
