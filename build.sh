@@ -196,7 +196,6 @@ gawk
 gnome-online-accounts
 gnome-online-accounts-gtk
 gvfs-goa
-gvfs-google
 gnome-calendar
 gnome-notes
 geary
