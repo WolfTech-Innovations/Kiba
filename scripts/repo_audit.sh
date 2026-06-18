@@ -57,6 +57,14 @@ fi
 
 # 3. Security Checks
 echo "--- Auditing Security ---"
+# AIROOTFS must be defined before use in build.sh
+if [ -f "build.sh" ]; then
+    DEF_LINE=$(grep -n "AIROOTFS=" build.sh | head -n 1 | cut -d: -f1 || echo 999999)
+    USE_LINE=$(grep -nE "\$\{AIROOTFS\}|\$AIROOTFS" build.sh | head -n 1 | cut -d: -f1 || echo 999999)
+    if [ "$USE_LINE" -lt "$DEF_LINE" ]; then
+        log_error "AIROOTFS used in build.sh (line $USE_LINE) before it is defined (line $DEF_LINE)"
+    fi
+fi
 # chmod 777
 if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude-dir="node_modules" --exclude="audit-*.yml"; then
     log_error "Found dangerous chmod 777"

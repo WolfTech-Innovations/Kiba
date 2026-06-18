@@ -25,4 +25,5 @@ We acknowledge the many FOSS projects that KibaOS integrates and builds upon, in
 ---
 
 KibaOS is proud to be part of the open-source ecosystem.
+
 - christopherfoxjr
