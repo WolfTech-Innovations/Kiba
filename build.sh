@@ -110,6 +110,8 @@ mesa
 networkmanager
 power-profiles-daemon
 xdg-user-dirs
+  inter-font
+  ttf-jetbrains-mono
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
@@ -303,7 +305,7 @@ cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
 QWidget {
     background-color: #f0f6fa;
     color: #1a2030;
-    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
+    font-family: "Inter", "Noto Sans", "DejaVu Sans", sans-serif;
     font-size: 13px;
 }
 QStackedWidget, QFrame#mainContent {
@@ -812,7 +814,7 @@ pacman -S --noconfirm --needed \
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares libinput-gestures; do
+for pkg in calamares libinput-gestures kora-icon-theme vimix-cursors-git; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -2107,12 +2109,12 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface icon-theme              'kora'
+gsettings set org.gnome.desktop.interface cursor-theme            'Vimix-Cursors'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2123,7 +2125,7 @@ gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
 gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Inter Medium 10'
 gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
 gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
 gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
@@ -2442,7 +2444,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter','Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -2461,11 +2463,19 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
   section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
   .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
+  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'JetBrains Mono','Noto Sans Mono',monospace; font-size:.88em; }
+  .btn {
+    display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px;
+    text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0;
+    transition: background .12s, transform 0.1s, box-shadow 0.1s;
+    cursor: pointer;
+  }
   .btn:hover { background:var(--accent-dark); }
+  .btn:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); outline: none; }
+  .btn:active { transform: scale(0.96); transition: transform 0s; }
   .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
   .btn.secondary:hover { background:#e6f6fc; }
+  .btn.secondary:focus-visible { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--border); }
   .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
   .pill { background:var(--surface-2); border:1px solid var(--border); border-radius:100px; padding:5px 14px; font-size:.82rem; color:var(--sub); }
   footer { text-align:center; padding:24px; color:var(--sub); font-size:.8rem; border-top:1px solid var(--border); margin-top:16px; }
@@ -2487,9 +2497,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report Issue (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
@@ -2499,7 +2509,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
   </div>
 </section>
-<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
+<footer>KibaOS Rolling — WolfTech Innovations — <a href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository (opens in a new tab)" style="color:inherit;text-decoration:none;">github.com/WolfTech-Innovations/Kiba</a></footer>
 </body>
 </html>
 WELCOMEHTML
