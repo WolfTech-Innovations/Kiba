@@ -40,6 +40,12 @@ if [ -f "build.sh" ]; then
             log_error "liveuser found in build.sh but UID/GID 1000 is not explicitly set"
         fi
     fi
+    # Security: Verify AIROOTFS is defined before its first usage to prevent host contamination
+    FIRST_AIROOTFS_USAGE=$(grep -n "\${AIROOTFS}" build.sh | head -n 1 | cut -d: -f1)
+    AIROOTFS_DEFINITION=$(grep -n "^AIROOTFS=" build.sh | head -n 1 | cut -d: -f1)
+    if [ -z "$AIROOTFS_DEFINITION" ] || [ "$AIROOTFS_DEFINITION" -gt "$FIRST_AIROOTFS_USAGE" ]; then
+        log_error "AIROOTFS is used before it is defined in build.sh (potential host contamination risk)"
+    fi
 fi
 
 # 2. Markdown Hygiene

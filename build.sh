@@ -1,6 +1,12 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM:-0}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
@@ -23,12 +29,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -1656,17 +1656,17 @@ WAYFIREINI
 # ══════════════════════════════════════════════════════════════════════════
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
-OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
+OTA_KEYRING="${AIROOTFS}/etc/kibaos/ota-keyring.gpg"
+mkdir -p "${AIROOTFS}/etc/kibaos" "${AIROOTFS}/var/lib/kibaos-ota" "${AIROOTFS}/var/log/kibaos"
 
 # ── Import OTA public key into dedicated keyring ───────────────────────────
 curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
   gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-      --import /tmp/ota-public.asc 2>/dev/null || true
+      --import /tmp/ota-public.asc 2>/dev/null
 rm -f /tmp/ota-public.asc
 
 # ── Patch-level tracking ───────────────────────────────────────────────────
-echo "0" > /etc/kibaos/patch-level
+echo "0" > "${AIROOTFS}/etc/kibaos/patch-level"
 
 # ══════════════════════════════════════════════════════════════════════════
 # /usr/local/bin/kibaos-ota — the live patching engine
@@ -1685,7 +1685,9 @@ OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
 PATCH_LEVEL_FILE="/etc/kibaos/patch-level"
 OTA_WORKDIR="/var/lib/kibaos-ota"
 OTA_LOG="/var/log/kibaos/ota.log"
-FREEZE_PID_FILE="/tmp/kibaos-fb-freeze.pid"
+# Secure location for temporary files within the root-owned OTA directory
+OTA_RUNTIME_DIR="/var/run/kibaos-ota"
+FREEZE_PID_FILE="${OTA_RUNTIME_DIR}/freeze.pid"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
 
@@ -1792,9 +1794,11 @@ done < "${MANIFEST}"
 # ══════════════════════════════════════════════════════════════════════════
 fb_freeze() {
   log "Freezing display with framebuffer snapshot..."
+  mkdir -p "${OTA_RUNTIME_DIR}"
+  chmod 700 "${OTA_RUNTIME_DIR}"
   # Capture current screen with grim (Wayland screenshot)
-  SNAP="/tmp/kibaos-ota-snap.png"
-  SNAP_RAW="/tmp/kibaos-ota-snap.raw"
+  SNAP="${OTA_RUNTIME_DIR}/snap.png"
+  SNAP_RAW="${OTA_RUNTIME_DIR}/snap.raw"
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
   XDG_RUNTIME_DIR="/run/user/1000"
 
@@ -1863,7 +1867,7 @@ fb_unfreeze() {
     kill "$(cat ${FREEZE_PID_FILE})" 2>/dev/null || true
     rm -f "${FREEZE_PID_FILE}"
   fi
-  rm -f /tmp/kibaos-ota-snap.png /tmp/kibaos-ota-snap.raw
+  rm -rf "${OTA_RUNTIME_DIR}"
   log "Framebuffer freeze released."
 }
 
