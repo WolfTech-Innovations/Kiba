@@ -95,8 +95,8 @@ mkinitcpio
 mkinitcpio-archiso
 earlyoom
 fakeroot
-grub
 efibootmgr
+sdboot-manage
 bluez
 sudo
 bash
@@ -206,10 +206,18 @@ PACKAGES
 # ══════════════════════════════════════════════════════════════════════════
 # mkinitcpio
 # ══════════════════════════════════════════════════════════════════════════
+# archiso.conf — used only by the LIVE environment (memdisk/archiso hooks)
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
 HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesystems)
 INITRAMFS
+
+# installed.conf — used by the INSTALLED system after Calamares runs initcpio.
+# Must NOT include memdisk/archiso hooks (those are live-only).
+# Plymouth goes between udev and keymap so it gets the framebuffer early.
+cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
+HOOKS=(base udev plymouth keyboard keymap modconf block filesystems fsck)
+INSTALLED_HOOKS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
@@ -234,7 +242,7 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash plymouth.enable=1 rd.plymouth=1
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 splash plymouth.enable=1 rd.plymouth=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
@@ -543,6 +551,8 @@ sequence:
   - networkcfg
   - hwclock
   - services-systemd
+  - initcpiocfg
+  - initcpio
   - bootloader
   - umount
 - show:
@@ -592,6 +602,132 @@ defaultDesktopEnvironment:
   desktopFile: "budgie-desktop"
 basicSetup: false
 DMCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/bootloader.conf" << 'BOOTLOADERCONF'
+---
+efiBootLoader:   "systemd-boot"
+installPath:     "/boot"
+efiBootloaderId: "KibaOS"
+BOOTLOADERCONF
+
+# systemd-boot loader config — written into airootfs so Calamares copies it
+# to the installed ESP. timeout=0 means it never pauses or shows a menu;
+# it boots the default entry immediately every time.
+mkdir -p "${AIROOTFS}/boot/loader"
+cat > "${AIROOTFS}/boot/loader/loader.conf" << 'INSTALLED_LOADER'
+default kibaos.conf
+timeout 0
+console-mode max
+editor no
+INSTALLED_LOADER
+
+# The installed kernel entry — Calamares's systemd-boot module writes its own
+# entries, but we seed this as a fallback so the kernel cmdline is correct
+# even if the Calamares entry generation fails.
+mkdir -p "${AIROOTFS}/boot/loader/entries"
+cat > "${AIROOTFS}/boot/loader/entries/kibaos.conf" << 'INSTALLED_ENTRY'
+title   KibaOS
+linux   /vmlinuz-linux
+initrd  /initramfs-linux.img
+options root=PARTUUID=PLACEHOLDER rw quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 splash
+INSTALLED_ENTRY
+
+cat > "${AIROOTFS}/etc/calamares/modules/services-systemd.conf" << 'SERVICESCONF'
+---
+services:
+  - name: NetworkManager
+    mandatory: false
+  - name: bluetooth
+    mandatory: false
+  - name: sddm
+    mandatory: false
+  - name: earlyoom
+    mandatory: false
+SERVICESCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/initcpiocfg.conf" << 'INITCPIOCFGCONF'
+---
+kernel:       "/boot/vmlinuz-linux"
+config:       "/etc/mkinitcpio.conf.d/installed.conf"
+INITCPIOCFGCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/initcpio.conf" << 'INITCPIOCONF'
+---
+kernel:   "/boot/vmlinuz-linux"
+img:      "/boot/initramfs-linux.img"
+fallback: "/boot/initramfs-linux-fallback.img"
+INITCPIOCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/machineid.conf" << 'MACHINEIDCONF'
+---
+systemd: true
+dbus:    true
+symlink: false
+MACHINEIDCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/fstab.conf" << 'FSTABCONF'
+---
+mountOptions:
+  default:   "defaults,noatime"
+  btrfs:     "defaults,noatime,compress=zstd"
+  efi:       "umask=0077"
+  swap:      "defaults"
+FSTABCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/locale.conf" << 'LOCALECONF'
+---
+region:   "America"
+zone:     "New_York"
+localeGenPath: "/etc/locale.gen"
+geoipURL: ""
+LOCALECONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/keyboard.conf" << 'KEYBOARDCONF'
+---
+writeEtcDefaultKeyboard: true
+KEYBOARDCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/localecfg.conf" << 'LOCALECFGCONF'
+---
+localeGenPath: "/etc/locale.gen"
+LOCALECFGCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/networkcfg.conf" << 'NETWORKCFGCONF'
+---
+onlyWifiInterfaces: false
+NETWORKCFGCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/hwclock.conf" << 'HWCLOCKCONF'
+---
+utc: true
+HWCLOCKCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/mount.conf" << 'MOUNTCONF'
+---
+extraMounts:
+  - device: "proc"
+    fs:     "proc"
+    mountPoint: "/proc"
+  - device: "sys"
+    fs:     "sysfs"
+    mountPoint: "/sys"
+  - device: "efivarfs"
+    fs:     "efivarfs"
+    mountPoint: "/sys/firmware/efi/efivars"
+  - device: "/dev"
+    mountPoint: "/dev"
+    options:   "bind"
+  - device: "tmpfs"
+    fs:     "tmpfs"
+    mountPoint: "/run"
+MOUNTCONF
+
+cat > "${AIROOTFS}/etc/calamares/modules/finished.conf" << 'FINISHEDCONF'
+---
+restartNowEnabled:  true
+restartNowChecked:  true
+restartNowCommand:  "systemctl reboot"
+FINISHEDCONF
 
 # ══════════════════════════════════════════════════════════════════════════
 # pacman.conf tweaks
@@ -870,9 +1006,13 @@ PLYM
 
 magick -size 1920x1080 gradient:"#003f5c-#0d1b2a" "${PLYMOUTH_THEME}/background-tile.png"
 cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
-plymouth-set-default-theme kibaos 2>/dev/null || \
-  plymouth-set-default-theme spinner 2>/dev/null || true
-mkinitcpio -p linux 2>/dev/null || true
+plymouth-set-default-theme -R kibaos 2>/dev/null || \
+  plymouth-set-default-theme -R spinner 2>/dev/null || true
+# Rebuild initramfs with the installed (non-archiso) hook set so Plymouth
+# is embedded. The live ISO uses its own squashfs boot path regardless;
+# this image is only used if something falls back to the preset on disk.
+mkinitcpio -c /etc/mkinitcpio.conf.d/installed.conf \
+           -g /boot/initramfs-linux.img 2>/dev/null || true
 systemctl enable plymouth-start.service      2>/dev/null || true
 systemctl enable plymouth-read-write.service 2>/dev/null || true
 systemctl enable plymouth-quit-wait.service  2>/dev/null || true
@@ -2565,7 +2705,7 @@ echo "=== Calamares launch $(date) ===" > "${LOG}"
     {
       echo "--- watchdog $(date +%T) ---"
       ps --forest -o pid,stat,etimes,cmd -C calamares 2>/dev/null
-      pgrep -a -f 'udevadm|partprobe|parted|systemctl|grub-install|mkfs|blkid' 2>/dev/null
+      pgrep -a -f 'udevadm|partprobe|parted|systemctl|bootctl|mkfs|blkid' 2>/dev/null
     } >> "${LOG}"
   done
 ) &
