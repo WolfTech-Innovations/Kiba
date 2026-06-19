@@ -50,14 +50,14 @@ For those who prefer the command line, KibaOS defaults to **Pacman** — a moder
 
 ### Common Commands
 
-| Task                     | Command                                                        |
-| :----------------------- | :------------------------------------------------------------- |
+| Task                     | Command                                   |
+| :----------------------- | :---------------------------------------- |
 | **Update system**        | `update` _(Alias for `sudo pacman -Syu`)_ |
-| **Search for a package** | `search <name>`                                                |
-| **Install a package**    | `install <name>`                                               |
-| **Remove a package**     | `remove <name>`                                                |
-| **View history**         | `pacman -Qi`                                                 |
-| **Undo an operation**    | `sudo pacman -Qi undo <ID>`                                  |
+| **Search for a package** | `search <name>`                           |
+| **Install a package**    | `install <name>`                          |
+| **Remove a package**     | `remove <name>`                           |
+| **View history**         | `pacman -Qi`                              |
+| **Undo an operation**    | `sudo pacman -Qi undo <ID>`               |
 
 > [!NOTE]
 
