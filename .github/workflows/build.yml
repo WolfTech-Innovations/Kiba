@@ -164,14 +164,13 @@ jobs:
           OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
         run: |
           echo "$OTA_SIGNING_KEY" | gpg --batch --import
-          gpg --batch --export ota@kiba.wolftech.tech | gpg --batch --import
-          KEY_FP=$(gpg --list-keys --with-colons ota@kiba.wolftech.tech \
+          KEY_FP=$(gpg --list-keys --with-colons ota@kibaos.wolftech.tech \
             | awk -F: '/^fpr/{print $10; exit}')
           echo "${KEY_FP}:6:" | gpg --import-ownertrust
 
           PATCH_NUM="${{ github.run_number }}"
           gpg --batch --yes \
-              --local-user ota@kiba.wolftech.tech \
+              --local-user ota@kibaos.wolftech.tech \
               --detach-sign --armor \
               "kibaos-ota-${PATCH_NUM}.tar.gz"
 
@@ -243,6 +242,7 @@ jobs:
         if: steps.diff.outputs.has_changes == 'true'
         run: |
           git config user.name  "KibaOS OTA Bot"
-          git config user.email "ota@kiba.wolftech.tech"
+          git config user.email "ota@kibaos.wolftech.tech"
           git tag "ota-patch-${{ github.run_number }}"
           git push origin "ota-patch-${{ github.run_number }}" 2>/dev/null || true
+          
