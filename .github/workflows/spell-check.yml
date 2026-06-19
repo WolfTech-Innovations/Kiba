@@ -1,0 +1,16 @@
+name: Spell Check
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  codespell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run codespell
+        uses: codespell-project/actions-codespell@v2
+        with:
+          ignore_words_file: .codespellignore
+          skip: "./node_modules,./.git,./pnpm-lock.yaml"

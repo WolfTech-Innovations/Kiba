@@ -1,0 +1,20 @@
+name: Automated Repo Health Report
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate Report
+        run: |
+          echo "KibaOS Health Report" > report.txt
+          echo "Total Scripts: $(find scripts -name "*.sh" | wc -l)" >> report.txt
+          echo "Total Documentation files: $(find docs -name "*.md" | wc -l)" >> report.txt
+          cat report.txt

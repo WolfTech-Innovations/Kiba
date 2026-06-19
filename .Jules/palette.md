@@ -23,3 +23,7 @@
 
 **Learning:** Hero images in README files are often the first point of contact for users. Using generic alt text like "image" is an accessibility failure that creates a poor first impression. Descriptive alt text should accurately reflect the actual state of the UI (e.g., LXDE/Openbox) rather than remaining stagnant when the architecture shifts.
 **Action:** Always audit hero images in primary documentation for descriptive, accurate `alt` attributes that align with the current system architecture.
+
+## 2025-06-15 - Dracula Theme for Welcome Screen
+**Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
+**Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.

@@ -7,6 +7,6 @@
 **Learning:** While `awk` or `grep` can be extremely fast for simple text scanning, they are unreliable for structured formats like YAML where property order and context (comments, script blocks) matter. A single-process Python script with `yaml.CSafeLoader` provides the best balance of speed (~300x faster than `yq` loops) and semantic correctness.
 **Action:** Replace shell-based loops calling CLI parsers (`yq`, `jq`) with single-execution Python scripts for bulk metadata validation.
 
-## 2024-05-20 - [Optimizing AUR builds in CI/CD]
-**Learning:** AUR package builds via `makepkg` default to single-core compilation and heavy compression. In throwaway build environments (like `build.sh` inside a container or chroot), these defaults are major bottlenecks. Injecting `MAKEFLAGS="-j$(nproc)"` and `PKGEXT='.pkg.tar'` bypasses these inefficiencies.
-**Action:** Always optimize source-based builds in the KibaOS build pipeline by enabling multi-core compilation and disabling redundant package compression.
+## 2025-06-15 - Kernel Build Performance with CachyOS
+**Learning:** Migrating to CachyOS kernel requires proper repository configuration at the host level in the build script to avoid 'package not found' errors during mkarchiso execution.
+**Action:** Ensure custom repositories are added to both /etc/pacman.conf and the profile's pacman.conf before building the ISO.
