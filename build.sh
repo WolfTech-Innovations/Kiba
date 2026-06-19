@@ -96,7 +96,6 @@ mkinitcpio-archiso
 earlyoom
 fakeroot
 efibootmgr
-sdboot-manage
 bluez
 sudo
 bash
