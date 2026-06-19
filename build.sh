@@ -1,10 +1,17 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM:-0}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
 # ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
+mkdir -p "${AIROOTFS}/etc"
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
 grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
@@ -23,12 +30,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -158,14 +159,15 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
-papirus-icon-theme
+kora-icon-theme
+inter-font
+ttf-jetbrains-mono
 accountsservice
 firefox
 sassc
-network-manager-applet
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -175,7 +177,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -187,7 +189,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -200,7 +202,6 @@ gnome-calendar
 gnome-notes
 geary
 gnome-music
-gnome-todo
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -812,7 +813,7 @@ pacman -S --noconfirm --needed \
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares libinput-gestures; do
+for pkg in calamares libinput-gestures vimix-cursors-git; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
@@ -884,8 +885,9 @@ echo "=== Plymouth configured ==="
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
 gtk-theme-name = "ChromeOS-Dark"
-gtk-icon-theme-name = "Papirus-Dark"
-gtk-font-name = "Noto Sans 11"
+gtk-icon-theme-name = "Kora"
+gtk-font-name = "Inter 11"
+gtk-cursor-theme-name = "Vimix-Cursors"
 gtk-cursor-theme-size = 24
 gtk-toolbar-style = GTK_TOOLBAR_ICONS
 gtk-button-images = 1
@@ -900,8 +902,9 @@ mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora
+gtk-font-name=Inter 11
+gtk-cursor-theme-name=Vimix-Cursors
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -1656,17 +1659,17 @@ WAYFIREINI
 # ══════════════════════════════════════════════════════════════════════════
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
-OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
+OTA_KEYRING="${AIROOTFS}/etc/kibaos/ota-keyring.gpg"
+mkdir -p "${AIROOTFS}/etc/kibaos" "${AIROOTFS}/var/lib/kibaos-ota" "${AIROOTFS}/var/log/kibaos"
 
 # ── Import OTA public key into dedicated keyring ───────────────────────────
-curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
+curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc && \
   gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-      --import /tmp/ota-public.asc 2>/dev/null || true
+      --import /tmp/ota-public.asc
 rm -f /tmp/ota-public.asc
 
 # ── Patch-level tracking ───────────────────────────────────────────────────
-echo "0" > /etc/kibaos/patch-level
+echo "0" > "${AIROOTFS}/etc/kibaos/patch-level"
 
 # ══════════════════════════════════════════════════════════════════════════
 # /usr/local/bin/kibaos-ota — the live patching engine
@@ -2062,8 +2065,9 @@ NEMODESKTOP
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora
+gtk-font-name=Inter 11
+gtk-cursor-theme-name=Vimix-Cursors
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -2079,8 +2083,9 @@ cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="ChromeOS-Dark"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 11"
+gtk-icon-theme-name="Kora"
+gtk-font-name="Inter 11"
+gtk-cursor-theme-name="Vimix-Cursors"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
 gtk-button-images=1
@@ -2107,12 +2112,12 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface icon-theme              'Kora'
+gsettings set org.gnome.desktop.interface cursor-theme            'Vimix-Cursors'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2181,10 +2186,9 @@ for ids in \
   "nemo.desktop" \
   "org.gnome.Calendar.desktop gnome-calendar.desktop" \
   "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
-  "org.gnome.eog.desktop eog.desktop" \
+  "org.gnome.Loupe.desktop loupe.desktop" \
   "org.gnome.Geary.desktop geary.desktop" \
-  "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
+  "org.gnome.Music.desktop gnome-music.desktop"
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
@@ -2293,7 +2297,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
