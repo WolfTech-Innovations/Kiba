@@ -1,5 +1,5 @@
 <p align="center">
-<img width="1430" height="892" alt="KibaOS Budgie Desktop showcase with Dracula theme and floating panel" src="https://github.com/user-attachments/assets/6709be99-ea56-44c9-8863-fc784c0c744f" />
+<img width="1430" height="892" alt="KibaOS Budgie Desktop showcase with Dracula theme and floating panel" src="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/file_0000000073c071f69219bd715a18a4ab.png" />
 
 </p>
 
