@@ -1,6 +1,12 @@
 #!/bin/bash
 set -ex
 
+# ── Paths ─────────────────────────────────────────────────────────────────
+WORKDIR="/w"
+ISO="kibaos-v${RUN_NUM:-0}"
+PROFILE="${WORKDIR}/kiba-profile"
+AIROOTFS="${PROFILE}/airootfs"
+
 # ── Performance: Enable parallel downloads for host pacman ─────────────────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
@@ -23,12 +29,6 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   openssl curl imagemagick
-
-# ── Paths ─────────────────────────────────────────────────────────────────
-WORKDIR="/w"
-ISO="kibaos-v${RUN_NUM}"
-PROFILE="${WORKDIR}/kiba-profile"
-AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
@@ -110,7 +110,8 @@ mesa
 networkmanager
 power-profiles-daemon
 xdg-user-dirs
-noto-fonts
+inter-font
+ttf-jetbrains-mono
 noto-fonts-emoji
 noto-fonts-cjk
 bluez-utils
@@ -158,10 +159,10 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
-papirus-icon-theme
+kora-icon-theme
 accountsservice
 firefox
 sassc
@@ -175,7 +176,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -187,7 +188,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -200,7 +201,6 @@ gnome-calendar
 gnome-notes
 geary
 gnome-music
-gnome-todo
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -400,6 +400,7 @@ QToolTip {
     font-size: 12px;
 }
 QSS
+sed -i 's/Noto Sans/Inter/g' "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss"
 
 cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/show.qml" << 'SHOWQML'
 import QtQuick
@@ -884,8 +885,9 @@ echo "=== Plymouth configured ==="
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
 gtk-theme-name = "ChromeOS-Dark"
-gtk-icon-theme-name = "Papirus-Dark"
-gtk-font-name = "Noto Sans 11"
+gtk-icon-theme-name = "Kora-Dark"
+gtk-font-name = "Inter 11"
+gtk-cursor-theme-name = "Vimix-Cursors"
 gtk-cursor-theme-size = 24
 gtk-toolbar-style = GTK_TOOLBAR_ICONS
 gtk-button-images = 1
@@ -900,8 +902,9 @@ mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora-Dark
+gtk-font-name=Inter 11
+gtk-cursor-theme-name=Vimix-Cursors
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -1372,7 +1375,7 @@ Type=sddm-theme
 Version=1.0
 Website=https://github.com/WolfTech-Innovations/Kiba
 MainScript=Main.qml
-Font=Noto Sans
+Font=Inter
 QuickVersion=6
 SDDMMETA
 
@@ -2062,8 +2065,9 @@ NEMODESKTOP
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=ChromeOS-Dark
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Noto Sans 11
+gtk-icon-theme-name=Kora-Dark
+gtk-font-name=Inter 11
+gtk-cursor-theme-name=Vimix-Cursors
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
 gtk-xft-hinting=1
@@ -2079,8 +2083,9 @@ cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="ChromeOS-Dark"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Noto Sans 11"
+gtk-icon-theme-name="Kora-Dark"
+gtk-font-name="Inter 11"
+gtk-cursor-theme-name="Vimix-Cursors"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
 gtk-button-images=1
@@ -2107,12 +2112,12 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
+gsettings set org.gnome.desktop.interface icon-theme              'Kora-Dark'
+gsettings set org.gnome.desktop.interface cursor-theme            'Vimix-Cursors'
 gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
+gsettings set org.gnome.desktop.interface font-name               'Inter 11'
+gsettings set org.gnome.desktop.interface document-font-name      'Inter 11'
+gsettings set org.gnome.desktop.interface monospace-font-name     'JetBrains Mono 11'
 gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
@@ -2123,7 +2128,7 @@ gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
 gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
+gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Inter Medium 10'
 gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
 gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
 gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
@@ -2181,10 +2186,9 @@ for ids in \
   "nemo.desktop" \
   "org.gnome.Calendar.desktop gnome-calendar.desktop" \
   "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
-  "org.gnome.eog.desktop eog.desktop" \
+  "org.gnome.Loupe.desktop eog.desktop" \
   "org.gnome.Geary.desktop geary.desktop" \
-  "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
+  "org.gnome.Music.desktop gnome-music.desktop"
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
@@ -2269,11 +2273,11 @@ cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
   </match>
   <alias>
     <family>sans-serif</family>
-    <prefer><family>Noto Sans</family></prefer>
+    <prefer><family>Inter</family></prefer>
   </alias>
   <alias>
     <family>monospace</family>
-    <prefer><family>Noto Sans Mono</family></prefer>
+    <prefer><family>JetBrains Mono</family></prefer>
   </alias>
 </fontconfig>
 FONTCONF
@@ -2293,7 +2297,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -2442,7 +2446,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     --shadow: 0 4px 24px rgba(0,100,160,0.10);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); }
   header {
     background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
     color:#fff; padding:52px 32px 72px; text-align:center;
@@ -2517,7 +2521,7 @@ QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 GTK_THEME=ChromeOS-Dark
 QT_STYLE_OVERRIDE=kvantum
-XCURSOR_THEME=Adwaita
+XCURSOR_THEME=Vimix-Cursors
 XCURSOR_SIZE=24
 MOZ_ENABLE_WAYLAND=1
 WINEDEBUG=-all

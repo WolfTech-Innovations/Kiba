@@ -57,6 +57,14 @@ fi
 
 # 3. Security Checks
 echo "--- Auditing Security ---"
+# Verify AIROOTFS is defined before use
+if [ -f "build.sh" ]; then
+    FIRST_AIROOTFS_USE=$(grep -n "AIROOTFS" build.sh | head -n 1 | cut -d: -f1 || true)
+    AIROOTFS_DEF=$(grep -n 'AIROOTFS="' build.sh | head -n 1 | cut -d: -f1 || true)
+    if [ -n "$FIRST_AIROOTFS_USE" ] && { [ -z "$AIROOTFS_DEF" ] || [ "$AIROOTFS_DEF" -gt "$FIRST_AIROOTFS_USE" ]; }; then
+        log_error "AIROOTFS is used before it is defined in build.sh"
+    fi
+fi
 # chmod 777
 if grep -rE "chmod (0?777|777)" . --exclude-dir=.git --exclude="repo_audit.sh" --exclude-dir="node_modules" --exclude="audit-*.yml"; then
     log_error "Found dangerous chmod 777"
