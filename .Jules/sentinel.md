@@ -1,7 +1,5 @@
-# Sentinel Journal
-
-## 2026-06-18 - [Secure Connectivity Check URL]
-
-**Vulnerability:** Use of insecure HTTP (`http://example.com`) for Calamares internet connectivity checks.
-**Learning:** Even seemingly innocuous connectivity checks can be leveraged for MitM attacks or traffic analysis. Using HTTPS ensures the integrity of the connectivity check and prevents potential redirection or interception.
-**Prevention:** Always use HTTPS for any external network requests, including "ping" or connectivity check URLs in system installers.
+## 2026-06-19 - [Security] Hardened OTA runtime and host isolation
+**Vulnerability:** Symlink-based privilege escalation in world-writable directories and potential host contamination from early script failures.
+**Learning:** Temporary runtime files must use restricted, root-owned directories.
+**Learning:** Critical build variables must be defined before any file operations occur to ensure correct chroot isolation.
+**Prevention:** Use `/var/run/` with 700 permissions for OTA runtime; enforce variable definition order in build scripts.
