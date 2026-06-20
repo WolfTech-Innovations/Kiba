@@ -14,5 +14,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Generate Stats
         run: |
-          echo "Lines of code:"
-          find . -type f -name "*.sh" -o -name "*.py" -o -name "*.js" | xargs wc -l
+          echo "### KibaOS Repository Metrics"
+          echo "#### Code Statistics"
+          find . -type f \( -name "*.sh" -o -name "*.py" -o -name "*.js" \) -not -path "./node_modules/*" | xargs wc -l
+
+          echo "#### UI and Asset Statistics"
+          echo "Branding Images: $(find branding -type f \( -name "*.png" -o -name "*.jpg" \) | wc -l)"
+          echo "Documentation Files: $(find docs -name "*.md" | wc -l)"
+          echo "GitHub Workflows: $(find .github/workflows -name "*.yml" | wc -l)"

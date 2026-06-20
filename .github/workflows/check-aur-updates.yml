@@ -1,0 +1,33 @@
+name: Check AUR Updates
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check AUR
+        run: |
+          PACKAGES=("calamares" "libinput-gestures")
+          for pkg in "${PACKAGES[@]}"; do
+            echo "Checking $pkg..."
+            LATEST=$(curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=$pkg" | jq -r '.results[0].Version')
+            echo "Latest version of $pkg: $LATEST"
+
+            # Simple version change detection using a local file
+            STATE_FILE="aur_state_${pkg}.txt"
+            if [ -f "$STATE_FILE" ]; then
+              OLD=$(cat "$STATE_FILE")
+              if [ "$OLD" != "$LATEST" ]; then
+                echo "UPDATE DETECTED for $pkg: $OLD -> $LATEST"
+                # This could be extended to use gh issue create
+              fi
+            fi
+            echo "$LATEST" > "$STATE_FILE"
+          done

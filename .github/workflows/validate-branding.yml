@@ -1,0 +1,33 @@
+name: Validate Branding Assets
+on:
+  push:
+    paths:
+      - 'branding/**'
+  pull_request:
+    paths:
+      - 'branding/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ImageMagick
+        run: sudo apt-get update && sudo apt-get install -y imagemagick
+      - name: Validate Images
+        run: |
+          for img in branding/*.{png,jpg,jpeg}; do
+            [ -e "$img" ] || continue
+            echo "Checking $img..."
+            identify "$img" || { echo "Invalid image: $img"; exit 1; }
+
+            # Check dimensions for key assets
+            if [[ "$img" == *"boot.png" ]]; then
+              DIM=$(identify -format "%wx%h" "$img")
+              echo "boot.png dimensions: $DIM"
+            fi
+          done

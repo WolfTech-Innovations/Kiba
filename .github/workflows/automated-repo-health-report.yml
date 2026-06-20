@@ -14,7 +14,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Generate Report
         run: |
-          echo "KibaOS Health Report" > report.txt
-          echo "Total Scripts: $(find scripts -name "*.sh" | wc -l)" >> report.txt
-          echo "Total Documentation files: $(find docs -name "*.md" | wc -l)" >> report.txt
+          echo "# KibaOS Health Report" > report.txt
+          echo "Generated on $(date)" >> report.txt
+          echo "" >> report.txt
+          echo "## General Metrics" >> report.txt
+          echo "- Total Scripts: $(find scripts -name "*.sh" | wc -l)" >> report.txt
+          echo "- Total Documentation files: $(find docs -name "*.md" | wc -l)" >> report.txt
+          echo "" >> report.txt
+          echo "## Repository Audit Results" >> report.txt
+          bash scripts/repo_audit.sh >> report.txt 2>&1 || true
           cat report.txt

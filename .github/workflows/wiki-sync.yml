@@ -1,0 +1,43 @@
+name: Sync Wiki
+on:
+  push:
+    paths:
+      - 'docs/**'
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Regenerate WIKI.md
+        run: |
+          echo "# KibaOS Documentation Wiki" > WIKI.md
+          echo "Generated on $(date)" >> WIKI.md
+          echo "" >> WIKI.md
+          echo "## Table of Contents" >> WIKI.md
+          for f in docs/*.md; do
+            TITLE=$(grep -m 1 "^# " "$f" | sed 's/# //')
+            FILENAME=$(basename "$f")
+            echo "- [$TITLE](#${FILENAME%.md})" >> WIKI.md
+          done
+          echo "" >> WIKI.md
+          for f in docs/*.md; do
+            FILENAME=$(basename "$f")
+            echo "---" >> WIKI.md
+            echo "<a name=\"${FILENAME%.md}\"></a>" >> WIKI.md
+            cat "$f" >> WIKI.md
+            echo "" >> WIKI.md
+          done
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add WIKI.md
+          git diff --quiet && git diff --staged --quiet || git commit -m "docs: sync wiki from docs/"
+          git push

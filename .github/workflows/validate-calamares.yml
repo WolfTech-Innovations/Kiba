@@ -1,0 +1,38 @@
+name: Validate Calamares Config
+on:
+  push:
+    paths:
+      - 'build.sh'
+  pull_request:
+    paths:
+      - 'build.sh'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Extract Configs
+        run: python scripts/extract_calamares_config.py
+      - name: Validate QSS Syntax
+        run: |
+          # Basic check for unbalanced braces in QSS
+          OPEN=$(grep -o '{' calamares-style.qss | wc -l)
+          CLOSE=$(grep -o '}' calamares-style.qss | wc -l)
+          if [ "$OPEN" -ne "$CLOSE" ]; then
+            echo "Error: Unbalanced braces in Calamares QSS"
+            exit 1
+          fi
+          echo "QSS braces balanced: $OPEN open, $CLOSE close"
+      - name: Validate Branding YAML
+        run: |
+          pip install PyYAML
+          python3 -c "import yaml; yaml.safe_load(open('branding.desc'))"
