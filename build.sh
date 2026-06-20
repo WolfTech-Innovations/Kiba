@@ -179,7 +179,6 @@ udisks2
 upower
 scrot
 fastfetch
-plymouth
 flatpak
 xdg-desktop-portal
 gnome-software
@@ -208,14 +207,14 @@ PACKAGES
 # archiso.conf — used only by the LIVE environment (memdisk/archiso hooks)
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
-HOOKS=(base udev plymouth keyboard keymap modconf memdisk archiso block filesystems)
+HOOKS=(base udev keyboard keymap modconf memdisk archiso block filesystems)
 INITRAMFS
 
 # installed.conf — used by the INSTALLED system after Calamares runs initcpio.
 # Must NOT include memdisk/archiso hooks (those are live-only).
-# Plymouth goes between udev and keymap so it gets the framebuffer early.
+# No plymouth hook: boot splash uses the firmware BGRT logo instead.
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
-HOOKS=(base udev plymouth keyboard keymap modconf block filesystems fsck)
+HOOKS=(base udev keyboard keymap modconf block filesystems fsck)
 INSTALLED_HOOKS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
@@ -241,14 +240,14 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 splash plymouth.enable=1 rd.plymouth=1
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
 title   KibaOS (safe mode)
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.unit=multi-user.target systemd.log_level=info
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G nomodeset systemd.unit=multi-user.target systemd.log_level=info
 ENTRY_SAFE
 
 SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
@@ -261,7 +260,7 @@ LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
   LINUX boot/x86_64/vmlinuz-linux
   INITRD boot/x86_64/initramfs-linux.img
-  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G plymouth.enable=0 nomodeset systemd.unit=multi-user.target systemd.log_level=info
+  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G nomodeset systemd.unit=multi-user.target systemd.log_level=info
 SYSLINUX_SAFE
 fi
 
@@ -569,7 +568,6 @@ showReleaseNotesUrl:  false
 requirements:
   requiredStorage: 10.0
   requiredRam:     1.0
-  internetCheckUrl: https://www.google.com
   check:
     - storage
     - ram
@@ -628,7 +626,7 @@ cat > "${AIROOTFS}/boot/loader/entries/kibaos.conf" << 'INSTALLED_ENTRY'
 title   KibaOS
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=PARTUUID=PLACEHOLDER rw quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 splash
+options root=PARTUUID=PLACEHOLDER rw quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0
 INSTALLED_ENTRY
 
 cat > "${AIROOTFS}/etc/calamares/modules/services-systemd.conf" << 'SERVICESCONF'
@@ -983,39 +981,14 @@ pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
 echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# PLYMOUTH
-# ══════════════════════════════════════════════════════════════════════════
-PLYMOUTH_THEME="/usr/share/plymouth/themes/kibaos"
-mkdir -p "${PLYMOUTH_THEME}"
-SPINNER_SRC="/usr/share/plymouth/themes/spinner"
-[ -d "${SPINNER_SRC}" ] && cp -a "${SPINNER_SRC}/." "${PLYMOUTH_THEME}/" && \
-  rm -f "${PLYMOUTH_THEME}/spinner.plymouth"
-
-cat > "${PLYMOUTH_THEME}/kibaos.plymouth" << 'PLYM'
-[Plymouth Theme]
-Name=KibaOS
-Description=KibaOS boot splash
-ModuleName=spinner
-
-[spinner]
-Title=KibaOS
-HideDelay=5
-TransitionDuration=3
-PLYM
-
-magick -size 1920x1080 gradient:"#003f5c-#0d1b2a" "${PLYMOUTH_THEME}/background-tile.png"
-cp "${LOGO_256}" "${PLYMOUTH_THEME}/watermark.png"
-plymouth-set-default-theme -R kibaos 2>/dev/null || \
-  plymouth-set-default-theme -R spinner 2>/dev/null || true
-# Rebuild initramfs with the installed (non-archiso) hook set so Plymouth
-# is embedded. The live ISO uses its own squashfs boot path regardless;
-# this image is only used if something falls back to the preset on disk.
+# BOOT SPLASH — using firmware BGRT logo instead of Plymouth.
+# No Plymouth theme/service: the UEFI vendor/OEM logo (BGRT) stays on screen
+# through boot since nothing draws over it, and quiet+loglevel keep kernel
+# text from interrupting it. Still rebuild initramfs with the installed
+# (non-archiso) hook set picked up from mkinitcpio.conf.d/installed.conf.
 mkinitcpio -c /etc/mkinitcpio.conf.d/installed.conf \
            -g /boot/initramfs-linux.img 2>/dev/null || true
-systemctl enable plymouth-start.service      2>/dev/null || true
-systemctl enable plymouth-read-write.service 2>/dev/null || true
-systemctl enable plymouth-quit-wait.service  2>/dev/null || true
-echo "=== Plymouth configured ==="
+echo "=== Boot splash: using firmware BGRT logo, no Plymouth ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # GTK THEME — system-wide ChromeOS-Dark + KibaOS pill panel override
