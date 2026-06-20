@@ -1,6 +1,8 @@
 name: "Build KibaOS"
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [kernel-update]
 
 jobs:
   build-and-upload:
@@ -245,4 +247,3 @@ jobs:
           git config user.email "ota@kibaos.wolftech.tech"
           git tag "ota-patch-${{ github.run_number }}"
           git push origin "ota-patch-${{ github.run_number }}" 2>/dev/null || true
-          

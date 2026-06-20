@@ -118,7 +118,6 @@ gnome-clocks
 gnome-calculator
 sof-firmware
 thermald
-network-manager-applet
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -157,8 +156,8 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
@@ -174,7 +173,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -185,7 +184,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -198,7 +197,6 @@ gnome-calendar
 gnome-notes
 geary
 gnome-music
-gnome-todo
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -2293,10 +2291,10 @@ for ids in \
   "nemo.desktop" \
   "org.gnome.Calendar.desktop gnome-calendar.desktop" \
   "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
-  "org.gnome.eog.desktop eog.desktop" \
+  "org.gnome.TextEditor.desktop gedit.desktop" \
+  "org.gnome.Loupe.desktop org.gnome.eog.desktop eog.desktop" \
   "org.gnome.Geary.desktop geary.desktop" \
-  "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
+  "org.gnome.Music.desktop gnome-music.desktop"
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
@@ -2405,7 +2403,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
@@ -2599,9 +2597,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report Issue (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
@@ -2611,7 +2609,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
   </div>
 </section>
-<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
+<footer>KibaOS Rolling — WolfTech Innovations — <a href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="Kiba GitHub (opens in a new tab)">github.com/WolfTech-Innovations/Kiba</a></footer>
 </body>
 </html>
 WELCOMEHTML
