@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2025-07-10 - [Heredoc UI Verification Workflow]
+**Learning:** Enhancing UI components embedded as heredocs in shell scripts (like the KibaOS Welcome screen) requires a rigorous extraction and verification workflow. Playwright verification on extracted HTML is critical for identifying subtle accessibility issues—such as strict mode violations caused by multiple elements sharing the same accessible name—which are easily overlooked when editing raw shell scripts.
+**Action:** Always extract heredoc UI components to temporary files and run automated accessibility and interactivity checks before re-integrating them into the build script.
