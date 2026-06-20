@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2024-05-20 - [Welcome Screen Interactivity and Accessibility]
+**Learning:** For static HTML components embedded in build scripts, following native OS interactivity patterns (focus-visible box-shadows and scale transforms on active) significantly improves the cohesive feel of the desktop experience. Adding descriptive ARIA labels to external links that open in new tabs is essential for screen reader users to understand navigation intent.
+**Action:** Always apply standard KibaOS interactivity tokens and descriptive `aria-label`s to heredoc-based UI components.
