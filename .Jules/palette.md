@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2024-05-21 - [Accessible External Links in Onboarding]
+**Learning:** External links in embedded onboarding components (like the Welcome screen) should explicitly signal their behavior to avoid user disorientation. Using `target="_blank"` ensures the onboarding context isn't lost, while `aria-label="[Label] (opens in a new tab)"` provides critical context for screen reader users.
+**Action:** Always pair `target="_blank"` with `rel="noopener noreferrer"` and a descriptive `aria-label` that mentions the "new tab" behavior in KibaOS web-based UI components.
