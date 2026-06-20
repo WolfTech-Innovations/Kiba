@@ -1768,17 +1768,17 @@ WAYFIREINI
 # ══════════════════════════════════════════════════════════════════════════
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
-OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
+OTA_KEYRING="${AIROOTFS}/etc/kibaos/ota-keyring.gpg"
+mkdir -p "${AIROOTFS}/etc/kibaos" "${AIROOTFS}/var/lib/kibaos-ota" "${AIROOTFS}/var/log/kibaos"
 
 # ── Import OTA public key into dedicated keyring ───────────────────────────
 curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
   gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-      --import /tmp/ota-public.asc 2>/dev/null || true
+      --import /tmp/ota-public.asc 2>/dev/null
 rm -f /tmp/ota-public.asc
 
 # ── Patch-level tracking ───────────────────────────────────────────────────
-echo "0" > /etc/kibaos/patch-level
+echo "0" > "${AIROOTFS}/etc/kibaos/patch-level"
 
 # ══════════════════════════════════════════════════════════════════════════
 # /usr/local/bin/kibaos-ota — the live patching engine
@@ -1797,9 +1797,14 @@ OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
 PATCH_LEVEL_FILE="/etc/kibaos/patch-level"
 OTA_WORKDIR="/var/lib/kibaos-ota"
 OTA_LOG="/var/log/kibaos/ota.log"
-FREEZE_PID_FILE="/tmp/kibaos-fb-freeze.pid"
+OTA_RUN_DIR="/var/run/kibaos-ota"
+FREEZE_PID_FILE="${OTA_RUN_DIR}/freeze.pid"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
+
+# ── Ensure secure runtime directory ────────────────────────────────────────
+mkdir -p "${OTA_RUN_DIR}"
+chmod 700 "${OTA_RUN_DIR}"
 
 # ── Check current patch level ──────────────────────────────────────────────
 CURRENT=$(cat "${PATCH_LEVEL_FILE}" 2>/dev/null || echo 0)
@@ -1905,16 +1910,16 @@ done < "${MANIFEST}"
 fb_freeze() {
   log "Freezing display with framebuffer snapshot..."
   # Capture current screen with grim (Wayland screenshot)
-  SNAP="/tmp/kibaos-ota-snap.png"
-  SNAP_RAW="/tmp/kibaos-ota-snap.raw"
+  SNAP="${OTA_RUN_DIR}/snap.png"
+  SNAP_RAW="${OTA_RUN_DIR}/snap.raw"
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
   XDG_RUNTIME_DIR="/run/user/1000"
 
-  # Take screenshot as liveuser
+  # Take screenshot as liveuser using stdout redirection to secure path
   sudo -u liveuser \
     WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
-    grim "${SNAP}" 2>/dev/null || true
+    grim - > "${SNAP}" 2>/dev/null || true
 
   if [ -f "${SNAP}" ]; then
     # Convert to raw framebuffer format and write to /dev/fb0
@@ -1975,7 +1980,7 @@ fb_unfreeze() {
     kill "$(cat ${FREEZE_PID_FILE})" 2>/dev/null || true
     rm -f "${FREEZE_PID_FILE}"
   fi
-  rm -f /tmp/kibaos-ota-snap.png /tmp/kibaos-ota-snap.raw
+  rm -f "${OTA_RUN_DIR}/snap.png" "${OTA_RUN_DIR}/snap.raw"
   log "Framebuffer freeze released."
 }
 
