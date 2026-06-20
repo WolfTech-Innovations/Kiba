@@ -2,17 +2,16 @@
 # Monitor CachyOS kernel version by scraping the mirror
 set -e
 
-MIRROR_URL="https://mirror.cachyos.org/repo/x86_64/main/"
+MIRROR_URL="https://mirror.cachyos.org/repo/x86_64/cachyos/"
 # Regex to match linux-cachyos-x.y.z-a-x86_64.pkg.tar.zst and extract version
-# We look for something like linux-cachyos-6.17.9-1-x86_64.pkg.tar.zst
-# Updated regex to be more robust based on typical Arch package naming
-REGEX='linux-cachyos-([0-9][^"-]*)-[0-9]+-x86_64\.pkg\.tar\.zst'
+# Optimized PCRE regex with lookarounds to extract version without subprocess overhead
+REGEX='(?<=linux-cachyos-)[0-9][^"-]*(?=-[0-9]+-x86_64\.pkg\.tar\.zst)'
 
 echo "Fetching CachyOS kernel version from $MIRROR_URL..."
 HTML=$(curl -sL "$MIRROR_URL")
 
 # Extract versions, sort them and get the latest
-LATEST_VERSION=$(echo "$HTML" | grep -oP "$REGEX" | sed -E "s/$REGEX/\1/" | sort -V | tail -n 1)
+LATEST_VERSION=$(echo "$HTML" | grep -oP "$REGEX" | sort -V | tail -n 1)
 
 if [ -z "$LATEST_VERSION" ]; then
     echo "Error: Could not find kernel version on mirror."
