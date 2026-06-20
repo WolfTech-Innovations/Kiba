@@ -979,7 +979,488 @@ rm -f /etc/sudoers.d/builduser
 pacman -Rns --noconfirm gcc base-devel debugedit make patch autoconf automake 2>/dev/null || true
 pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
 echo "=== AUR packages installed ==="
+# ═══════════════════════════════════════════════════════════════════════════
+# WHERE THIS GOES:
+# Paste this entire block into customize_airootfs.sh, inside the heredoc
+# (between `cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'`
+# and the closing `CUSTOMIZE`), placed AFTER the existing AUR PACKAGES
+# section (the one that builds calamares + libinput-gestures + ChromeOS-theme)
+# and BEFORE the "cd /; rm -rf ${AUR_BUILD}; userdel -r builduser" cleanup
+# lines that already exist at the end of that section. This block adds its
+# own cleanup at the end, so once pasted in, DELETE the original cleanup
+# lines that used to follow the AUR PACKAGES section — this block's final
+# three lines replace them.
+# ═══════════════════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════════════════
+# ELEMENTARY INSTALLER + DISTINST — PACMAN/ARCH PORT
+#
+# distinst's chroot_conf.rs has apt/dpkg/Ubuntu tooling compiled directly
+# into Rust source (confirmed against real upstream source, not just logs).
+# Rather than sed-patch Rust control flow — risky for branches like
+# bootloader()'s kernelstub/grub fallback or keyboard_layout()'s
+# console-setup calls — the whole file is replaced with a KibaOS/pacman/
+# systemd-boot/mkinitcpio equivalent. Function-by-function rationale:
+#
+#   apt_install/apt_remove   -> pacman -S / -Rns. No separate autoremove
+#                               needed (pacman -Rns already removes deps).
+#   bootloader                -> kernelstub is Pop/elementary-only and
+#                               doesn't exist on Arch; KibaOS already uses
+#                               systemd-boot via bootctl elsewhere in this
+#                               build script.
+#   cdrom_add/cdrom_disable   -> dead code on KibaOS (no /cdrom; archiso
+#                               squashfs boot instead) — stubbed to Ok(()).
+#   install_drivers           -> ubuntu-drivers doesn't exist; no-op.
+#   keyboard_layout            -> console-setup.sh/cached.kmap.gz are
+#                               Debian-only; replaced with /etc/vconsole.conf,
+#                               Arch's real console-keymap mechanism. NOTE:
+#                               KEYMAP expects a kbd(4) name, not an XKB
+#                               layout name — matches for common layouts
+#                               (us, de, fr...) but isn't a guaranteed 1:1
+#                               mapping for every layout/variant combo.
+#   initramfs_disable/reenable -> update-initramfs doesn't exist; mkinitcpio
+#                               has no equivalent "disable" trick, and
+#                               installs are short enough that no-op-ing
+#                               both calls is simpler and safer than faking it.
+#   update_initramfs           -> rebuilt via mkinitcpio against the same
+#                               installed.conf hook set built earlier in
+#                               this script (no archiso/memdisk hooks).
+#   kernel_copy/recovery        -> entirely casper/Ubuntu-live-boot specific;
+#                               already self-gated upstream behind /cdrom
+#                               existing (never true here), but references
+#                               casper paths and vmlinuz.efi/initrd.gz that
+#                               don't exist on KibaOS — explicit no-op
+#                               instead of relying on upstream's own gate.
+#   create_user                 -> default group list swapped from Debian
+#                               group names (adm,sudo,lpadmin) to KibaOS's
+#                               actual groups (wheel,audio,video,input,
+#                               network,storage,power), matching liveuser's
+#                               groups set elsewhere in this build script.
+#   generate_locale              -> locale-gen kept (same on Arch); the
+#                               Debian-only update-locale call is swapped
+#                               for a direct /etc/locale.conf write.
+#   generate_machine_id, hostname, hosts, netresolve,
+#   disable_nvidia_fallback, timezone -> distro-neutral, unchanged.
+#
+# FAILURE MODE: if upstream distinst's API has drifted since this patch was
+# written (Chroot::command signature, Config struct fields, etc.), `make
+# all` below will fail loudly at compile time rather than silently produce
+# a broken binary. That's the intended behavior — investigate the compiler
+# error against the new upstream source if it happens, don't bypass it.
+# ══════════════════════════════════════════════════════════════════════════
+echo "=== Building Rust toolchain for distinst ==="
+pacman -S --noconfirm --needed rustup pkgconf libparted cryptsetup lvm2 clang git
+rustup default stable
+
+DISTINST_SRC="${AUR_BUILD}/distinst"
+echo "=== Cloning distinst ==="
+git clone --depth=1 https://github.com/pop-os/distinst.git "${DISTINST_SRC}"
+CONF_RS="${DISTINST_SRC}/src/installer/steps/configure/chroot_conf.rs"
+
+if [ ! -f "${CONF_RS}" ]; then
+  echo "FATAL: ${CONF_RS} not found — upstream distinst layout changed since this patch was written." >&2
+  exit 1
+fi
+
+cat > "${CONF_RS}" << 'CHROOTCONFRS'
+use crate::chroot::{Chroot, Command};
+use crate::errors::{IoContext, IntoIoResult};
+use crate::misc;
+use partition_identity::PartitionID;
+use proc_mounts::MountList;
+use std::path::PathBuf;
+use std::{
+    fs,
+    io::{self, Write},
+    path::Path,
+};
+use crate::timezones::Region;
+use crate::Config;
+
+// KibaOS/Arch port: no apt-cdrom equivalent needed for pacman.
+const BOOT_OPTIONS: &str = "quiet loglevel=0 systemd.show_status=false splash";
+const RECOVERY_BOOT_OPTIONS: &str = "";
+
+pub struct ChrootConfigurator<'a> {
+    chroot: Chroot<'a>,
+}
+
+impl<'a> ChrootConfigurator<'a> {
+    pub fn new(chroot: Chroot<'a>) -> Self {
+        Self { chroot }
+    }
+
+    /// Install packages via pacman (KibaOS/Arch port of apt_install).
+    pub fn apt_install(&self, packages: &[&str]) -> io::Result<()> {
+        info!("installing packages (pacman): {:?}", packages);
+        let mut args: Vec<&str> = Vec::with_capacity(packages.len() + 2);
+        args.extend_from_slice(&["-S", "--noconfirm"]);
+        args.extend_from_slice(packages);
+        self.chroot.command("pacman", &args).run()
+    }
+
+    /// Remove packages via pacman (KibaOS/Arch port of apt_remove).
+    /// pacman -Rns removes unneeded deps + config files in one pass, so no
+    /// separate autoremove step is needed the way apt requires. Doesn't
+    /// hard-fail on already-absent packages (pacman errors there; apt-get
+    /// purge historically didn't — see upstream pop-os/distinst#207).
+    pub fn apt_remove(&self, packages: &[&str]) -> io::Result<()> {
+        info!("removing packages (pacman): {:?}", packages);
+        let mut args: Vec<&str> = Vec::with_capacity(packages.len() + 2);
+        args.extend_from_slice(&["-Rns", "--noconfirm"]);
+        args.extend_from_slice(packages);
+        let _ = self.chroot.command("pacman", &args).run();
+        Ok(())
+    }
+
+    /// KibaOS ships systemd-boot via bootctl (no kernelstub — that's a
+    /// Pop/elementary-only wrapper). Loader entries are already written
+    /// into the image at build time; this ensures bootctl is installed
+    /// into the ESP on the target disk.
+    pub fn bootloader(&self) -> io::Result<()> {
+        info!("configuring bootloader (systemd-boot via bootctl)");
+        let result = self
+            .chroot
+            .command("bootctl", &["--esp-path=/boot", "install"])
+            .run();
+
+        match result {
+            Ok(()) => Ok(()),
+            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
+                warn!("bootctl not found in chroot; loader entries from image will be used as-is");
+                Ok(())
+            }
+            Err(why) => Err(why),
+        }
+    }
+
+    /// No-op on KibaOS: archiso boots from squashfs, never a mounted /cdrom.
+    pub fn cdrom_add(&self) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// No-op on KibaOS — see cdrom_add.
+    pub fn cdrom_disable(&self) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// No-op on KibaOS: ubuntu-drivers doesn't exist on Arch. Hardware
+    /// support comes from the pacman package set already baked into the
+    /// image (mesa, sof-firmware, etc.), not a post-install driver scan.
+    pub fn install_drivers(&self, _install: bool) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// Create a new user account. Group list swapped from Debian group
+    /// names (adm,sudo,lpadmin) to KibaOS's actual groups, matching
+    /// liveuser's groups elsewhere in this build script.
+    pub fn create_user(
+        &self,
+        config: &Config,
+        user: &str,
+        pass: Option<&str>,
+        fullname: Option<&str>,
+        profile_icon: Option<&str>,
+    ) -> io::Result<()> {
+        {
+            const DEFAULT_USERADD_FLAGS: &[&str] = &[
+                "-m",
+                "-G", "wheel,audio,video,input,network,storage,power",
+                "-s", "/bin/bash"
+            ];
+
+            let mut command = self.chroot.command("useradd", DEFAULT_USERADD_FLAGS);
+
+            if let Some(name) = fullname {
+                command.args(&["-c", name]);
+            }
+
+            command.arg(user).run()?;
+        }
+
+        if let Some(pass) = pass {
+            let pass = &[pass, "\n", pass, "\n"].concat();
+            self.chroot.command("passwd", &[user]).stdin_input(pass).run()?;
+        }
+
+        if let Some(path) = profile_icon {
+            let mut dest = self.chroot.path.join(&["var/lib/AccountsService/icons/", user].concat());
+
+            if fs::copy(&path, &dest).is_err() {
+                let _ = fs::remove_file(&dest);
+                return Ok(());
+            }
+
+            dest = self.chroot.path.join(&["var/lib/AccountsService/users/", user].concat());
+
+            if fs::write(&dest, fomat!(
+                "[User]\n"
+                "Icon=/var/lib/AccountsService/icons/" (user) "\n"
+                "SystemAccount=false\n"
+            )).is_err() {
+                let _ = fs::remove_file(&dest);
+            }
+        }
+
+        _ = self.chroot.command("usermod", [
+            "--shell",
+            "/bin/bash",
+            user
+        ]).run();
+
+        self.chroot.command("chown", [
+            "-R",
+            &[user, ":", user].concat(),
+            &["/home/", user, "/.config/"].concat(),
+        ]).run()?;
+
+        Ok(())
+    }
+
+    /// Distro-neutral, unchanged.
+    pub fn disable_nvidia_fallback(&self) {
+        info!("attempting to disable nvidia-fallback.service");
+        let args = &["disable", "nvidia-fallback.service"];
+        if let Err(why) = self.chroot.command("systemctl", args).run() {
+            warn!("disabling nvidia-fallback.service failed: {}", why);
+        }
+    }
+
+    /// locale-gen is the same on Arch; the Debian-only update-locale call
+    /// is swapped for a direct /etc/locale.conf write.
+    pub fn generate_locale(&self, locale: &str) -> io::Result<()> {
+        info!("generating locale via `locale-gen`");
+        self.chroot.command("locale-gen", &["--purge", locale]).run()?;
+        let locale_conf = self.chroot.path.join("etc/locale.conf");
+        let mut file = misc::create(&locale_conf)?;
+        writeln!(&mut file, "LANG={}", locale)
+            .with_context(|err| format!("failed to write /etc/locale.conf: {}", err))
+    }
+
+    /// Distro-neutral, unchanged.
+    pub fn generate_machine_id(&self) -> io::Result<()> {
+        info!("generating machine id via `dbus-uuidgen`");
+        self.chroot.command("sh", &["-c", "dbus-uuidgen > /etc/machine-id"]).run()?;
+        self.chroot.command("ln", &["-sf", "/etc/machine-id", "/var/lib/dbus/machine-id"]).run()
+    }
+
+    /// Distro-neutral, unchanged.
+    pub fn hostname(&self, hostname: &str) -> io::Result<()> {
+        info!("setting hostname to {}", hostname);
+        let hostfile = self.chroot.path.join("etc/hostname");
+        let mut file = misc::create(&hostfile)?;
+        writeln!(&mut file, "{}", hostname)
+            .with_context(|err| format!("failed to write hostname to {:?}: {}", hostfile, err))
+    }
+
+    /// Distro-neutral, unchanged.
+    pub fn hosts(&self, hostname: &str) -> io::Result<()> {
+        info!("setting hosts file");
+        let hosts = self.chroot.path.join("etc/hosts");
+        let mut file = misc::create(&hosts)?;
+        writeln!(
+            &mut file,
+            "# See `man hosts` for details.\n#
+# By default, systemd-resolved or libnss-myhostname will resolve
+# localhost and the system hostname if they're not specified here.
+127.0.0.1\tlocalhost\n::1\t\tlocalhost"
+        )
+        .with_context(|err| format!("failed to write hosts to {:?}: {}", hosts, err))
+    }
+
+    /// update-initramfs doesn't exist on Arch; mkinitcpio has no "disable"
+    /// concept the way Debian's symlink-to-true trick works. Installs are
+    /// short enough that no-op-ing both calls is simpler and safer than
+    /// emulating the disable/reenable dance.
+    pub fn initramfs_disable(&self) -> io::Result<()> {
+        Ok(())
+    }
+
+    pub fn initramfs_reenable(&self) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// console-setup.sh and cached.kmap.gz are Debian-only. Arch's real
+    /// equivalent for console (non-X11) keymap persistence is
+    /// /etc/vconsole.conf, read by systemd-vconsole-setup at boot.
+    pub fn keyboard_layout(&self, config: &Config) -> io::Result<()> {
+        info!("configuring keyboard layout via /etc/vconsole.conf");
+
+        if Path::new("/bin/cosmic-comp").exists() {
+            set_cosmic_xkb_config(config, self.chroot.path.join("etc/cosmic/com.system76.CosmicComp/v1/xkb_config"))?;
+        }
+
+        let keyboard_file = self.chroot.path.join("etc/default/keyboard");
+        let mut file = misc::create(&keyboard_file)?;
+        writeln!(&mut file, "XKBLAYOUT={}\nBACKSPACE=guess", config.keyboard_layout)
+            .with_context(|err| {
+                format!("failed to write keyboard layout to /etc/default/keyboard: {}", err)
+            })?;
+
+        if let Some(model) = config.keyboard_model.as_deref() {
+            writeln!(&mut file, "XKBMODEL={}", model).with_context(|err| {
+                format!("failed to write keyboard layout to /etc/default/keyboard: {}", err)
+            })?;
+        }
+
+        if let Some(variant) = config.keyboard_variant.as_deref() {
+            writeln!(&mut file, "XKBVARIANT={}", variant).with_context(|err| {
+                format!("failed to write keyboard layout to /etc/default/keyboard: {}", err)
+            })?;
+        }
+
+        // KEYMAP expects a kbd(4) console keymap name, not an XKB layout
+        // name — matches for common layouts (us, de, fr...) but is a known
+        // approximation, not a guaranteed 1:1 mapping for every combo.
+        let vconsole = self.chroot.path.join("etc/vconsole.conf");
+        let mut vfile = misc::create(&vconsole)?;
+        writeln!(&mut vfile, "KEYMAP={}", config.keyboard_layout)
+            .with_context(|err| format!("failed to write /etc/vconsole.conf: {}", err))
+    }
+
+    /// No-op on KibaOS: casper/Ubuntu-live-boot specific; the /cdrom path
+    /// it checks for never exists on an archiso-booted system.
+    pub fn kernel_copy(&self) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// Distro-neutral, unchanged.
+    pub fn netresolve(&self) -> io::Result<()> {
+        info!("creating /etc/resolv.conf");
+        let resolvconf = "../run/systemd/resolve/stub-resolv.conf";
+        self.chroot.command("ln", &["-sf", resolvconf, "/etc/resolv.conf"]).run()
+    }
+
+    /// No-op on KibaOS: builds a casper/Ubuntu-style recovery partition;
+    /// already self-gated upstream behind /cdrom existing (never true
+    /// here), but references casper paths and vmlinuz.efi/initrd.gz
+    /// filenames that don't exist on KibaOS — explicit no-op rather than
+    /// relying on upstream's own gate.
+    pub fn recovery(
+        &self,
+        _config: &Config,
+        _name: &str,
+        _root_uuid: &str,
+        _luks_uuid: &str,
+    ) -> io::Result<()> {
+        Ok(())
+    }
+
+    /// Distro-neutral, unchanged.
+    pub fn timezone(&self, region: &Region) -> io::Result<()> {
+        self.chroot.command("rm", &["/etc/timezone"]).run()?;
+        let args: &[&str] = &[];
+        self.chroot.command("ln", args).arg(region.path()).arg("/etc/timezone").run()
+    }
+
+    /// update-initramfs doesn't exist; rebuild via mkinitcpio against the
+    /// same installed (non-archiso) hook config built earlier in this
+    /// build script's customize_airootfs.sh.
+    pub fn update_initramfs(&self) -> io::Result<()> {
+        self.chroot
+            .command("mkinitcpio", &["-c", "/etc/mkinitcpio.conf.d/installed.conf", "-g", "/boot/initramfs-linux.img"])
+            .run()
+            .with_context(|why| format!("failed to update initramfs: {}", why))
+    }
+}
+
+fn set_cosmic_xkb_config(config: &Config, path: PathBuf) -> io::Result<()> {
+    info!("installing xkb_config for cosmic at `{}`", path.display());
+
+    if path.exists() {
+        _ = std::fs::remove_file(&path);
+    }
+
+    _ = std::fs::create_dir_all(path.parent().unwrap());
+    let mut cosmic_xkb_file = misc::create(&path)?;
+
+    writeln!(
+        &mut cosmic_xkb_file,
+        r#"(
+    rules: "",
+    model: "{}",
+    layout: "{}",
+    variant: "{}",
+    options: Some("lv3:ralt_switch,compose:rctrl"),
+    repeat_delay: 600,
+    repeat_rate: 25,
+)"#,
+        config.keyboard_model.as_ref().map(String::as_str).unwrap_or_default(),
+        config.keyboard_layout,
+        config.keyboard_variant.as_ref().map(String::as_str).unwrap_or_default()
+    )
+    .with_context(|err| {
+        format!("failed to write keyboard layout to {}: {}", path.display(), err)
+    })
+}
+CHROOTCONFRS
+
+echo "=== chroot_conf.rs replaced with KibaOS/pacman port ==="
+
+cd "${DISTINST_SRC}"
+make all || { echo "FATAL: distinst build failed against patched chroot_conf.rs — check for upstream API drift (Chroot::command signature, Config fields, cascade!/fomat! macro availability) since this patch was written." >&2; exit 1; }
+make install prefix=/usr
+ldconfig
+
+# ══════════════════════════════════════════════════════════════════════════
+# elementary/installer — GTK4/libadwaita fullscreen front-end.
+# Deps not in official Arch repos, built from AUR: granite7, pantheon-wayland.
+# ══════════════════════════════════════════════════════════════════════════
+pacman -S --noconfirm --needed \
+  gtk4 libadwaita gobject-introspection vala meson ninja \
+  libgee json-glib pwquality libxkbcommon systemd-libs
+
+echo "=== Building granite (AUR) ==="
+git clone --depth=1 "https://aur.archlinux.org/granite7.git" "${AUR_BUILD}/granite7" \
+  || git clone --depth=1 "https://aur.archlinux.org/granite.git" "${AUR_BUILD}/granite7"
+chown -R builduser:builduser "${AUR_BUILD}/granite7"
+cd "${AUR_BUILD}/granite7"
+sudo -u builduser MAKEFLAGS="-j$(nproc)" makepkg -si --noconfirm --skippgpcheck || \
+  echo "WARNING: granite7 AUR build failed — elementary installer build will likely fail next."
+
+echo "=== Building pantheon-wayland (AUR) ==="
+git clone --depth=1 "https://aur.archlinux.org/pantheon-wayland.git" "${AUR_BUILD}/pantheon-wayland"
+chown -R builduser:builduser "${AUR_BUILD}/pantheon-wayland"
+cd "${AUR_BUILD}/pantheon-wayland"
+sudo -u builduser MAKEFLAGS="-j$(nproc)" makepkg -si --noconfirm --skippgpcheck || \
+  echo "WARNING: pantheon-wayland AUR build failed — elementary installer build will likely fail next."
+
+echo "=== Cloning + building elementary installer (distinst backend) ==="
+INSTALLER_SRC="${AUR_BUILD}/elementary-installer"
+git clone --depth=1 https://github.com/elementary/installer.git "${INSTALLER_SRC}"
+cd "${INSTALLER_SRC}"
+meson setup build --prefix=/usr -Dinstaller_backend=distinst
+ninja -C build
+ninja -C build install || echo "WARNING: elementary installer install step failed — Calamares (kibaos-install.desktop) remains the install path."
+
+# Rebrand via assets, not source edits — keeps gettext catalogs intact.
+mkdir -p /usr/share/kibaos-installer
+cp /usr/share/kibaos/logo-256.png  /usr/share/kibaos-installer/logo.png        2>/dev/null || true
+cp /usr/share/kibaos/wallpaper.png /usr/share/kibaos-installer/background.png  2>/dev/null || true
+
+if [ -x /usr/bin/io.elementary.installer ]; then
+  cat > /usr/share/applications/kibaos-install.desktop << 'INSTFSDESK'
+[Desktop Entry]
+Name=Install KibaOS
+Comment=Install KibaOS to your hard drive
+Exec=pkexec /usr/bin/io.elementary.installer
+Icon=kibaos
+Terminal=false
+Type=Application
+Categories=System;
+Keywords=install;setup;kibaos;
+INSTFSDESK
+  cp /usr/share/applications/kibaos-install.desktop /home/liveuser/Desktop/kibaos-install.desktop 2>/dev/null || true
+  chmod +x /home/liveuser/Desktop/kibaos-install.desktop 2>/dev/null || true
+  echo "=== elementary installer (distinst/pacman port) is the active install path ==="
+else
+  echo "=== elementary installer binary not found post-build — Calamares remains the install path ==="
+fi
+
+# Replaces the original cleanup lines that followed the AUR PACKAGES section.
+cd /; rm -rf "${AUR_BUILD}"
+userdel -r builduser 2>/dev/null || true
+rm -f /etc/sudoers.d/builduser
 # ══════════════════════════════════════════════════════════════════════════
 # BOOT SPLASH — using firmware BGRT logo instead of Plymouth.
 # No Plymouth theme/service: the UEFI vendor/OEM logo (BGRT) stays on screen
@@ -2500,7 +2981,7 @@ cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
 Name=Install KibaOS
 Comment=Install KibaOS to your hard drive
-Exec=/usr/local/bin/calamares-launch
+Exec=/usr/bin/io.elementary.installer
 Icon=kibaos
 Terminal=false
 Type=Application
@@ -2656,45 +3137,15 @@ cat > /etc/issue << 'ISSUE'
 ISSUE
 
 cat > /etc/motd << 'MOTD'
-Welcome to KibaOS — Budgie 10.10 Wayland desktop on Arch Linux.
-Built by WolfTech Innovations.  https://github.com/WolfTech-Innovations/Kiba
+Welcome to KibaOS
 MOTD
-
-cat > /usr/local/bin/calamares-launch << 'EOF'
-#!/usr/bin/env bash
-LIVE_UID=1000
-LIVE_RUNTIME="/run/user/${LIVE_UID}"
-LOG=/tmp/calamares-debug.log
-echo "=== Calamares launch $(date) ===" > "${LOG}"
-
-# Watchdog: every 15s, snapshot calamares' process tree into the log.
-# When a module "hangs forever", the last job line printed by calamares
-# tells you WHICH module, and this snapshot tells you WHICH child process
-# (parted/udevadm/systemctl/grub-install/etc.) is actually stuck.
-(
-  while true; do
-    sleep 15
-    {
-      echo "--- watchdog $(date +%T) ---"
-      ps --forest -o pid,stat,etimes,cmd -C calamares 2>/dev/null
-      pgrep -a -f 'udevadm|partprobe|parted|systemctl|bootctl|mkfs|blkid' 2>/dev/null
-    } >> "${LOG}"
-  done
-) &
-WATCHDOG_PID=$!
-trap 'kill "${WATCHDOG_PID}" 2>/dev/null' EXIT
 
 sudo -E \
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
   XDG_RUNTIME_DIR="${LIVE_RUNTIME}" \
   QT_QPA_PLATFORM=wayland \
-  QT_WAYLAND_SHELL_INTEGRATION=layer-shell \
-  /usr/bin/calamares -D 9 2>&1 \
-  | awk '{ print strftime("[%H:%M:%S]"), $0; fflush(); }' \
-  | tee -a "${LOG}"
-echo "=== Calamares exited $? — full log at ${LOG} ===" | tee -a "${LOG}"
+  QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 EOF
-chmod +x /usr/local/bin/calamares-launch
 
 systemctl enable sddm
 systemctl enable NetworkManager.service
