@@ -10,3 +10,7 @@
 ## 2025-06-15 - Kernel Build Performance with CachyOS
 **Learning:** Migrating to CachyOS kernel requires proper repository configuration at the host level in the build script to avoid 'package not found' errors during mkarchiso execution.
 **Action:** Ensure custom repositories are added to both /etc/pacman.conf and the profile's pacman.conf before building the ISO.
+
+## 2026-06-20 - [Subprocess Reduction in Shell Scripts]
+**Learning:** Spawning subprocesses like `date`, `cut`, and `sed` in a loop or frequently called script adds significant overhead. Modern Bash (4.2+) provides `printf %(...)T` and advanced parameter expansion which can replace these with internal logic, making the script ~10x faster and significantly lighter on system resources.
+**Action:** Prioritize Bash built-ins (`printf -v`, `${var:offset:length}`, `${var#prefix}`) over external pipes for string and date manipulation in automation scripts.
