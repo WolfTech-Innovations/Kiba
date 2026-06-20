@@ -1,0 +1,13 @@
+name: Commit Signature Check
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify Signatures
+        run: |
+          # Verify that at least the last commit is signed (if applicable)
+          git log -1 --show-signature

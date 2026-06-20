@@ -1,0 +1,16 @@
+name: PR Metadata Check
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          if [ -z "$PR_BODY" ]; then
+            echo "PR description is missing"
+            exit 1
+          fi

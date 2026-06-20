@@ -1,0 +1,13 @@
+name: Branding Link Checker
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Links
+        run: |
+          grep -oP 'https?://[^"]+' build.sh | xargs -I {} curl -sfI {}

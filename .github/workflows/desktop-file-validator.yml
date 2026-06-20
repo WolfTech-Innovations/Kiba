@@ -1,0 +1,12 @@
+name: Desktop File Validator
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Desktop Files
+        run: |
+          sudo apt-get update && sudo apt-get install -y desktop-file-utils
+          python3 -c "import re; [open(f'tmp_{i}.desktop', 'w').write(m.group(1)) for i, m in enumerate(re.finditer(r'cat > .*?\.desktop << .[A-Z_]+.\n(.*?)\n[A-Z_]+', open('build.sh').read(), re.DOTALL))]"
+          desktop-file-validate tmp_*.desktop

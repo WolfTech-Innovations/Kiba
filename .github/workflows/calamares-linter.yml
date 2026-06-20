@@ -1,0 +1,10 @@
+name: Calamares Linter
+on: [push, pull_request]
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Calamares YAML
+        run: |
+          python3 -c "import yaml, re; [yaml.safe_load(m.group(1)) for m in re.finditer(r'cat > .*? << .[A-Z_]+.\n(.*?)\n[A-Z_]+', open('build.sh').read(), re.DOTALL) if 'calamares' in m.group(0)]"

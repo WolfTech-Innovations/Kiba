@@ -1,0 +1,10 @@
+name: MIME Type Auditor
+on: [push, pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check MIME XML
+        run: |
+          grep -A 10 "WINEXML" build.sh | grep -q "<mime-info"

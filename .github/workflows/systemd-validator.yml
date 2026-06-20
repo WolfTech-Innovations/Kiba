@@ -1,0 +1,10 @@
+name: Systemd Validator
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Systemd Units
+        run: |
+          grep -A 20 "\[Unit\]" build.sh

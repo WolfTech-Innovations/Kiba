@@ -1,0 +1,19 @@
+name: Arch Linux Security Advisory Scan
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Scan
+        run: |
+          PACKAGES=$(grep -oP "(?<=^  )[a-z0-9-]+(?=$)" build.sh | sort -u)
+          ASA=$(curl -s https://security.archlinux.org/issues/all.json)
+          for pkg in $PACKAGES; do
+            if echo "$ASA" | grep -q "\"pkgname\": \"$pkg\""; then
+               echo "Potential vulnerability found for $pkg"
+            fi
+          done

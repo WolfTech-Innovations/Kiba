@@ -1,0 +1,15 @@
+name: Duplicate Package Detection
+on: [push, pull_request]
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find Duplicates
+        run: |
+          DUPS=$(grep -v "^#" build.sh | grep -oP "^[a-z0-9-]+" | sort | uniq -d)
+          if [ -n "$DUPS" ]; then
+            echo "Duplicate packages found:"
+            echo "$DUPS"
+            exit 1
+          fi

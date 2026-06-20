@@ -1,0 +1,15 @@
+name: AUR Package Monitor
+on:
+  schedule:
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check AUR Status
+        run: |
+          for pkg in calamares libinput-gestures; do
+            curl -s "https://aur.archlinux.org/rpc/?v=5&type=info&arg[]=${pkg}" | grep -q '"resultcount":1' || (echo "Package ${pkg} not found or orphaned" && exit 1)
+          done

@@ -1,0 +1,15 @@
+name: Arch Package Audit
+on:
+  schedule:
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit Packages
+        run: |
+          pacman -Sy --noconfirm
+          grep -oP "(?<=^  )[a-z0-9-]+(?=$)" build.sh | xargs pacman -Si > /dev/null

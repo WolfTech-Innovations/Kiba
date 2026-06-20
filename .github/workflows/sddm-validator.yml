@@ -1,0 +1,10 @@
+name: SDDM Validator
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check SDDM QML
+        run: |
+          grep -A 100 "Main.qml" build.sh | grep -q "import QtQuick"

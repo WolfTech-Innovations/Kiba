@@ -1,0 +1,14 @@
+name: Shell Best Practices
+on: [push, pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for common pitfalls
+        run: |
+          # Avoid using 'ls' to iterate over files
+          if grep -r "for .* in \$(ls" . --include="*.sh"; then
+            echo "Dangerous 'for ... in \$(ls ...)' found"
+            exit 1
+          fi

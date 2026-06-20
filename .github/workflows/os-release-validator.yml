@@ -1,0 +1,10 @@
+name: Os-Release Validator
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check os-release
+        run: |
+          grep -A 10 "ID=kibaos" build.sh

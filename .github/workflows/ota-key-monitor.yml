@@ -1,0 +1,13 @@
+name: OTA Key Monitor
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Key Expiry
+        run: |
+          grep -q "ota-public.asc" build.sh

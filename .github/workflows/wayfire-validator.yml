@@ -1,0 +1,10 @@
+name: Wayfire Validator
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Wayfire Config
+        run: |
+          grep -A 50 "wayfire.ini" build.sh | grep -q "\[core\]"

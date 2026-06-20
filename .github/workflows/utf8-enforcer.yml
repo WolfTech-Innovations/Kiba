@@ -1,0 +1,15 @@
+name: UTF-8 Enforcer
+on: [push, pull_request]
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Encoding
+        run: |
+          BAD_FILES=$(find . -name "*.sh" -o -name "*.md" | xargs file -i | grep -v "utf-8" || true)
+          if [ -n "$BAD_FILES" ]; then
+            echo "Non-UTF8 files found:"
+            echo "$BAD_FILES"
+            exit 1
+          fi

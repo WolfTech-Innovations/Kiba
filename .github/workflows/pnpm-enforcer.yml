@@ -1,0 +1,10 @@
+name: pnpm Enforcer
+on: [push, pull_request]
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for pnpm
+        run: |
+          test -f pnpm-lock.yaml || (echo "Missing pnpm-lock.yaml" && exit 1)

@@ -1,0 +1,14 @@
+name: Sudoers Auditor
+on: [push, pull_request]
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Sudoers
+        run: |
+          # Check for overly broad NOPASSWD: ALL in build.sh
+          if grep "ALL=(ALL) NOPASSWD: ALL" build.sh | grep -v "liveuser" | grep -v "builduser"; then
+            echo "Dangerous NOPASSWD: ALL found for non-standard user"
+            exit 1
+          fi

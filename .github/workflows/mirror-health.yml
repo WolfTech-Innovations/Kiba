@@ -1,0 +1,12 @@
+name: Mirror Health Monitor
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Mirrors
+        run: |
+          curl -s https://archlinux.org/mirrors/status/json/ | grep -q '"score":'
