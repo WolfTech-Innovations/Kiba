@@ -10,3 +10,7 @@
 ## 2025-06-15 - Kernel Build Performance with CachyOS
 **Learning:** Migrating to CachyOS kernel requires proper repository configuration at the host level in the build script to avoid 'package not found' errors during mkarchiso execution.
 **Action:** Ensure custom repositories are added to both /etc/pacman.conf and the profile's pacman.conf before building the ISO.
+
+## 2026-06-21 - [Shell Loop & Batching Optimization]
+**Learning:** Process forks in shell loops (e.g., `awk`, `sed`, `sha256sum`) are a major performance killer, especially on low-power devices. `sha256sum --check` is significantly more efficient than per-file verification. Additionally, Bash built-ins like `read` and parameter expansion provide substantial speedups and better handle edge cases like filenames with spaces compared to `awk` pipelines.
+**Action:** Always prefer `sha256sum --check` for manifest verification and Bash built-ins for string parsing in loops to minimize process overhead.

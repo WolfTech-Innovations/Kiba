@@ -2462,23 +2462,20 @@ mkdir -p "${EXTRACT_DIR}"
 tar xzf "${PATCH_TAR}" -C "${EXTRACT_DIR}"
 
 # manifest format: SHA256  ./path/to/file
-while IFS= read -r line; do
-  EXPECTED_HASH=$(echo "${line}" | awk '{print $1}')
-  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-  ACTUAL_HASH=$(sha256sum "${EXTRACT_DIR}/${FILEPATH}" 2>/dev/null | awk '{print $1}')
-  if [ "${EXPECTED_HASH}" != "${ACTUAL_HASH}" ]; then
-    log "CHECKSUM MISMATCH for ${FILEPATH}. Aborting."
-    rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
-    exit 1
-  fi
-done < "${MANIFEST}"
+# Optimized: use sha256sum --check to avoid per-file process forks
+if ! (cd "${EXTRACT_DIR}" && sha256sum --check --status "${MANIFEST}"); then
+  log "CHECKSUM MISMATCH or missing files. Aborting."
+  rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
+  exit 1
+fi
 log "All checksums verified."
 
 # ── Detect whether patch touches display-critical files ───────────────────
 NEEDS_DISPLAY_RESTART=false
 NEEDS_COMPOSITOR_RESTART=false
-while IFS= read -r line; do
-  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
+# Optimized: use bash built-ins to avoid awk/sed forks
+while read -r _ FILEPATH; do
+  FILEPATH="${FILEPATH#./}"
   case "${FILEPATH}" in
     etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
       NEEDS_DISPLAY_RESTART=true ;;
@@ -2512,8 +2509,12 @@ fb_freeze() {
 
   if [ -f "${SNAP}" ]; then
     # Convert to raw framebuffer format and write to /dev/fb0
-    FB_WIDTH=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f1 || echo 1920)
-    FB_HEIGHT=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f2 || echo 1080)
+    # Optimized: use bash built-ins instead of cat/cut
+    if [ -f /sys/class/graphics/fb0/virtual_size ]; then
+      IFS=, read -r FB_WIDTH FB_HEIGHT < /sys/class/graphics/fb0/virtual_size
+    fi
+    FB_WIDTH=${FB_WIDTH:-1920}
+    FB_HEIGHT=${FB_HEIGHT:-1080}
     magick "${SNAP}" -resize "${FB_WIDTH}x${FB_HEIGHT}!" \
       -depth 8 bgr:"${SNAP_RAW}" 2>/dev/null || true
     if [ -f "${SNAP_RAW}" ] && [ -w /dev/fb0 ]; then
@@ -2581,8 +2582,9 @@ apply_patch() {
   ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
   mkdir -p "${ROLLBACK_DIR}"
 
-  while IFS= read -r line; do
-    FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
+  # Optimized: use bash built-ins to avoid awk/sed forks
+  while read -r _ FILEPATH; do
+    FILEPATH="${FILEPATH#./}"
     SRC="${EXTRACT_DIR}/${FILEPATH}"
     DST="/${FILEPATH}"
 
