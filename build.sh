@@ -1385,76 +1385,87 @@ CHROOTCONFRS
 
 echo "=== chroot_conf.rs replaced with KibaOS/pacman port ==="
 
-# ── libparted-sys ABI fix: regenerate bindings against Arch's real headers ──
-# CONFIRMED FAILURE (from actual CI log): cargo build for distinst fails in
-# the libparted-sys crate, not in our patched chroot_conf.rs — error is
-# `unknown field` on PedPartition.type_, with only `_address` present.
-# That's libparted-sys's vendored/pinned bindgen output going stale against
-# whatever libparted.so version Arch currently ships — a wholesale struct
-# layout mismatch, not a single renamed field (52 compile errors from one
-# crate). Fix: force bindgen to regenerate bindings from Arch's actual
-# /usr/include/parted/parted.h before compiling distinst, instead of
-# trusting whatever bindings.rs the crate vendors.
-pacman -S --noconfirm --needed rust-bindgen clang
-if [ ! -f /usr/include/parted/parted.h ]; then
-  echo "FATAL: /usr/include/parted/parted.h not found — parted package changed its header layout since this patch was written." >&2
+# ── libparted-sys ABI fix: build GNU parted from source, bypass Arch's headers ──
+# ROOT CAUSE (confirmed via multiple independent sources): libparted-sys's
+# own crate docs state it "requires libparted-dev installed to build on
+# debian variants" — libparted-dev is a Debian-specific split package
+# carrying fuller development headers than the combined runtime+dev
+# `parted` package Arch ships. bindgen (called by libparted-sys's own
+# build.rs, confirmed via Cargo.lock: libparted-sys depends on bindgen
+# 0.65.1) generates real fielded structs when pointed at Debian's
+# libparted-dev headers, but produces opaque `_address`-only structs when
+# pointed at Arch's thinner /usr/include/parted/parted.h — same bindgen
+# version, same crate, different header completeness. This is NOT a
+# bindgen flag problem (confirmed by two independent failed attempts
+# producing the identical opaque signature) and not something fixable by
+# pinning a different libparted-sys version (the bindgen call site is
+# correct; the input header is what's insufficient).
+#
+# FIX: build upstream GNU parted from source into /usr/local, then
+# redirect cargo/bindgen to those headers/libs instead of Arch's package —
+# this is the same workaround GParted's own build documentation prescribes
+# for exactly this class of problem (insufficient distro-packaged headers):
+#   export CPPFLAGS=-I/usr/local/include
+#   export LDFLAGS=-L/usr/local/lib
+#   export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+echo "=== Building GNU parted from source (Arch's packaged headers are insufficient for libparted-sys) ==="
+pacman -S --noconfirm --needed wget device-mapper
+
+PARTED_VERSION="3.6"
+PARTED_BUILD="${AUR_BUILD}/parted-src"
+mkdir -p "${PARTED_BUILD}"
+cd "${PARTED_BUILD}"
+wget -q "https://ftp.gnu.org/gnu/parted/parted-${PARTED_VERSION}.tar.xz" || {
+  echo "FATAL: failed to download GNU parted ${PARTED_VERSION} source — check ftp.gnu.org availability or try an alternate mirror/version." >&2
+  exit 1
+}
+tar xf "parted-${PARTED_VERSION}.tar.xz"
+cd "parted-${PARTED_VERSION}"
+
+# --disable-device-mapper avoids a libdevmapper version-compat fight inside
+# this throwaway build; we only need the headers/lib for bindgen to read
+# against, not a fully-featured parted binary — the live system already
+# has its own pacman-installed parted for actual partitioning operations.
+./configure --prefix=/usr/local --disable-static --disable-device-mapper || {
+  echo "FATAL: GNU parted ./configure failed — check the build log above for the specific missing dependency." >&2
+  exit 1
+}
+make -j"$(nproc)" || {
+  echo "FATAL: GNU parted build failed — check the build log above." >&2
+  exit 1
+}
+make install
+ldconfig
+
+if [ ! -f /usr/local/include/parted/parted.h ]; then
+  echo "FATAL: /usr/local/include/parted/parted.h not found after make install — GNU parted's install layout may differ from expectation for version ${PARTED_VERSION}." >&2
   exit 1
 fi
+echo "=== GNU parted ${PARTED_VERSION} built and installed to /usr/local ==="
 
-export CARGO_HOME="${CARGO_HOME:-/root/.cargo}"
+# Redirect bindgen/cargo/pkg-config to the freshly built parted instead of
+# Arch's packaged one. PKG_CONFIG_PATH is prepended so /usr/local's
+# parted.pc is found before Arch's /usr/lib/pkgconfig/libparted.pc (if any).
+export CPPFLAGS="-I/usr/local/include ${CPPFLAGS:-}"
+export LDFLAGS="-L/usr/local/lib ${LDFLAGS:-}"
+export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
+export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/local/include"
+echo "=== Build environment redirected to /usr/local for libparted headers/libs ==="
+
 cd "${DISTINST_SRC}"
-# cargo fetch (not full build) just to populate registry/src with the real
-# unpacked libparted-sys crate directory bindgen needs to overwrite. Note:
-# libparted-sys is a TRANSITIVE dependency (distinst depends on the
-# `libparted` wrapper crate 0.1.4, which itself depends on libparted-sys
-# 0.3.1 — confirmed against both crates' real Cargo.toml files), so cargo
-# fetch needs to resolve the full tree, not just direct deps.
-cargo fetch || true
-
-LIBPARTED_SYS_DIR=$(find "${CARGO_HOME}/registry/src" -maxdepth 2 -type d -name 'libparted-sys-*' 2>/dev/null | head -n1)
-if [ -z "${LIBPARTED_SYS_DIR}" ]; then
-  echo "libparted-sys not found after cargo fetch. Listing what was actually fetched under libparted* for diagnosis:" >&2
-  find "${CARGO_HOME}/registry/src" -maxdepth 2 -type d -name 'libparted*' 2>/dev/null >&2
-  echo "FATAL: libparted-sys source dir still not found under ${CARGO_HOME}/registry/src. cargo fetch may need a full resolution pass first — try running 'cargo build --offline' (allowed to fail) before this search, or inspect ${DISTINST_SRC}/Cargo.lock directly for the exact pinned version." >&2
-  exit 1
-fi
-echo "=== Found libparted-sys at ${LIBPARTED_SYS_DIR} ==="
-
-LIBRS="${LIBPARTED_SYS_DIR}/src/lib.rs"
-if [ ! -f "${LIBRS}" ]; then
-  echo "FATAL: ${LIBRS} not found — cannot wire in regenerated bindings; crate layout differs from expectation." >&2
-  exit 1
-fi
-
-echo "=== Regenerating bindings against Arch's /usr/include/parted/parted.h ==="
-bindgen /usr/include/parted/parted.h \
-  --allowlist-type '_?Ped.*' \
-  --allowlist-function 'ped_.*' \
-  --allowlist-var 'PED_.*' \
-  -o "${LIBPARTED_SYS_DIR}/src/bindings_kibaos.rs" \
-  -- -I/usr/include
-
-if [ ! -s "${LIBPARTED_SYS_DIR}/src/bindings_kibaos.rs" ]; then
-  echo "FATAL: bindgen produced an empty/missing output file — check clang availability and parted.h readability." >&2
-  exit 1
-fi
-
-# Append a fresh include rather than rewriting lib.rs's existing
-# include!()/module structure we haven't directly inspected — safer than
-# guessing at exact existing syntax, at the cost of leaving the old
-# (broken) bindings module compiled-but-unused alongside the new one.
-cp "${LIBRS}" "${LIBRS}.kibaos-orig"
-{
-  echo ""
-  echo "// KibaOS/Arch port: regenerated bindgen output appended below,"
-  echo "// re-exported to shadow the crate's stale vendored bindings."
-  echo "pub mod kibaos_bindings { include!(\"bindings_kibaos.rs\"); }"
-  echo "pub use kibaos_bindings::*;"
-} >> "${LIBRS}"
-echo "=== Appended regenerated bindings to ${LIBRS} ==="
-
-cd "${DISTINST_SRC}"
-make all || { echo "FATAL: distinst build failed — if the error is still in libparted-sys, the bindgen allowlist patterns above may need adjusting for the actual struct/function names in this version of parted.h. If the error is in chroot_conf.rs, check for upstream API drift (Chroot::command signature, Config fields, cascade!/fomat! macro availability) since this patch was written." >&2; exit 1; }
+make all || {
+  echo "FATAL: distinst build failed even after building GNU parted from source and redirecting CPPFLAGS/PKG_CONFIG_PATH/BINDGEN_EXTRA_CLANG_ARGS to it.";
+  echo "If the error is again 'unknown field' / opaque _address-only structs on Ped*";
+  echo "types, libparted-sys's build.rs may not be honoring BINDGEN_EXTRA_CLANG_ARGS";
+  echo "or PKG_CONFIG_PATH the way assumed here — at that point, inspect libparted-sys";
+  echo "0.3.2's actual build.rs source directly (not inferred from Cargo.lock) to see";
+  echo "exactly how it locates parted.h, rather than guessing the env var names again.";
+  echo "If the error is in chroot_conf.rs instead, check for upstream API drift";
+  echo "(Chroot::command signature, Config fields, cascade!/fomat! macro availability)";
+  echo "since this patch was written.";
+  exit 1;
+}
 make install prefix=/usr
 ldconfig
 
