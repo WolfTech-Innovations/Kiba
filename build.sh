@@ -1395,7 +1395,7 @@ echo "=== chroot_conf.rs replaced with KibaOS/pacman port ==="
 # crate). Fix: force bindgen to regenerate bindings from Arch's actual
 # /usr/include/parted/parted.h before compiling distinst, instead of
 # trusting whatever bindings.rs the crate vendors.
-pacman -S --noconfirm --needed bindgen clang
+pacman -S --noconfirm --needed rust-bindgen clang
 if [ ! -f /usr/include/parted/parted.h ]; then
   echo "FATAL: /usr/include/parted/parted.h not found — parted package changed its header layout since this patch was written." >&2
   exit 1
