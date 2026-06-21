@@ -118,7 +118,6 @@ gnome-clocks
 gnome-calculator
 sof-firmware
 thermald
-network-manager-applet
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -157,14 +156,14 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
+network-manager-applet
 papirus-icon-theme
 accountsservice
 firefox
 sassc
-network-manager-applet
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -174,7 +173,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -185,7 +184,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -198,7 +197,7 @@ gnome-calendar
 gnome-notes
 geary
 gnome-music
-gnome-todo
+endeavour
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -2822,12 +2821,13 @@ find_desktop_id() {
 DOCK_LAUNCHERS=()
 for ids in \
   "nemo.desktop" \
+  "org.gnome.TextEditor.desktop gedit.desktop" \
+  "org.gnome.Loupe.desktop org.gnome.eog.desktop eog.desktop" \
   "org.gnome.Calendar.desktop gnome-calendar.desktop" \
   "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
-  "org.gnome.eog.desktop eog.desktop" \
   "org.gnome.Geary.desktop geary.desktop" \
   "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
+  "org.gnome.Todo.desktop org.gnome.Endeavour.desktop gnome-todo.desktop"
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
@@ -2936,7 +2936,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
