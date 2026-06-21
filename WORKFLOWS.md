@@ -1,26 +1,25 @@
 # GitHub Workflows Manual
-Generated on Sat Jun 13 15:43:02 UTC 2026
+Generated on Sun Jun 21 14:51:48 UTC 2026
 
 | Workflow Name | File Path |
 |---------------|-----------|
 | Actionlint | `./.github/workflows/actionlint.yml` |
-| Auto Assign | `./.github/workflows/auto-assign.yml` |
 | Automated Repo Health Report | `./.github/workflows/automated-repo-health-report.yml` |
 | Bandit | `./.github/workflows/bandit.yml` |
+| Branding Assets Audit | `./.github/workflows/branding-assets-audit.yml` |
 | Broken Link Checker | `./.github/workflows/broken-link-checker.yml` |
 | Build KibaOS | `./.github/workflows/build.yml` |
-| CachyOS Kernel Monitor | `./.github/workflows/cachyos-kernel-monitor.yml` |
+| Calamares Configuration Audit | `./.github/workflows/calamares-config-audit.yml` |
+| Check AUR Updates | `./.github/workflows/check-aur-updates.yml` |
 | Check JSON Syntax | `./.github/workflows/check-json-syntax.yml` |
 | Check Python Syntax | `./.github/workflows/check-py-syntax.yml` |
-| Close Inactive PRs | `./.github/workflows/close-inactive-prs.yml` |
 | CodeQL | `./.github/workflows/codeql.yml` |
 | Commit Lint | `./.github/workflows/commit-lint.yml` |
 | Dependency Review | `./.github/workflows/dependency-review.yml` |
 | Gitleaks | `./.github/workflows/gitleaks.yml` |
-| Greetings | `./.github/workflows/greetings.yml` |
 | Labeler | `./.github/workflows/labeler.yml` |
-| Lock Threads | `./.github/workflows/lock-threads.yml` |
 | Markdownlint | `./.github/workflows/markdownlint.yml` |
+| Monitor CachyOS Kernel | `./.github/workflows/monitor-cachyos-kernel.yml` |
 | Notify SourceForge Release | `./.github/workflows/notify-release-sourceforge-upload.yml` |
 | Prettier | `./.github/workflows/prettier.yml` |
 | Release Drafter | `./.github/workflows/release-drafter.yml` |
@@ -29,8 +28,8 @@ Generated on Sat Jun 13 15:43:02 UTC 2026
 | Scorecard supply-chain security | `./.github/workflows/scorecards.yml` |
 | Semgrep | `./.github/workflows/semgrep.yml` |
 | ShellCheck | `./.github/workflows/shellcheck.yml` |
-| Size Labeler | `./.github/workflows/size-labeler.yml` |
 | Spell Check | `./.github/workflows/spell-check.yml` |
-| Stale | `./.github/workflows/stale.yml` |
 | TODO Checker | `./.github/workflows/todo-checker.yml` |
 | Trivy | `./.github/workflows/trivy.yml` |
+| Update Workflows Documentation | `./.github/workflows/update-workflows-docs.yml` |
+| Wiki Synchronization | `./.github/workflows/wiki-sync.yml` |

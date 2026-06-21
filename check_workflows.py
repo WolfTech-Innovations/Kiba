@@ -10,6 +10,7 @@ import sys
 workflow_dir = ".github/workflows"
 all_passed = True
 count = 0
+EXPECTED_COUNT = 30
 
 if not os.path.exists(workflow_dir):
     print(f"Error: {workflow_dir} does not exist")
@@ -27,6 +28,10 @@ for f in sorted(os.listdir(workflow_dir)):
         except Exception as exc:
             print(f"Failed: {filepath} - {exc}")
             all_passed = False
+
+if count != EXPECTED_COUNT:
+    print(f"Error: Expected exactly {EXPECTED_COUNT} workflows, but found {count}.")
+    all_passed = False
 
 if not all_passed:
     sys.exit(1)

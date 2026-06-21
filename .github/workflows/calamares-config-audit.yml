@@ -1,0 +1,32 @@
+name: Calamares Configuration Audit
+on:
+  push:
+    paths:
+      - "build.sh"
+      - "scripts/extract_calamares_config.py"
+  pull_request:
+    paths:
+      - "build.sh"
+
+permissions:
+  contents: read
+
+jobs:
+  audit-calamares:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract Config
+        run: python3 scripts/extract_calamares_config.py
+      - name: Verify QSS Syntax
+        run: |
+          if [ -f "calamares_extracted.qss" ]; then
+            # Basic check for balanced braces
+            OPEN=$(grep -o '{' calamares_extracted.qss | wc -l)
+            CLOSE=$(grep -o '}' calamares_extracted.qss | wc -l)
+            if [ "$OPEN" -ne "$CLOSE" ]; then
+              echo "Error: Unbalanced braces in extracted QSS"
+              exit 1
+            fi
+            echo "QSS syntax check passed (balanced braces)."
+          fi
