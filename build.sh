@@ -959,7 +959,15 @@ for pkg in libinput-gestures; do
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
   cd "${AUR_BUILD}/${pkg}"
   # Bolt: Optimize AUR builds by using all cores and skipping compression
-  sudo -u builduser MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
+  # NOTE: runuser, not sudo -u — sudo is a setuid binary and setuid binaries
+  # are unreliable/broken on nosuid-mounted chroot filesystems (confirmed:
+  # this is exactly the "strange sudo error" multiple Arch forum threads
+  # report when running sudo inside arch-chroot/Docker-based archiso
+  # builds). runuser does the same "run this as another user" job but is
+  # meant to be invoked by a process that's already root, which is exactly
+  # our situation inside customize_airootfs.sh — no setuid escalation
+  # needed at all since we start as root already.
+  runuser -u builduser -- env MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
   cd /
 done
 
@@ -2873,8 +2881,12 @@ fb_freeze() {
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
   XDG_RUNTIME_DIR="/run/user/1000"
 
-  # Take screenshot as liveuser
-  sudo -u liveuser \
+  # Take screenshot as liveuser. (This script runs at real boot time on the
+  # installed system, not inside the nosuid build chroot, so sudo would
+  # actually work here — using runuser anyway for consistency, since this
+  # script is also always invoked as root and runuser is the more direct
+  # tool for "run as a different user" with no escalation step needed.)
+  runuser -u liveuser -- env \
     WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
     grim "${SNAP}" 2>/dev/null || true
@@ -3586,7 +3598,7 @@ chown -R 1000:1000 /home/liveuser
 systemctl enable NetworkManager
 
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
-sudo -u liveuser dbus-run-session -- bash -c '
+runuser -u liveuser -- dbus-run-session -- bash -c '
   dconf write /com/solus-project/budgie-panel/panels "@as []"
 '
 echo "=== customize_airootfs.sh complete ==="
