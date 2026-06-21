@@ -1067,6 +1067,24 @@ public class KibaOOBE : Adw.Application {
     private bool is_oem_mode = false;
     private const string OEM_MARKER = "/etc/kibaos/oem-pending";
 
+    /* Strips a trailing partition number from a block device name, e.g.
+     * "sda1" -> "sda", "nvme0n1p1" -> "nvme0n1". Wrapped in try/catch since
+     * Regex.replace() can throw GLib.RegexError on a malformed pattern —
+     * our patterns are fixed string literals so this never actually
+     * fails, but Vala still requires handling it explicitly. */
+    private string strip_partition_suffix (string device_name) {
+        string result = device_name;
+        try {
+            result = /[0-9]+$/.replace (result, -1, 0, "");
+            if (result.has_prefix ("nvme")) {
+                result = /p$/.replace (result, -1, 0, "");
+            }
+        } catch (GLib.RegexError e) {
+            warning ("Regex error stripping partition suffix from %s: %s", device_name, e.message);
+        }
+        return result;
+    }
+
     private bool detect_already_on_computer () {
         if (GLib.FileUtils.test (OEM_MARKER, GLib.FileTest.EXISTS)) {
             return true;
@@ -1082,13 +1100,7 @@ public class KibaOOBE : Adw.Application {
         boot_source = boot_source.strip ();
         if (boot_source == "") return false;
 
-        // Strip partition suffix to get the parent block device name,
-        // e.g. /dev/sda1 -> sda, /dev/nvme0n1p1 -> nvme0n1.
-        var base_name = GLib.Path.get_basename (boot_source);
-        base_name = /[0-9]+$/.replace (base_name, -1, 0, "");
-        if (base_name.has_prefix ("nvme")) {
-            base_name = /p$/.replace (base_name, -1, 0, "");
-        }
+        var base_name = strip_partition_suffix (GLib.Path.get_basename (boot_source));
 
         string removable_path = "/sys/block/%s/removable".printf (base_name);
         string removable_content = "";
@@ -1275,10 +1287,7 @@ public class KibaOOBE : Adw.Application {
         } catch (GLib.SpawnError e) {
             return "";
         }
-        var base_name = GLib.Path.get_basename (boot_source.strip ());
-        base_name = /[0-9]+$/.replace (base_name, -1, 0, "");
-        if (base_name.has_prefix ("nvme")) base_name = /p$/.replace (base_name, -1, 0, "");
-        return base_name;
+        return strip_partition_suffix (GLib.Path.get_basename (boot_source.strip ()));
     }
 
     private class StorageOption {
@@ -1314,7 +1323,11 @@ public class KibaOOBE : Adw.Application {
 
             var size_and_model = rest;
             // Drop the trailing removable-flag column before display.
-            size_and_model = /\s+[01]$/.replace (size_and_model, -1, 0, "");
+            try {
+                size_and_model = /\s+[01]$/.replace (size_and_model, -1, 0, "");
+            } catch (GLib.RegexError e) {
+                warning ("Regex error cleaning storage label: %s", e.message);
+            }
 
             var opt = new StorageOption ();
             opt.devpath = devpath;
@@ -1356,7 +1369,7 @@ public class KibaOOBE : Adw.Application {
             picker_list.append (row);
         }
         picker_list.row_selected.connect ((row) => {
-            if (row != null) selected_disk = (string) row.get_data ("devpath");
+            if (row != null) selected_disk = row.get_data<string> ("devpath");
         });
         if (options.size > 0) {
             selected_disk = options[0].devpath;
