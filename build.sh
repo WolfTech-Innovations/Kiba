@@ -235,6 +235,15 @@ timeout 0
 console-mode max
 editor no
 LOADER
+# NOTE on boot logo: a `splash /path/to/image.bmp` line is intentionally
+# NOT added here. Confirmed via systemd upstream issue #33728: systemd-boot's
+# native splash image only renders when timeout >= 1 or the menu is shown
+# manually — it is silently skipped whenever timeout is 0, which is exactly
+# our zero-menu setup. This is an open upstream bug, not a config mistake on
+# our end. Revisit if/when that's fixed; until then, no systemd-boot splash
+# is shown, and the firmware's own BGRT logo (unrelated, OEM-controlled,
+# not replaceable without a HackBGRT-style standalone EFI app) is what
+# stays on screen through this phase of boot, exactly as before.
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
@@ -981,596 +990,935 @@ pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
 echo "=== AUR packages installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# ELEMENTARY INSTALLER + DISTINST — PACMAN/ARCH PORT
+# KIBAOS OOBE INSTALLER — fullscreen, one-step-per-screen Vala/GTK4 app.
 #
-# distinst's chroot_conf.rs has apt/dpkg/Ubuntu tooling compiled directly
-# into Rust source (confirmed against real upstream source, not just logs).
-# Rather than sed-patch Rust control flow — risky for branches like
-# bootloader()'s kernelstub/grub fallback or keyboard_layout()'s
-# console-setup calls — the whole file is replaced with a KibaOS/pacman/
-# systemd-boot/mkinitcpio equivalent. Function-by-function rationale:
-#
-#   apt_install/apt_remove   -> pacman -S / -Rns. No separate autoremove
-#                               needed (pacman -Rns already removes deps).
-#   bootloader                -> kernelstub is Pop/elementary-only and
-#                               doesn't exist on Arch; KibaOS already uses
-#                               systemd-boot via bootctl elsewhere in this
-#                               build script.
-#   cdrom_add/cdrom_disable   -> dead code on KibaOS (no /cdrom; archiso
-#                               squashfs boot instead) — stubbed to Ok(()).
-#   install_drivers           -> ubuntu-drivers doesn't exist; no-op.
-#   keyboard_layout            -> console-setup.sh/cached.kmap.gz are
-#                               Debian-only; replaced with /etc/vconsole.conf,
-#                               Arch's real console-keymap mechanism. NOTE:
-#                               KEYMAP expects a kbd(4) name, not an XKB
-#                               layout name — matches for common layouts
-#                               (us, de, fr...) but isn't a guaranteed 1:1
-#                               mapping for every layout/variant combo.
-#   initramfs_disable/reenable -> update-initramfs doesn't exist; mkinitcpio
-#                               has no equivalent "disable" trick, and
-#                               installs are short enough that no-op-ing
-#                               both calls is simpler and safer than faking it.
-#   update_initramfs           -> rebuilt via mkinitcpio against the same
-#                               installed.conf hook set built earlier in
-#                               this script (no archiso/memdisk hooks).
-#   kernel_copy/recovery        -> entirely casper/Ubuntu-live-boot specific;
-#                               already self-gated upstream behind /cdrom
-#                               existing (never true here), but references
-#                               casper paths and vmlinuz.efi/initrd.gz that
-#                               don't exist on KibaOS — explicit no-op
-#                               instead of relying on upstream's own gate.
-#   create_user                 -> default group list swapped from Debian
-#                               group names (adm,sudo,lpadmin) to KibaOS's
-#                               actual groups (wheel,audio,video,input,
-#                               network,storage,power), matching liveuser's
-#                               groups set elsewhere in this build script.
-#   generate_locale              -> locale-gen kept (same on Arch); the
-#                               Debian-only update-locale call is swapped
-#                               for a direct /etc/locale.conf write.
-#   generate_machine_id, hostname, hosts, netresolve,
-#   disable_nvidia_fallback, timezone -> distro-neutral, unchanged.
-#
-# FAILURE MODE: if upstream distinst's API has drifted since this patch was
-# written (Chroot::command signature, Config struct fields, etc.), `make
-# all` below will fail loudly at compile time rather than silently produce
-# a broken binary. That's the intended behavior — investigate the compiler
-# error against the new upstream source if it happens, don't bypass it.
+# Earlier attempts ported elementary/installer + distinst to Arch/pacman.
+# That path is abandoned: distinst's apt/dpkg assumptions required a Rust
+# source patch (done), which then required building GNU parted from source
+# to get complete libparted headers for bindgen (done), which then hit an
+# unrelated upstream parted CLI compile bug. Rather than keep patching a
+# dependency chain built for Ubuntu/apt, this section replaces it entirely
+# with a small from-scratch Vala/GTK4/libadwaita app:
+#   - UI: a NavigationView stack, one page per step (welcome, locale, disk,
+#     account, confirm, installing, done) — no sidebar, no visible step
+#     list, matching the Windows-OOBE single-question-per-screen pattern
+#     the person actually asked for, themed in KibaOS's own navy/glass
+#     palette (matching gtk-3.0/gtk.css's colors elsewhere in this script).
+#   - Backend: a single root bash script (kibaos-oobe-backend.sh), called
+#     via pkexec. ALL partitioning/mkfs/chroot work lives there in plain
+#     bash — auditable, no FFI, no Rust, reuses this script's own existing
+#     conventions (systemd-boot/bootctl, mkinitcpio installed.conf hooks,
+#     pacman group names) rather than introducing new ones.
 # ══════════════════════════════════════════════════════════════════════════
-echo "=== Building Rust toolchain for distinst ==="
-pacman -S --noconfirm --needed rustup pkgconf parted cryptsetup lvm2 clang git
-rustup default stable
 
-DISTINST_SRC="${AUR_BUILD}/distinst"
-echo "=== Cloning distinst ==="
-git clone --depth=1 https://github.com/pop-os/distinst.git "${DISTINST_SRC}"
-CONF_RS="${DISTINST_SRC}/src/installer/steps/configure/chroot_conf.rs"
+mkdir -p /usr/share/kibaos-oobe/src
+echo "=== Installing GTK4/libadwaita OOBE build dependencies ==="
+pacman -S --noconfirm --needed gtk4 libadwaita libgee vala meson ninja rsync polkit gptfdisk arch-install-scripts dosfstools
 
-if [ ! -f "${CONF_RS}" ]; then
-  echo "FATAL: ${CONF_RS} not found — upstream distinst layout changed since this patch was written." >&2
-  exit 1
-fi
+# ── main.vala ────────────────────────────────────────────────────────────
+cat > /usr/share/kibaos-oobe/src/main.vala << 'OOBEVALA'
+/* KibaOS OOBE Installer — fullscreen, one-step-per-screen, no sidebar.
+ * GTK4 + libadwaita. Visual language matches the live desktop directly:
+ * navy gradient (#0d1b2a -> #003f5c -> #0099cc), frosted glass cards,
+ * pill buttons, the same K-mark watermark used on the wallpaper.
+ *
+ * This is a UI shell only. All actual disk/install work happens in
+ * /usr/local/bin/kibaos-oobe-backend.sh, invoked via pkexec. Keeping the
+ * privileged logic in one auditable bash script, not in Vala/GObject code,
+ * mirrors the same separation Calamares already uses (UI process vs.
+ * root-requiring jobs) without needing a Rust/C++ FFI layer at all.
+ */
 
-cat > "${CONF_RS}" << 'CHROOTCONFRS'
-use crate::chroot::{Chroot, Command};
-use crate::errors::{IoContext, IntoIoResult};
-use crate::misc;
-use partition_identity::PartitionID;
-use proc_mounts::MountList;
-use std::path::PathBuf;
-use std::{
-    fs,
-    io::{self, Write},
-    path::Path,
-};
-use crate::timezones::Region;
-use crate::Config;
+using Gtk;
+using Adw;
+using Gee;
 
-// KibaOS/Arch port: no apt-cdrom equivalent needed for pacman.
-const BOOT_OPTIONS: &str = "quiet loglevel=0 systemd.show_status=false splash";
-const RECOVERY_BOOT_OPTIONS: &str = "";
+public class KibaOOBE : Adw.Application {
+    private Adw.ApplicationWindow window;
+    private Adw.NavigationView nav_view;
+    private string selected_disk = "";
+    private string selected_locale = "en_US.UTF-8";
+    private string selected_keymap = "us";
+    private string hostname_value = "kibaos";
+    private string username_value = "";
+    private string password_value = "";
 
-pub struct ChrootConfigurator<'a> {
-    chroot: Chroot<'a>,
+    /* "Already on your computer" mode (formerly "OEM mode"): detected
+     * automatically, no jargon, no manual step required. The signal: if
+     * the device this live image actually booted from is NOT removable
+     * (i.e. /sys/block/<dev>/removable reads "0"), the image was written
+     * directly onto a fixed internal drive — a hybrid ISO dd'd straight
+     * onto the target disk, or a drive pre-imaged by a manufacturer.
+     * There's nothing to copy and nothing to divide up: the files are
+     * already sitting on the disk that's going to run them. So setup
+     * skips straight to language and an account, with no disk step
+     * shown at all — because there's genuinely nothing to choose.
+     *
+     * If booted from a removable drive (a USB stick) instead, the target
+     * is some other, separate internal drive — that's the normal "set
+     * this computer up" path, which still does real disk work, just
+     * without ever naming it as such on screen (see list_storage_options).
+     *
+     * /sys/block/.../removable is a strong signal but not flawless (some
+     * eMMC storage misreports as removable; a USB-attached internal
+     * drive can misreport as fixed) — see detect_already_on_computer()
+     * for the exact check, and OEM_MARKER below for a manual override an
+     * imaging script can set if the automatic check ever gets it wrong. */
+    private bool is_oem_mode = false;
+    private const string OEM_MARKER = "/etc/kibaos/oem-pending";
+
+    private bool detect_already_on_computer () {
+        if (GLib.FileUtils.test (OEM_MARKER, GLib.FileTest.EXISTS)) {
+            return true;
+        }
+        string boot_source = "";
+        try {
+            GLib.Process.spawn_command_line_sync (
+                "findmnt -n -o SOURCE /run/archiso/bootmnt", out boot_source);
+        } catch (GLib.SpawnError e) {
+            warning ("Could not determine boot source: %s", e.message);
+            return false;
+        }
+        boot_source = boot_source.strip ();
+        if (boot_source == "") return false;
+
+        // Strip partition suffix to get the parent block device name,
+        // e.g. /dev/sda1 -> sda, /dev/nvme0n1p1 -> nvme0n1.
+        var base_name = GLib.Path.get_basename (boot_source);
+        base_name = /[0-9]+$/.replace (base_name, -1, 0, "");
+        if (base_name.has_prefix ("nvme")) {
+            base_name = /p$/.replace (base_name, -1, 0, "");
+        }
+
+        string removable_path = "/sys/block/%s/removable".printf (base_name);
+        string removable_content = "";
+        try {
+            GLib.FileUtils.get_contents (removable_path, out removable_content);
+        } catch (GLib.FileError e) {
+            warning ("Could not read %s: %s", removable_path, e.message);
+            return false;
+        }
+        return removable_content.strip () == "0";
+    }
+
+    public KibaOOBE () {
+        Object (application_id: "io.kibaos.oobe", flags: ApplicationFlags.FLAGS_NONE);
+    }
+
+    protected override void activate () {
+        is_oem_mode = detect_already_on_computer ();
+
+        window = new Adw.ApplicationWindow (this) {
+            default_width = 1280,
+            default_height = 800,
+            fullscreened = true,
+            title = is_oem_mode ? "Finish Setting Up KibaOS" : "KibaOS Setup"
+        };
+        window.add_css_class ("kibaos-oobe-window");
+
+        nav_view = new Adw.NavigationView ();
+        window.set_content (nav_view);
+
+        if (is_oem_mode) {
+            nav_view.push (build_locale_page ());
+        } else {
+            nav_view.push (build_welcome_page ());
+        }
+        load_css ();
+        window.present ();
+    }
+
+    private void load_css () {
+        var provider = new Gtk.CssProvider ();
+        provider.load_from_path ("/usr/share/kibaos-oobe/oobe.css");
+        Gtk.StyleContext.add_provider_for_display (
+            Gdk.Display.get_default (), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+    }
+
+    /* ── Shared page chrome: K-mark watermark behind every page, frosted
+     * card centered on top, Back/Next pinned bottom-right — exactly the
+     * Windows-OOBE-style single-question layout, themed with KibaOS's own
+     * navy/glass language instead of Windows' flat blue. */
+    private Adw.NavigationPage make_page (string title, Gtk.Widget content,
+                                            string? next_label, GLib.Callback? on_next) {
+        var root = new Gtk.Overlay ();
+        root.add_css_class ("oobe-background");
+
+        var watermark = new Gtk.Image.from_icon_name ("kibaos-watermark-symbolic") {
+            pixel_size = 420,
+            opacity = 0.10,
+            halign = Gtk.Align.CENTER,
+            valign = Gtk.Align.CENTER
+        };
+        root.add_overlay (watermark);
+
+        var card = new Gtk.Box (Gtk.Orientation.VERTICAL, 18) {
+            halign = Gtk.Align.CENTER,
+            valign = Gtk.Align.CENTER,
+            width_request = 560
+        };
+        card.add_css_class ("oobe-card");
+        card.append (content);
+        root.add_overlay (card);
+
+        var nav_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12) {
+            halign = Gtk.Align.END,
+            valign = Gtk.Align.END,
+            margin_end = 36,
+            margin_bottom = 36
+        };
+        if (nav_view.get_navigation_stack ().get_n_items () > 0) {
+            var back_btn = new Gtk.Button.with_label ("Back");
+            back_btn.add_css_class ("oobe-secondary-button");
+            back_btn.clicked.connect (() => nav_view.pop ());
+            nav_row.append (back_btn);
+        }
+        if (next_label != null) {
+            var next_btn = new Gtk.Button.with_label (next_label);
+            next_btn.add_css_class ("oobe-primary-button");
+            if (on_next != null) {
+                next_btn.clicked.connect (() => { ((void (*)()) on_next) (); });
+            }
+            nav_row.append (next_btn);
+        }
+        root.add_overlay (nav_row);
+
+        var page = new Adw.NavigationPage (root, title);
+        return page;
+    }
+
+    private Gtk.Widget oobe_heading (string text, string? subtitle = null) {
+        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8);
+        var label = new Gtk.Label (text);
+        label.add_css_class ("oobe-title");
+        label.wrap = true;
+        box.append (label);
+        if (subtitle != null) {
+            var sub = new Gtk.Label (subtitle);
+            sub.add_css_class ("oobe-subtitle");
+            sub.wrap = true;
+            box.append (sub);
+        }
+        return box;
+    }
+
+    /* ── Page 1: Welcome ──────────────────────────────────────────────── */
+    private Adw.NavigationPage build_welcome_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 24);
+        content.append (oobe_heading ("Welcome to KibaOS",
+            "Let's get your system set up. This will take about five to ten minutes."));
+        return make_page ("Welcome", content, "Get Started", () => {
+            nav_view.push (build_locale_page ());
+        });
+    }
+
+    /* ── Page 2: Locale + keyboard ────────────────────────────────────── */
+    private Adw.NavigationPage build_locale_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
+        content.append (oobe_heading ("Language & Keyboard",
+            "Choose how KibaOS should speak to you."));
+
+        var locale_row = new Adw.ComboRow () { title = "Language" };
+        var locale_model = new Gtk.StringList (null);
+        string[] locales = { "en_US.UTF-8", "en_GB.UTF-8", "de_DE.UTF-8", "fr_FR.UTF-8", "es_ES.UTF-8" };
+        foreach (var l in locales) locale_model.append (l);
+        locale_row.set_model (locale_model);
+        locale_row.notify["selected"].connect (() => {
+            selected_locale = locales[locale_row.get_selected ()];
+        });
+        content.append (locale_row);
+
+        var keymap_row = new Adw.ComboRow () { title = "Keyboard layout" };
+        var keymap_model = new Gtk.StringList (null);
+        string[] keymaps = { "us", "uk", "de", "fr", "es" };
+        foreach (var k in keymaps) keymap_model.append (k);
+        keymap_row.set_model (keymap_model);
+        keymap_row.notify["selected"].connect (() => {
+            selected_keymap = keymaps[keymap_row.get_selected ()];
+        });
+        content.append (keymap_row);
+
+        return make_page ("Language", content, "Next", () => {
+            if (is_oem_mode) {
+                nav_view.push (build_account_page ());
+            } else {
+                advance_past_storage_step ();
+            }
+        });
+    }
+
+    /* ── Storage target: fully automatic, no jargon shown to the person.
+     * "Partition", "disk", "erase", and device paths never appear on
+     * screen. Logic:
+     *   1. Find the drive we booted from (to exclude it — we never want
+     *      to suggest overwriting the very USB stick running setup).
+     *   2. List every OTHER fixed, non-removable drive found.
+     *   3. Exactly one candidate -> skip the page entirely, just use it.
+     *   4. Multiple candidates -> show a short plain-language picker
+     *      ("your computer's storage", with size and a friendly model
+     *      name) so the person can still tell two drives apart, without
+     *      ever seeing the word "partition" or a /dev/ path. ───────────── */
+    private string boot_device_basename () {
+        string boot_source = "";
+        try {
+            GLib.Process.spawn_command_line_sync (
+                "findmnt -n -o SOURCE /run/archiso/bootmnt", out boot_source);
+        } catch (GLib.SpawnError e) {
+            return "";
+        }
+        var base_name = GLib.Path.get_basename (boot_source.strip ());
+        base_name = /[0-9]+$/.replace (base_name, -1, 0, "");
+        if (base_name.has_prefix ("nvme")) base_name = /p$/.replace (base_name, -1, 0, "");
+        return base_name;
+    }
+
+    private class StorageOption {
+        public string devpath;
+        public string label;
+    }
+
+    private Gee.ArrayList<StorageOption> list_storage_options () {
+        var options = new Gee.ArrayList<StorageOption> ();
+        string boot_dev = boot_device_basename ();
+
+        string raw = "";
+        try {
+            GLib.Process.spawn_command_line_sync (
+                "lsblk -dpno NAME,SIZE,MODEL,RM -e7,11", out raw);
+        } catch (GLib.SpawnError e) {
+            warning ("Could not list storage: %s", e.message);
+            return options;
+        }
+
+        foreach (var line in raw.split ("\n")) {
+            var trimmed = line.strip ();
+            if (trimmed == "") continue;
+            var parts = trimmed.split (" ", 2);
+            string devpath = parts[0];
+            string rest = parts.length > 1 ? parts[1].strip () : "";
+
+            // Skip removable drives entirely (the boot USB itself, or any
+            // other USB stick plugged in) — never offer to use one as the
+            // install target, since that's almost never what's intended.
+            if (rest.has_suffix (" 1") || rest == "1") continue;
+            if (GLib.Path.get_basename (devpath) == boot_dev) continue;
+
+            var size_and_model = rest;
+            // Drop the trailing removable-flag column before display.
+            size_and_model = /\s+[01]$/.replace (size_and_model, -1, 0, "");
+
+            var opt = new StorageOption ();
+            opt.devpath = devpath;
+            opt.label = "Your computer's storage (%s)".printf (
+                size_and_model == "" ? "internal drive" : size_and_model);
+            options.add (opt);
+        }
+        return options;
+    }
+
+    private void advance_past_storage_step () {
+        var options = list_storage_options ();
+        if (options.size <= 1) {
+            // Nothing to choose — either there's exactly one obvious
+            // place to put KibaOS, or detection found nothing and the
+            // backend script will surface a clear error later instead
+            // of showing an empty, confusing picker now.
+            selected_disk = options.size == 1 ? options[0].devpath : "";
+            nav_view.push (build_account_page ());
+        } else {
+            nav_view.push (build_storage_picker_page (options));
+        }
+    }
+
+    /* Only shown when there's genuinely more than one place KibaOS could
+     * go — e.g. a desktop with two internal drives. Plain language only. */
+    private Adw.NavigationPage build_storage_picker_page (Gee.ArrayList<StorageOption> options) {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
+        content.append (oobe_heading ("Where should KibaOS go?",
+            "Your computer has more than one place to put it. Pick one."));
+
+        var picker_list = new Gtk.ListBox ();
+        picker_list.add_css_class ("oobe-list");
+        picker_list.selection_mode = Gtk.SelectionMode.SINGLE;
+
+        foreach (var opt in options) {
+            var row = new Adw.ActionRow () { title = opt.label };
+            row.set_data ("devpath", opt.devpath);
+            picker_list.append (row);
+        }
+        picker_list.row_selected.connect ((row) => {
+            if (row != null) selected_disk = (string) row.get_data ("devpath");
+        });
+        if (options.size > 0) {
+            selected_disk = options[0].devpath;
+            picker_list.select_row (picker_list.get_row_at_index (0));
+        }
+        content.append (picker_list);
+
+        return make_page ("Storage", content, "Next", () => {
+            nav_view.push (build_account_page ());
+        });
+    }
+
+    /* ── Page 4: Account creation ─────────────────────────────────────── */
+    private Adw.NavigationPage build_account_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 16);
+        content.append (oobe_heading ("Create Your Account",
+            "This is the account you'll use to sign in to KibaOS."));
+
+        var hostname_entry = new Adw.EntryRow () { title = "Computer name" };
+        hostname_entry.text = "kibaos";
+        hostname_entry.changed.connect (() => { hostname_value = hostname_entry.text; });
+        content.append (hostname_entry);
+
+        var user_entry = new Adw.EntryRow () { title = "Username" };
+        user_entry.changed.connect (() => { username_value = user_entry.text; });
+        content.append (user_entry);
+
+        var pass_entry = new Adw.PasswordEntryRow () { title = "Password" };
+        pass_entry.changed.connect (() => { password_value = pass_entry.text; });
+        content.append (pass_entry);
+
+        return make_page ("Account", content, is_oem_mode ? "Finish Setup" : "Next", () => {
+            if (is_oem_mode) {
+                nav_view.push (build_installing_page ());
+                start_oem_finish ();
+            } else {
+                nav_view.push (build_confirm_page ());
+            }
+        });
+    }
+
+    /* ── Page 5: Confirm ──────────────────────────────────────────────── */
+    private Adw.NavigationPage build_confirm_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 16);
+        content.append (oobe_heading ("Ready to Set Up KibaOS",
+            "KibaOS will be set up on your computer now. Anything currently " +
+            "on it will be replaced, so make sure anything important is backed up first."));
+
+        return make_page ("Confirm", content, "Set Up KibaOS", () => {
+            nav_view.push (build_installing_page ());
+            start_install ();
+        });
+    }
+
+    /* ── Page 6: Installing (progress) ───────────────────────────────── */
+    private Gtk.Label progress_label;
+    private Gtk.ProgressBar progress_bar;
+
+    private Adw.NavigationPage build_installing_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
+        content.append (oobe_heading ("Installing KibaOS", "Sit tight — this won't take long."));
+
+        progress_bar = new Gtk.ProgressBar () { show_text = false };
+        progress_bar.add_css_class ("oobe-progress");
+        content.append (progress_bar);
+
+        progress_label = new Gtk.Label ("Preparing...");
+        progress_label.add_css_class ("oobe-subtitle");
+        content.append (progress_label);
+
+        return make_page ("Installing", content, null, null);
+    }
+
+    /* ── Page 7: Done ─────────────────────────────────────────────────── */
+    private Adw.NavigationPage build_done_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
+        content.append (oobe_heading ("You're All Set", "KibaOS is ready. Restart to get started."));
+        return make_page ("Done", content, "Restart", () => {
+            try { GLib.Process.spawn_command_line_async ("systemctl reboot"); }
+            catch (GLib.SpawnError e) { warning ("Reboot failed: %s", e.message); }
+        });
+    }
+
+    /* ── OEM mode: calls a separate, much lighter backend (no partitioning,
+     * no squashfs extraction — the system is already fully installed).
+     * Kept as its own script rather than branching kibaos-oobe-backend.sh
+     * internally, so the destructive disk-wipe script and the OEM
+     * finish-setup script are never the same file a person could
+     * accidentally invoke with the wrong arguments. */
+    private void start_oem_finish () {
+        string cmd = "pkexec /usr/local/bin/kibaos-oem-finish.sh '%s' '%s' '%s' '%s' '%s'".printf (
+            selected_locale, selected_keymap, hostname_value, username_value, password_value);
+
+        try {
+            string[] argv;
+            GLib.Shell.parse_argv (cmd, out argv);
+            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
+            var proc = launcher.spawnv (argv);
+            var stdout_stream = new GLib.DataInputStream (proc.get_stdout_pipe ());
+
+            read_backend_output.begin (stdout_stream, proc);
+        } catch (GLib.Error e) {
+            progress_label.label = "Setup failed to start: %s".printf (e.message);
+        }
+    }
+
+    /* ── Backend invocation: hands off to the privileged bash script via
+     * pkexec, reading its stdout line-by-line for progress updates. The
+     * backend prints "PROGRESS <0-100> <message>" lines; everything else
+     * is logged but not parsed, so the backend can be verbose/safe without
+     * the UI breaking on unexpected output. */
+    private void start_install () {
+        string cmd = "pkexec /usr/local/bin/kibaos-oobe-backend.sh '%s' '%s' '%s' '%s' '%s' '%s'".printf (
+            selected_disk, selected_locale, selected_keymap,
+            hostname_value, username_value, password_value);
+
+        try {
+            string[] argv;
+            GLib.Shell.parse_argv (cmd, out argv);
+            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
+            var proc = launcher.spawnv (argv);
+            var stdout_stream = new GLib.DataInputStream (proc.get_stdout_pipe ());
+
+            read_backend_output.begin (stdout_stream, proc);
+        } catch (GLib.Error e) {
+            progress_label.label = "Install failed to start: %s".printf (e.message);
+        }
+    }
+
+    private async void read_backend_output (GLib.DataInputStream stream, GLib.Subprocess proc) {
+        try {
+            while (true) {
+                string? line = yield stream.read_line_async ();
+                if (line == null) break;
+                if (line.has_prefix ("PROGRESS ")) {
+                    var parts = line.substring (9).split (" ", 2);
+                    int pct = int.parse (parts[0]);
+                    string msg = parts.length > 1 ? parts[1] : "";
+                    progress_bar.fraction = pct / 100.0;
+                    progress_label.label = msg;
+                }
+            }
+            yield proc.wait_async ();
+            if (proc.get_exit_status () == 0) {
+                nav_view.push (build_done_page ());
+            } else {
+                progress_label.label = "Something went wrong. Please try again, or ask for help if it keeps happening.";
+            }
+        } catch (GLib.Error e) {
+            progress_label.label = "Lost connection to installer: %s".printf (e.message);
+        }
+    }
+
+    public static int main (string[] args) {
+        var app = new KibaOOBE ();
+        return app.run (args);
+    }
 }
 
-impl<'a> ChrootConfigurator<'a> {
-    pub fn new(chroot: Chroot<'a>) -> Self {
-        Self { chroot }
-    }
+OOBEVALA
 
-    /// Install packages via pacman (KibaOS/Arch port of apt_install).
-    pub fn apt_install(&self, packages: &[&str]) -> io::Result<()> {
-        info!("installing packages (pacman): {:?}", packages);
-        let mut args: Vec<&str> = Vec::with_capacity(packages.len() + 2);
-        args.extend_from_slice(&["-S", "--noconfirm"]);
-        args.extend_from_slice(packages);
-        self.chroot.command("pacman", &args).run()
-    }
+# ── meson build files ─────────────────────────────────────────────────────
+cat > /usr/share/kibaos-oobe/src/meson.build << 'OOBEMESON'
+project('kibaos-oobe', 'vala', 'c', version: '1.0')
 
-    /// Remove packages via pacman (KibaOS/Arch port of apt_remove).
-    /// pacman -Rns removes unneeded deps + config files in one pass, so no
-    /// separate autoremove step is needed the way apt requires. Doesn't
-    /// hard-fail on already-absent packages (pacman errors there; apt-get
-    /// purge historically didn't — see upstream pop-os/distinst#207).
-    pub fn apt_remove(&self, packages: &[&str]) -> io::Result<()> {
-        info!("removing packages (pacman): {:?}", packages);
-        let mut args: Vec<&str> = Vec::with_capacity(packages.len() + 2);
-        args.extend_from_slice(&["-Rns", "--noconfirm"]);
-        args.extend_from_slice(packages);
-        let _ = self.chroot.command("pacman", &args).run();
-        Ok(())
-    }
+gtk4_dep = dependency('gtk4')
+adwaita_dep = dependency('libadwaita-1')
+gee_dep = dependency('gee-0.8')
 
-    /// KibaOS ships systemd-boot via bootctl (no kernelstub — that's a
-    /// Pop/elementary-only wrapper). Loader entries are already written
-    /// into the image at build time; this ensures bootctl is installed
-    /// into the ESP on the target disk.
-    pub fn bootloader(&self) -> io::Result<()> {
-        info!("configuring bootloader (systemd-boot via bootctl)");
-        let result = self
-            .chroot
-            .command("bootctl", &["--esp-path=/boot", "install"])
-            .run();
+executable(
+  'io.kibaos.oobe',
+  'main.vala',
+  dependencies: [gtk4_dep, adwaita_dep, gee_dep],
+  install: true
+)
+OOBEMESON
 
-        match result {
-            Ok(()) => Ok(()),
-            Err(ref e) if e.kind() == io::ErrorKind::NotFound => {
-                warn!("bootctl not found in chroot; loader entries from image will be used as-is");
-                Ok(())
-            }
-            Err(why) => Err(why),
-        }
-    }
+# ── CSS theme ──────────────────────────────────────────────────────────────
+cat > /usr/share/kibaos-oobe/oobe.css << 'OOBECSS'
+/* KibaOS OOBE theme — same palette as the rest of the OS build:
+ * #0d1b2a / #003f5c / #0099cc gradient family, frosted glass cards,
+ * pill buttons. See customize_airootfs.sh's gtk-3.0/gtk.css for the
+ * canonical KibaOS color definitions this mirrors. */
 
-    /// No-op on KibaOS: archiso boots from squashfs, never a mounted /cdrom.
-    pub fn cdrom_add(&self) -> io::Result<()> {
-        Ok(())
-    }
-
-    /// No-op on KibaOS — see cdrom_add.
-    pub fn cdrom_disable(&self) -> io::Result<()> {
-        Ok(())
-    }
-
-    /// No-op on KibaOS: ubuntu-drivers doesn't exist on Arch. Hardware
-    /// support comes from the pacman package set already baked into the
-    /// image (mesa, sof-firmware, etc.), not a post-install driver scan.
-    pub fn install_drivers(&self, _install: bool) -> io::Result<()> {
-        Ok(())
-    }
-
-    /// Create a new user account. Group list swapped from Debian group
-    /// names (adm,sudo,lpadmin) to KibaOS's actual groups, matching
-    /// liveuser's groups elsewhere in this build script.
-    pub fn create_user(
-        &self,
-        config: &Config,
-        user: &str,
-        pass: Option<&str>,
-        fullname: Option<&str>,
-        profile_icon: Option<&str>,
-    ) -> io::Result<()> {
-        {
-            const DEFAULT_USERADD_FLAGS: &[&str] = &[
-                "-m",
-                "-G", "wheel,audio,video,input,network,storage,power",
-                "-s", "/bin/bash"
-            ];
-
-            let mut command = self.chroot.command("useradd", DEFAULT_USERADD_FLAGS);
-
-            if let Some(name) = fullname {
-                command.args(&["-c", name]);
-            }
-
-            command.arg(user).run()?;
-        }
-
-        if let Some(pass) = pass {
-            let pass = &[pass, "\n", pass, "\n"].concat();
-            self.chroot.command("passwd", &[user]).stdin_input(pass).run()?;
-        }
-
-        if let Some(path) = profile_icon {
-            let mut dest = self.chroot.path.join(&["var/lib/AccountsService/icons/", user].concat());
-
-            if fs::copy(&path, &dest).is_err() {
-                let _ = fs::remove_file(&dest);
-                return Ok(());
-            }
-
-            dest = self.chroot.path.join(&["var/lib/AccountsService/users/", user].concat());
-
-            if fs::write(&dest, fomat!(
-                "[User]\n"
-                "Icon=/var/lib/AccountsService/icons/" (user) "\n"
-                "SystemAccount=false\n"
-            )).is_err() {
-                let _ = fs::remove_file(&dest);
-            }
-        }
-
-        _ = self.chroot.command("usermod", [
-            "--shell",
-            "/bin/bash",
-            user
-        ]).run();
-
-        self.chroot.command("chown", [
-            "-R",
-            &[user, ":", user].concat(),
-            &["/home/", user, "/.config/"].concat(),
-        ]).run()?;
-
-        Ok(())
-    }
-
-    /// Distro-neutral, unchanged.
-    pub fn disable_nvidia_fallback(&self) {
-        info!("attempting to disable nvidia-fallback.service");
-        let args = &["disable", "nvidia-fallback.service"];
-        if let Err(why) = self.chroot.command("systemctl", args).run() {
-            warn!("disabling nvidia-fallback.service failed: {}", why);
-        }
-    }
-
-    /// locale-gen is the same on Arch; the Debian-only update-locale call
-    /// is swapped for a direct /etc/locale.conf write.
-    pub fn generate_locale(&self, locale: &str) -> io::Result<()> {
-        info!("generating locale via `locale-gen`");
-        self.chroot.command("locale-gen", &["--purge", locale]).run()?;
-        let locale_conf = self.chroot.path.join("etc/locale.conf");
-        let mut file = misc::create(&locale_conf)?;
-        writeln!(&mut file, "LANG={}", locale)
-            .with_context(|err| format!("failed to write /etc/locale.conf: {}", err))
-    }
-
-    /// Distro-neutral, unchanged.
-    pub fn generate_machine_id(&self) -> io::Result<()> {
-        info!("generating machine id via `dbus-uuidgen`");
-        self.chroot.command("sh", &["-c", "dbus-uuidgen > /etc/machine-id"]).run()?;
-        self.chroot.command("ln", &["-sf", "/etc/machine-id", "/var/lib/dbus/machine-id"]).run()
-    }
-
-    /// Distro-neutral, unchanged.
-    pub fn hostname(&self, hostname: &str) -> io::Result<()> {
-        info!("setting hostname to {}", hostname);
-        let hostfile = self.chroot.path.join("etc/hostname");
-        let mut file = misc::create(&hostfile)?;
-        writeln!(&mut file, "{}", hostname)
-            .with_context(|err| format!("failed to write hostname to {:?}: {}", hostfile, err))
-    }
-
-    /// Distro-neutral, unchanged.
-    pub fn hosts(&self, hostname: &str) -> io::Result<()> {
-        info!("setting hosts file");
-        let hosts = self.chroot.path.join("etc/hosts");
-        let mut file = misc::create(&hosts)?;
-        writeln!(
-            &mut file,
-            "# See `man hosts` for details.\n#
-# By default, systemd-resolved or libnss-myhostname will resolve
-# localhost and the system hostname if they're not specified here.
-127.0.0.1\tlocalhost\n::1\t\tlocalhost"
-        )
-        .with_context(|err| format!("failed to write hosts to {:?}: {}", hosts, err))
-    }
-
-    /// update-initramfs doesn't exist on Arch; mkinitcpio has no "disable"
-    /// concept the way Debian's symlink-to-true trick works. Installs are
-    /// short enough that no-op-ing both calls is simpler and safer than
-    /// emulating the disable/reenable dance.
-    pub fn initramfs_disable(&self) -> io::Result<()> {
-        Ok(())
-    }
-
-    pub fn initramfs_reenable(&self) -> io::Result<()> {
-        Ok(())
-    }
-
-    /// console-setup.sh and cached.kmap.gz are Debian-only. Arch's real
-    /// equivalent for console (non-X11) keymap persistence is
-    /// /etc/vconsole.conf, read by systemd-vconsole-setup at boot.
-    pub fn keyboard_layout(&self, config: &Config) -> io::Result<()> {
-        info!("configuring keyboard layout via /etc/vconsole.conf");
-
-        if Path::new("/bin/cosmic-comp").exists() {
-            set_cosmic_xkb_config(config, self.chroot.path.join("etc/cosmic/com.system76.CosmicComp/v1/xkb_config"))?;
-        }
-
-        let keyboard_file = self.chroot.path.join("etc/default/keyboard");
-        let mut file = misc::create(&keyboard_file)?;
-        writeln!(&mut file, "XKBLAYOUT={}\nBACKSPACE=guess", config.keyboard_layout)
-            .with_context(|err| {
-                format!("failed to write keyboard layout to /etc/default/keyboard: {}", err)
-            })?;
-
-        if let Some(model) = config.keyboard_model.as_deref() {
-            writeln!(&mut file, "XKBMODEL={}", model).with_context(|err| {
-                format!("failed to write keyboard layout to /etc/default/keyboard: {}", err)
-            })?;
-        }
-
-        if let Some(variant) = config.keyboard_variant.as_deref() {
-            writeln!(&mut file, "XKBVARIANT={}", variant).with_context(|err| {
-                format!("failed to write keyboard layout to /etc/default/keyboard: {}", err)
-            })?;
-        }
-
-        // KEYMAP expects a kbd(4) console keymap name, not an XKB layout
-        // name — matches for common layouts (us, de, fr...) but is a known
-        // approximation, not a guaranteed 1:1 mapping for every combo.
-        let vconsole = self.chroot.path.join("etc/vconsole.conf");
-        let mut vfile = misc::create(&vconsole)?;
-        writeln!(&mut vfile, "KEYMAP={}", config.keyboard_layout)
-            .with_context(|err| format!("failed to write /etc/vconsole.conf: {}", err))
-    }
-
-    /// No-op on KibaOS: casper/Ubuntu-live-boot specific; the /cdrom path
-    /// it checks for never exists on an archiso-booted system.
-    pub fn kernel_copy(&self) -> io::Result<()> {
-        Ok(())
-    }
-
-    /// Distro-neutral, unchanged.
-    pub fn netresolve(&self) -> io::Result<()> {
-        info!("creating /etc/resolv.conf");
-        let resolvconf = "../run/systemd/resolve/stub-resolv.conf";
-        self.chroot.command("ln", &["-sf", resolvconf, "/etc/resolv.conf"]).run()
-    }
-
-    /// No-op on KibaOS: builds a casper/Ubuntu-style recovery partition;
-    /// already self-gated upstream behind /cdrom existing (never true
-    /// here), but references casper paths and vmlinuz.efi/initrd.gz
-    /// filenames that don't exist on KibaOS — explicit no-op rather than
-    /// relying on upstream's own gate.
-    pub fn recovery(
-        &self,
-        _config: &Config,
-        _name: &str,
-        _root_uuid: &str,
-        _luks_uuid: &str,
-    ) -> io::Result<()> {
-        Ok(())
-    }
-
-    /// Distro-neutral, unchanged.
-    pub fn timezone(&self, region: &Region) -> io::Result<()> {
-        self.chroot.command("rm", &["/etc/timezone"]).run()?;
-        let args: &[&str] = &[];
-        self.chroot.command("ln", args).arg(region.path()).arg("/etc/timezone").run()
-    }
-
-    /// update-initramfs doesn't exist; rebuild via mkinitcpio against the
-    /// same installed (non-archiso) hook config built earlier in this
-    /// build script's customize_airootfs.sh.
-    pub fn update_initramfs(&self) -> io::Result<()> {
-        self.chroot
-            .command("mkinitcpio", &["-c", "/etc/mkinitcpio.conf.d/installed.conf", "-g", "/boot/initramfs-linux.img"])
-            .run()
-            .with_context(|why| format!("failed to update initramfs: {}", why))
-    }
+window.kibaos-oobe-window {
+    background: none;
 }
 
-fn set_cosmic_xkb_config(config: &Config, path: PathBuf) -> io::Result<()> {
-    info!("installing xkb_config for cosmic at `{}`", path.display());
-
-    if path.exists() {
-        _ = std::fs::remove_file(&path);
-    }
-
-    _ = std::fs::create_dir_all(path.parent().unwrap());
-    let mut cosmic_xkb_file = misc::create(&path)?;
-
-    writeln!(
-        &mut cosmic_xkb_file,
-        r#"(
-    rules: "",
-    model: "{}",
-    layout: "{}",
-    variant: "{}",
-    options: Some("lv3:ralt_switch,compose:rctrl"),
-    repeat_delay: 600,
-    repeat_rate: 25,
-)"#,
-        config.keyboard_model.as_ref().map(String::as_str).unwrap_or_default(),
-        config.keyboard_layout,
-        config.keyboard_variant.as_ref().map(String::as_str).unwrap_or_default()
-    )
-    .with_context(|err| {
-        format!("failed to write keyboard layout to {}: {}", path.display(), err)
-    })
+.oobe-background {
+    background-image: linear-gradient(160deg, #0d1b2a 0%, #003f5c 45%, #0099cc 100%);
 }
-CHROOTCONFRS
 
-echo "=== chroot_conf.rs replaced with KibaOS/pacman port ==="
+.oobe-card {
+    background-color: rgba(16, 24, 40, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 26px;
+    padding: 48px 44px;
+    box-shadow:
+        0 24px 80px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
 
-# ── libparted-sys ABI fix: build GNU parted from source, bypass Arch's headers ──
-# ROOT CAUSE (confirmed via multiple independent sources): libparted-sys's
-# own crate docs state it "requires libparted-dev installed to build on
-# debian variants" — libparted-dev is a Debian-specific split package
-# carrying fuller development headers than the combined runtime+dev
-# `parted` package Arch ships. bindgen (called by libparted-sys's own
-# build.rs, confirmed via Cargo.lock: libparted-sys depends on bindgen
-# 0.65.1) generates real fielded structs when pointed at Debian's
-# libparted-dev headers, but produces opaque `_address`-only structs when
-# pointed at Arch's thinner /usr/include/parted/parted.h — same bindgen
-# version, same crate, different header completeness. This is NOT a
-# bindgen flag problem (confirmed by two independent failed attempts
-# producing the identical opaque signature) and not something fixable by
-# pinning a different libparted-sys version (the bindgen call site is
-# correct; the input header is what's insufficient).
+.oobe-title {
+    font-size: 28px;
+    font-weight: 500;
+    color: #f2f6fa;
+    margin-bottom: 4px;
+}
+
+.oobe-subtitle {
+    font-size: 14px;
+    color: #aebccd;
+}
+
+.oobe-list {
+    background: transparent;
+}
+
+.oobe-list row {
+    background-color: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    margin: 4px 0;
+    padding: 10px 14px;
+    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+.oobe-list row:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-list row:selected {
+    background-color: rgba(0, 153, 204, 0.30);
+    border-color: rgba(0, 153, 204, 0.55);
+}
+
+.oobe-primary-button {
+    background-color: #0099cc;
+    color: #ffffff;
+    border: none;
+    border-radius: 999px;
+    padding: 12px 32px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-primary-button:hover {
+    background-color: #00b8f0;
+}
+
+.oobe-secondary-button {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #e8eef5;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 999px;
+    padding: 12px 28px;
+    font-size: 14px;
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.oobe-secondary-button:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+.oobe-progress {
+    min-height: 8px;
+    border-radius: 999px;
+}
+
+.oobe-progress trough {
+    background-color: rgba(255, 255, 255, 0.10);
+    border-radius: 999px;
+    min-height: 8px;
+}
+
+.oobe-progress progress {
+    background-color: #0099cc;
+    border-radius: 999px;
+}
+
+entry, row.entry {
+    background-color: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 12px;
+    color: #e8eef5;
+}
+
+entry:focus-within, row.entry:focus-within {
+    border-color: rgba(0, 153, 204, 0.6);
+    background-color: rgba(255, 255, 255, 0.10);
+}
+
+OOBECSS
+
+# ── Watermark icon: reuse the existing KibaOS logo as the symbolic
+# watermark rather than generating a separate asset — same K-mark already
+# used for the panel/branding elsewhere in this build. ────────────────────
+mkdir -p /usr/share/icons/hicolor/scalable/actions
+cp /usr/share/kibaos/logo-256.png /usr/share/icons/hicolor/scalable/actions/kibaos-watermark-symbolic.png 2>/dev/null || true
+gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
+
+# ── Build the OOBE app ─────────────────────────────────────────────────────
+echo "=== Building KibaOS OOBE installer ==="
+cd /usr/share/kibaos-oobe/src
+meson setup build --prefix=/usr || { echo "FATAL: meson setup failed for kibaos-oobe — check vala/gtk4/libadwaita dev package availability." >&2; exit 1; }
+ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check the Vala compile errors above." >&2; exit 1; }
+ninja -C build install
+cd /
+
+# ── Privileged backend script ─────────────────────────────────────────────
+cat > /usr/local/bin/kibaos-oobe-backend.sh << 'OOBEBACKEND'
+#!/usr/bin/env bash
+# KibaOS OOBE backend — does the actual disk work. Invoked via pkexec from
+# the Vala UI, never run directly by the user. Emits "PROGRESS <pct> <msg>"
+# lines to stdout for the UI to parse; everything else goes to the log file
+# only, so the UI never breaks on unexpected output.
 #
-# FIX: build upstream GNU parted from source into /usr/local, then
-# redirect cargo/bindgen to those headers/libs instead of Arch's package —
-# this is the same workaround GParted's own build documentation prescribes
-# for exactly this class of problem (insufficient distro-packaged headers):
-#   export CPPFLAGS=-I/usr/local/include
-#   export LDFLAGS=-L/usr/local/lib
-#   export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
-echo "=== Building GNU parted from source (Arch's packaged headers are insufficient for libparted-sys) ==="
-pacman -S --noconfirm --needed wget device-mapper
+# Args: $1=disk $2=locale $3=keymap $4=hostname $5=username $6=password
+set -uo pipefail
 
-PARTED_VERSION="3.6"
-PARTED_BUILD="${AUR_BUILD}/parted-src"
-mkdir -p "${PARTED_BUILD}"
-cd "${PARTED_BUILD}"
-wget -q "https://ftp.gnu.org/gnu/parted/parted-${PARTED_VERSION}.tar.xz" || {
-  echo "FATAL: failed to download GNU parted ${PARTED_VERSION} source — check ftp.gnu.org availability or try an alternate mirror/version." >&2
+DISK="$1"
+LOCALE="$2"
+KEYMAP="$3"
+HOSTNAME_VAL="$4"
+USERNAME_VAL="$5"
+PASSWORD_VAL="$6"
+
+LOG=/var/log/kibaos-oobe.log
+MNT=/mnt/kibaos-install
+exec > >(tee -a "${LOG}") 2>&1
+
+progress() { echo "PROGRESS $1 $2"; }
+
+fail() {
+  progress 100 "Install failed: $1"
+  echo "FATAL: $1" >&2
   exit 1
 }
-tar xf "parted-${PARTED_VERSION}.tar.xz"
-cd "parted-${PARTED_VERSION}"
 
-# ── Patch do_version's signature mismatch directly ──────────────────────────
-# CONFIRMED from actual build log: parted.c's do_version() is declared as
-# `do_version ()` — old K&R-style C with no parameter list at all, which
-# the compiler infers as `int (*)(void)`. But command_create() (command.h)
-# expects every command handler to match `int (*method)(PedDevice **,
-# PedDisk **)`. This compiled under older/more lenient GCC for years; GCC's
-# newer defaults (Arch's current toolchain) now treat the mismatch as a
-# hard error instead of a warning. Our earlier CFLAGS=-Wno-error=... did NOT
-# suppress this specific case, confirmed by this exact error still showing
-# literally "[-Wincompatible-pointer-types]" in the output — so go directly
-# at the source instead of fighting compiler flags further.
-#
-# Fix: give do_version the same two (unused) parameters every other command
-# handler takes, matching the signature command_create requires. This
-# changes do_version's declaration only, not parted's runtime behavior —
-# the function still ignores whatever's passed to it, same as before.
-DOVERSION_FILE="parted/parted.c"
-if [ ! -f "${DOVERSION_FILE}" ]; then
-  echo "FATAL: ${DOVERSION_FILE} not found — parted's source layout differs from expectation for version ${PARTED_VERSION}." >&2
-  exit 1
-fi
-grep -q '^do_version ()$' "${DOVERSION_FILE}" || {
-  echo "FATAL: 'do_version ()' line not found verbatim in ${DOVERSION_FILE} — exact source text differs from the confirmed build log for version ${PARTED_VERSION}; inspect the file directly before patching further." >&2
-  exit 1
-}
-sed -i 's/^do_version ()$/do_version (PedDevice** dev, PedDisk** diskp)/' "${DOVERSION_FILE}"
-echo "=== Patched do_version() signature in ${DOVERSION_FILE} ==="
+[ -n "${DISK}" ]     || fail "no disk selected"
+[ -b "${DISK}" ]     || fail "${DISK} is not a block device"
+[ -n "${USERNAME_VAL}" ] || fail "no username given"
 
-# --disable-device-mapper avoids a libdevmapper version-compat fight inside
-# this throwaway build; we only need the headers/lib for bindgen to read
-# against, not a fully-featured parted binary — the live system already
-# has its own pacman-installed parted for actual partitioning operations.
-#
-# CFLAGS="-Wno-error=incompatible-pointer-types": parted 3.6's own source
-# has a known function-pointer signature mismatch (do_version passed where
-# command_create expects a more generic handler signature — same pattern
-# as C's classic "callback table" pointer-cast issue). Older/Debian-default
-# GCC only warns about this; GCC 14+ (which Arch ships) makes
-# -Wincompatible-pointer-types a hard error by default. This isn't a real
-# memory-safety bug we're papering over — it's old, previously-fine C that
-# a newer compiler default reclassified as fatal. Downgrading it back to a
-# warning is the standard, low-risk fix for exactly this situation, rather
-# than patching parted's own call site without having seen its real source.
-export CFLAGS="-Wno-error=incompatible-pointer-types ${CFLAGS:-}"
-./configure --prefix=/usr/local --disable-static --disable-device-mapper || {
-  echo "FATAL: GNU parted ./configure failed — check the build log above for the specific missing dependency." >&2
-  exit 1
-}
-make -j"$(nproc)" || {
-  echo "FATAL: GNU parted build failed even with -Wno-error=incompatible-pointer-types.";
-  echo "If the error is still 'incompatible pointer type' on do_version/command_create,";
-  echo "GCC may be erroring on a DIFFERENT warning category for this issue (e.g.";
-  echo "-Wincompatible-function-pointer-types is a separate, more specific flag in";
-  echo "newer GCC) — try adding that to CFLAGS as well, or as a last resort";
-  echo "-w (suppress all warnings) for this one throwaway build.";
-  echo "If the error is something else entirely, check the build log above." >&2
-  exit 1
-}
-make install
-ldconfig
+progress 2 "Getting ready..."
+umount -R "${DISK}"* 2>/dev/null || true
+swapoff "${DISK}"* 2>/dev/null || true
 
-if [ ! -f /usr/local/include/parted/parted.h ]; then
-  echo "FATAL: /usr/local/include/parted/parted.h not found after make install — GNU parted's install layout may differ from expectation for version ${PARTED_VERSION}." >&2
-  exit 1
-fi
-echo "=== GNU parted ${PARTED_VERSION} built and installed to /usr/local ==="
+# ── Partition: single ESP + root, matching the same systemd-boot/mkinitcpio
+# layout the rest of KibaOS's build script already assumes (no separate
+# /home, no LVM/LUKS — kept simple and matching the live image's own
+# boot.loader entries which expect a plain ESP + root). ──────────────────
+progress 8 "Preparing your computer's storage..."
+sgdisk --zap-all "${DISK}"                                    || fail "sgdisk zap failed"
+sgdisk -n1:0:+512M -t1:ef00 -c1:ESP  "${DISK}"                 || fail "ESP partition failed"
+sgdisk -n2:0:0     -t2:8300 -c2:ROOT "${DISK}"                 || fail "root partition failed"
+partprobe "${DISK}"
+sleep 2
 
-# Redirect bindgen/cargo/pkg-config to the freshly built parted instead of
-# Arch's packaged one. PKG_CONFIG_PATH is prepended so /usr/local's
-# parted.pc is found before Arch's /usr/lib/pkgconfig/libparted.pc (if any).
-export CPPFLAGS="-I/usr/local/include ${CPPFLAGS:-}"
-export LDFLAGS="-L/usr/local/lib ${LDFLAGS:-}"
-export PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
-export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"
-export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/local/include"
-echo "=== Build environment redirected to /usr/local for libparted headers/libs ==="
-
-cd "${DISTINST_SRC}"
-make all || {
-  echo "FATAL: distinst build failed even after building GNU parted from source and redirecting CPPFLAGS/PKG_CONFIG_PATH/BINDGEN_EXTRA_CLANG_ARGS to it.";
-  echo "If the error is again 'unknown field' / opaque _address-only structs on Ped*";
-  echo "types, libparted-sys's build.rs may not be honoring BINDGEN_EXTRA_CLANG_ARGS";
-  echo "or PKG_CONFIG_PATH the way assumed here — at that point, inspect libparted-sys";
-  echo "0.3.2's actual build.rs source directly (not inferred from Cargo.lock) to see";
-  echo "exactly how it locates parted.h, rather than guessing the env var names again.";
-  echo "If the error is in chroot_conf.rs instead, check for upstream API drift";
-  echo "(Chroot::command signature, Config fields, cascade!/fomat! macro availability)";
-  echo "since this patch was written.";
-  exit 1;
-}
-make install prefix=/usr
-ldconfig
-
-# ══════════════════════════════════════════════════════════════════════════
-# elementary/installer — GTK4/libadwaita fullscreen front-end.
-# Deps not in official Arch repos, built from AUR: granite7, pantheon-wayland.
-# ══════════════════════════════════════════════════════════════════════════
-pacman -S --noconfirm --needed \
-  gtk4 libadwaita gobject-introspection vala meson ninja \
-  libgee json-glib pwquality libxkbcommon systemd-libs
-
-echo "=== Building granite (AUR) ==="
-git clone --depth=1 "https://aur.archlinux.org/granite7.git" "${AUR_BUILD}/granite7" \
-  || git clone --depth=1 "https://aur.archlinux.org/granite.git" "${AUR_BUILD}/granite7"
-chown -R builduser:builduser "${AUR_BUILD}/granite7"
-cd "${AUR_BUILD}/granite7"
-sudo -u builduser MAKEFLAGS="-j$(nproc)" makepkg -si --noconfirm --skippgpcheck || \
-  echo "WARNING: granite7 AUR build failed — elementary installer build will likely fail next."
-
-echo "=== Building pantheon-wayland (AUR) ==="
-git clone --depth=1 "https://aur.archlinux.org/pantheon-wayland.git" "${AUR_BUILD}/pantheon-wayland"
-chown -R builduser:builduser "${AUR_BUILD}/pantheon-wayland"
-cd "${AUR_BUILD}/pantheon-wayland"
-sudo -u builduser MAKEFLAGS="-j$(nproc)" makepkg -si --noconfirm --skippgpcheck || \
-  echo "WARNING: pantheon-wayland AUR build failed — elementary installer build will likely fail next."
-
-echo "=== Cloning + building elementary installer (distinst backend) ==="
-INSTALLER_SRC="${AUR_BUILD}/elementary-installer"
-git clone --depth=1 https://github.com/elementary/installer.git "${INSTALLER_SRC}"
-cd "${INSTALLER_SRC}"
-meson setup build --prefix=/usr -Dinstaller_backend=distinst
-ninja -C build
-ninja -C build install || echo "WARNING: elementary installer install step failed — Calamares (kibaos-install.desktop) remains the install path."
-
-# Rebrand via assets, not source edits — keeps gettext catalogs intact.
-mkdir -p /usr/share/kibaos-installer
-cp /usr/share/kibaos/logo-256.png  /usr/share/kibaos-installer/logo.png        2>/dev/null || true
-cp /usr/share/kibaos/wallpaper.png /usr/share/kibaos-installer/background.png  2>/dev/null || true
-
-if [ -x /usr/bin/io.elementary.installer ]; then
-  cat > /usr/share/applications/kibaos-install.desktop << 'INSTFSDESK'
-[Desktop Entry]
-Name=Install KibaOS
-Comment=Install KibaOS to your hard drive
-Exec=pkexec /usr/bin/io.elementary.installer
-Icon=kibaos
-Terminal=false
-Type=Application
-Categories=System;
-Keywords=install;setup;kibaos;
-INSTFSDESK
-  cp /usr/share/applications/kibaos-install.desktop /home/liveuser/Desktop/kibaos-install.desktop 2>/dev/null || true
-  chmod +x /home/liveuser/Desktop/kibaos-install.desktop 2>/dev/null || true
-  echo "=== elementary installer (distinst/pacman port) is the active install path ==="
+if [[ "${DISK}" == *nvme* ]]; then
+  ESP_PART="${DISK}p1"; ROOT_PART="${DISK}p2"
 else
-  echo "=== elementary installer binary not found post-build — Calamares remains the install path ==="
+  ESP_PART="${DISK}1"; ROOT_PART="${DISK}2"
 fi
 
-# Replaces the original cleanup lines that followed the AUR PACKAGES section.
+progress 16 "Getting everything ready..."
+mkfs.fat -F32 -n ESP  "${ESP_PART}"   || fail "ESP format failed"
+mkfs.ext4 -F -L kibaos "${ROOT_PART}" || fail "root format failed"
+
+progress 22 "Almost there..."
+mkdir -p "${MNT}"
+mount "${ROOT_PART}" "${MNT}"                  || fail "root mount failed"
+mkdir -p "${MNT}/boot"
+mount "${ESP_PART}" "${MNT}/boot"              || fail "ESP mount failed"
+
+# ── Extract the live squashfs onto the new root. This mirrors what
+# Calamares' unpackfs.conf module does elsewhere in this build (see
+# /etc/calamares/modules/unpackfs.conf), just invoked directly instead of
+# through Calamares' job pipeline. ────────────────────────────────────────
+progress 30 "Copying KibaOS files (this takes a few minutes)..."
+SQUASHFS_SRC="/run/archiso/bootmnt/arch/x86_64/airootfs.sfs"
+[ -f "${SQUASHFS_SRC}" ] || fail "squashfs image not found at ${SQUASHFS_SRC}"
+
+MOUNT_TMP="$(mktemp -d)"
+mount -t squashfs -o loop "${SQUASHFS_SRC}" "${MOUNT_TMP}" || fail "squashfs mount failed"
+rsync -aHAX --info=progress2 "${MOUNT_TMP}/" "${MNT}/" \
+  --exclude='/run/*' --exclude='/proc/*' --exclude='/sys/*' --exclude='/dev/*' \
+  --exclude='/tmp/*' --exclude='/home/liveuser' \
+  | while read -r line; do
+      pct=$(echo "$line" | grep -oP '\d+%' | head -1 | tr -d '%')
+      [ -n "${pct:-}" ] && progress $((30 + pct * 30 / 100)) "Copying files... ${pct}%"
+    done
+umount "${MOUNT_TMP}"
+rmdir "${MOUNT_TMP}"
+
+progress 62 "Personalizing your computer..."
+for fs in proc sys dev; do mount --rbind /$fs "${MNT}/$fs"; done
+mount --make-rslave "${MNT}/proc" "${MNT}/sys" "${MNT}/dev" 2>/dev/null || true
+
+ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
+ESP_UUID=$(blkid -s UUID -o value "${ESP_PART}")
+
+cat > "${MNT}/etc/fstab" << FSTAB
+UUID=${ROOT_UUID}  /      ext4  defaults,noatime  0 1
+UUID=${ESP_UUID}   /boot  vfat  umask=0077        0 2
+FSTAB
+
+echo "${HOSTNAME_VAL}" > "${MNT}/etc/hostname"
+cat > "${MNT}/etc/hosts" << HOSTS
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   ${HOSTNAME_VAL}.localdomain ${HOSTNAME_VAL}
+HOSTS
+
+progress 70 "Setting locale and keyboard..."
+sed -i "s/#${LOCALE}/${LOCALE}/" "${MNT}/etc/locale.gen" 2>/dev/null || true
+echo "LANG=${LOCALE}" > "${MNT}/etc/locale.conf"
+echo "KEYMAP=${KEYMAP}" > "${MNT}/etc/vconsole.conf"
+arch-chroot "${MNT}" locale-gen || fail "locale-gen failed"
+
+progress 78 "Creating your account..."
+arch-chroot "${MNT}" useradd -m -G wheel,audio,video,input,network,storage,power \
+  -s /bin/bash "${USERNAME_VAL}" || fail "useradd failed"
+echo "${USERNAME_VAL}:${PASSWORD_VAL}" | arch-chroot "${MNT}" chpasswd || fail "chpasswd failed"
+# Remove the live-session liveuser/autologin now that a real user exists.
+arch-chroot "${MNT}" userdel -r liveuser 2>/dev/null || true
+rm -f "${MNT}/etc/sddm.conf.d/kibaos.conf" 2>/dev/null || true
+
+progress 86 "Getting your computer ready to start up..."
+arch-chroot "${MNT}" bootctl --esp-path=/boot install || fail "bootctl install failed"
+sed -i "s/PARTUUID=PLACEHOLDER/PARTUUID=$(blkid -s PARTUUID -o value "${ROOT_PART}")/" \
+  "${MNT}/boot/loader/entries/kibaos.conf" 2>/dev/null || true
+
+# Clear any stale LoaderConfigTimeout/LoaderEntryDefault EFI variables that
+# may already exist on this hardware (e.g. left over from a previous OS, or
+# from a prior boot where a key was pressed to bring up the menu, which
+# persists a timeout override to an EFI variable). Confirmed (Arch forum,
+# ArchWiki systemd-boot page): EFI variables take precedence over
+# loader.conf when present, so our `timeout 0` file setting can be silently
+# overridden by leftover firmware state without this. bootctl set-timeout/
+# set-default with an empty string clears the variable rather than setting
+# it, restoring loader.conf's own values as authoritative.
+arch-chroot "${MNT}" bootctl set-timeout "" 2>/dev/null || true
+arch-chroot "${MNT}" bootctl set-default "" 2>/dev/null || true
+
+progress 92 "Almost ready..."
+arch-chroot "${MNT}" mkinitcpio -c /etc/mkinitcpio.conf.d/installed.conf \
+  -g /boot/initramfs-linux.img || fail "mkinitcpio failed"
+
+progress 96 "Just a little longer..."
+for svc in NetworkManager sddm bluetooth; do
+  arch-chroot "${MNT}" systemctl enable "${svc}" 2>/dev/null || true
+done
+
+progress 99 "Finishing up..."
+umount -R "${MNT}"
+
+progress 100 "Done"
+exit 0
+
+OOBEBACKEND
+chmod +x /usr/local/bin/kibaos-oobe-backend.sh
+
+# ── kibaos-oem-finish.sh — lightweight OEM-mode completion backend.
+# Runs on an ALREADY-INSTALLED system (imaged by an OEM before shipping —
+# see kibaos-oem-prepare below for how that state is set), so there is no
+# partitioning, no squashfs extraction, no bootloader install here at all.
+# Just locale/keyboard, the real customer account, and removing the OEM
+# marker + temporary OEM account. Mirrors Calamares' own documented
+# post-delivery OEM phase (locale/keyboard/account-only, no disk work).
+cat > /usr/local/bin/kibaos-oem-finish.sh << 'OEMFINISH'
+#!/usr/bin/env bash
+# Args: $1=locale $2=keymap $3=hostname $4=username $5=password
+set -uo pipefail
+
+LOCALE="$1"; KEYMAP="$2"; HOSTNAME_VAL="$3"; USERNAME_VAL="$4"; PASSWORD_VAL="$5"
+LOG=/var/log/kibaos-oobe.log
+exec > >(tee -a "${LOG}") 2>&1
+
+progress() { echo "PROGRESS $1 $2"; }
+fail() { progress 100 "Setup failed: $1"; echo "FATAL: $1" >&2; exit 1; }
+
+[ -n "${USERNAME_VAL}" ] || fail "no username given"
+
+progress 15 "Setting locale and keyboard..."
+sed -i "s/#${LOCALE}/${LOCALE}/" /etc/locale.gen 2>/dev/null || true
+echo "LANG=${LOCALE}" > /etc/locale.conf
+echo "KEYMAP=${KEYMAP}" > /etc/vconsole.conf
+locale-gen || fail "locale-gen failed"
+
+progress 45 "Setting computer name..."
+echo "${HOSTNAME_VAL}" > /etc/hostname
+sed -i "s/127.0.1.1.*/127.0.1.1\t${HOSTNAME_VAL}.localdomain ${HOSTNAME_VAL}/" /etc/hosts 2>/dev/null || true
+
+progress 65 "Creating your account..."
+useradd -m -G wheel,audio,video,input,network,storage,power -s /bin/bash "${USERNAME_VAL}" \
+  || fail "useradd failed"
+echo "${USERNAME_VAL}:${PASSWORD_VAL}" | chpasswd || fail "chpasswd failed"
+
+progress 85 "Cleaning up OEM account..."
+# Remove the temporary OEM account created by kibaos-oem-prepare, if present.
+userdel -r oem 2>/dev/null || true
+rm -f /etc/sddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
+
+progress 95 "Finishing up..."
+rm -f /etc/kibaos/oem-pending
+
+progress 100 "Done"
+exit 0
+OEMFINISH
+chmod +x /usr/local/bin/kibaos-oem-finish.sh
+
+# ── kibaos-oem-prepare — run by WHOEVER images a device for OEM delivery
+# (not run on a normal end-user install). Creates a temporary autologin
+# "oem" account so the imaged device boots straight to a usable desktop
+# for OEM-side burn-in/testing, and drops the marker file that makes
+# io.kibaos.oobe launch in OEM-finish mode on first real customer boot.
+# This is the KibaOS equivalent of Calamares' `dont-chroot: true` +
+# OEM-mode settings.conf pattern, just implemented as a small script
+# instead of a Calamares config file, consistent with the rest of this
+# from-scratch installer. ─────────────────────────────────────────────────
+cat > /usr/local/bin/kibaos-oem-prepare << 'OEMPREPARE'
+#!/usr/bin/env bash
+set -e
+mkdir -p /etc/kibaos
+touch /etc/kibaos/oem-pending
+
+id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power -s /bin/bash oem
+passwd -d oem 2>/dev/null || true
+
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
+[Autologin]
+User=oem
+Session=budgie-desktop
+OEMAUTOLOGIN
+
+# OOBE app autostarts for the oem user too, in OEM-finish mode (the
+# /etc/kibaos/oem-pending marker is what triggers that mode, not the
+# username — the OOBE app itself doesn't know or care who's logged in).
+echo "OEM mode prepared. This device will boot to a temporary 'oem' account"
+echo "and prompt the customer to finish setup on next boot. Do not run this"
+echo "on a normal end-user installation."
+OEMPREPARE
+chmod +x /usr/local/bin/kibaos-oem-prepare
+
+# ── polkit rule: allow both backends to run via pkexec without a password
+# prompt loop mid-install (the user already authenticates once via the
+# account-creation step in the UI; this just lets pkexec itself proceed
+# without re-prompting for the *root* password, which liveuser doesn't
+# have set anyway — sudoers NOPASSWD already covers liveuser elsewhere
+# in this build script). ───────────────────────────────────────────────────
+mkdir -p /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-kibaos-oobe.rules << 'POLKITRULE'
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        (action.lookup("program") == "/usr/local/bin/kibaos-oobe-backend.sh" ||
+         action.lookup("program") == "/usr/local/bin/kibaos-oem-finish.sh") &&
+        subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});
+POLKITRULE
+
+if [ -x /usr/bin/io.kibaos.oobe ]; then
+  echo "=== KibaOS OOBE installer is the active install path ==="
+else
+  echo "=== KibaOS OOBE installer binary not found post-build — Calamares remains the install path ==="
+fi
+
 cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
@@ -2941,6 +3289,22 @@ NoDisplay=true
 X-GNOME-Autostart-enabled=true
 AUTOCFG
 
+# ── OEM-mode autostart: launches io.kibaos.oobe (which self-detects
+# OEM-finish mode via /etc/kibaos/oem-pending, see main.vala) on login to
+# the temporary 'oem' autologin account set up by kibaos-oem-prepare. A
+# plain Exec= can't conditionally skip launching, so the condition is
+# wrapped in a one-line shell test instead — on a normal (non-OEM) install
+# this marker never exists, so the test fails and nothing launches. ───────
+cat > "${SKEL}/.config/autostart/kibaos-oem-finish.desktop" << 'OEMAUTOCFG'
+[Desktop Entry]
+Type=Application
+Name=Finish Setting Up KibaOS
+Exec=sh -c 'test -f /etc/kibaos/oem-pending && exec /usr/bin/io.kibaos.oobe'
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+OEMAUTOCFG
+
 mkdir -p /etc/systemd/zram-generator.conf.d
 cat > /etc/systemd/zram-generator.conf << 'ZRAM'
 [zram0]
@@ -3015,16 +3379,6 @@ NoDisplay=true
 X-GNOME-Autostart-enabled=true
 GESTURESAUTO
 
-cat > "${SKEL}/.config/autostart/kiba-welcome.desktop" << 'WELCOME_AUTO'
-[Desktop Entry]
-Type=Application
-Name=KibaOS Welcome
-Exec=/usr/local/bin/kiba-welcome
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-WELCOME_AUTO
-
 cat > "${SKEL}/.bashrc" << 'BASHRC'
 [[ $- != *i* ]] && return
 PS1='\[\e[1;36m\][KibaOS]\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]\$ '
@@ -3094,7 +3448,7 @@ cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
 Name=Install KibaOS
 Comment=Install KibaOS to your hard drive
-Exec=/usr/bin/io.elementary.installer
+Exec=/usr/bin/io.kibaos.oobe
 Icon=kibaos
 Terminal=false
 Type=Application
@@ -3120,95 +3474,6 @@ for src_desktop in kibaos-install kibaos-about; do
   chmod +x "/home/liveuser/Desktop/${src_desktop}.desktop" 2>/dev/null || true
 done
 
-# ══════════════════════════════════════════════════════════════════════════
-# WELCOME PAGE
-# ══════════════════════════════════════════════════════════════════════════
-cat > /usr/local/bin/kiba-welcome << 'WELCOMESCRIPT'
-#!/usr/bin/env bash
-WELCOME_HTML="/usr/share/kibaos/welcome.html"
-if command -v firefox &>/dev/null; then
-  firefox --no-remote "${WELCOME_HTML}" &
-elif command -v xdg-open &>/dev/null; then
-  xdg-open "${WELCOME_HTML}" &
-fi
-WELCOMESCRIPT
-chmod +x /usr/local/bin/kiba-welcome
-
-cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Welcome to KibaOS</title>
-<style>
-  :root {
-    --accent: #0099cc; --accent-dark: #0077aa; --bg: #f0f6fa;
-    --surface: #fff; --surface-2: #f7fbfd; --text: #0d1b2a;
-    --sub: #4a5a70; --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  header {
-    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
-    color:#fff; padding:52px 32px 72px; text-align:center;
-  }
-  header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
-  header p  { font-size:1rem; opacity:.72; margin-top:8px; }
-  .card-row { display:flex; gap:18px; flex-wrap:wrap; padding:28px 32px; max-width:920px; margin:-32px auto 0; }
-  .card {
-    background:var(--surface); border-radius:18px; padding:24px 22px;
-    flex:1; min-width:200px; box-shadow:var(--shadow); border:1px solid var(--border);
-    transition: transform .15s, box-shadow .15s;
-  }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
-  .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
-  .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
-  section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
-  section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
-  .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
-  .btn:hover { background:var(--accent-dark); }
-  .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
-  .btn.secondary:hover { background:#e6f6fc; }
-  .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-  .pill { background:var(--surface-2); border:1px solid var(--border); border-radius:100px; padding:5px 14px; font-size:.82rem; color:var(--sub); }
-  footer { text-align:center; padding:24px; color:var(--sub); font-size:.8rem; border-top:1px solid var(--border); margin-top:16px; }
-</style>
-</head>
-<body>
-<header>
-  <h1>Welcome to KibaOS</h1>
-  <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
-</header>
-<div class="card-row">
-  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by Wayfire for wobbly windows and real compositor effects.</p></div>
-  <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
-  <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
-  <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
-</div>
-<section>
-  <h2>Ready to Install?</h2>
-  <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
-  <div class="tip"><code>sudo calamares</code></div>
-  <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
-  <h2>Design Language</h2>
-  <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
-    <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
-  </div>
-</section>
-<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
-</body>
-</html>
-WELCOMEHTML
 
 # ══════════════════════════════════════════════════════════════════════════
 # SYSTEM ENVIRONMENT
