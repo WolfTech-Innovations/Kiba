@@ -945,7 +945,7 @@ pacman -S --noconfirm --needed \
 
 AUR_BUILD="/tmp/aur-build"
 mkdir -p "${AUR_BUILD}"
-for pkg in calamares libinput-gestures; do
+for pkg in libinput-gestures; do
   echo "=== Building ${pkg} from AUR ==="
   git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
   chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
