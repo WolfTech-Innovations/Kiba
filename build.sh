@@ -1397,8 +1397,70 @@ CHROOTCONFRS
 
 echo "=== chroot_conf.rs replaced with KibaOS/pacman port ==="
 
+# ── libparted-sys ABI fix: regenerate bindings against Arch's real headers ──
+# CONFIRMED FAILURE (from actual CI log): cargo build for distinst fails in
+# the libparted-sys crate, not in our patched chroot_conf.rs — error is
+# `unknown field` on PedPartition.type_, with only `_address` present.
+# That's libparted-sys's vendored/pinned bindgen output going stale against
+# whatever libparted.so version Arch currently ships — a wholesale struct
+# layout mismatch, not a single renamed field (52 compile errors from one
+# crate). Fix: force bindgen to regenerate bindings from Arch's actual
+# /usr/include/parted/parted.h before compiling distinst, instead of
+# trusting whatever bindings.rs the crate vendors.
+pacman -S --noconfirm --needed bindgen-cli clang
+if [ ! -f /usr/include/parted/parted.h ]; then
+  echo "FATAL: /usr/include/parted/parted.h not found — parted package changed its header layout since this patch was written." >&2
+  exit 1
+fi
+
+export CARGO_HOME="${CARGO_HOME:-/root/.cargo}"
 cd "${DISTINST_SRC}"
-make all || { echo "FATAL: distinst build failed against patched chroot_conf.rs — check for upstream API drift (Chroot::command signature, Config fields, cascade!/fomat! macro availability) since this patch was written." >&2; exit 1; }
+# cargo fetch (not full build) just to populate registry/src with the real
+# unpacked libparted-sys crate directory bindgen needs to overwrite.
+cargo fetch || true
+
+LIBPARTED_SYS_DIR=$(find "${CARGO_HOME}/registry/src" -maxdepth 1 -type d -name 'libparted-sys-*' 2>/dev/null | head -n1)
+if [ -z "${LIBPARTED_SYS_DIR}" ]; then
+  echo "FATAL: libparted-sys source dir not found under ${CARGO_HOME}/registry/src after cargo fetch — crate name/version differs from expectation; inspect ${DISTINST_SRC}/Cargo.lock for the actual dependency name." >&2
+  exit 1
+fi
+echo "=== Found libparted-sys at ${LIBPARTED_SYS_DIR} ==="
+
+LIBRS="${LIBPARTED_SYS_DIR}/src/lib.rs"
+if [ ! -f "${LIBRS}" ]; then
+  echo "FATAL: ${LIBRS} not found — cannot wire in regenerated bindings; crate layout differs from expectation." >&2
+  exit 1
+fi
+
+echo "=== Regenerating bindings against Arch's /usr/include/parted/parted.h ==="
+bindgen /usr/include/parted/parted.h \
+  --allowlist-type '_?Ped.*' \
+  --allowlist-function 'ped_.*' \
+  --allowlist-var 'PED_.*' \
+  -o "${LIBPARTED_SYS_DIR}/src/bindings_kibaos.rs" \
+  -- -I/usr/include
+
+if [ ! -s "${LIBPARTED_SYS_DIR}/src/bindings_kibaos.rs" ]; then
+  echo "FATAL: bindgen produced an empty/missing output file — check clang availability and parted.h readability." >&2
+  exit 1
+fi
+
+# Append a fresh include rather than rewriting lib.rs's existing
+# include!()/module structure we haven't directly inspected — safer than
+# guessing at exact existing syntax, at the cost of leaving the old
+# (broken) bindings module compiled-but-unused alongside the new one.
+cp "${LIBRS}" "${LIBRS}.kibaos-orig"
+{
+  echo ""
+  echo "// KibaOS/Arch port: regenerated bindgen output appended below,"
+  echo "// re-exported to shadow the crate's stale vendored bindings."
+  echo "pub mod kibaos_bindings { include!(\"bindings_kibaos.rs\"); }"
+  echo "pub use kibaos_bindings::*;"
+} >> "${LIBRS}"
+echo "=== Appended regenerated bindings to ${LIBRS} ==="
+
+cd "${DISTINST_SRC}"
+make all || { echo "FATAL: distinst build failed — if the error is still in libparted-sys, the bindgen allowlist patterns above may need adjusting for the actual struct/function names in this version of parted.h. If the error is in chroot_conf.rs, check for upstream API drift (Chroot::command signature, Config fields, cascade!/fomat! macro availability) since this patch was written." >&2; exit 1; }
 make install prefix=/usr
 ldconfig
 
@@ -2694,511 +2756,4 @@ glib-compile-schemas /usr/share/glib-2.0/schemas/
 # ══════════════════════════════════════════════════════════════════════════
 # FIRST-LOGIN SCRIPT
 # ══════════════════════════════════════════════════════════════════════════
-cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
-#!/usr/bin/env bash
-STAMP="${HOME}/.config/.kibaos-configured"
-[ -f "${STAMP}" ] && exit 0
-
-gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
-gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
-gsettings set org.gnome.desktop.interface cursor-size             24
-gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
-gsettings set org.gnome.desktop.interface document-font-name      'Noto Sans 11'
-gsettings set org.gnome.desktop.interface monospace-font-name     'Noto Sans Mono 11'
-gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
-gsettings set org.gnome.desktop.interface enable-animations       true
-gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
-
-gsettings set org.gnome.desktop.background picture-uri      'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-options  'zoom'
-gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
-
-gsettings set org.gnome.desktop.wm.preferences button-layout               'close,minimize,maximize:'
-gsettings set org.gnome.desktop.wm.preferences titlebar-font               'Noto Sans Medium 10'
-gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize'
-gsettings set org.gnome.desktop.wm.preferences num-workspaces               4
-gsettings set org.gnome.desktop.wm.preferences focus-mode                  'click'
-
-gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click                true
-gsettings set org.gnome.desktop.peripherals.touchpad natural-scroll               true
-gsettings set org.gnome.desktop.peripherals.touchpad two-finger-scrolling-enabled true
-gsettings set org.gnome.desktop.peripherals.mouse    natural-scroll               false
-gsettings set org.gnome.desktop.peripherals.mouse    accel-profile                'adaptive'
-
-gsettings set org.nemo.desktop show-desktop-icons              true
-gsettings set org.nemo.desktop ignored-desktop-handlers        "['budgie-helper']"
-gsettings set org.nemo.preferences show-hidden-files           false
-gsettings set org.nemo.preferences default-folder-viewer       'icon-view'
-gsettings set org.nemo.icon-view default-zoom-level            'standard'
-gsettings set org.nemo.preferences show-location-entry         false
-
-# ── Panel config, using the schema verified directly from upstream source ─
-# (src/panel/manager.vala, BuddiesOfBudgie/budgie-desktop main branch):
-#   ROOT_SCHEMA      = com.solus-project.budgie-panel          (hyphenated!)
-#   TOPLEVEL_PREFIX  = /com/solus-project/budgie-panel/panels
-#   PANEL_KEY_POSITION    = "location"       (not "position")
-#   PANEL_KEY_SHADOW      = "enable-shadow"  (not "shadow")
-#   PANEL_KEY_APPLETS     = "applets"        (flat ordered UUID list)
-# The previous version of this block used "com.solus-project.budgie.panel"
-# (dotted) with keys "position"/"shadow" — neither the schema nor those key
-# names exist upstream, so those dconf writes were very likely a silent
-# no-op the whole time, not actually configuring anything.
-PANEL_UUID=$(gsettings get com.solus-project.budgie-panel panels 2>/dev/null | \
-  tr -d "[]' " | cut -d',' -f1)
-if [ -z "${PANEL_UUID}" ]; then
-  PANEL_UUID=$(uuidgen)
-  dconf write /com/solus-project/budgie-panel/panels "['${PANEL_UUID}']"
-fi
-PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
-dconf write "${PANEL_PATH}location"      "'BOTTOM'"
-dconf write "${PANEL_PATH}size"          "42"
-dconf write "${PANEL_PATH}transparency"  "'DYNAMIC'"
-dconf write "${PANEL_PATH}enable-shadow" "true"
-
-# ── Centered dock: applets + pinned launchers, matching the mockup's order ─
-# Budgie's icon-tasklist applet PERMANENTLY crashes the session on every
-# future login if pinned-launchers references a .desktop file that doesn't
-# exist (solus-project/budgie-desktop#1480 — confirmed, not theoretical).
-# So: probe the real filesystem for whichever desktop-id variant actually
-# shipped, rather than hardcoding a guess and hoping it's right.
-find_desktop_id() {
-  for candidate in "$@"; do
-    [ -f "/usr/share/applications/${candidate}" ] && { echo "${candidate}"; return 0; }
-  done
-  return 1
-}
-DOCK_LAUNCHERS=()
-for ids in \
-  "nemo.desktop" \
-  "org.gnome.Calendar.desktop gnome-calendar.desktop" \
-  "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
-  "org.gnome.eog.desktop eog.desktop" \
-  "org.gnome.Geary.desktop geary.desktop" \
-  "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
-do
-  FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
-done
-
-# Each applet UUID needs two things written: (1) a generic "which plugin is
-# this UUID" lookup entry, and (2) that plugin's OWN settings at ITS OWN
-# settings-prefix. (1) is extrapolated by direct structural analogy to the
-# now-confirmed TOPLEVEL_SCHEMA/TOPLEVEL_PREFIX pattern above — I have not
-# directly observed this exact const in source the way I have for the panel
-# schema, so flag it as the one remaining inferential step if applets don't
-# show up. (2) for icon-tasklist specifically IS directly confirmed: Budgie's
-# own docs give the Budgie Menu applet's settings-prefix as
-# /com/solus-project/budgie-panel/instance/budgie-menu/{uuid} — same pattern
-# applies to icon-tasklist's instance path below.
-add_applet() {
-  local plugin_name="$1"
-  local uuid
-  uuid=$(uuidgen)
-  dconf write "/com/solus-project/budgie-panel/applets/${uuid}/name" "'${plugin_name}'"
-  echo "${uuid}"
-}
-
-MENU_UUID=$(add_applet "budgie-menu")
-TASKLIST_UUID=$(add_applet "icon-tasklist")
-CLOCK_UUID=$(add_applet "clock")
-
-ALL_APPLETS="['${MENU_UUID}', '${TASKLIST_UUID}', '${CLOCK_UUID}']"
-dconf write "${PANEL_PATH}applets" "${ALL_APPLETS}"
-
-if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
-  LAUNCHERS_GVARIANT=$(printf "'%s', " "${DOCK_LAUNCHERS[@]}")
-  dconf write \
-    "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
-    "[${LAUNCHERS_GVARIANT%, }]"
-fi
-
-touch "${STAMP}"
-FIRSTLOGIN
-chmod +x /usr/local/bin/kibaos-first-login
-
-cat > "${SKEL}/.config/autostart/kibaos-configure.desktop" << 'AUTOCFG'
-[Desktop Entry]
-Type=Application
-Name=KibaOS First Login Setup
-Exec=/usr/local/bin/kibaos-first-login
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-AUTOCFG
-
-mkdir -p /etc/systemd/zram-generator.conf.d
-cat > /etc/systemd/zram-generator.conf << 'ZRAM'
-[zram0]
-zram-size = ram / 2
-compression-algorithm = zstd
-ZRAM
-
-mkdir -p "${SKEL}/.config"
-cat > "${SKEL}/.config/libinput-gestures.conf" << 'GESTURES'
-gesture swipe left  3  dbus-send --session --type=method_call \
-  --dest=org.gnome.Shell /org/gnome/Shell \
-  org.gnome.Shell.Eval string:'Main.wm.actionMoveWorkspaceRight()'
-gesture swipe right 3  dbus-send --session --type=method_call \
-  --dest=org.gnome.Shell /org/gnome/Shell \
-  org.gnome.Shell.Eval string:'Main.wm.actionMoveWorkspaceLeft()'
-gesture swipe up    4  /usr/local/bin/kibaos-expose
-gesture pinch in    2  xdotool key super+d
-GESTURES
-
-mkdir -p "${SKEL}/.config/fontconfig"
-cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
-<?xml version="1.0"?>
-<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
-<fontconfig>
-  <match target="font">
-    <edit name="antialias" mode="assign"><bool>true</bool></edit>
-    <edit name="hinting" mode="assign"><bool>true</bool></edit>
-    <edit name="hintstyle" mode="assign"><const>hintslight</const></edit>
-    <edit name="rgba" mode="assign"><const>rgb</const></edit>
-    <edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit>
-    <edit name="embeddedbitmap" mode="assign"><bool>false</bool></edit>
-  </match>
-  <alias>
-    <family>sans-serif</family>
-    <prefer><family>Noto Sans</family></prefer>
-  </alias>
-  <alias>
-    <family>monospace</family>
-    <prefer><family>Noto Sans Mono</family></prefer>
-  </alias>
-</fontconfig>
-FONTCONF
-
-cat > "${SKEL}/.config/electron-flags.conf" << 'ELECTRONFLAGS'
---enable-features=UseOzonePlatform
---ozone-platform=wayland
---enable-wayland-ime
-ELECTRONFLAGS
-
-cat > "${SKEL}/.config/chrome-flags.conf" << 'CHROMEFLAGS'
---enable-features=UseOzonePlatform
---ozone-platform=wayland
-CHROMEFLAGS
-
-cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
-[Desktop Entry]
-Type=Application
-Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-POLKIT
-
-cat > "${SKEL}/.config/autostart/libinput-gestures.desktop" << 'GESTURESAUTO'
-[Desktop Entry]
-Type=Application
-Name=Libinput Gestures
-Exec=libinput-gestures-setup start
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-GESTURESAUTO
-
-cat > "${SKEL}/.config/autostart/kiba-welcome.desktop" << 'WELCOME_AUTO'
-[Desktop Entry]
-Type=Application
-Name=KibaOS Welcome
-Exec=/usr/local/bin/kiba-welcome
-Hidden=false
-NoDisplay=false
-X-GNOME-Autostart-enabled=true
-WELCOME_AUTO
-
-cat > "${SKEL}/.bashrc" << 'BASHRC'
-[[ $- != *i* ]] && return
-PS1='\[\e[1;36m\][KibaOS]\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\]\$ '
-alias ls='ls --color=auto'
-alias ll='ls -lah --color=auto'
-alias grep='grep --color=auto'
-alias install='sudo calamares'
-alias update='sudo pacman -Syu'
-fastfetch 2>/dev/null || true
-export XDG_CONFIG_HOME="$HOME/.config"
-export XDG_DATA_HOME="$HOME/.local/share"
-export XDG_CACHE_HOME="$HOME/.cache"
-export XDG_STATE_HOME="$HOME/.local/state"
-export WINEPREFIX="$XDG_DATA_HOME/wine"
-export HISTFILE="$XDG_STATE_HOME/bash/history"
-BASHRC
-
-mkdir -p "${SKEL}/.config/fastfetch"
-cat > "${SKEL}/.config/fastfetch/config.jsonc" << 'FFCONF'
-{
-  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
-  "logo": {
-    "source": "kibaos",
-    "color": { "1": "cyan", "2": "white" },
-    "padding": { "top": 1 }
-  },
-  "display": { "separator": "  ", "color": { "keys": "cyan" } },
-  "modules": [
-    { "type": "title",  "format": "{user-name-colored}@{host-name-colored}" },
-    "separator",
-    { "type": "os",     "key": "OS" },
-    { "type": "kernel", "key": "Kernel" },
-    { "type": "de",     "key": "Desktop" },
-    { "type": "wm",     "key": "WM" },
-    { "type": "shell",  "key": "Shell" },
-    { "type": "cpu",    "key": "CPU" },
-    { "type": "gpu",    "key": "GPU" },
-    { "type": "memory", "key": "Memory" },
-    { "type": "disk",   "key": "Disk" },
-    "break",
-    { "type": "colors", "paddingLeft": 0 }
-  ]
-}
-FFCONF
-
-cp -aT "${SKEL}/" /home/liveuser/
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
-
-ufw default deny incoming
-ufw default allow outgoing
-ufw enable
-systemctl enable ufw
-
-# ══════════════════════════════════════════════════════════════════════════
-# DESKTOP SHORTCUTS
-# ══════════════════════════════════════════════════════════════════════════
-mkdir -p /usr/share/applications /etc/skel/Desktop
-cat > /etc/skel/.config/user-dirs.dirs << 'USERDIRS'
-XDG_DESKTOP_DIR="$HOME/Desktop"
-XDG_DOWNLOAD_DIR="$HOME/Downloads"
-XDG_DOCUMENTS_DIR="$HOME/Documents"
-XDG_PICTURES_DIR="$HOME/Pictures"
-USERDIRS
-
-cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
-[Desktop Entry]
-Name=Install KibaOS
-Comment=Install KibaOS to your hard drive
-Exec=/usr/bin/io.elementary.installer
-Icon=kibaos
-Terminal=false
-Type=Application
-Categories=System;
-Keywords=install;setup;kibaos;
-INSTDESK
-
-cat > /usr/share/applications/kibaos-about.desktop << 'ABOUTDESK'
-[Desktop Entry]
-Name=About KibaOS
-Comment=Learn more about KibaOS
-Exec=xdg-open https://github.com/WolfTech-Innovations/Kiba
-Icon=kibaos
-Terminal=false
-Type=Application
-Categories=System;
-ABOUTDESK
-
-mkdir -p /home/liveuser/Desktop
-for src_desktop in kibaos-install kibaos-about; do
-  cp "/usr/share/applications/${src_desktop}.desktop" \
-     "/home/liveuser/Desktop/${src_desktop}.desktop" 2>/dev/null || true
-  chmod +x "/home/liveuser/Desktop/${src_desktop}.desktop" 2>/dev/null || true
-done
-
-# ══════════════════════════════════════════════════════════════════════════
-# WELCOME PAGE
-# ══════════════════════════════════════════════════════════════════════════
-cat > /usr/local/bin/kiba-welcome << 'WELCOMESCRIPT'
-#!/usr/bin/env bash
-WELCOME_HTML="/usr/share/kibaos/welcome.html"
-if command -v firefox &>/dev/null; then
-  firefox --no-remote "${WELCOME_HTML}" &
-elif command -v xdg-open &>/dev/null; then
-  xdg-open "${WELCOME_HTML}" &
-fi
-WELCOMESCRIPT
-chmod +x /usr/local/bin/kiba-welcome
-
-cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Welcome to KibaOS</title>
-<style>
-  :root {
-    --accent: #0099cc; --accent-dark: #0077aa; --bg: #f0f6fa;
-    --surface: #fff; --surface-2: #f7fbfd; --text: #0d1b2a;
-    --sub: #4a5a70; --border: #d4e8f2;
-    --shadow: 0 4px 24px rgba(0,100,160,0.10);
-  }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:'Noto Sans',system-ui,sans-serif; background:var(--bg); color:var(--text); }
-  header {
-    background: linear-gradient(135deg, #003f5c 0%, #0077aa 60%, #0099cc 100%);
-    color:#fff; padding:52px 32px 72px; text-align:center;
-  }
-  header h1 { font-size:2.2rem; font-weight:300; letter-spacing:1px; }
-  header p  { font-size:1rem; opacity:.72; margin-top:8px; }
-  .card-row { display:flex; gap:18px; flex-wrap:wrap; padding:28px 32px; max-width:920px; margin:-32px auto 0; }
-  .card {
-    background:var(--surface); border-radius:18px; padding:24px 22px;
-    flex:1; min-width:200px; box-shadow:var(--shadow); border:1px solid var(--border);
-    transition: transform .15s, box-shadow .15s;
-  }
-  .card:hover { transform:translateY(-3px); box-shadow:0 8px 32px rgba(0,100,160,0.14); }
-  .card h2 { font-size:1rem; font-weight:600; margin-bottom:6px; color:var(--text); }
-  .card p  { font-size:.88rem; color:var(--sub); line-height:1.55; }
-  section { max-width:920px; margin:0 auto; padding:4px 32px 40px; }
-  section h2 { font-size:1.2rem; font-weight:600; margin:28px 0 12px; color:var(--accent); }
-  .tip { background:#e6f6fc; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; padding:14px 18px; margin-top:10px; font-size:.9rem; }
-  .tip code { background:#cde8f5; padding:2px 7px; border-radius:5px; font-family:'Noto Sans Mono',monospace; font-size:.88em; }
-  .btn { display:inline-block; background:var(--accent); color:#fff; border-radius:10px; padding:9px 20px; text-decoration:none; font-size:.88rem; font-weight:600; margin:6px 6px 0 0; transition:background .12s; }
-  .btn:hover { background:var(--accent-dark); }
-  .btn.secondary { background:var(--surface); color:var(--accent); border:1.5px solid var(--border); }
-  .btn.secondary:hover { background:#e6f6fc; }
-  .design-pills { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-  .pill { background:var(--surface-2); border:1px solid var(--border); border-radius:100px; padding:5px 14px; font-size:.82rem; color:var(--sub); }
-  footer { text-align:center; padding:24px; color:var(--sub); font-size:.8rem; border-top:1px solid var(--border); margin-top:16px; }
-</style>
-</head>
-<body>
-<header>
-  <h1>Welcome to KibaOS</h1>
-  <p>A fast, polished Budgie desktop built on Arch Linux — by WolfTech Innovations</p>
-</header>
-<div class="card-row">
-  <div class="card"><h2>Budgie 10.10 Wayland</h2><p>Fully Wayland-native. Powered by Wayfire for wobbly windows and real compositor effects.</p></div>
-  <div class="card"><h2>Built on Arch Linux</h2><p>Rolling release. Always the latest software, straight from upstream with full AUR access.</p></div>
-  <div class="card"><h2>Unified Design</h2><p>Inspired by DDE's curves, Paper's flat surfaces, and Cutefish's airy, floating aesthetic.</p></div>
-  <div class="card"><h2>Private by Default</h2><p>Full disk encryption support. No telemetry. Your data stays yours.</p></div>
-</div>
-<section>
-  <h2>Ready to Install?</h2>
-  <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
-  <div class="tip"><code>sudo calamares</code></div>
-  <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
-  <h2>Design Language</h2>
-  <p>KibaOS's visual identity draws from three reference desktops:</p>
-  <div class="design-pills">
-    <span class="pill">DDE — smooth rounded corners, cohesive icon language, dark navy base</span>
-    <span class="pill">Paper DE — flat material surfaces, colored accents, minimal depth shadows</span>
-    <span class="pill">Cutefish — floating dock, translucent panels, generous whitespace, airy cards</span>
-    <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
-  </div>
-</section>
-<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
-</body>
-</html>
-WELCOMEHTML
-
-# ══════════════════════════════════════════════════════════════════════════
-# SYSTEM ENVIRONMENT
-# ══════════════════════════════════════════════════════════════════════════
-cat > /etc/environment << 'ENV'
-DESKTOP_SESSION=budgie-desktop
-XDG_CURRENT_DESKTOP=Budgie:GNOME
-XDG_SESSION_DESKTOP=budgie-desktop
-XDG_SESSION_TYPE=wayland
-QT_AUTO_SCREEN_SCALE_FACTOR=1
-QT_QPA_PLATFORM=wayland
-QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-GTK_THEME=ChromeOS-Dark
-QT_STYLE_OVERRIDE=kvantum
-XCURSOR_THEME=Adwaita
-XCURSOR_SIZE=24
-MOZ_ENABLE_WAYLAND=1
-WINEDEBUG=-all
-ELECTRON_OZONE_PLATFORM_HINT=wayland
-CLUTTER_BACKEND=wayland
-SDL_VIDEODRIVER=wayland
-KIBAOS_VERSION=rolling
-KIBAOS_VENDOR="WolfTech Innovations"
-ENV
-
-cat > /etc/issue << 'ISSUE'
-
-  ██╗  ██╗██╗██████╗  █████╗  ██████╗ ███████╗
-  ██║ ██╔╝██║██╔══██╗██╔══██╗██╔═══██╗██╔════╝
-  █████╔╝ ██║██████╔╝███████║██║   ██║███████╗
-  ██╔═██╗ ██║██╔══██╗██╔══██║██║   ██║╚════██║
-  ██║  ██╗██║██████╔╝██║  ██║╚██████╔╝███████║
-  ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
-
-  KibaOS Rolling — Budgie 10.10 Wayland Edition — WolfTech Innovations
-  Live session: user=liveuser  password=live
-  Install: click the desktop icon or run  sudo calamares
-
-ISSUE
-
-cat > /etc/motd << 'MOTD'
-Welcome to KibaOS
-MOTD
-
-sudo -E \
-  WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
-  XDG_RUNTIME_DIR="${LIVE_RUNTIME}" \
-  QT_QPA_PLATFORM=wayland \
-  QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-EOF
-
-systemctl enable sddm
-systemctl enable NetworkManager.service
-
-chown -R 1000:1000 /home/liveuser
-chmod 750 /home/liveuser
-
-# ── Size reduction ─────────────────────────────────────────────────────────
-rm -rf /var/cache/pacman/pkg/*
-rm -rf /usr/share/man/* /usr/share/info/* /usr/share/doc/*
-find /usr/share/locale -mindepth 1 -maxdepth 1 \
-  ! -name 'en_US' ! -name 'en_GB' ! -name 'locale.alias' \
-  -exec rm -rf {} + 2>/dev/null || true
-find /usr/lib/firmware -mindepth 1 -maxdepth 1 \
-  ! -name 'i915'    ! -name 'amdgpu'   ! -name 'radeon'  \
-  ! -name 'nouveau' ! -name 'iwlwifi*' ! -name 'ath*'    \
-  ! -name 'ath10k'  ! -name 'ath11k'   ! -name 'rtl_nic' \
-  ! -name 'rtlwifi' ! -name 'rtw88'    ! -name 'rtw89'   \
-  ! -name 'sof'     ! -name 'sof-tplg' ! -name 'intel'   \
-  -exec rm -rf {} + 2>/dev/null || true
-find /usr -type d -name '__pycache__' -exec rm -rf {} + 2>/dev/null || true
-find /usr -name '*.pyc' -delete 2>/dev/null || true
-find /usr/lib -name '*.a' -delete 2>/dev/null || true
-rm -rf /usr/include/* 2>/dev/null || true
-find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
-rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
-
-chown -R 1000:1000 /home/liveuser
-systemctl enable NetworkManager
-
-install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
-sudo -u liveuser dbus-run-session -- bash -c '
-  dconf write /com/solus-project/budgie-panel/panels "@as []"
-'
-echo "=== customize_airootfs.sh complete ==="
-CUSTOMIZE
-chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
-
-# ══════════════════════════════════════════════════════════════════════════
-# BUILD ISO
-# ══════════════════════════════════════════════════════════════════════════
-cd "${WORKDIR}"
-rm -rf "${WORKDIR}/work"
-mkarchiso -v -w work -o out "${PROFILE}/"
-
-if ls out/*.iso 1>/dev/null 2>&1; then
-  mv out/*.iso "${ISO}.iso"
-  sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
-  echo "╔══════════════════════════════════════╗"
-  echo "║  KibaOS Budgie build complete!       ║"
-  echo "║  ${ISO}.iso            ║"
-  echo "╚══════════════════════════════════════╝"
-else
-  echo "ERROR: ISO file not found after mkarchiso!"
-  exit 1
-fi
+cat > /usr/local/bin
