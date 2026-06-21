@@ -3130,9 +3130,9 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
   <p>Click <strong>Install KibaOS</strong> on the desktop, or run:</p>
   <div class="tip"><code>sudo calamares</code></div>
   <br>
-  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md">Wiki</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues">Report Issue</a>
-  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba">GitHub</a>
+  <a class="btn" href="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md" target="_blank" rel="noopener noreferrer" aria-label="Wiki (opens in a new tab)">Wiki</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba/issues" target="_blank" rel="noopener noreferrer" aria-label="Report Issue (opens in a new tab)">Report Issue</a>
+  <a class="btn secondary" href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="GitHub (opens in a new tab)">GitHub</a>
   <h2>Design Language</h2>
   <p>KibaOS's visual identity draws from three reference desktops:</p>
   <div class="design-pills">
@@ -3142,7 +3142,7 @@ cat > /usr/share/kibaos/welcome.html << 'WELCOMEHTML'
     <span class="pill">Organic Motion — asymmetric natural easing: quick settle in, slower fade out</span>
   </div>
 </section>
-<footer>KibaOS Rolling — WolfTech Innovations — github.com/WolfTech-Innovations/Kiba</footer>
+<footer>KibaOS Rolling — WolfTech Innovations — <a href="https://github.com/WolfTech-Innovations/Kiba" target="_blank" rel="noopener noreferrer" aria-label="GitHub Repository (opens in a new tab)" style="color: inherit; text-decoration: underline;">github.com/WolfTech-Innovations/Kiba</a></footer>
 </body>
 </html>
 WELCOMEHTML

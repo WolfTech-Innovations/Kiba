@@ -27,3 +27,7 @@
 ## 2025-06-15 - Dracula Theme for Welcome Screen
 **Learning:** Transitioning the Welcome screen to the Dracula palette improves visual consistency with the rest of the OS. Using box-shadow for focus indicators provides a smoother, more accessible experience than standard outlines.
 **Action:** Use Dracula design tokens (#282a36, #44475a, etc.) for all first-party UI components.
+
+## 2025-06-16 - [Enhanced Welcome Screen Accessibility]
+**Learning:** External links in UI components should always be explicitly marked with `target="_blank"`, `rel="noopener noreferrer"`, and a descriptive `aria-label` that mentions the link opens in a new tab to ensure a predictable and accessible experience for all users.
+**Action:** Always apply this pattern to external links and convert plain-text URLs into semantic clickable links.
