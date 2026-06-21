@@ -3450,9 +3450,24 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
+# ── Firewall defaults, set without invoking `ufw enable` directly ──────────
+# CONFIRMED root cause of a real build failure: `ufw enable` internally
+# checks /proc/<pid>/stat to determine SSH context (ufw/util.py's
+# under_ssh()), which fails inside this chroot build container since
+# there's no real /proc here — same underlying issue as the well-documented
+# Ubuntu bug LP#268084 ("ufw fails badly during installation/upgrade if
+# /proc is not mounted"), just surfacing through Arch's ufw/python stack
+# instead. The resulting Python exception cascades into a malformed
+# downstream sudo call, which is what actually printed as a `sudo` usage
+# error — that was a symptom, not the real failure.
+#
+# Fix: set the default policies directly (ufw default just edits
+# /etc/default/ufw — no /proc lookup involved, confirmed safe), and enable
+# the systemd unit so the firewall activates at first real boot on the
+# installed system, instead of trying to activate it live inside the
+# build chroot where it was never going to filter real traffic anyway.
 ufw default deny incoming
 ufw default allow outgoing
-ufw enable
 systemctl enable ufw
 
 # ══════════════════════════════════════════════════════════════════════════
