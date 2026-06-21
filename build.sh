@@ -145,7 +145,6 @@ gtklock
 wlopm
 wdisplays
 nemo
-ufw
 nemo-fileroller
 gnome-terminal
 gnome-system-monitor
@@ -3450,25 +3449,20 @@ cp -aT "${SKEL}/" /home/liveuser/
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
-# ── Firewall defaults, set without invoking `ufw enable` directly ──────────
-# CONFIRMED root cause of a real build failure: `ufw enable` internally
-# checks /proc/<pid>/stat to determine SSH context (ufw/util.py's
-# under_ssh()), which fails inside this chroot build container since
-# there's no real /proc here — same underlying issue as the well-documented
-# Ubuntu bug LP#268084 ("ufw fails badly during installation/upgrade if
-# /proc is not mounted"), just surfacing through Arch's ufw/python stack
-# instead. The resulting Python exception cascades into a malformed
-# downstream sudo call, which is what actually printed as a `sudo` usage
-# error — that was a symptom, not the real failure.
-#
-# Fix: set the default policies directly (ufw default just edits
-# /etc/default/ufw — no /proc lookup involved, confirmed safe), and enable
-# the systemd unit so the firewall activates at first real boot on the
-# installed system, instead of trying to activate it live inside the
-# build chroot where it was never going to filter real traffic anyway.
-ufw default deny incoming
-ufw default allow outgoing
-systemctl enable ufw
+# ── No firewall package on KibaOS ──────────────────────────────────────────
+# ufw was previously included, but its packaging hooks misbehave inside
+# this chroot build container even beyond just the `ufw enable` CLI
+# command (confirmed: removing that one call wasn't sufficient — something
+# in ufw's own systemd-enable-time hooks still tries a /proc-dependent
+# SSH-detection check and fails the same way, since there's no real /proc
+# in this build environment). Rather than keep fighting a third-party
+# tool's chroot incompatibility for a build-time-only customization step
+# that was never going to filter live traffic anyway, ufw is dropped
+# entirely. KibaOS currently ships with no firewall configured by default —
+# worth revisiting later (e.g. via nftables directly, or a different
+# firewall frontend) if network-facing security hardening becomes a
+# priority, but it's not a build-blocking concern for a desktop live/
+# install image the way it might be for a server image.
 
 # ══════════════════════════════════════════════════════════════════════════
 # DESKTOP SHORTCUTS
