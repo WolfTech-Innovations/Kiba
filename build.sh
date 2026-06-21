@@ -3561,13 +3561,6 @@ cat > /etc/motd << 'MOTD'
 Welcome to KibaOS
 MOTD
 
-sudo -E \
-  WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}" \
-  XDG_RUNTIME_DIR="${LIVE_RUNTIME}" \
-  QT_QPA_PLATFORM=wayland \
-  QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-EOF
-
 systemctl enable sddm
 systemctl enable NetworkManager.service
 
