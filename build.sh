@@ -53,7 +53,7 @@ bootmodes=('bios.syslinux.mbr' 'bios.syslinux.eltorito' 'uefi-ia32.systemd-boot.
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
-airootfs_image_tool_options=('-comp' 'xz' '-Xbcj' 'x86' '-b' '1048576' '-Xdict-size' '1048576' '-no-duplicates' '-noappend')
+airootfs_image_tool_options=('-comp' 'zstd' '-Xcompression-level' '19' '-no-duplicates' '-noappend')
 file_permissions=(
   ["/etc/shadow"]="0:0:400"
   ["/etc/gshadow"]="0:0:400"
@@ -118,7 +118,6 @@ gnome-clocks
 gnome-calculator
 sof-firmware
 thermald
-network-manager-applet
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -157,14 +156,13 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
 firefox
 sassc
-network-manager-applet
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -174,7 +172,7 @@ gparted
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
+polkit-gnome
 udisks2
 upower
 scrot
@@ -185,7 +183,7 @@ gnome-software
 xdg-desktop-portal-gtk
 xdg-desktop-portal-wlr
 imagemagick
-eglinfo
+mesa-utils
 gnupg
 xdotool
 v4l2loopback-dkms
@@ -198,7 +196,7 @@ gnome-calendar
 gnome-notes
 geary
 gnome-music
-gnome-todo
+endeavour
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -2299,8 +2297,8 @@ WAYFIREINI
 # ══════════════════════════════════════════════════════════════════════════
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
-OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
+OTA_KEYRING="${AIROOTFS}/etc/kibaos/ota-keyring.gpg"
+mkdir -p "${AIROOTFS}/etc/kibaos" "${AIROOTFS}/var/lib/kibaos-ota" "${AIROOTFS}/var/log/kibaos"
 
 # ── Import OTA public key into dedicated keyring ───────────────────────────
 curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
@@ -2309,7 +2307,7 @@ curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
 rm -f /tmp/ota-public.asc
 
 # ── Patch-level tracking ───────────────────────────────────────────────────
-echo "0" > /etc/kibaos/patch-level
+echo "0" > "${AIROOTFS}/etc/kibaos/patch-level"
 
 # ══════════════════════════════════════════════════════════════════════════
 # /usr/local/bin/kibaos-ota — the live patching engine
@@ -2824,10 +2822,10 @@ for ids in \
   "nemo.desktop" \
   "org.gnome.Calendar.desktop gnome-calendar.desktop" \
   "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
-  "org.gnome.eog.desktop eog.desktop" \
+  "org.gnome.Loupe.desktop org.gnome.eog.desktop eog.desktop" \
   "org.gnome.Geary.desktop geary.desktop" \
   "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
+  "org.gnome.Endeavour.desktop org.gnome.Todo.desktop gnome-todo.desktop"
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
@@ -2936,7 +2934,7 @@ cat > "${SKEL}/.config/autostart/polkit-agent.desktop" << 'POLKIT'
 [Desktop Entry]
 Type=Application
 Name=Polkit Authentication Agent
-Exec=/usr/lib/polkit-kde-authentication-agent-1
+Exec=/usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
