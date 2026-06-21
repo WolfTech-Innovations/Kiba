@@ -54,27 +54,27 @@ save_release_notes() {
   fi
 
   # 1. Generate filename: NTE-DDHYM
-  # Optimization: Single date call reduces process spawning.
+  # Optimization: Use Bash built-ins to avoid process forks (Bolt directive).
   # DD: Day of month (01-31)
   # H: Hour of day (0-N for 0-23)
   # Y: Last digit of year
   # M: Month (1-C for 1-12)
 
-  vars=$(date "+%d %H %y %m")
-  dd=$(echo "$vars" | cut -d' ' -f1)
-  h_val=$(echo "$vars" | cut -d' ' -f2)
-  y_val=$(echo "$vars" | cut -d' ' -f3)
-  m_val=$(echo "$vars" | cut -d' ' -f4)
+  printf -v vars "%(%d %H %y %m)T" -1
+  read -r dd h_val y_val m_val <<< "$vars"
 
-  # Remove leading zeros to avoid octal interpretation in arithmetic
-  h_val_clean=$(echo "$h_val" | sed 's/^0//'); h_val_clean="${h_val_clean:-0}"
-  m_val_clean=$(echo "$m_val" | sed 's/^0//'); m_val_clean="${m_val_clean:-0}"
+  # Strip leading zeros to prevent octal interpretation
+  h_val=${h_val#0}
+  h_val=${h_val:-0}
+  m_val=${m_val#0}
+  m_val=${m_val:-0}
 
   hours="0123456789ABCDEFGHIJKLMN"
-  h=$(echo "$hours" | cut -c "$((h_val_clean + 1))")
-  y=$(echo "$y_val" | cut -c 2)
+  h="${hours:h_val:1}"
+  y="${y_val:1:1}"
   months="123456789ABC"
-  m=$(echo "$months" | cut -c "$((m_val_clean + 0))")
+  m_idx=$((m_val - 1))
+  m="${months:m_idx:1}"
 
   filename="Notes/NTE-${dd}${h}${y}${m}.md"
 
