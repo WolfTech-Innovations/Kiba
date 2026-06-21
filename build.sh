@@ -1135,12 +1135,20 @@ public class KibaOOBE : Adw.Application {
             Gdk.Display.get_default (), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
 
+    /* A plain Vala delegate for "do something, no args, no return value" —
+     * this is the correct idiom for passing an anonymous closure (a Vala
+     * lambda created with `() => { ... }`) as a method parameter. The
+     * earlier version of this tried to use a raw C function-pointer cast
+     * ((void (*)()) on_next)(), which is not valid Vala syntax at all and
+     * fails to parse — delegates are how Vala actually represents this. */
+    private delegate void NextAction ();
+
     /* ── Shared page chrome: K-mark watermark behind every page, frosted
      * card centered on top, Back/Next pinned bottom-right — exactly the
      * Windows-OOBE-style single-question layout, themed with KibaOS's own
      * navy/glass language instead of Windows' flat blue. */
     private Adw.NavigationPage make_page (string title, Gtk.Widget content,
-                                            string? next_label, GLib.Callback? on_next) {
+                                            string? next_label, NextAction? on_next) {
         var root = new Gtk.Overlay ();
         root.add_css_class ("oobe-background");
 
@@ -1177,7 +1185,8 @@ public class KibaOOBE : Adw.Application {
             var next_btn = new Gtk.Button.with_label (next_label);
             next_btn.add_css_class ("oobe-primary-button");
             if (on_next != null) {
-                next_btn.clicked.connect (() => { ((void (*)()) on_next) (); });
+                NextAction action = on_next;
+                next_btn.clicked.connect (() => { action (); });
             }
             nav_row.append (next_btn);
         }
