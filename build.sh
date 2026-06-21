@@ -1422,16 +1422,62 @@ wget -q "https://ftp.gnu.org/gnu/parted/parted-${PARTED_VERSION}.tar.xz" || {
 tar xf "parted-${PARTED_VERSION}.tar.xz"
 cd "parted-${PARTED_VERSION}"
 
+# ── Patch do_version's signature mismatch directly ──────────────────────────
+# CONFIRMED from actual build log: parted.c's do_version() is declared as
+# `do_version ()` — old K&R-style C with no parameter list at all, which
+# the compiler infers as `int (*)(void)`. But command_create() (command.h)
+# expects every command handler to match `int (*method)(PedDevice **,
+# PedDisk **)`. This compiled under older/more lenient GCC for years; GCC's
+# newer defaults (Arch's current toolchain) now treat the mismatch as a
+# hard error instead of a warning. Our earlier CFLAGS=-Wno-error=... did NOT
+# suppress this specific case, confirmed by this exact error still showing
+# literally "[-Wincompatible-pointer-types]" in the output — so go directly
+# at the source instead of fighting compiler flags further.
+#
+# Fix: give do_version the same two (unused) parameters every other command
+# handler takes, matching the signature command_create requires. This
+# changes do_version's declaration only, not parted's runtime behavior —
+# the function still ignores whatever's passed to it, same as before.
+DOVERSION_FILE="parted/parted.c"
+if [ ! -f "${DOVERSION_FILE}" ]; then
+  echo "FATAL: ${DOVERSION_FILE} not found — parted's source layout differs from expectation for version ${PARTED_VERSION}." >&2
+  exit 1
+fi
+grep -q '^do_version ()$' "${DOVERSION_FILE}" || {
+  echo "FATAL: 'do_version ()' line not found verbatim in ${DOVERSION_FILE} — exact source text differs from the confirmed build log for version ${PARTED_VERSION}; inspect the file directly before patching further." >&2
+  exit 1
+}
+sed -i 's/^do_version ()$/do_version (PedDevice** dev, PedDisk** diskp)/' "${DOVERSION_FILE}"
+echo "=== Patched do_version() signature in ${DOVERSION_FILE} ==="
+
 # --disable-device-mapper avoids a libdevmapper version-compat fight inside
 # this throwaway build; we only need the headers/lib for bindgen to read
 # against, not a fully-featured parted binary — the live system already
 # has its own pacman-installed parted for actual partitioning operations.
+#
+# CFLAGS="-Wno-error=incompatible-pointer-types": parted 3.6's own source
+# has a known function-pointer signature mismatch (do_version passed where
+# command_create expects a more generic handler signature — same pattern
+# as C's classic "callback table" pointer-cast issue). Older/Debian-default
+# GCC only warns about this; GCC 14+ (which Arch ships) makes
+# -Wincompatible-pointer-types a hard error by default. This isn't a real
+# memory-safety bug we're papering over — it's old, previously-fine C that
+# a newer compiler default reclassified as fatal. Downgrading it back to a
+# warning is the standard, low-risk fix for exactly this situation, rather
+# than patching parted's own call site without having seen its real source.
+export CFLAGS="-Wno-error=incompatible-pointer-types ${CFLAGS:-}"
 ./configure --prefix=/usr/local --disable-static --disable-device-mapper || {
   echo "FATAL: GNU parted ./configure failed — check the build log above for the specific missing dependency." >&2
   exit 1
 }
 make -j"$(nproc)" || {
-  echo "FATAL: GNU parted build failed — check the build log above." >&2
+  echo "FATAL: GNU parted build failed even with -Wno-error=incompatible-pointer-types.";
+  echo "If the error is still 'incompatible pointer type' on do_version/command_create,";
+  echo "GCC may be erroring on a DIFFERENT warning category for this issue (e.g.";
+  echo "-Wincompatible-function-pointer-types is a separate, more specific flag in";
+  echo "newer GCC) — try adding that to CFLAGS as well, or as a last resort";
+  echo "-w (suppress all warnings) for this one throwaway build.";
+  echo "If the error is something else entirely, check the build log above." >&2
   exit 1
 }
 make install
