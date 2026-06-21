@@ -1049,7 +1049,7 @@ echo "=== AUR packages installed ==="
 # error against the new upstream source if it happens, don't bypass it.
 # ══════════════════════════════════════════════════════════════════════════
 echo "=== Building Rust toolchain for distinst ==="
-pacman -S --noconfirm --needed rustup pkgconf libparted cryptsetup lvm2 clang git
+pacman -S --noconfirm --needed rustup pkgconf parted cryptsetup lvm2 clang git
 rustup default stable
 
 DISTINST_SRC="${AUR_BUILD}/distinst"
