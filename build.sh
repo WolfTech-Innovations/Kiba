@@ -1404,12 +1404,18 @@ fi
 export CARGO_HOME="${CARGO_HOME:-/root/.cargo}"
 cd "${DISTINST_SRC}"
 # cargo fetch (not full build) just to populate registry/src with the real
-# unpacked libparted-sys crate directory bindgen needs to overwrite.
+# unpacked libparted-sys crate directory bindgen needs to overwrite. Note:
+# libparted-sys is a TRANSITIVE dependency (distinst depends on the
+# `libparted` wrapper crate 0.1.4, which itself depends on libparted-sys
+# 0.3.1 — confirmed against both crates' real Cargo.toml files), so cargo
+# fetch needs to resolve the full tree, not just direct deps.
 cargo fetch || true
 
-LIBPARTED_SYS_DIR=$(find "${CARGO_HOME}/registry/src" -maxdepth 1 -type d -name 'libparted-sys-*' 2>/dev/null | head -n1)
+LIBPARTED_SYS_DIR=$(find "${CARGO_HOME}/registry/src" -maxdepth 2 -type d -name 'libparted-sys-*' 2>/dev/null | head -n1)
 if [ -z "${LIBPARTED_SYS_DIR}" ]; then
-  echo "FATAL: libparted-sys source dir not found under ${CARGO_HOME}/registry/src after cargo fetch — crate name/version differs from expectation; inspect ${DISTINST_SRC}/Cargo.lock for the actual dependency name." >&2
+  echo "libparted-sys not found after cargo fetch. Listing what was actually fetched under libparted* for diagnosis:" >&2
+  find "${CARGO_HOME}/registry/src" -maxdepth 2 -type d -name 'libparted*' 2>/dev/null >&2
+  echo "FATAL: libparted-sys source dir still not found under ${CARGO_HOME}/registry/src. cargo fetch may need a full resolution pass first — try running 'cargo build --offline' (allowed to fail) before this search, or inspect ${DISTINST_SRC}/Cargo.lock directly for the exact pinned version." >&2
   exit 1
 fi
 echo "=== Found libparted-sys at ${LIBPARTED_SYS_DIR} ==="
