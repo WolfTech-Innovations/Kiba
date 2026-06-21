@@ -2366,10 +2366,11 @@ OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
 mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
 
 # ── Import OTA public key into dedicated keyring ───────────────────────────
-curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
+_TMP_KEY=$(mktemp)
+curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o "${_TMP_KEY}" 2>/dev/null && \
   gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-      --import /tmp/ota-public.asc 2>/dev/null || true
-rm -f /tmp/ota-public.asc
+      --import "${_TMP_KEY}" 2>/dev/null || true
+rm -f "${_TMP_KEY}"
 
 # ── Patch-level tracking ───────────────────────────────────────────────────
 echo "0" > /etc/kibaos/patch-level
@@ -2391,7 +2392,7 @@ OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
 PATCH_LEVEL_FILE="/etc/kibaos/patch-level"
 OTA_WORKDIR="/var/lib/kibaos-ota"
 OTA_LOG="/var/log/kibaos/ota.log"
-FREEZE_PID_FILE="/tmp/kibaos-fb-freeze.pid"
+FREEZE_PID_FILE="${OTA_WORKDIR}/kibaos-fb-freeze.pid"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
 
@@ -2499,16 +2500,16 @@ done < "${MANIFEST}"
 fb_freeze() {
   log "Freezing display with framebuffer snapshot..."
   # Capture current screen with grim (Wayland screenshot)
-  SNAP="/tmp/kibaos-ota-snap.png"
-  SNAP_RAW="/tmp/kibaos-ota-snap.raw"
+  SNAP="${OTA_WORKDIR}/kibaos-ota-snap.png"
+  SNAP_RAW="${OTA_WORKDIR}/kibaos-ota-snap.raw"
   WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
   XDG_RUNTIME_DIR="/run/user/1000"
 
-  # Take screenshot as liveuser
+  # Take screenshot as liveuser, piped to root-restricted file
   sudo -u liveuser \
     WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
     XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
-    grim "${SNAP}" 2>/dev/null || true
+    grim - > "${SNAP}" 2>/dev/null || true
 
   if [ -f "${SNAP}" ]; then
     # Convert to raw framebuffer format and write to /dev/fb0
@@ -2569,7 +2570,7 @@ fb_unfreeze() {
     kill "$(cat ${FREEZE_PID_FILE})" 2>/dev/null || true
     rm -f "${FREEZE_PID_FILE}"
   fi
-  rm -f /tmp/kibaos-ota-snap.png /tmp/kibaos-ota-snap.raw
+  rm -f "${OTA_WORKDIR}/kibaos-ota-snap.png" "${OTA_WORKDIR}/kibaos-ota-snap.raw"
   log "Framebuffer freeze released."
 }
 
