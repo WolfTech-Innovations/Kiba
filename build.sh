@@ -1526,12 +1526,11 @@ public class KibaOOBE : Adw.Application {
         var summary = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
         summary.add_css_class ("oobe-summary-box");
 
-        string[][] items = {
-            { "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : selected_disk },
-            { "preferences-desktop-locale-symbolic", "Language", selected_locale },
-            { "input-keyboard-symbolic",   "Keyboard", selected_keymap },
-            { "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value }
-        };
+        var items = new Gee.ArrayList<string[]> ();
+        items.add ({ "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : selected_disk });
+        items.add ({ "preferences-desktop-locale-symbolic", "Language", selected_locale });
+        items.add ({ "input-keyboard-symbolic",   "Keyboard", selected_keymap });
+        items.add ({ "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value });
         bool first = true;
         foreach (var item in items) {
             if (!first) {
@@ -4208,4 +4207,3 @@ else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
 fi
-,
