@@ -199,6 +199,7 @@ geary
 gnome-music
 gnome-todo
 plymouth
+archinstall
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -213,7 +214,7 @@ INITRAMFS
 # installed.conf — used by the INSTALLED system after Calamares runs initcpio.
 # Must NOT include memdisk/archiso hooks (those are live-only).
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
-HOOKS=(base udev plymouth keyboard keymap modconf block filesystems fsck)
+HOOKS=(base udev plymouth autodetect modconf kms block keyboard keymap filesystems fsck)
 INSTALLED_HOOKS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
@@ -634,7 +635,7 @@ cat > "${AIROOTFS}/boot/loader/entries/kibaos.conf" << 'INSTALLED_ENTRY'
 title   KibaOS
 linux   /vmlinuz-linux
 initrd  /initramfs-linux.img
-options root=PARTUUID=PLACEHOLDER rw quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 clocksource=tsc tsc=reliable
+options root=PARTUUID=PLACEHOLDER rw quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 clocksource=tsc tsc=reliable plymouth.use-simpledrm=1
 INSTALLED_ENTRY
 
 cat > "${AIROOTFS}/etc/calamares/modules/services-systemd.conf" << 'SERVICESCONF'
@@ -1024,17 +1025,8 @@ pacman -S --noconfirm --needed gtk4 libadwaita libgee vala meson ninja rsync pol
 
 # ── main.vala ────────────────────────────────────────────────────────────
 cat > /usr/share/kibaos-oobe/src/main.vala << 'OOBEVALA'
-/* KibaOS OOBE Installer — fullscreen, one-step-per-screen, no sidebar.
- * GTK4 + libadwaita. Visual language matches the live desktop directly:
- * navy gradient (#0d1b2a -> #003f5c -> #0099cc), frosted glass cards,
- * pill buttons, the same K-mark watermark used on the wallpaper.
- *
- * This is a UI shell only. All actual disk/install work happens in
- * /usr/local/bin/kibaos-oobe-backend.sh, invoked via pkexec. Keeping the
- * privileged logic in one auditable bash script, not in Vala/GObject code,
- * mirrors the same separation Calamares already uses (UI process vs.
- * root-requiring jobs) without needing a Rust/C++ FFI layer at all.
- */
+/* KibaOS OOBE — GTK4 + libadwaita, white-card design language.
+ * Backend: /usr/local/bin/kibaos-oobe-backend (Python/archinstall). */
 
 using Gtk;
 using Adw;
@@ -1042,81 +1034,39 @@ using Gee;
 
 public class KibaOOBE : Adw.Application {
     private Adw.ApplicationWindow window;
-    private Adw.NavigationView nav_view;
-    private string selected_disk = "";
+    private Adw.NavigationView    nav_view;
+    private string selected_disk   = "";
     private string selected_locale = "en_US.UTF-8";
     private string selected_keymap = "us";
-    private string hostname_value = "kibaos";
-    private string username_value = "";
-    private string password_value = "";
-
-    /* "Already on your computer" mode (formerly "OEM mode"): detected
-     * automatically, no jargon, no manual step required. The signal: if
-     * the device this live image actually booted from is NOT removable
-     * (i.e. /sys/block/<dev>/removable reads "0"), the image was written
-     * directly onto a fixed internal drive — a hybrid ISO dd'd straight
-     * onto the target disk, or a drive pre-imaged by a manufacturer.
-     * There's nothing to copy and nothing to divide up: the files are
-     * already sitting on the disk that's going to run them. So setup
-     * skips straight to language and an account, with no disk step
-     * shown at all — because there's genuinely nothing to choose.
-     *
-     * If booted from a removable drive (a USB stick) instead, the target
-     * is some other, separate internal drive — that's the normal "set
-     * this computer up" path, which still does real disk work, just
-     * without ever naming it as such on screen (see list_storage_options).
-     *
-     * /sys/block/.../removable is a strong signal but not flawless (some
-     * eMMC storage misreports as removable; a USB-attached internal
-     * drive can misreport as fixed) — see detect_already_on_computer()
-     * for the exact check, and OEM_MARKER below for a manual override an
-     * imaging script can set if the automatic check ever gets it wrong. */
-    private bool is_oem_mode = false;
+    private string hostname_value  = "kibaos";
+    private string username_value  = "";
+    private string password_value  = "";
+    private bool   is_oem_mode     = false;
     private const string OEM_MARKER = "/etc/kibaos/oem-pending";
 
-    /* Strips a trailing partition number from a block device name, e.g.
-     * "sda1" -> "sda", "nvme0n1p1" -> "nvme0n1". Wrapped in try/catch since
-     * Regex.replace() can throw GLib.RegexError on a malformed pattern —
-     * our patterns are fixed string literals so this never actually
-     * fails, but Vala still requires handling it explicitly. */
-    private string strip_partition_suffix (string device_name) {
-        string result = device_name;
+    // ── Helpers ────────────────────────────────────────────────────────
+    private string strip_partition_suffix (string n) {
+        string r = n;
         try {
-            result = /[0-9]+$/.replace (result, -1, 0, "");
-            if (result.has_prefix ("nvme")) {
-                result = /p$/.replace (result, -1, 0, "");
-            }
-        } catch (GLib.RegexError e) {
-            warning ("Regex error stripping partition suffix from %s: %s", device_name, e.message);
-        }
-        return result;
+            r = /[0-9]+$/.replace (r, -1, 0, "");
+            if (r.has_prefix ("nvme")) r = /p$/.replace (r, -1, 0, "");
+        } catch (GLib.RegexError e) {}
+        return r;
     }
 
     private bool detect_already_on_computer () {
-        if (GLib.FileUtils.test (OEM_MARKER, GLib.FileTest.EXISTS)) {
-            return true;
-        }
-        string boot_source = "";
-        try {
-            GLib.Process.spawn_command_line_sync (
-                "findmnt -n -o SOURCE /run/archiso/bootmnt", out boot_source);
-        } catch (GLib.SpawnError e) {
-            warning ("Could not determine boot source: %s", e.message);
-            return false;
-        }
-        boot_source = boot_source.strip ();
-        if (boot_source == "") return false;
-
-        var base_name = strip_partition_suffix (GLib.Path.get_basename (boot_source));
-
-        string removable_path = "/sys/block/%s/removable".printf (base_name);
+        if (GLib.FileUtils.test (OEM_MARKER, GLib.FileTest.EXISTS)) return true;
+        string src = "";
+        try { GLib.Process.spawn_command_line_sync (
+                "findmnt -n -o SOURCE /run/archiso/bootmnt", out src); }
+        catch (GLib.SpawnError e) { return false; }
+        src = src.strip ();
+        if (src == "") return false;
+        string removable_path = "/sys/block/%s/removable".printf (
+            strip_partition_suffix (GLib.Path.get_basename (src)));
         string removable_content = "";
-        try {
-            GLib.FileUtils.get_contents (removable_path, out removable_content);
-        } catch (GLib.FileError e) {
-            warning ("Could not read %s: %s", removable_path, e.message);
-            return false;
-        }
+        try { GLib.FileUtils.get_contents (removable_path, out removable_content); }
+        catch (GLib.FileError e) { return false; }
         return removable_content.strip () == "0";
     }
 
@@ -1126,75 +1076,82 @@ public class KibaOOBE : Adw.Application {
 
     protected override void activate () {
         is_oem_mode = detect_already_on_computer ();
-
         window = new Adw.ApplicationWindow (this) {
-            default_width = 1280,
+            default_width  = 1280,
             default_height = 800,
-            fullscreened = true,
-            title = is_oem_mode ? "Finish Setting Up KibaOS" : "KibaOS Setup"
+            fullscreened   = true,
+            title          = is_oem_mode ? "Finish Setting Up KibaOS" : "KibaOS Setup"
         };
         window.add_css_class ("kibaos-oobe-window");
-
         nav_view = new Adw.NavigationView ();
         window.set_content (nav_view);
-
-        if (is_oem_mode) {
-            nav_view.push (build_locale_page ());
-        } else {
-            nav_view.push (build_welcome_page ());
-        }
         load_css ();
+        nav_view.push (is_oem_mode ? build_locale_page () : build_welcome_page ());
         window.present ();
     }
 
     private void load_css () {
-        var provider = new Gtk.CssProvider ();
-        provider.load_from_path ("/usr/share/kibaos-oobe/oobe.css");
+        var p = new Gtk.CssProvider ();
+        p.load_from_path ("/usr/share/kibaos-oobe/oobe.css");
         Gtk.StyleContext.add_provider_for_display (
-            Gdk.Display.get_default (), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            Gdk.Display.get_default (), p, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
     }
 
-    /* A plain Vala delegate for "do something, no args, no return value" —
-     * this is the correct idiom for passing an anonymous closure (a Vala
-     * lambda created with `() => { ... }`) as a method parameter. The
-     * earlier version of this tried to use a raw C function-pointer cast
-     * ((void (*)()) on_next)(), which is not valid Vala syntax at all and
-     * fails to parse — delegates are how Vala actually represents this. */
     private delegate void NextAction ();
 
-    /* ── Shared page chrome: K-mark watermark behind every page, frosted
-     * card centered on top, Back/Next pinned bottom-right — exactly the
-     * Windows-OOBE-style single-question layout, themed with KibaOS's own
-     * navy/glass language instead of Windows' flat blue. */
-    private Adw.NavigationPage make_page (string title, Gtk.Widget content,
-                                            string? next_label, NextAction? on_next) {
+    // ── Page chrome ────────────────────────────────────────────────────
+    // step_index / step_total drive the dot-indicator at the top of each card.
+    private Adw.NavigationPage make_page (
+            string title, Gtk.Widget content,
+            string? next_label, NextAction? on_next,
+            bool hide_back   = false,
+            int  step_index  = 0,
+            int  step_total  = 0) {
+
+        // Outer overlay = full-screen canvas
         var root = new Gtk.Overlay ();
         root.add_css_class ("oobe-background");
 
-        var logo = new Gtk.Image.from_file ("/usr/share/kibaos/logo-256.png") {
-            pixel_size = 96,
-            halign = Gtk.Align.CENTER,
-            valign = Gtk.Align.START,
-            margin_top = 40
-        };
-        root.add_overlay (logo);
-
-        var card = new Gtk.Box (Gtk.Orientation.VERTICAL, 18) {
+        // Frosted card
+        var card = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
             halign = Gtk.Align.CENTER,
             valign = Gtk.Align.CENTER,
-            width_request = 560
+            width_request = 600
         };
         card.add_css_class ("oobe-card");
-        card.append (content);
-        root.add_overlay (card);
 
-        var nav_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12) {
-            halign = Gtk.Align.END,
-            valign = Gtk.Align.END,
-            margin_end = 36,
-            margin_bottom = 36
+        // ── Step-dots (shown when step_total > 1) ──────────────────────
+        if (step_total > 1) {
+            var dots_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+                halign = Gtk.Align.CENTER,
+                margin_bottom = 20
+            };
+            for (int i = 0; i < step_total; i++) {
+                var dot = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {};
+                dot.add_css_class ("oobe-step-dot");
+                if (i == step_index) dot.add_css_class ("oobe-step-dot-active");
+                dots_row.append (dot);
+            }
+            card.append (dots_row);
+        }
+
+        // Content + nav row wrapped in a box with padding
+        var inner = new Gtk.Box (Gtk.Orientation.VERTICAL, 24);
+        inner.add_css_class ("oobe-inner");
+        inner.append (content);
+
+        // Nav row
+        var nav_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
+            halign = Gtk.Align.FILL,
+            margin_top = 8
         };
-        if (nav_view.get_navigation_stack ().get_n_items () > 0) {
+        nav_row.add_css_class ("oobe-nav-row");
+
+        // Spacer
+        var spacer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true };
+        nav_row.append (spacer);
+
+        if (!hide_back && nav_view.get_navigation_stack ().get_n_items () > 1) {
             var back_btn = new Gtk.Button.with_label ("Back");
             back_btn.add_css_class ("oobe-secondary-button");
             back_btn.clicked.connect (() => nav_view.pop ());
@@ -1209,46 +1166,207 @@ public class KibaOOBE : Adw.Application {
             }
             nav_row.append (next_btn);
         }
-        root.add_overlay (nav_row);
+        inner.append (nav_row);
+        card.append (inner);
+        root.add_overlay (card);
 
-        var page = new Adw.NavigationPage (root, title);
-        return page;
+        // KibaOS wordmark top-left
+        var brand = new Gtk.Label ("KibaOS") {
+            halign = Gtk.Align.START,
+            valign = Gtk.Align.START,
+            margin_start = 36,
+            margin_top   = 32
+        };
+        brand.add_css_class ("oobe-brand");
+        root.add_overlay (brand);
+
+        return new Adw.NavigationPage (root, title);
     }
 
+    // ── Heading ─────────────────────────────────────────────────────────
     private Gtk.Widget oobe_heading (string text, string? subtitle = null) {
-        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 8);
+        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6);
         var label = new Gtk.Label (text);
         label.add_css_class ("oobe-title");
-        label.wrap = true;
+        label.halign = Gtk.Align.START;
+        label.wrap   = true;
         box.append (label);
         if (subtitle != null) {
             var sub = new Gtk.Label (subtitle);
             sub.add_css_class ("oobe-subtitle");
-            sub.wrap = true;
+            sub.halign = Gtk.Align.START;
+            sub.wrap   = true;
             box.append (sub);
         }
         return box;
     }
 
-    /* ── Page 1: Welcome ──────────────────────────────────────────────── */
+    // ══════════════════════════════════════════════════════════════════
+    // Page 1: Welcome
+    // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_welcome_page () {
-        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 24);
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 32);
+
+        // Logo
+        var logo = new Gtk.Image.from_file ("/usr/share/kibaos/logo-256.png") {
+            pixel_size = 80,
+            halign     = Gtk.Align.START
+        };
+        content.append (logo);
+
         content.append (oobe_heading ("Welcome to KibaOS",
-            "Let's get your system set up. This will take about five to ten minutes."));
+            "Let's get your system set up. This should only take a few minutes."));
+
         return make_page ("Welcome", content, "Get Started", () => {
-            nav_view.push (build_locale_page ());
-        });
+            nav_view.push (build_wifi_page ());
+        }, true, 0, 0);
     }
 
-    /* ── Page 2: Locale + keyboard ────────────────────────────────────── */
+    // ══════════════════════════════════════════════════════════════════
+    // Page 2: Wi-Fi  (animated icon, network list)
+    // ══════════════════════════════════════════════════════════════════
+    private Adw.NavigationPage build_wifi_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 24);
+
+        // Animated Wi-Fi icon drawn on a DrawingArea
+        var canvas = new Gtk.DrawingArea () {
+            width_request  = 120,
+            height_request = 120,
+            halign         = Gtk.Align.CENTER
+        };
+        canvas.add_css_class ("oobe-wifi-canvas");
+
+        // Animation tick state (boxed in an array so closures can capture it)
+        double[] tick   = { 0.0 };   // 0..1 repeating
+        double[] wiggle = { 0.0 };   // small side-sway for the playful bounce
+        uint[]   src_id = { 0 };
+
+        canvas.set_draw_func ((da, cr, w, h) => {
+            double t      = tick[0];
+            double cx     = w / 2.0;
+            double cy     = h / 2.0 + 8;
+            double r1     = 14.0, r2 = 26.0, r3 = 38.0;  // arc radii
+            double sw     = 4.5;                           // stroke width
+
+            // Arc opacity: arcs fade in from outer to inner as t grows
+            double a3 = double.max (0, double.min (1, t * 3));
+            double a2 = double.max (0, double.min (1, t * 3 - 0.6));
+            double a1 = double.max (0, double.min (1, t * 3 - 1.2));
+
+            // ── Outer arc ───────────────────────────────────────────────
+            cr.set_line_width (sw);
+            cr.set_line_cap (Cairo.LineCap.ROUND);
+            cr.set_source_rgba (0.0, 0.60, 0.80, a3 * 0.85);
+            double start_angle = Math.PI * (1.0 + 0.18);
+            double end_angle   = Math.PI * (2.0 - 0.18);
+            cr.arc (cx, cy, r3, start_angle, end_angle);
+            cr.stroke ();
+
+            // ── Middle arc ──────────────────────────────────────────────
+            cr.set_source_rgba (0.0, 0.60, 0.80, a2 * 0.90);
+            cr.arc (cx, cy, r2, start_angle, end_angle);
+            cr.stroke ();
+
+            // ── Inner arc ───────────────────────────────────────────────
+            cr.set_source_rgba (0.0, 0.60, 0.80, a1 * 0.95);
+            cr.arc (cx, cy, r1, start_angle, end_angle);
+            cr.stroke ();
+
+            // ── Dot + ripple ─────────────────────────────────────────────
+            // dot phase: pulses from 0→1→0 at 1.2× speed
+            double dp = (t * 1.4) % 1.0;
+            // ripple ring expands outward and fades
+            double rip_r = 6.0 + dp * 18.0;
+            double rip_a = (1.0 - dp) * 0.55;
+
+            // ripple circle
+            cr.set_source_rgba (0.0, 0.60, 0.80, rip_a);
+            cr.set_line_width (2.0);
+            cr.arc (cx, cy + r3 - 2.0 + wiggle[0] * 3.0, rip_r, 0, 2 * Math.PI);
+            cr.stroke ();
+
+            // solid dot
+            cr.set_source_rgba (0.0, 0.60, 0.80, 1.0);
+            cr.arc (cx, cy + r3 - 2.0 + wiggle[0] * 3.0, 5.5, 0, 2 * Math.PI);
+            cr.fill ();
+        });
+
+        // Tick function driving the animation (60 fps)
+        src_id[0] = GLib.Timeout.add (16, () => {
+            tick[0]   = (tick[0] + 0.012) % 1.0;
+            wiggle[0] = Math.sin (tick[0] * Math.PI * 6.0) * 0.4;
+            canvas.queue_draw ();
+            return GLib.Source.CONTINUE;
+        });
+
+        // Stop animation when widget is destroyed
+        canvas.destroy.connect (() => {
+            if (src_id[0] != 0) { GLib.Source.remove (src_id[0]); src_id[0] = 0; }
+        });
+
+        content.append (canvas);
+        content.append (oobe_heading ("Connect to Wi-Fi",
+            "Choose a network to continue. You can also skip this step."));
+
+        // Network list — populated via nmcli
+        var list_box = new Gtk.ListBox ();
+        list_box.add_css_class ("oobe-list");
+        list_box.selection_mode = Gtk.SelectionMode.SINGLE;
+
+        // Scan for networks (best-effort; if nmcli is absent, show a note)
+        string raw_nets = "";
+        try {
+            GLib.Process.spawn_command_line_sync (
+                "nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list", out raw_nets);
+        } catch (GLib.SpawnError e) {}
+
+        var seen = new Gee.HashSet<string> ();
+        bool any = false;
+        foreach (var line in raw_nets.split ("\n")) {
+            var parts = line.strip ().split (":", 3);
+            if (parts.length < 2) continue;
+            string ssid = parts[0].strip ();
+            if (ssid == "" || ssid == "--" || seen.contains (ssid)) continue;
+            seen.add (ssid);
+            string signal   = parts.length > 1 ? parts[1] : "";
+            bool   secured  = parts.length > 2 && parts[2] != "" && parts[2] != "--";
+            string icon_name = secured ? "network-wireless-signal-good-symbolic"
+                                       : "network-wireless-signal-good-symbolic";
+            var row = new Adw.ActionRow () {
+                title    = ssid,
+                subtitle = "%s%%".printf (signal)
+            };
+            row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
+            if (secured) row.add_suffix (new Gtk.Image.from_icon_name ("system-lock-screen-symbolic"));
+            list_box.append (row);
+            any = true;
+        }
+        if (!any) {
+            var row = new Adw.ActionRow () { title = "No networks found nearby" };
+            row.add_prefix (new Gtk.Image.from_icon_name ("network-offline-symbolic"));
+            list_box.append (row);
+        }
+        content.append (list_box);
+
+        return make_page ("Wi-Fi", content, "Next", () => {
+            nav_view.push (build_locale_page ());
+        }, false, 1, 6);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Page 3: Locale + Keyboard
+    // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_locale_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading ("Language & Keyboard",
-            "Choose how KibaOS should speak to you."));
+            "Choose how KibaOS should communicate with you."));
 
         var locale_row = new Adw.ComboRow () { title = "Language" };
         var locale_model = new Gtk.StringList (null);
-        string[] locales = { "en_US.UTF-8", "en_GB.UTF-8", "de_DE.UTF-8", "fr_FR.UTF-8", "es_ES.UTF-8" };
+        string[] locales = {
+            "en_US.UTF-8", "en_GB.UTF-8", "de_DE.UTF-8",
+            "fr_FR.UTF-8", "es_ES.UTF-8", "ja_JP.UTF-8", "zh_CN.UTF-8"
+        };
         foreach (var l in locales) locale_model.append (l);
         locale_row.set_model (locale_model);
         locale_row.notify["selected"].connect (() => {
@@ -1258,7 +1376,7 @@ public class KibaOOBE : Adw.Application {
 
         var keymap_row = new Adw.ComboRow () { title = "Keyboard layout" };
         var keymap_model = new Gtk.StringList (null);
-        string[] keymaps = { "us", "uk", "de", "fr", "es" };
+        string[] keymaps = { "us", "uk", "de", "fr", "es", "jp", "dvorak" };
         foreach (var k in keymaps) keymap_model.append (k);
         keymap_row.set_model (keymap_model);
         keymap_row.notify["selected"].connect (() => {
@@ -1267,34 +1385,20 @@ public class KibaOOBE : Adw.Application {
         content.append (keymap_row);
 
         return make_page ("Language", content, "Next", () => {
-            if (is_oem_mode) {
-                nav_view.push (build_account_page ());
-            } else {
-                advance_past_storage_step ();
-            }
-        });
+            if (is_oem_mode) nav_view.push (build_account_page ());
+            else advance_past_storage_step ();
+        }, false, 2, 6);
     }
 
-    /* ── Storage target: fully automatic, no jargon shown to the person.
-     * "Partition", "disk", "erase", and device paths never appear on
-     * screen. Logic:
-     *   1. Find the drive we booted from (to exclude it — we never want
-     *      to suggest overwriting the very USB stick running setup).
-     *   2. List every OTHER fixed, non-removable drive found.
-     *   3. Exactly one candidate -> skip the page entirely, just use it.
-     *   4. Multiple candidates -> show a short plain-language picker
-     *      ("your computer's storage", with size and a friendly model
-     *      name) so the person can still tell two drives apart, without
-     *      ever seeing the word "partition" or a /dev/ path. ───────────── */
+    // ══════════════════════════════════════════════════════════════════
+    // Storage detection helpers
+    // ══════════════════════════════════════════════════════════════════
     private string boot_device_basename () {
-        string boot_source = "";
-        try {
-            GLib.Process.spawn_command_line_sync (
-                "findmnt -n -o SOURCE /run/archiso/bootmnt", out boot_source);
-        } catch (GLib.SpawnError e) {
-            return "";
-        }
-        return strip_partition_suffix (GLib.Path.get_basename (boot_source.strip ()));
+        string s = "";
+        try { GLib.Process.spawn_command_line_sync (
+                "findmnt -n -o SOURCE /run/archiso/bootmnt", out s); }
+        catch (GLib.SpawnError e) {}
+        return strip_partition_suffix (GLib.Path.get_basename (s.strip ()));
     }
 
     private class StorageOption {
@@ -1303,43 +1407,28 @@ public class KibaOOBE : Adw.Application {
     }
 
     private Gee.ArrayList<StorageOption> list_storage_options () {
-        var options = new Gee.ArrayList<StorageOption> ();
+        var options  = new Gee.ArrayList<StorageOption> ();
         string boot_dev = boot_device_basename ();
-
         string raw = "";
-        try {
-            GLib.Process.spawn_command_line_sync (
-                "lsblk -dpno NAME,SIZE,MODEL,RM -e7,11", out raw);
-        } catch (GLib.SpawnError e) {
-            warning ("Could not list storage: %s", e.message);
-            return options;
-        }
+        try { GLib.Process.spawn_command_line_sync (
+                "lsblk -dpno NAME,SIZE,MODEL,RM -e7,11", out raw); }
+        catch (GLib.SpawnError e) { return options; }
 
         foreach (var line in raw.split ("\n")) {
             var trimmed = line.strip ();
             if (trimmed == "") continue;
-            var parts = trimmed.split (" ", 2);
+            var parts   = trimmed.split (" ", 2);
             string devpath = parts[0];
-            string rest = parts.length > 1 ? parts[1].strip () : "";
-
-            // Skip removable drives entirely (the boot USB itself, or any
-            // other USB stick plugged in) — never offer to use one as the
-            // install target, since that's almost never what's intended.
+            string rest    = parts.length > 1 ? parts[1].strip () : "";
             if (rest.has_suffix (" 1") || rest == "1") continue;
             if (GLib.Path.get_basename (devpath) == boot_dev) continue;
-
-            var size_and_model = rest;
-            // Drop the trailing removable-flag column before display.
-            try {
-                size_and_model = /\s+[01]$/.replace (size_and_model, -1, 0, "");
-            } catch (GLib.RegexError e) {
-                warning ("Regex error cleaning storage label: %s", e.message);
-            }
-
-            var opt = new StorageOption ();
+            string label = rest;
+            try { label = /\s+[01]$/.replace (label, -1, 0, ""); }
+            catch (GLib.RegexError e) {}
+            var opt  = new StorageOption ();
             opt.devpath = devpath;
-            opt.label = "Your computer's storage (%s)".printf (
-                size_and_model == "" ? "internal drive" : size_and_model);
+            opt.label   = "Your computer's storage (%s)".printf (
+                label == "" ? "internal drive" : label);
             options.add (opt);
         }
         return options;
@@ -1348,10 +1437,6 @@ public class KibaOOBE : Adw.Application {
     private void advance_past_storage_step () {
         var options = list_storage_options ();
         if (options.size <= 1) {
-            // Nothing to choose — either there's exactly one obvious
-            // place to put KibaOS, or detection found nothing and the
-            // backend script will surface a clear error later instead
-            // of showing an empty, confusing picker now.
             selected_disk = options.size == 1 ? options[0].devpath : "";
             nav_view.push (build_account_page ());
         } else {
@@ -1359,150 +1444,194 @@ public class KibaOOBE : Adw.Application {
         }
     }
 
-    /* Only shown when there's genuinely more than one place KibaOS could
-     * go — e.g. a desktop with two internal drives. Plain language only. */
+    // ══════════════════════════════════════════════════════════════════
+    // Page 4: Storage picker (only shown with 2+ drives)
+    // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_storage_picker_page (Gee.ArrayList<StorageOption> options) {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading ("Where should KibaOS go?",
-            "Your computer has more than one place to put it. Pick one."));
+            "Your computer has more than one drive. Pick the one to set up."));
 
-        var picker_list = new Gtk.ListBox ();
-        picker_list.add_css_class ("oobe-list");
-        picker_list.selection_mode = Gtk.SelectionMode.SINGLE;
+        var picker = new Gtk.ListBox ();
+        picker.add_css_class ("oobe-list");
+        picker.selection_mode = Gtk.SelectionMode.SINGLE;
 
         foreach (var opt in options) {
             var row = new Adw.ActionRow () { title = opt.label };
+            row.add_prefix (new Gtk.Image.from_icon_name ("drive-harddisk-symbolic"));
             row.set_data ("devpath", opt.devpath);
-            picker_list.append (row);
+            picker.append (row);
         }
-        picker_list.row_selected.connect ((row) => {
+        picker.row_selected.connect ((row) => {
             if (row != null) selected_disk = row.get_data<string> ("devpath");
         });
         if (options.size > 0) {
             selected_disk = options[0].devpath;
-            picker_list.select_row (picker_list.get_row_at_index (0));
+            picker.select_row (picker.get_row_at_index (0));
         }
-        content.append (picker_list);
+        content.append (picker);
 
         return make_page ("Storage", content, "Next", () => {
             nav_view.push (build_account_page ());
-        });
+        }, false, 3, 6);
     }
 
-    /* ── Page 4: Account creation ─────────────────────────────────────── */
+    // ══════════════════════════════════════════════════════════════════
+    // Page 5: Account creation
+    // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_account_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 16);
         content.append (oobe_heading ("Create Your Account",
-            "This is the account you'll use to sign in to KibaOS."));
+            "This is the account you'll use every day."));
+
+        var group = new Adw.PreferencesGroup ();
+        group.add_css_class ("oobe-prefs-group");
 
         var hostname_entry = new Adw.EntryRow () { title = "Computer name" };
         hostname_entry.text = "kibaos";
         hostname_entry.changed.connect (() => { hostname_value = hostname_entry.text; });
-        content.append (hostname_entry);
+        group.add (hostname_entry);
 
         var user_entry = new Adw.EntryRow () { title = "Username" };
         user_entry.changed.connect (() => { username_value = user_entry.text; });
-        content.append (user_entry);
+        group.add (user_entry);
 
         var pass_entry = new Adw.PasswordEntryRow () { title = "Password" };
         pass_entry.changed.connect (() => { password_value = pass_entry.text; });
-        content.append (pass_entry);
+        group.add (pass_entry);
 
-        return make_page ("Account", content, is_oem_mode ? "Finish Setup" : "Next", () => {
-            if (is_oem_mode) {
-                nav_view.push (build_installing_page ());
-                start_oem_finish ();
-            } else {
-                nav_view.push (build_confirm_page ());
-            }
-        });
+        content.append (group);
+
+        return make_page ("Account", content,
+            is_oem_mode ? "Finish Setup" : "Next", () => {
+                if (is_oem_mode) {
+                    nav_view.push (build_installing_page ());
+                    start_oem_finish ();
+                } else {
+                    nav_view.push (build_confirm_page ());
+                }
+            }, false, 4, 6);
     }
 
-    /* ── Page 5: Confirm ──────────────────────────────────────────────── */
+    // ══════════════════════════════════════════════════════════════════
+    // Page 6: Confirm
+    // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_confirm_page () {
-        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 16);
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading ("Ready to Set Up KibaOS",
-            "KibaOS will be set up on your computer now. Anything currently " +
-            "on it will be replaced, so make sure anything important is backed up first."));
+            "Everything on your computer will be replaced. " +
+            "Make sure anything important is backed up first."));
 
-        return make_page ("Confirm", content, "Set Up KibaOS", () => {
+        // Summary card
+        var summary = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+        summary.add_css_class ("oobe-summary-box");
+
+        string[][] items = {
+            { "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : selected_disk },
+            { "preferences-desktop-locale-symbolic", "Language", selected_locale },
+            { "input-keyboard-symbolic",   "Keyboard", selected_keymap },
+            { "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value }
+        };
+        bool first = true;
+        foreach (var item in items) {
+            if (!first) {
+                var sep = new Gtk.Separator (Gtk.Orientation.HORIZONTAL);
+                sep.add_css_class ("oobe-summary-sep");
+                summary.append (sep);
+            }
+            first = false;
+            var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
+            row.add_css_class ("oobe-summary-row");
+            row.append (new Gtk.Image.from_icon_name (item[0]));
+            var lbl = new Gtk.Label (item[1]);
+            lbl.add_css_class ("oobe-summary-key");
+            row.append (lbl);
+            var spacer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true };
+            row.append (spacer);
+            var val = new Gtk.Label (item[2]);
+            val.add_css_class ("oobe-summary-val");
+            row.append (val);
+            summary.append (row);
+        }
+        content.append (summary);
+
+        return make_page ("Confirm", content, "Install KibaOS", () => {
             nav_view.push (build_installing_page ());
             start_install ();
-        });
+        }, false, 5, 6);
     }
 
-    /* ── Page 6: Installing (progress) ───────────────────────────────── */
-    private Gtk.Label progress_label;
+    // ══════════════════════════════════════════════════════════════════
+    // Page 7: Installing
+    // ══════════════════════════════════════════════════════════════════
+    private Gtk.Label      progress_label;
     private Gtk.ProgressBar progress_bar;
 
     private Adw.NavigationPage build_installing_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
-        content.append (oobe_heading ("Installing KibaOS", "Sit tight — this won't take long."));
+        content.append (oobe_heading ("Installing KibaOS",
+            "Sit tight — this won't take long."));
 
         progress_bar = new Gtk.ProgressBar () { show_text = false };
         progress_bar.add_css_class ("oobe-progress");
         content.append (progress_bar);
 
-        progress_label = new Gtk.Label ("Preparing...");
+        progress_label = new Gtk.Label ("Preparing…");
         progress_label.add_css_class ("oobe-subtitle");
         content.append (progress_label);
 
-        return make_page ("Installing", content, null, null);
+        return make_page ("Installing", content, null, null, true);
     }
 
-    /* ── Page 7: Done ─────────────────────────────────────────────────── */
+    // ══════════════════════════════════════════════════════════════════
+    // Page 8: Done
+    // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_done_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
-        content.append (oobe_heading ("You're All Set", "KibaOS is ready. Restart to get started."));
-        return make_page ("Done", content, "Restart", () => {
+
+        var check = new Gtk.Image.from_icon_name ("emblem-ok-symbolic") {
+            pixel_size = 56,
+            halign     = Gtk.Align.START
+        };
+        check.add_css_class ("oobe-done-check");
+        content.append (check);
+
+        content.append (oobe_heading ("You're all set.",
+            "KibaOS is installed and ready. Restart your computer to get started."));
+
+        return make_page ("Done", content, "Restart Now", () => {
             try { GLib.Process.spawn_command_line_async ("systemctl reboot"); }
             catch (GLib.SpawnError e) { warning ("Reboot failed: %s", e.message); }
-        });
+        }, true);
     }
 
-    /* ── OEM mode: calls a separate, much lighter backend (no partitioning,
-     * no squashfs extraction — the system is already fully installed).
-     * Kept as its own script rather than branching kibaos-oobe-backend.sh
-     * internally, so the destructive disk-wipe script and the OEM
-     * finish-setup script are never the same file a person could
-     * accidentally invoke with the wrong arguments. */
+    // ══════════════════════════════════════════════════════════════════
+    // Backend plumbing
+    // ══════════════════════════════════════════════════════════════════
     private void start_oem_finish () {
         string cmd = "pkexec /usr/local/bin/kibaos-oem-finish.sh '%s' '%s' '%s' '%s' '%s'".printf (
-            selected_locale, selected_keymap, hostname_value, username_value, password_value);
-
-        try {
-            string[] argv;
-            GLib.Shell.parse_argv (cmd, out argv);
-            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
-            var proc = launcher.spawnv (argv);
-            var stdout_stream = new GLib.DataInputStream (proc.get_stdout_pipe ());
-
-            read_backend_output.begin (stdout_stream, proc);
-        } catch (GLib.Error e) {
-            progress_label.label = "Setup failed to start: %s".printf (e.message);
-        }
+            selected_locale, selected_keymap, hostname_value,
+            username_value, password_value);
+        launch_backend (cmd);
     }
 
-    /* ── Backend invocation: hands off to the privileged bash script via
-     * pkexec, reading its stdout line-by-line for progress updates. The
-     * backend prints "PROGRESS <0-100> <message>" lines; everything else
-     * is logged but not parsed, so the backend can be verbose/safe without
-     * the UI breaking on unexpected output. */
     private void start_install () {
-        string cmd = "pkexec /usr/local/bin/kibaos-oobe-backend.sh '%s' '%s' '%s' '%s' '%s' '%s'".printf (
+        string cmd = "pkexec /usr/local/bin/kibaos-oobe-backend '%s' '%s' '%s' '%s' '%s' '%s'".printf (
             selected_disk, selected_locale, selected_keymap,
             hostname_value, username_value, password_value);
+        launch_backend (cmd);
+    }
 
+    private void launch_backend (string cmd) {
         try {
             string[] argv;
             GLib.Shell.parse_argv (cmd, out argv);
             var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
-            var proc = launcher.spawnv (argv);
-            var stdout_stream = new GLib.DataInputStream (proc.get_stdout_pipe ());
-
-            read_backend_output.begin (stdout_stream, proc);
+            var proc     = launcher.spawnv (argv);
+            read_backend_output.begin (
+                new GLib.DataInputStream (proc.get_stdout_pipe ()), proc);
         } catch (GLib.Error e) {
-            progress_label.label = "Install failed to start: %s".printf (e.message);
+            progress_label.label = "Failed to start: %s".printf (e.message);
         }
     }
 
@@ -1513,17 +1642,18 @@ public class KibaOOBE : Adw.Application {
                 if (line == null) break;
                 if (line.has_prefix ("PROGRESS ")) {
                     var parts = line.substring (9).split (" ", 2);
-                    int pct = int.parse (parts[0]);
+                    int    pct = int.parse (parts[0]);
                     string msg = parts.length > 1 ? parts[1] : "";
                     progress_bar.fraction = pct / 100.0;
-                    progress_label.label = msg;
+                    progress_label.label  = msg;
                 }
             }
             yield proc.wait_async ();
             if (proc.get_exit_status () == 0) {
                 nav_view.push (build_done_page ());
             } else {
-                progress_label.label = "Something went wrong. Please try again, or ask for help if it keeps happening.";
+                progress_label.label =
+                    "Something went wrong. Check /var/log/kibaos-oobe.log for details.";
             }
         } catch (GLib.Error e) {
             progress_label.label = "Lost connection to installer: %s".printf (e.message);
@@ -1531,8 +1661,7 @@ public class KibaOOBE : Adw.Application {
     }
 
     public static int main (string[] args) {
-        var app = new KibaOOBE ();
-        return app.run (args);
+        return new KibaOOBE ().run (args);
     }
 }
 
@@ -1556,182 +1685,243 @@ OOBEMESON
 
 # ── CSS theme ──────────────────────────────────────────────────────────────
 cat > /usr/share/kibaos-oobe/oobe.css << 'OOBECSS'
-/* KibaOS OOBE — clean white theme with smooth motion */
+/* ═══════════════════════════════════════════════════════════════════════
+ * KibaOS OOBE — white-card design language, image 2 inspiration.
+ * Timing functions:
+ *   settle  cubic-bezier(0.22, 1, 0.36, 1)   easeOutQuint, enter
+ *   fade    cubic-bezier(0.5,  0, 0.75, 0)   easeInQuart,  leave
+ *   spring  cubic-bezier(0.34, 1.56, 0.64, 1) gentle overshoot
+ * ═══════════════════════════════════════════════════════════════════════ */
 
-/* ── Timing functions (KibaOS Organic Motion Language) ──────────────────
- * settle  cubic-bezier(0.22, 1, 0.36, 1)   — easeOutQuint, entering state
- * fade    cubic-bezier(0.5, 0, 0.75, 0)    — easeInQuart, leaving state
- * spring  cubic-bezier(0.34, 1.56, 0.64, 1) — gentle overshoot for cards */
-
-window.kibaos-oobe-window {
-    background: #ffffff;
-}
+/* ── Window / background ───────────────────────────────────────────────── */
+window.kibaos-oobe-window { background: transparent; }
 
 .oobe-background {
-    background: #ffffff;
+    background: linear-gradient(160deg,
+        rgba(180,210,240,0.55) 0%,
+        rgba(220,235,250,0.40) 50%,
+        rgba(200,220,245,0.55) 100%);
+    /* Blurred wallpaper shows through — the card pops as the focal point */
 }
 
-/* ── Card ────────────────────────────────────────────────────────────────*/
+/* ── Brand wordmark ────────────────────────────────────────────────────── */
+.oobe-brand {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
 .oobe-card {
-    background-color: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 24px;
-    padding: 48px 48px 40px;
+    background:    rgba(255,255,255,0.88);
+    border:        1px solid rgba(255,255,255,0.70);
+    border-radius: 28px;
     box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.06),
-        0 16px 48px rgba(0, 0, 0, 0.10);
-    animation: card-in 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+        0 2px 4px  rgba(0,0,0,0.04),
+        0 8px 24px rgba(0,0,0,0.10),
+        0 32px 64px rgba(0,0,0,0.12);
+    backdrop-filter: blur(40px) saturate(1.8);
+    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    animation: card-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes card-in {
-    from {
-        opacity: 0;
-        transform: translateY(18px) scale(0.98);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-    }
+    from { opacity: 0; transform: translateY(22px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
-/* ── Typography ──────────────────────────────────────────────────────────*/
+/* Inner padding */
+.oobe-inner {
+    padding: 40px 44px 36px;
+}
+
+/* ── Step dots ─────────────────────────────────────────────────────────── */
+.oobe-step-dot {
+    min-width:     7px;
+    min-height:    7px;
+    border-radius: 999px;
+    background:    rgba(0,0,0,0.15);
+    transition: all 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oobe-step-dot-active {
+    min-width:  22px;
+    background: #0099cc;
+}
+
+/* ── Nav row ───────────────────────────────────────────────────────────── */
+.oobe-nav-row { margin-top: 4px; }
+
+/* ── Typography ────────────────────────────────────────────────────────── */
 .oobe-title {
-    font-size: 26px;
-    font-weight: 600;
-    color: #111827;
-    margin-bottom: 4px;
-    letter-spacing: -0.3px;
+    font-size:      26px;
+    font-weight:    650;
+    color:          #0f172a;
+    letter-spacing: -0.4px;
+    margin-bottom:  2px;
     animation: fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
 }
-
 .oobe-subtitle {
-    font-size: 14px;
-    color: #6b7280;
-    line-height: 1.5;
-    animation: fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+    font-size:   14px;
+    color:       #64748b;
+    line-height: 1.55;
+    animation:   fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
 }
-
 @keyframes fade-up {
-    from { opacity: 0; transform: translateY(8px); }
+    from { opacity: 0; transform: translateY(7px); }
     to   { opacity: 1; transform: translateY(0);   }
 }
 
-/* ── List / disk picker ──────────────────────────────────────────────────*/
-.oobe-list {
-    background: transparent;
+/* ── Wi-Fi canvas ──────────────────────────────────────────────────────── */
+.oobe-wifi-canvas {
+    animation: scale-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) 80ms both;
+}
+@keyframes scale-in {
+    from { opacity: 0; transform: scale(0.6); }
+    to   { opacity: 1; transform: scale(1);   }
 }
 
-.oobe-list row {
-    background-color: #f9fafb;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    border-radius: 12px;
-    margin: 4px 0;
-    padding: 12px 16px;
-    color: #111827;
+/* ── List / pickers ────────────────────────────────────────────────────── */
+.oobe-list { background: transparent; }
+
+.oobe-list row,
+listview > row {
+    background:    rgba(248,250,252,0.9);
+    border:        1px solid rgba(0,0,0,0.07);
+    border-radius: 14px;
+    margin:        3px 0;
+    padding:       10px 14px;
+    color:         #1e293b;
     transition:
         background-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
         border-color     180ms cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow       180ms cubic-bezier(0.22, 1, 0.36, 1);
+        box-shadow       180ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform        180ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
-.oobe-list row:hover {
-    background-color: #f0f9ff;
-    border-color: rgba(0, 153, 204, 0.30);
-    box-shadow: 0 2px 8px rgba(0, 153, 204, 0.10);
-}
-
+.oobe-list row:hover { background: #f0f9ff; border-color: rgba(0,153,204,0.28); }
 .oobe-list row:selected {
-    background-color: rgba(0, 153, 204, 0.10);
-    border-color: rgba(0, 153, 204, 0.60);
-    box-shadow: 0 0 0 3px rgba(0, 153, 204, 0.15);
+    background: rgba(0,153,204,0.10);
+    border-color: rgba(0,153,204,0.55);
+    box-shadow: 0 0 0 3px rgba(0,153,204,0.14);
 }
 
-/* ── Primary button ──────────────────────────────────────────────────────*/
-.oobe-primary-button {
-    background-color: #0099cc;
-    color: #ffffff;
-    border: none;
-    border-radius: 999px;
-    padding: 11px 32px;
+/* ── Preferences group (account page) ─────────────────────────────────── */
+.oobe-prefs-group {
+    border-radius: 16px;
+    overflow: hidden;
+}
+
+/* ── Summary box (confirm page) ────────────────────────────────────────── */
+.oobe-summary-box {
+    background:    rgba(248,250,252,0.9);
+    border:        1px solid rgba(0,0,0,0.07);
+    border-radius: 16px;
+    overflow:      hidden;
+    margin-top:    8px;
+}
+.oobe-summary-row {
+    padding: 13px 18px;
+}
+.oobe-summary-sep {
+    margin: 0 18px;
+    opacity: 0.5;
+}
+.oobe-summary-key {
+    font-size:   13px;
     font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 1px 3px rgba(0, 153, 204, 0.30);
+    color:       #475569;
+}
+.oobe-summary-val {
+    font-size: 13px;
+    color:     #0f172a;
+}
+
+/* ── Done check icon ───────────────────────────────────────────────────── */
+.oobe-done-check {
+    color: #0099cc;
+    animation: pop-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes pop-in {
+    from { opacity: 0; transform: scale(0.4); }
+    to   { opacity: 1; transform: scale(1);   }
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────── */
+.oobe-primary-button {
+    background:    #0099cc;
+    color:         #ffffff;
+    border:        none;
+    border-radius: 999px;
+    padding:       11px 28px;
+    font-weight:   650;
+    font-size:     14px;
+    box-shadow:    0 1px 3px rgba(0,153,204,0.35);
     transition:
-        background-color 150ms cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow       150ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow       140ms cubic-bezier(0.22, 1, 0.36, 1),
         transform        120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
 .oobe-primary-button:hover {
-    background-color: #00aee3;
-    box-shadow: 0 4px 12px rgba(0, 153, 204, 0.35);
-    transform: translateY(-1px);
+    background: #00aee3;
+    box-shadow: 0 4px 14px rgba(0,153,204,0.40);
+    transform:  translateY(-1px);
 }
-
 .oobe-primary-button:active {
-    background-color: #0088b8;
-    transform: translateY(0px);
-    box-shadow: 0 1px 3px rgba(0, 153, 204, 0.20);
-    transition-duration: 80ms;
+    background:        #0088b8;
+    transform:         translateY(0);
+    box-shadow:        0 1px 3px rgba(0,153,204,0.20);
+    transition-duration: 70ms;
 }
 
-/* ── Secondary button ────────────────────────────────────────────────────*/
 .oobe-secondary-button {
-    background-color: transparent;
-    color: #374151;
-    border: 1px solid rgba(0, 0, 0, 0.14);
+    background:    transparent;
+    color:         #475569;
+    border:        1px solid rgba(0,0,0,0.14);
     border-radius: 999px;
-    padding: 11px 28px;
-    font-size: 14px;
+    padding:       11px 24px;
+    font-size:     14px;
     transition:
-        background-color 150ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-color     150ms cubic-bezier(0.22, 1, 0.36, 1);
+        background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color     140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+.oobe-secondary-button:hover  { background: #f1f5f9; border-color: rgba(0,0,0,0.22); }
+.oobe-secondary-button:active { background: #e2e8f0; transition-duration: 70ms; }
 
-.oobe-secondary-button:hover {
-    background-color: #f3f4f6;
-    border-color: rgba(0, 0, 0, 0.22);
-}
-
-.oobe-secondary-button:active {
-    background-color: #e5e7eb;
-    transition-duration: 80ms;
-}
-
-/* ── Progress bar ────────────────────────────────────────────────────────*/
-.oobe-progress {
-    min-height: 6px;
-    border-radius: 999px;
-}
-
+/* ── Progress bar ──────────────────────────────────────────────────────── */
+.oobe-progress { min-height: 6px; border-radius: 999px; }
 .oobe-progress trough {
-    background-color: #e5e7eb;
+    background:    #e2e8f0;
     border-radius: 999px;
-    min-height: 6px;
+    min-height:    6px;
 }
-
 .oobe-progress progress {
-    background-color: #0099cc;
+    background:  linear-gradient(90deg, #0099cc, #00c4f0);
     border-radius: 999px;
-    transition: all 400ms cubic-bezier(0.22, 1, 0.36, 1);
+    transition:  all 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* ── Form entries ────────────────────────────────────────────────────────*/
-entry, row.entry {
-    background-color: #f9fafb;
-    border: 1px solid rgba(0, 0, 0, 0.12);
+/* ── Form entries ──────────────────────────────────────────────────────── */
+entry, row.entry, .oobe-prefs-group entry {
+    background:  rgba(248,250,252,0.9);
+    border:      1px solid rgba(0,0,0,0.10);
     border-radius: 10px;
-    color: #111827;
+    color:       #0f172a;
     transition:
-        border-color     180ms cubic-bezier(0.22, 1, 0.36, 1),
-        background-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
-        box-shadow       180ms cubic-bezier(0.22, 1, 0.36, 1);
+        border-color     160ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow       160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-
 entry:focus-within, row.entry:focus-within {
     border-color: #0099cc;
-    background-color: #ffffff;
-    box-shadow: 0 0 0 3px rgba(0, 153, 204, 0.18);
+    background:   #ffffff;
+    box-shadow:   0 0 0 3px rgba(0,153,204,0.18);
+}
+
+/* ── ComboRow / ActionRow (Adwaita overrides) ──────────────────────────── */
+row.combo, row.action {
+    border-radius: 12px;
+    background:    rgba(248,250,252,0.9);
 }
 
 OOBECSS
@@ -1752,166 +1942,421 @@ ninja -C build install
 cd /
 
 # ── Privileged backend script ─────────────────────────────────────────────
-cat > /usr/local/bin/kibaos-oobe-backend.sh << 'OOBEBACKEND'
-#!/usr/bin/env bash
-# KibaOS OOBE backend — does the actual disk work. Invoked via pkexec from
-# the Vala UI, never run directly by the user. Emits "PROGRESS <pct> <msg>"
-# lines to stdout for the UI to parse; everything else goes to the log file
-# only, so the UI never breaks on unexpected output.
+cat > /usr/local/bin/kibaos-oobe-backend << 'OOBEBACKEND'
+#!/usr/bin/env python3
+# KibaOS OOBE backend
+# Strategy:
+#   1. archinstall for partition layout + formatting + bootloader
+#   2. rsync the live squashfs onto the new root (preserves ALL KibaOS customisations)
+#   3. chroot to configure locale/keymap/hostname/user
+#   4. Remove live-only artefacts (installer, liveuser, autologin, squashfs tools)
+#   5. Enable services, rebuild initramfs
 #
-# Args: $1=disk $2=locale $3=keymap $4=hostname $5=username $6=password
-set -euo pipefail
+# Emits "PROGRESS <0-100> <message>" to stdout; everything else -> log file.
+import sys, subprocess as sp, pathlib, traceback, shutil, os, tempfile
 
-DISK="$1"
-LOCALE="$2"
-KEYMAP="$3"
-HOSTNAME_VAL="$4"
-USERNAME_VAL="$5"
-PASSWORD_VAL="$6"
+LOG = pathlib.Path("/var/log/kibaos-oobe.log")
+LOG.parent.mkdir(parents=True, exist_ok=True)
+log_fh = open(LOG, "a")
 
-LOG=/var/log/kibaos-oobe.log
-MNT=/mnt/kibaos-install
-exec > >(tee -a "${LOG}") 2>&1
+def tee(msg):
+    print(msg, flush=True)
+    print(msg, file=log_fh, flush=True)
 
-progress() { echo "PROGRESS $1 $2"; }
+def progress(pct, msg):
+    tee(f"PROGRESS {pct} {msg}")
 
-fail() {
-  progress 100 "Install failed: $1"
-  echo "FATAL: $1" >&2
-  exit 1
-}
+def fail(msg):
+    progress(100, f"Install failed: {msg}")
+    tee(f"FATAL: {msg}")
+    sys.exit(1)
 
-[ -n "${DISK}" ]     || fail "no disk selected"
-[ -b "${DISK}" ]     || fail "${DISK} is not a block device"
-[ -n "${USERNAME_VAL}" ] || fail "no username given"
+def run(cmd, **kw):
+    """Run a command, log it, raise on non-zero exit."""
+    tee(f"  $ {' '.join(cmd) if isinstance(cmd, list) else cmd}")
+    r = sp.run(cmd, capture_output=True, text=True, **kw)
+    if r.stdout: tee(r.stdout.rstrip())
+    if r.stderr: tee(r.stderr.rstrip())
+    if r.returncode != 0:
+        raise RuntimeError(f"Command failed (exit {r.returncode}): {cmd}")
+    return r
 
-progress 2 "Getting ready..."
-# Unmount/swapoff any existing partitions on this disk safely
-while read -r part; do
-  umount -f "${part}" 2>/dev/null || true
-  swapoff "${part}" 2>/dev/null || true
-done < <(lsblk -rpno NAME "${DISK}" 2>/dev/null | tail -n +2)
-umount -R "${DISK}" 2>/dev/null || true
+def chroot(cmd_list):
+    """arch-chroot into MNT and run a command."""
+    run(["arch-chroot", str(MNT)] + cmd_list)
 
-# ── Partition: single ESP + root, matching the same systemd-boot/mkinitcpio
-# layout the rest of KibaOS's build script already assumes (no separate
-# /home, no LVM/LUKS — kept simple and matching the live image's own
-# boot.loader entries which expect a plain ESP + root). ──────────────────
-progress 8 "Preparing your computer's storage..."
-sgdisk --zap-all "${DISK}"                                    || fail "sgdisk zap failed"
-sgdisk -n1:0:+512M -t1:ef00 -c1:ESP  "${DISK}"                 || fail "ESP partition failed"
-sgdisk -n2:0:0     -t2:8300 -c2:ROOT "${DISK}"                 || fail "root partition failed"
-partprobe "${DISK}"
-sleep 2
+sys.stderr = log_fh
 
-if [[ "${DISK}" == *nvme* ]]; then
-  ESP_PART="${DISK}p1"; ROOT_PART="${DISK}p2"
-else
-  ESP_PART="${DISK}1"; ROOT_PART="${DISK}2"
-fi
+if len(sys.argv) < 7:
+    fail("Usage: backend <disk> <locale> <keymap> <hostname> <username> <password>")
 
-progress 16 "Getting everything ready..."
-mkfs.fat -F32 -n ESP  "${ESP_PART}"   || fail "ESP format failed"
-mkfs.ext4 -F -L kibaos "${ROOT_PART}" || fail "root format failed"
+DISK     = sys.argv[1]
+LOCALE   = sys.argv[2]   # e.g. en_US.UTF-8
+KEYMAP   = sys.argv[3]   # e.g. us
+HOSTNAME = sys.argv[4]
+USERNAME = sys.argv[5]
+PASSWORD = sys.argv[6]
+MNT      = pathlib.Path("/mnt/kibaos-install")
 
-progress 22 "Almost there..."
-mkdir -p "${MNT}"
-mount "${ROOT_PART}" "${MNT}"                  || fail "root mount failed"
-mkdir -p "${MNT}/boot"
-mount "${ESP_PART}" "${MNT}/boot"              || fail "ESP mount failed"
+if not DISK:
+    fail("no disk selected")
+if not pathlib.Path(DISK).is_block_device():
+    fail(f"{DISK} is not a block device")
 
-# ── Extract the live squashfs onto the new root. This mirrors what
-# Calamares' unpackfs.conf module does elsewhere in this build (see
-# /etc/calamares/modules/unpackfs.conf), just invoked directly instead of
-# through Calamares' job pipeline. ────────────────────────────────────────
-progress 30 "Copying KibaOS files (this takes a few minutes)..."
-SQUASHFS_SRC="/run/archiso/bootmnt/arch/x86_64/airootfs.sfs"
-[ -f "${SQUASHFS_SRC}" ] || fail "squashfs image not found at ${SQUASHFS_SRC}"
+# ── 1. Import archinstall ────────────────────────────────────────────────
+progress(2, "Loading installer library…")
+try:
+    from archinstall.lib.disk.device_handler import device_handler
+    from archinstall.lib.disk.filesystem import FilesystemHandler
+    from archinstall.lib.models.device import (
+        DeviceModification, DiskLayoutConfiguration, DiskLayoutType,
+        FilesystemType, ModificationStatus, PartitionFlag,
+        PartitionModification, PartitionType, Size, Unit,
+    )
+except ImportError as e:
+    fail(f"archinstall not available: {e}")
 
-MOUNT_TMP="$(mktemp -d)"
-mount -t squashfs -o loop "${SQUASHFS_SRC}" "${MOUNT_TMP}" || fail "squashfs mount failed"
-set +o pipefail
-rsync -aHAX --info=progress2 "${MOUNT_TMP}/" "${MNT}/" \
-  --exclude='/run/*' --exclude='/proc/*' --exclude='/sys/*' --exclude='/dev/*' \
-  --exclude='/tmp/*' --exclude='/home/liveuser' \
-  | while IFS= read -r line; do
-      pct=$(printf '%s' "$line" | grep -oE '[0-9]+%' | head -1 | tr -d '%')
-      [ -n "${pct:-}" ] && progress $((30 + pct * 30 / 100)) "Copying files... ${pct}%"
-    done
-set -o pipefail
-umount "${MOUNT_TMP}"
-rmdir "${MOUNT_TMP}"
+# ── 2. Clear stale mounts ────────────────────────────────────────────────
+progress(5, "Clearing previous mounts…")
+try:
+    parts = sp.check_output(
+        ["lsblk", "-rpno", "NAME", DISK], text=True
+    ).strip().splitlines()[1:]
+    for p in reversed(parts):
+        sp.run(["umount", "-f", p], capture_output=True)
+        sp.run(["swapoff", p],       capture_output=True)
+    sp.run(["umount", "-R", str(MNT)], capture_output=True)
+except Exception:
+    pass
 
-progress 62 "Personalizing your computer..."
-for fs in proc sys dev; do mount --rbind /$fs "${MNT}/$fs"; done
-mount --make-rslave "${MNT}/proc" 2>/dev/null || true
-mount --make-rslave "${MNT}/sys"  2>/dev/null || true
-mount --make-rslave "${MNT}/dev"  2>/dev/null || true
+# ── 3. Partition + format via archinstall ────────────────────────────────
+progress(8, "Setting up partitions…")
+try:
+    device = device_handler.get_device(pathlib.Path(DISK))
+    if not device:
+        fail(f"archinstall could not open {DISK}")
 
-ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
-ESP_UUID=$(blkid -s UUID -o value "${ESP_PART}")
+    sector = device.device_info.sector_size
+    dev_mod = DeviceModification(device, wipe=True)
 
-cat > "${MNT}/etc/fstab" << FSTAB
-UUID=${ROOT_UUID}  /      ext4  defaults,noatime  0 1
-UUID=${ESP_UUID}   /boot  vfat  umask=0077        0 2
-FSTAB
+    boot_part = PartitionModification(
+        status     = ModificationStatus.Create,
+        type       = PartitionType.Primary,
+        start      = Size(1,   Unit.MiB, sector),
+        length     = Size(512, Unit.MiB, sector),
+        mountpoint = pathlib.Path("/boot"),
+        fs_type    = FilesystemType.Fat32,
+        flags      = [PartitionFlag.BOOT],
+    )
+    dev_mod.add_partition(boot_part)
 
-echo "${HOSTNAME_VAL}" > "${MNT}/etc/hostname"
-cat > "${MNT}/etc/hosts" << HOSTS
-127.0.0.1   localhost
-::1         localhost
-127.0.1.1   ${HOSTNAME_VAL}.localdomain ${HOSTNAME_VAL}
-HOSTS
+    root_part = PartitionModification(
+        status     = ModificationStatus.Create,
+        type       = PartitionType.Primary,
+        start      = Size(513, Unit.MiB, sector),
+        length     = device.device_info.total_size - Size(513, Unit.MiB, sector),
+        mountpoint = pathlib.Path("/"),
+        fs_type    = FilesystemType("ext4"),
+    )
+    dev_mod.add_partition(root_part)
 
-progress 70 "Setting locale and keyboard..."
-sed -i "s/#${LOCALE}/${LOCALE}/" "${MNT}/etc/locale.gen" 2>/dev/null || true
-echo "LANG=${LOCALE}" > "${MNT}/etc/locale.conf"
-echo "KEYMAP=${KEYMAP}" > "${MNT}/etc/vconsole.conf"
-arch-chroot "${MNT}" locale-gen || fail "locale-gen failed"
+    disk_config = DiskLayoutConfiguration(
+        config_type          = DiskLayoutType.Default,
+        device_modifications = [dev_mod],
+    )
+    FilesystemHandler(disk_config).perform_filesystem_operations()
+except Exception as e:
+    fail(f"Partition/format failed: {e}\n{traceback.format_exc()}")
 
-progress 78 "Creating your account..."
-arch-chroot "${MNT}" useradd -m -G wheel,audio,video,input,network,storage,power \
-  -s /bin/bash "${USERNAME_VAL}" || fail "useradd failed"
-echo "${USERNAME_VAL}:${PASSWORD_VAL}" | arch-chroot "${MNT}" chpasswd || fail "chpasswd failed"
-# Remove the live-session liveuser/autologin now that a real user exists.
-arch-chroot "${MNT}" userdel -r liveuser 2>/dev/null || true
-rm -f "${MNT}/etc/sddm.conf.d/kibaos.conf" 2>/dev/null || true
+# ── 4. Mount the new root ────────────────────────────────────────────────
+progress(14, "Mounting target filesystem…")
+try:
+    # Determine partition device paths (nvme uses p1/p2, sata uses 1/2)
+    if "nvme" in DISK or "mmcblk" in DISK:
+        ESP_PART  = DISK + "p1"
+        ROOT_PART = DISK + "p2"
+    else:
+        ESP_PART  = DISK + "1"
+        ROOT_PART = DISK + "2"
 
-progress 86 "Getting your computer ready to start up..."
-arch-chroot "${MNT}" bootctl --esp-path=/boot install || fail "bootctl install failed"
-sed -i "s/PARTUUID=PLACEHOLDER/PARTUUID=$(blkid -s PARTUUID -o value "${ROOT_PART}")/" \
-  "${MNT}/boot/loader/entries/kibaos.conf" 2>/dev/null || true
+    MNT.mkdir(parents=True, exist_ok=True)
+    run(["mount", ROOT_PART, str(MNT)])
+    (MNT / "boot").mkdir(parents=True, exist_ok=True)
+    run(["mount", ESP_PART, str(MNT / "boot")])
+except Exception as e:
+    fail(f"Mount failed: {e}\n{traceback.format_exc()}")
 
-# Clear any stale LoaderConfigTimeout/LoaderEntryDefault EFI variables that
-# may already exist on this hardware (e.g. left over from a previous OS, or
-# from a prior boot where a key was pressed to bring up the menu, which
-# persists a timeout override to an EFI variable). Confirmed (Arch forum,
-# ArchWiki systemd-boot page): EFI variables take precedence over
-# loader.conf when present, so our `timeout 0` file setting can be silently
-# overridden by leftover firmware state without this. bootctl set-timeout/
-# set-default with an empty string clears the variable rather than setting
-# it, restoring loader.conf's own values as authoritative.
-arch-chroot "${MNT}" bootctl set-timeout "" 2>/dev/null || true
-arch-chroot "${MNT}" bootctl set-default "" 2>/dev/null || true
+# ── 5. Find the live squashfs ────────────────────────────────────────────
+progress(18, "Locating KibaOS system image…")
+SQUASHFS_CANDIDATES = [
+    "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs",
+    "/run/archiso/bootmnt/arch/x86_64/airootfs.erofs",
+    "/run/mnt/arch/x86_64/airootfs.sfs",
+]
+SQUASHFS_SRC = None
+for c in SQUASHFS_CANDIDATES:
+    if pathlib.Path(c).exists():
+        SQUASHFS_SRC = c
+        break
+if not SQUASHFS_SRC:
+    # Last resort: find it
+    r = sp.run(["find", "/run", "-name", "airootfs.sfs", "-o", "-name", "airootfs.erofs"],
+               capture_output=True, text=True)
+    for line in r.stdout.strip().splitlines():
+        if line:
+            SQUASHFS_SRC = line.strip()
+            break
+if not SQUASHFS_SRC:
+    fail("Could not locate the KibaOS system image (airootfs.sfs). "
+         "Make sure you're booted from the KibaOS live USB.")
 
-progress 92 "Almost ready..."
-arch-chroot "${MNT}" mkinitcpio -c /etc/mkinitcpio.conf.d/installed.conf \
-  -g /boot/initramfs-linux.img || fail "mkinitcpio failed"
+tee(f"  squashfs: {SQUASHFS_SRC}")
 
-progress 96 "Just a little longer..."
-for svc in NetworkManager sddm bluetooth systemd-timesyncd systemd-time-wait-sync; do
-  arch-chroot "${MNT}" systemctl enable "${svc}" 2>/dev/null || true
-done
-arch-chroot "${MNT}" plymouth-set-default-theme kibaos 2>/dev/null || true
+# ── 6. Mount squashfs and rsync to new root ──────────────────────────────
+progress(22, "Copying KibaOS to your computer (this takes a few minutes)…")
+SQMNT = pathlib.Path(tempfile.mkdtemp(prefix="kibaos-sq-"))
+try:
+    fs_type = "squashfs" if SQUASHFS_SRC.endswith(".sfs") else "erofs"
+    run(["mount", "-t", fs_type, "-o", "loop,ro", SQUASHFS_SRC, str(SQMNT)])
+except Exception as e:
+    fail(f"Could not mount system image: {e}")
 
-progress 99 "Finishing up..."
-umount -R "${MNT}"
+try:
+    # rsync with progress — parse % for the UI
+    proc = sp.Popen(
+        [
+            "rsync", "-aHAX",
+            "--info=progress2",
+            "--exclude=/run/*",
+            "--exclude=/proc/*",
+            "--exclude=/sys/*",
+            "--exclude=/dev/*",
+            "--exclude=/tmp/*",
+            "--exclude=/home/liveuser",           # live session home
+            "--exclude=/root/.bash_history",
+            str(SQMNT) + "/",
+            str(MNT) + "/",
+        ],
+        stdout=sp.PIPE, stderr=log_fh, text=True
+    )
+    for line in proc.stdout:
+        line = line.rstrip()
+        if not line:
+            continue
+        tee(line)
+        # parse "  1,234,567  42%  12.34MB/s    0:00:05"
+        import re
+        m = re.search(r'(\d+)%', line)
+        if m:
+            pct = int(m.group(1))
+            progress(22 + pct * 48 // 100, f"Copying files… {pct}%")
+    proc.wait()
+    if proc.returncode not in (0, 23, 24):   # 23/24 = partial/vanished (ok)
+        fail(f"rsync exited with code {proc.returncode}")
+except Exception as e:
+    fail(f"File copy failed: {e}\n{traceback.format_exc()}")
+finally:
+    sp.run(["umount", str(SQMNT)], capture_output=True)
+    SQMNT.rmdir()
 
-progress 100 "Done"
-exit 0
+progress(72, "Finalising system…")
 
+# ── 7. Bind-mount kernel filesystems for chroot ──────────────────────────
+for fs in ["proc", "sys", "dev"]:
+    sp.run(["mount", "--rbind", f"/{fs}", str(MNT / fs)], capture_output=True)
+    sp.run(["mount", "--make-rslave", str(MNT / fs)], capture_output=True)
+
+try:
+    # ── 8. fstab ────────────────────────────────────────────────────────
+    progress(74, "Writing filesystem table…")
+    root_uuid = sp.check_output(["blkid", "-s", "UUID", "-o", "value", ROOT_PART], text=True).strip()
+    esp_uuid  = sp.check_output(["blkid", "-s", "UUID", "-o", "value", ESP_PART],  text=True).strip()
+    (MNT / "etc/fstab").write_text(
+        f"# KibaOS fstab — generated by installer\n"
+        f"UUID={root_uuid}  /      ext4  defaults,noatime  0 1\n"
+        f"UUID={esp_uuid}   /boot  vfat  umask=0077        0 2\n"
+    )
+
+    # ── 9. Hostname / hosts ──────────────────────────────────────────────
+    (MNT / "etc/hostname").write_text(HOSTNAME + "\n")
+    (MNT / "etc/hosts").write_text(
+        f"127.0.0.1   localhost\n"
+        f"::1         localhost\n"
+        f"127.0.1.1   {HOSTNAME}.localdomain {HOSTNAME}\n"
+    )
+
+    # ── 10. Locale + keyboard ────────────────────────────────────────────
+    progress(76, "Setting locale and keyboard…")
+    locale_gen = MNT / "etc/locale.gen"
+    if locale_gen.exists():
+        text = locale_gen.read_text()
+        text = text.replace(f"#{LOCALE}", LOCALE)
+        locale_gen.write_text(text)
+    (MNT / "etc/locale.conf").write_text(f"LANG={LOCALE}\n")
+    (MNT / "etc/vconsole.conf").write_text(f"KEYMAP={KEYMAP}\n")
+    chroot(["locale-gen"])
+
+    # ── 11. Create user account ──────────────────────────────────────────
+    progress(78, "Creating your account…")
+    # Remove live autologin first
+    for f in [
+        MNT / "etc/sddm.conf.d/kibaos-live.conf",
+        MNT / "etc/sddm.conf.d/autologin.conf",
+    ]:
+        f.unlink(missing_ok=True)
+
+    chroot(["userdel", "-r", "liveuser"])   # best-effort; ignore if absent
+    try:
+        chroot([
+            "useradd", "-m",
+            "-G", "wheel,audio,video,input,network,storage,power",
+            "-s", "/bin/bash",
+            USERNAME,
+        ])
+    except RuntimeError:
+        pass  # user may already exist from squashfs if somehow present
+
+    # Set password via chpasswd
+    proc = sp.run(
+        ["arch-chroot", str(MNT), "chpasswd"],
+        input=f"{USERNAME}:{PASSWORD}\n",
+        capture_output=True, text=True
+    )
+    if proc.returncode != 0:
+        fail(f"chpasswd failed: {proc.stderr}")
+
+    # ── 12. Remove live-only and installer packages/files ────────────────
+    progress(80, "Removing live-only tools…")
+    # Files to remove from installed system
+    live_only_paths = [
+        # The installer itself
+        MNT / "usr/share/applications/kibaos-install.desktop",
+        MNT / "usr/bin/io.kibaos.oobe",
+        MNT / "usr/share/kibaos-oobe",
+        MNT / "usr/local/bin/kibaos-oobe-backend",
+        MNT / "usr/local/bin/kibaos-oem-finish.sh",
+        # archiso live-session leftovers
+        MNT / "etc/systemd/system/getty@tty1.service.d",
+        MNT / "etc/systemd/system/choose-mirror.service",
+        MNT / "usr/share/libalpm/hooks/Installation_guide.hook",
+        MNT / "root/customize_airootfs.sh",
+        MNT / "root/install.txt",
+        MNT / "etc/motd",                      # live MOTD
+        MNT / "etc/issue",                     # live issue
+    ]
+    for p in live_only_paths:
+        if p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+        elif p.exists():
+            p.unlink(missing_ok=True)
+
+    # Remove archiso-specific packages if installed (squashfs-tools, mkinitcpio-archiso)
+    chroot(["pacman", "-Rns", "--noconfirm",
+            "archiso", "mkinitcpio-archiso", "squashfs-tools"])
+
+    # Remove "Install KibaOS" from SDDM / app menu on the installed system
+    sp.run(["arch-chroot", str(MNT),
+            "update-desktop-database", "/usr/share/applications"],
+           capture_output=True)
+
+    # ── 13. Bootloader ───────────────────────────────────────────────────
+    progress(84, "Installing bootloader…")
+    chroot(["bootctl", "--esp-path=/boot", "install"])
+    # Remove the Arch splash BMP that systemd-boot installs — it appears as
+    # the bootloader logo and overrides our silent boot. Also remove systemd-boot's
+    # own shipped loader.conf which sets "default arch" and can override ours.
+    for f in [
+        MNT / "boot/EFI/systemd/splash-arch.bmp",
+        MNT / "usr/share/systemd/bootctl/splash-arch.bmp",
+    ]:
+        f.unlink(missing_ok=True)
+    # Ensure our loader.conf wins — rewrite it after bootctl install
+    (MNT / "boot/loader/loader.conf").write_text(
+        "default kibaos.conf\n"
+        "timeout 0\n"
+        "console-mode max\n"
+        "editor no\n"
+        "auto-entries no\n"
+    )
+
+    # Patch the loader entry with the real PARTUUID
+    root_partuuid = sp.check_output(
+        ["blkid", "-s", "PARTUUID", "-o", "value", ROOT_PART], text=True
+    ).strip()
+    entry_path = MNT / "boot/loader/entries/kibaos.conf"
+    if entry_path.exists():
+        txt = entry_path.read_text()
+        txt = txt.replace("PARTUUID=PLACEHOLDER", f"PARTUUID={root_partuuid}")
+        entry_path.write_text(txt)
+    else:
+        # Write a sane fallback entry
+        entry_path.parent.mkdir(parents=True, exist_ok=True)
+        entry_path.write_text(
+            "title   KibaOS\n"
+            "linux   /vmlinuz-linux\n"
+            "initrd  /initramfs-linux.img\n"
+            f"options root=PARTUUID={root_partuuid} rw quiet splash loglevel=3 "
+            "rd.udev.log_level=3 vt.global_cursor_default=0 "
+            "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\n"
+        )
+
+    # Clear any stale EFI timeout/default variables
+    sp.run(["arch-chroot", "-S", str(MNT), "bootctl", "set-timeout", ""], capture_output=True)
+    sp.run(["arch-chroot", "-S", str(MNT), "bootctl", "set-default", ""], capture_output=True)
+
+    # ── 14. Services ─────────────────────────────────────────────────────
+    progress(88, "Enabling services…")
+    for svc in [
+        "NetworkManager", "sddm", "bluetooth",
+        "systemd-timesyncd", "systemd-time-wait-sync",
+    ]:
+        sp.run(["arch-chroot", str(MNT), "systemctl", "enable", svc],
+               capture_output=True)
+
+    # ── 15. Plymouth theme ────────────────────────────────────────────────
+    progress(91, "Applying boot theme…")
+    ply_conf_dir = MNT / "etc/plymouth"
+    ply_conf_dir.mkdir(parents=True, exist_ok=True)
+    (ply_conf_dir / "plymouthd.conf").write_text(
+        "[Daemon]\nTheme=kibaos\nShowDelay=0\nDeviceTimeout=8\n"
+    )
+    sp.run(["arch-chroot", str(MNT),
+            "plymouth-set-default-theme", "kibaos"],
+           capture_output=True)
+
+    # ── 16. initramfs ────────────────────────────────────────────────────
+    progress(94, "Rebuilding initramfs…")
+    chroot([
+        "mkinitcpio",
+        "-c", "/etc/mkinitcpio.conf.d/installed.conf",
+        "-g", "/boot/initramfs-linux.img",
+    ])
+
+    # ── 17. Wheel sudoers ────────────────────────────────────────────────
+    sudoers = MNT / "etc/sudoers.d/wheel"
+    sudoers.parent.mkdir(parents=True, exist_ok=True)
+    sudoers.write_text("%wheel ALL=(ALL:ALL) ALL\n")
+    sudoers.chmod(0o440)
+
+except Exception as e:
+    fail(f"Post-install configuration failed: {e}\n{traceback.format_exc()}")
+
+finally:
+    # ── 18. Unmount everything ───────────────────────────────────────────
+    progress(98, "Cleaning up…")
+    for fs in ["dev", "sys", "proc"]:
+        sp.run(["umount", "-R", str(MNT / fs)], capture_output=True)
+    sp.run(["umount", str(MNT / "boot")], capture_output=True)
+    sp.run(["umount", str(MNT)],           capture_output=True)
+
+progress(100, "Done")
+sys.exit(0)
 OOBEBACKEND
-chmod +x /usr/local/bin/kibaos-oobe-backend.sh
+chmod +x /usr/local/bin/kibaos-oobe-backend
+# Point polkit rule + Vala cmd at new backend (no .sh extension)
+sed -i 's|/usr/local/bin/kibaos-oobe-backend\.sh|/usr/local/bin/kibaos-oobe-backend|g' \
+    /usr/share/kibaos-oobe/src/main.vala 2>/dev/null || true
+
 
 # ── kibaos-oem-finish.sh — lightweight OEM-mode completion backend.
 # Runs on an ALREADY-INSTALLED system (imaged by an OEM before shipping —
@@ -2006,7 +2451,7 @@ mkdir -p /etc/polkit-1/rules.d
 cat > /etc/polkit-1/rules.d/49-kibaos-oobe.rules << 'POLKITRULE'
 polkit.addRule(function(action, subject) {
     if (action.id == "org.freedesktop.policykit.exec" &&
-        (action.lookup("program") == "/usr/local/bin/kibaos-oobe-backend.sh" ||
+        (action.lookup("program") == "/usr/local/bin/kibaos-oobe-backend" ||
          action.lookup("program") == "/usr/local/bin/kibaos-oem-finish.sh") &&
         subject.isInGroup("wheel")) {
         return polkit.Result.YES;
@@ -2075,7 +2520,16 @@ fun refresh_callback() {
 Plymouth.SetRefreshFunction(refresh_callback);
 PLYSCRIPT
 
-# Set as default theme and rebuild initramfs
+# Plymouth daemon config — must be written before mkinitcpio bakes it in
+mkdir -p /etc/plymouth
+cat > /etc/plymouth/plymouthd.conf << 'PLYMOUTHD'
+[Daemon]
+Theme=kibaos
+ShowDelay=0
+DeviceTimeout=8
+PLYMOUTHD
+
+# Set theme THEN rebuild initramfs so the hook embeds the correct theme
 plymouth-set-default-theme kibaos 2>/dev/null || true
 mkinitcpio -c /etc/mkinitcpio.conf.d/installed.conf \
            -g /boot/initramfs-linux.img 2>/dev/null || true
@@ -3754,3 +4208,4 @@ else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
 fi
+,
