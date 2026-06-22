@@ -131,7 +131,6 @@ lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
 wayfire
-wcm
 sddm
 budgie
 budgie-desktop-view
@@ -143,11 +142,9 @@ slurp
 swayidle
 gtklock
 wlopm
-wdisplays
 nemo
 nemo-fileroller
 gnome-terminal
-gnome-system-monitor
 gnome-disk-utility
 gnome-backgrounds
 gnome-keyring
@@ -169,7 +166,6 @@ pipewire-pulse
 pipewire-alsa
 wireplumber
 pavucontrol
-gparted
 ntfs-3g
 exfatprogs
 polkit
@@ -211,7 +207,7 @@ cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
 HOOKS=(base udev keyboard keymap modconf memdisk archiso block filesystems)
 INITRAMFS
 
-# installed.conf — used by the INSTALLED system after Calamares runs initcpio.
+# installed.conf — used by the INSTALLED system after the OOBE installer runs initcpio.
 # Must NOT include memdisk/archiso hooks (those are live-only).
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
 HOOKS=(base udev plymouth autodetect modconf kms block keyboard keymap filesystems fsck)
@@ -274,468 +270,6 @@ SYSLINUX_SAFE
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
-# Calamares installer config
-# ══════════════════════════════════════════════════════════════════════════
-mkdir -p "${AIROOTFS}/etc/calamares/modules"
-mkdir -p "${AIROOTFS}/usr/share/calamares/branding/kibaos"
-
-cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/branding.desc" << 'BRANDING'
----
-componentName: kibaos
-welcomeStyleCalamares: false
-welcomeExpandingLogo: false
-strings:
-  productName:         KibaOS
-  shortProductName:    KibaOS
-  version:             Rolling
-  shortVersion:        Rolling
-  versionedName:       KibaOS Rolling
-  shortVersionedName:  KibaOS
-  bootloaderEntryName: KibaOS
-  productUrl:          https://github.com/WolfTech-Innovations/Kiba
-  supportUrl:          https://github.com/WolfTech-Innovations/Kiba/issues
-  knownIssuesUrl:      https://github.com/WolfTech-Innovations/Kiba/issues
-  releaseNotesUrl:     https://github.com/WolfTech-Innovations/Kiba
-images:
-  productLogo:    "logo.png"
-  productIcon:    "logo.png"
-  productWelcome: "logo.png"
-slideshow:    "show.qml"
-slideshowAPI: 2
-style:
-  sidebarBackground:    "#f5f8fa"
-  sidebarText:          "#1a1a2e"
-  sidebarTextSelect:    "#0099cc"
-  sidebarTextHighlight: "#0099cc"
-windowExpanding:  fullscreen
-windowSize:       "1024px,768px"
-windowPlacement:  center
-sidebar:    none
-navigation: none
-BRANDING
-
-cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/stylesheet.qss" << 'QSS'
-QWidget {
-    background-color: #f0f6fa;
-    color: #1a2030;
-    font-family: "Noto Sans", "DejaVu Sans", sans-serif;
-    font-size: 13px;
-}
-QStackedWidget, QFrame#mainContent {
-    background-color: #ffffff;
-    border-radius: 16px;
-    border: 1px solid rgba(0,0,0,0.06);
-}
-QLabel#labelTitle {
-    font-size: 24px;
-    font-weight: 400;
-    color: #0d1b2a;
-    padding-top: 24px;
-    letter-spacing: 0.5px;
-}
-QLabel {
-    color: #3a4660;
-    font-size: 13px;
-}
-QPushButton#nextButton {
-    background-color: #0099cc;
-    color: #ffffff;
-    border: none;
-    border-radius: 12px;
-    padding: 10px 36px;
-    font-size: 13px;
-    font-weight: 600;
-    min-width: 120px;
-}
-QPushButton#nextButton:hover    { background-color: #007aaa; }
-QPushButton#nextButton:pressed  { background-color: #005f88; }
-QPushButton#nextButton:disabled { background-color: #a8d8ea; }
-QPushButton {
-    background-color: #eaf4f8;
-    color: #0099cc;
-    border: 1.5px solid #c5dde8;
-    border-radius: 12px;
-    padding: 9px 24px;
-    font-size: 13px;
-    min-width: 90px;
-}
-QPushButton:hover   { background-color: #d0ecf5; border-color: #0099cc; }
-QPushButton:pressed { background-color: #b8e2f0; }
-QPushButton:disabled { color: #aabbc8; border-color: #dde8ef; }
-QLineEdit, QComboBox {
-    background-color: #eaf4f8;
-    border: 1.5px solid #c5dde8;
-    border-radius: 12px;
-    padding: 9px 14px;
-    color: #1a2030;
-    selection-background-color: #0099cc;
-    selection-color: #ffffff;
-    font-size: 13px;
-}
-QLineEdit:focus, QComboBox:focus {
-    border: 2px solid #0099cc;
-    background-color: #f4fbff;
-}
-QProgressBar {
-    background-color: #d0ecf5;
-    border: none;
-    border-radius: 5px;
-    height: 7px;
-}
-QProgressBar::chunk {
-    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #0099cc, stop:1 #00bfff);
-    border-radius: 5px;
-}
-QListView, QTreeView {
-    background-color: #ffffff;
-    border: 1.5px solid #d8e8ef;
-    border-radius: 12px;
-    alternate-background-color: #f4fafd;
-    outline: none;
-}
-QListView::item:hover, QTreeView::item:hover { background-color: #d8f0fa; }
-QListView::item:selected, QTreeView::item:selected {
-    background-color: #b0e0f5;
-    color: #0d1b2a;
-}
-QScrollBar:vertical { background: transparent; width: 7px; }
-QScrollBar::handle:vertical {
-    background: #bbd8e8;
-    border-radius: 3px;
-    min-height: 28px;
-}
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QToolTip {
-    background-color: #0d1b2a;
-    color: #e8f4fa;
-    border: none;
-    border-radius: 8px;
-    padding: 5px 10px;
-    font-size: 12px;
-}
-QSS
-
-cat > "${AIROOTFS}/usr/share/calamares/branding/kibaos/show.qml" << 'SHOWQML'
-import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
-
-Item {
-    id: root; anchors.fill: parent
-    property bool activatedInCalamares: false
-    property var slides: [
-        { heading: "Welcome to KibaOS",       body: "We're setting everything up for you. This usually takes 5 to 10 minutes." },
-        { heading: "Built on Arch Linux",     body: "Rolling release. Always the latest software, straight from upstream." },
-        { heading: "Budgie 10.10 Wayland",    body: "Fully Wayland-native. Fast, modern, and compositor-agnostic." },
-        { heading: "Designed with care",      body: "KibaOS blends the best of DDE, Paper, and Cutefish into one cohesive look." },
-        { heading: "Your system, your rules", body: "Full disk encryption, pacman, and the entire AUR at your fingertips." },
-        { heading: "KibaOS by WolfTech",      body: "github.com/WolfTech-Innovations/Kiba — guides, wiki, and issue reporting." }
-    ]
-    property int currentSlide: 0
-
-    Timer {
-        interval: 6000; running: root.activatedInCalamares; repeat: true
-        onTriggered: root.currentSlide = (root.currentSlide + 1) % root.slides.length
-    }
-
-    Rectangle {
-        anchors.fill: parent; color: "#f0f6fa"
-
-        Rectangle {
-            id: topStrip
-            anchors { top: parent.top; left: parent.left; right: parent.right }
-            height: parent.height * 0.36
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: "#005f88" }
-                GradientStop { position: 1.0; color: "#0099cc" }
-            }
-            Image {
-                anchors.centerIn: parent; source: "logo.png"
-                width: 88; height: 88
-                fillMode: Image.PreserveAspectFit; smooth: true
-            }
-        }
-
-        Rectangle {
-            anchors {
-                top: topStrip.bottom; topMargin: -22
-                horizontalCenter: parent.horizontalCenter
-            }
-            width: Math.min(parent.width - 56, 500)
-            height: contentCol.implicitHeight + 52
-            radius: 20
-            color: "#ffffff"
-
-            ColumnLayout {
-                id: contentCol
-                anchors { top: parent.top; left: parent.left; right: parent.right; margins: 32 }
-                spacing: 14
-
-                Text {
-                    Layout.alignment: Qt.AlignHCenter; Layout.fillWidth: true
-                    text: root.slides[root.currentSlide].heading
-                    font.pixelSize: 19; font.weight: Font.Medium
-                    color: "#0d1b2a"
-                    horizontalAlignment: Text.AlignHCenter; wrapMode: Text.WordWrap
-                }
-                Text {
-                    Layout.alignment: Qt.AlignHCenter; Layout.fillWidth: true
-                    text: root.slides[root.currentSlide].body
-                    font.pixelSize: 13; color: "#4a5a70"
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.WordWrap; lineHeight: 1.55
-                }
-                Row {
-                    Layout.alignment: Qt.AlignHCenter; spacing: 7
-                    Repeater {
-                        model: root.slides.length
-                        delegate: Rectangle {
-                            width: index === root.currentSlide ? 20 : 7
-                            height: 7; radius: 3.5
-                            color: index === root.currentSlide ? "#0099cc" : "#c5dde8"
-                            Behavior on width { NumberAnimation { duration: 200 } }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: root.currentSlide = index
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Rectangle {
-            id: progressTrack
-            anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-            height: 5; color: "#cde8f5"
-            Rectangle {
-                anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
-                width: 0
-                gradient: Gradient {
-                    orientation: Gradient.Horizontal
-                    GradientStop { position: 0.0; color: "#0099cc" }
-                    GradientStop { position: 1.0; color: "#00bfff" }
-                }
-                radius: 2.5
-                SequentialAnimation on width {
-                    running: root.activatedInCalamares; loops: Animation.Infinite
-                    NumberAnimation { from: 0; to: progressTrack.width * 0.85; duration: 2800; easing.type: Easing.InOutCubic }
-                    PauseAnimation  { duration: 500 }
-                    NumberAnimation { to: progressTrack.width; duration: 600 }
-                    PauseAnimation  { duration: 300 }
-                    NumberAnimation { to: 0; duration: 500 }
-                }
-            }
-        }
-    }
-}
-SHOWQML
-
-cat > "${AIROOTFS}/etc/calamares/settings.conf" << 'CALA_SETTINGS'
----
-modules-search: [ local, /usr/lib/calamares/modules ]
-sequence:
-- show:
-  - welcome
-  - locale
-  - keyboard
-  - partition
-  - users
-  - summary
-- exec:
-  - partition
-  - mount
-  - unpackfs
-  - machineid
-  - fstab
-  - locale
-  - keyboard
-  - localecfg
-  - users
-  - displaymanager
-  - networkcfg
-  - hwclock
-  - services-systemd
-  - initcpiocfg
-  - initcpio
-  - bootloader
-  - umount
-- show:
-  - finished
-branding: kibaos
-prompt-install: false
-dont-chroot: false
-CALA_SETTINGS
-
-cat > "${AIROOTFS}/etc/calamares/modules/welcome.conf" << 'WELCOMECONF'
----
-showSupportUrl:       true
-showKnownIssuesUrl:   true
-showReleaseNotesUrl:  false
-requirements:
-  requiredStorage: 10.0
-  requiredRam:     1.0
-  check:
-    - storage
-    - ram
-    - root
-  required:
-    - storage
-    - ram
-    - root
-geoip:
-  style:    "none"
-  url:      ""
-  selector: ""
-WELCOMECONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/unpackfs.conf" << 'UNPACKFS'
----
-unpack:
-  - source: "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs"
-    sourcefs: "squashfs"
-    destination: ""
-UNPACKFS
-
-cat > "${AIROOTFS}/etc/calamares/modules/displaymanager.conf" << 'DMCONF'
----
-displaymanagers:
-  - sddm
-defaultDesktopEnvironment:
-  executable: "budgie-session"
-  desktopFile: "budgie-desktop"
-basicSetup: false
-DMCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/bootloader.conf" << 'BOOTLOADERCONF'
----
-efiBootLoader:   "systemd-boot"
-installPath:     "/boot"
-efiBootloaderId: "KibaOS"
-BOOTLOADERCONF
-
-# systemd-boot loader config — written into airootfs so Calamares copies it
-# to the installed ESP. timeout=0 means it never pauses or shows a menu;
-# it boots the default entry immediately every time.
-mkdir -p "${AIROOTFS}/boot/loader"
-cat > "${AIROOTFS}/boot/loader/loader.conf" << 'INSTALLED_LOADER'
-default kibaos.conf
-timeout 0
-console-mode max
-editor no
-INSTALLED_LOADER
-
-# The installed kernel entry — Calamares's systemd-boot module writes its own
-# entries, but we seed this as a fallback so the kernel cmdline is correct
-# even if the Calamares entry generation fails.
-mkdir -p "${AIROOTFS}/boot/loader/entries"
-cat > "${AIROOTFS}/boot/loader/entries/kibaos.conf" << 'INSTALLED_ENTRY'
-title   KibaOS
-linux   /vmlinuz-linux
-initrd  /initramfs-linux.img
-options root=PARTUUID=PLACEHOLDER rw quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 clocksource=tsc tsc=reliable plymouth.use-simpledrm=1
-INSTALLED_ENTRY
-
-cat > "${AIROOTFS}/etc/calamares/modules/services-systemd.conf" << 'SERVICESCONF'
----
-services:
-  - name: NetworkManager
-    mandatory: false
-  - name: bluetooth
-    mandatory: false
-  - name: sddm
-    mandatory: false
-  - name: earlyoom
-    mandatory: false
-SERVICESCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/initcpiocfg.conf" << 'INITCPIOCFGCONF'
----
-kernel:       "/boot/vmlinuz-linux"
-config:       "/etc/mkinitcpio.conf.d/installed.conf"
-INITCPIOCFGCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/initcpio.conf" << 'INITCPIOCONF'
----
-kernel:   "/boot/vmlinuz-linux"
-img:      "/boot/initramfs-linux.img"
-fallback: "/boot/initramfs-linux-fallback.img"
-INITCPIOCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/machineid.conf" << 'MACHINEIDCONF'
----
-systemd: true
-dbus:    true
-symlink: false
-MACHINEIDCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/fstab.conf" << 'FSTABCONF'
----
-mountOptions:
-  default:   "defaults,noatime"
-  btrfs:     "defaults,noatime,compress=zstd"
-  efi:       "umask=0077"
-  swap:      "defaults"
-FSTABCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/locale.conf" << 'LOCALECONF'
----
-region:   "America"
-zone:     "New_York"
-localeGenPath: "/etc/locale.gen"
-geoipURL: ""
-LOCALECONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/keyboard.conf" << 'KEYBOARDCONF'
----
-writeEtcDefaultKeyboard: true
-KEYBOARDCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/localecfg.conf" << 'LOCALECFGCONF'
----
-localeGenPath: "/etc/locale.gen"
-LOCALECFGCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/networkcfg.conf" << 'NETWORKCFGCONF'
----
-onlyWifiInterfaces: false
-NETWORKCFGCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/hwclock.conf" << 'HWCLOCKCONF'
----
-utc: true
-HWCLOCKCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/mount.conf" << 'MOUNTCONF'
----
-extraMounts:
-  - device: "proc"
-    fs:     "proc"
-    mountPoint: "/proc"
-  - device: "sys"
-    fs:     "sysfs"
-    mountPoint: "/sys"
-  - device: "efivarfs"
-    fs:     "efivarfs"
-    mountPoint: "/sys/firmware/efi/efivars"
-  - device: "/dev"
-    mountPoint: "/dev"
-    options:   "bind"
-  - device: "tmpfs"
-    fs:     "tmpfs"
-    mountPoint: "/run"
-MOUNTCONF
-
-cat > "${AIROOTFS}/etc/calamares/modules/finished.conf" << 'FINISHEDCONF'
----
-restartNowEnabled:  true
-restartNowChecked:  true
-restartNowCommand:  "systemctl reboot"
-FINISHEDCONF
-
-# ══════════════════════════════════════════════════════════════════════════
 # pacman.conf tweaks
 # ══════════════════════════════════════════════════════════════════════════
 PACMAN_CONF="${PROFILE}/pacman.conf"
@@ -767,9 +301,6 @@ WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
 ln -sf /usr/lib/systemd/system/sddm.service           "${WANTS}/display-manager.service"
-ln -sf /usr/lib/systemd/system/NetworkManager.service "${WANTS}/multi-user.target.wants/NetworkManager.service"
-ln -sf /usr/lib/systemd/system/NetworkManager-dispatcher.service \
-       "${WANTS}/dbus-org.freedesktop.nm-dispatcher.service"
 ln -sf /usr/lib/systemd/system/pacman-init.service    "${WANTS}/multi-user.target.wants/pacman-init.service"
 ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.target.wants/bluetooth.service"
 
@@ -792,23 +323,6 @@ chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 pacman -Syy --noconfirm
-
-mkdir -p /etc/calamares/modules/
-cat > /etc/calamares/modules/users.conf << 'USERSCONF'
----
-defaultGroups:
-  - users
-  - wheel
-  - audio
-  - video
-  - input
-  - network
-  - storage
-  - power
-autologinGroup: autologin
-sudoersGroup: wheel
-setRootPassword: false
-USERSCONF
 
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
@@ -938,7 +452,6 @@ cp "${LOGO_256}" /usr/share/icons/hicolor/256x256/apps/kibaos.png
 cp "${LOGO_48}"  /usr/share/icons/hicolor/48x48/apps/kibaos.png
 cp "${LOGO_32}"  /usr/share/icons/hicolor/32x32/apps/kibaos.png
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
-cp "${LOGO_256}" /usr/share/calamares/branding/kibaos/logo.png
 
 # ══════════════════════════════════════════════════════════════════════════
 # AUR PACKAGES
@@ -1031,6 +544,12 @@ cat > /usr/share/kibaos-oobe/src/main.vala << 'OOBEVALA'
 using Gtk;
 using Adw;
 using Gee;
+
+public struct OobeSummaryItem {
+    public string icon;
+    public string key;
+    public string val;
+}
 
 public class KibaOOBE : Adw.Application {
     private Adw.ApplicationWindow window;
@@ -1526,11 +1045,12 @@ public class KibaOOBE : Adw.Application {
         var summary = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
         summary.add_css_class ("oobe-summary-box");
 
-        var items = new Gee.ArrayList<string[]> ();
-        items.add ({ "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : selected_disk });
-        items.add ({ "preferences-desktop-locale-symbolic", "Language", selected_locale });
-        items.add ({ "input-keyboard-symbolic",   "Keyboard", selected_keymap });
-        items.add ({ "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value });
+        OobeSummaryItem[] items = {
+            { "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : selected_disk },
+            { "preferences-desktop-locale-symbolic", "Language", selected_locale },
+            { "input-keyboard-symbolic",   "Keyboard", selected_keymap },
+            { "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value }
+        };
         bool first = true;
         foreach (var item in items) {
             if (!first) {
@@ -1541,13 +1061,13 @@ public class KibaOOBE : Adw.Application {
             first = false;
             var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
             row.add_css_class ("oobe-summary-row");
-            row.append (new Gtk.Image.from_icon_name (item[0]));
-            var lbl = new Gtk.Label (item[1]);
+            row.append (new Gtk.Image.from_icon_name (item.icon));
+            var lbl = new Gtk.Label (item.key);
             lbl.add_css_class ("oobe-summary-key");
             row.append (lbl);
             var spacer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true };
             row.append (spacer);
-            var val = new Gtk.Label (item[2]);
+            var val = new Gtk.Label (item.val);
             val.add_css_class ("oobe-summary-val");
             row.append (val);
             summary.append (row);
@@ -2362,8 +1882,9 @@ sed -i 's|/usr/local/bin/kibaos-oobe-backend\.sh|/usr/local/bin/kibaos-oobe-back
 # see kibaos-oem-prepare below for how that state is set), so there is no
 # partitioning, no squashfs extraction, no bootloader install here at all.
 # Just locale/keyboard, the real customer account, and removing the OEM
-# marker + temporary OEM account. Mirrors Calamares' own documented
-# post-delivery OEM phase (locale/keyboard/account-only, no disk work).
+# marker + temporary OEM account. Mirrors the standard OEM-imaging pattern
+# (locale/keyboard/account-only finish step, no disk work) used by
+# installers like this one.
 cat > /usr/local/bin/kibaos-oem-finish.sh << 'OEMFINISH'
 #!/usr/bin/env bash
 # Args: $1=locale $2=keymap $3=hostname $4=username $5=password
@@ -2411,9 +1932,9 @@ chmod +x /usr/local/bin/kibaos-oem-finish.sh
 # "oem" account so the imaged device boots straight to a usable desktop
 # for OEM-side burn-in/testing, and drops the marker file that makes
 # io.kibaos.oobe launch in OEM-finish mode on first real customer boot.
-# This is the KibaOS equivalent of Calamares' `dont-chroot: true` +
-# OEM-mode settings.conf pattern, just implemented as a small script
-# instead of a Calamares config file, consistent with the rest of this
+# This mirrors the standard dont-chroot-style OEM-mode pattern from
+# Calamares-based distros, just implemented as a small script
+# instead of an installer config file, consistent with the rest of this
 # from-scratch installer. ─────────────────────────────────────────────────
 cat > /usr/local/bin/kibaos-oem-prepare << 'OEMPREPARE'
 #!/usr/bin/env bash
@@ -2461,7 +1982,8 @@ POLKITRULE
 if [ -x /usr/bin/io.kibaos.oobe ]; then
   echo "=== KibaOS OOBE installer is the active install path ==="
 else
-  echo "=== KibaOS OOBE installer binary not found post-build — Calamares remains the install path ==="
+  echo "=== WARNING: KibaOS OOBE installer binary not found post-build ===" >&2
+  exit 1
 fi
 
 cd /; rm -rf "${AUR_BUILD}"
@@ -3244,7 +2766,7 @@ chmod 750 /var/lib/sddm
 # Wayfire has no system-wide /etc/xdg config fallback the way labwc does —
 # it only reads $XDG_CONFIG_HOME/wayfire.ini (effectively ~/.config/wayfire.ini).
 # So the default lives in /etc/skel and gets copied into every new user's
-# home directory (liveuser, and any user Calamares creates) instead.
+# home directory (liveuser, and any user the OOBE installer creates) instead.
 mkdir -p "${SKEL}/.config"
 cat > "${SKEL}/.config/wayfire.ini" << 'WAYFIREINI'
 [core]
@@ -3991,7 +3513,7 @@ PS1='\[\e[1;36m\][KibaOS]\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\
 alias ls='ls --color=auto'
 alias ll='ls -lah --color=auto'
 alias grep='grep --color=auto'
-alias install='sudo calamares'
+alias install='sudo pkexec /usr/bin/io.kibaos.oobe'
 alias update='sudo pacman -Syu'
 fastfetch 2>/dev/null || true
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -4126,7 +3648,7 @@ cat > /etc/issue << 'ISSUE'
 
   KibaOS Rolling — Budgie 10.10 Wayland Edition — WolfTech Innovations
   Live session: user=liveuser  password=live
-  Install: click the desktop icon or run  sudo calamares
+  Install: click the desktop icon or run  install
 
 ISSUE
 
@@ -4179,7 +3701,6 @@ find /usr/share/icons -name 'icon-theme.cache' -delete 2>/dev/null || true
 rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser
-systemctl enable NetworkManager
 
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 runuser -u liveuser -- dbus-run-session -- bash -c '
