@@ -1,6 +1,5 @@
 <p align="center">
 <img width="1448" height="1086" alt="image" src="https://github.com/user-attachments/assets/b0f5339d-0c6a-4dc9-82f8-506f5adef851" />
-
 </p>
 
 <p align="center">
@@ -18,6 +17,8 @@
   <img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square" alt="Forks">
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
+
+## We support and love [CurrentBuild Linux PCs](https://wwww.currentbuild.com)
 
 KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop Environment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
 
