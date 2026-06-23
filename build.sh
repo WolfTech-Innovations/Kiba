@@ -1591,7 +1591,7 @@ progress(2, "Loading installer library…")
 try:
     from archinstall.lib.disk.device_handler import device_handler
     from archinstall.lib.disk.filesystem import FilesystemHandler
-    from archinstall.lib.models.device import (
+    from archinstall.lib.disk.device_model import (
         DeviceModification, DiskLayoutConfiguration, DiskLayoutType,
         FilesystemType, ModificationStatus, PartitionFlag,
         PartitionModification, PartitionType, Size, Unit,
