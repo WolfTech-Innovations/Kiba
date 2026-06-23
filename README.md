@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
 </p>
 
-## We support and love [CurrentBuild Linux PCs](https://wwww.currentbuild.com)
+## We support and love [CurrentBuild Linux PCs](https://currentbuild.com)
 
 KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop Environment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
 
