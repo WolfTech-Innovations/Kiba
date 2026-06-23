@@ -1,57 +1,59 @@
-<p align="center">
-<img width="1448" height="1086" alt="image" src="https://github.com/user-attachments/assets/b0f5339d-0c6a-4dc9-82f8-506f5adef851" />
-</p>
+<div align="center">
 
-<p align="center">
-  <a href="https://github.com/WolfTech-Innovations/Kiba/.github/workflows/build.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
-  </a>
-  <img src="https://img.shields.io/badge/License-MIT-lightblue?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Arch Linux-13%20Rolling-1793D1?style=for-the-badge&logo=archlinux&logoColor=white" alt="Arch Linux Version">
-  <img src="https://img.shields.io/badge/Kiba%20OS-1793D1?style=for-the-badge&logo=linux&logoColor=gray" alt="KibaOS Version">
-</p>
+<img width="200" alt="KibaOS installer icon" src="https://github.com/user-attachments/assets/b0f5339d-0c6a-4dc9-82f8-506f5adef851" />
 
-<p align="center">
-  <img src="https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style=flat-square" alt="Repo Size">
-  <img src="https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style=flat-square" alt="Stars">
-  <img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square" alt="Forks">
-  <img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square" alt="Last Commit">
-</p>
+# KibaOS
 
-## We support and love [CurrentBuild Linux PCs](https://currentbuild.com)
+**A friendly, ready-to-use Linux desktop, built for people switching to simple.**
 
-KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)** with **Budgie Desktop Environment** as the desktop environment. KibaOS is developed and maintained by **WolfTech Innovations**.
+[![Build Status](https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/WolfTech-Innovations/Kiba/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-3DDC97?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](#license)
+[![Arch Linux](https://img.shields.io/badge/Base-Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
+[![Budgie Desktop](https://img.shields.io/badge/Desktop-Budgie-2C001E?style=for-the-badge&logo=linux&logoColor=white)](https://buddiesofbudgie.org)
 
-<p align="center">
-  <a href="https://sourceforge.net/projects/kibaos/files/latest/download">
-    <img src="https://a.fsdn.com/con/app/sf-download-button" alt="Download KibaOS">
-  </a>
-</p>
+<sub>
+<img src="https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style=flat-square&color=blue" alt="Repo Size">
+<img src="https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style=flat-square&color=yellow" alt="Stars">
+<img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square&color=lightgrey" alt="Forks">
+<img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square&color=green" alt="Last Commit">
+<img src="https://img.shields.io/sourceforge/dt/kibaos?style=flat-square&color=orange" alt="SourceForge Downloads">
+</sub>
 
-<a href="https://www.star-history.com/?repos=WolfTech-Innovations%2FKiba&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=WolfTech-Innovations/Kiba&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=WolfTech-Innovations/Kiba&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=WolfTech-Innovations/Kiba&type=date&legend=top-left" />
- </picture>
-</a>
+<br><br>
+
+[![Download KibaOS](https://a.fsdn.com/con/app/sf-download-button)](https://sourceforge.net/projects/kibaos/files/latest/download)
+
+</div>
+
+---
+
+KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Budgie** desktop environment and is designed so that anyone switching to simple can sit down and use it immediately, without having to configure anything first.
+
+KibaOS is built and maintained by **Kiba Labs**.
+
+> [!NOTE]
+> New to Linux? A "distribution" (or "distro") is just a complete, ready-to-install version of the Linux operating system, bundled with a desktop, apps, and settings. KibaOS is one such distribution.
+
+### Want KibaOS on real hardware?
+
+We're happy to recommend **[CurrentBuild](https://www.currentbuild.com)**, a builder of Linux-first desktops, workstations, and laptops. This is just a recommendation — CurrentBuild is not affiliated with KibaOS and does not pre-install KibaOS on the machines they sell. If you're looking for hardware that's well-suited to running Linux in general, they're a solid option to check out; you'll still need to install KibaOS yourself by following the steps below.
+
 ---
 
 ## Table of Contents
 
-- [Documentation](#documentation)
-- [Features](#features)
-- [Quick Start](#quick-start)
-  - [Download](#download)
-  - [Writing to a USB Drive](#writing-to-a-usb-drive)
-  - [Live Session](#live-session)
-  - [Installation](#installation)
-- [Technical Details](#technical-details)
-  - [Shell](#shell)
-  - [Theme](#theme)
-  - [System Requirements](#system-requirements)
-- [Build System](#build-system)
-  - [Building Locally](#building-locally)
+- [What KibaOS Includes](#what-kibaos-includes)
+- [Recommended Hardware: CurrentBuild](#want-kibaos-on-real-hardware)
+- [Getting Started](#getting-started)
+  - [Step 1: Download the ISO](#step-1-download-the-iso)
+  - [Step 2: Write It to a USB Drive](#step-2-write-it-to-a-usb-drive)
+  - [Step 3: Try the Live Session](#step-3-try-the-live-session)
+  - [Step 4: Install KibaOS](#step-4-install-kibaos)
+- [System Requirements](#system-requirements)
+- [Everyday Use](#everyday-use)
+  - [Running Windows Programs](#running-windows-programs)
+  - [Automatic Updates](#automatic-updates)
+- [Building KibaOS Yourself](#building-kibaos-yourself)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [License](#license)
@@ -59,155 +61,113 @@ KibaOS is a lightweight Linux distribution built on **Arch Linux base (Rolling)*
 
 ---
 
-The goal of KibaOS is to provide a clean, modern, and visually consistent out-of-the-box experience without requiring post-install configuration. Everything from the boot splash to the terminal color scheme is pre-configured and ready to use.
+## What KibaOS Includes
+
+KibaOS aims to work well right out of the box, so there's no need to spend an afternoon installing extra software just to get a usable computer.
+
+| Feature | What it means for you |
+| --- | --- |
+| **A solid foundation** | Built on Arch Linux, a well-respected base known for staying current and supporting the newest hardware. |
+| **A clean, familiar desktop** | The Budgie desktop environment provides a taskbar, a centered dock, and a clock applet, laid out so everything is easy to find. |
+| **Everyday apps, already installed** | A file manager (Nemo), a web browser (Firefox), a calculator, a calendar, email (Geary), notes, music, and a to-do list app. |
+| **A guided setup experience** | KibaOS's own built-in installer (the OOBE app, short for "Out-Of-Box Experience") asks you one simple question at a time. |
+| **Windows program support** | Many simple Windows programs can be double-clicked and run directly — no extra setup needed. |
+| **Automatic background updates** | Small fixes download and apply on their own, without interrupting what you're doing. |
+
+> [!TIP]
+> If a word here is unfamiliar — like "desktop environment" or "ISO" — don't worry. We explain each one the first time it comes up.
 
 ---
 
-## Documentation
+## Getting Started
 
-For a more in-depth look at KibaOS, check out our detailed documentation:
+### Step 1: Download the ISO
 
-- [**Architecture**](./docs/architecture.md): Base system, kernel, and minimization strategies.
-- [**UX & Design**](./docs/ux-design.md): The Dracula aesthetic and terminal experience.
-- [**Software Management**](./docs/software-management.md): KibaStore, Nala, and Flatpaks.
-- [**Security & Compliance**](./docs/security-compliance.md): Privacy and AB 2273 compliance.
-- [**Build System**](./docs/build-system.md): How we build and release KibaOS.
-- [**Manual Compilation**](./docs/manual-compilation.md): Building the Budgie Desktop Environment from source.
-- [**FAQ**](./docs/faq.md): Frequently asked questions.
-- [**WIKI**](./WIKI.md): Comprehensive technical manual.
+An **ISO file** is a single file that contains an entire disc's (or USB drive's) worth of data. It's how most Linux operating systems are distributed. You'll write this ISO onto a USB drive, then boot your computer from that USB drive to try or install KibaOS.
 
----
-
-## Features
-
-- **Arch Linux Base:** Built on **Arch Linux Rolling**
-- **Deep Cloud Integration:** System-wide file and setting sync powered by Cloud Services. Built on **Arch Linux Rolling** (supported until 2030).
-- **Modern Desktop:** **Budgie Desktop Environment** with **Wayland** as the default session.
-- **Dracula Aesthetic:** **Dracula** color scheme applied system-wide — terminal, widgets, window decorations, and the panel.
-- **Polished UI:** Floating rounded taskbar and 12px rounded window corners via **KWin** compositor.
-- **Optimized Shell:** **Zsh** as the default shell with autosuggestions and syntax highlighting.
-- **Custom Branding:** **Plymouth** boot splash and **Calamares** graphical installer with KibaOS branding.
-- **Essential Apps:** **Firefox ESR**, **Dolphin**, **Konsole**, **Kate**, **VLC**, **GParted** included.
-- **Performance:** No bloat — only what you need is installed.
-
----
-
-## Quick Start
-
-### Download
-
-<img src="https://img.shields.io/sourceforge/dt/kibaos?style=flat-square" alt="SourceForge Downloads">
-
-ISO images are available on **SourceForge**:
+You can download the latest KibaOS ISO file here:
 [Download KibaOS on SourceForge](https://sourceforge.net/projects/kibaos/files/)
 
-SHA256 checksums are provided alongside each release. Always verify your download.
-
-### Writing to a USB Drive
-
-On Linux:
-
-```bash
-sudo dd if=kibaos-vN.iso of=/dev/sdX bs=4M status=progress oflag=sync
-```
-
 > [!IMPORTANT]
-> Replace `/dev/sdX` with your actual drive and `N` with the build number. You can also use tools like **Balena Etcher** or **Ventoy**.
+> Each release comes with a SHA256 checksum, which is a short code used to verify your download wasn't corrupted or tampered with. It's good practice to check it, though not strictly required to get started.
 
-### Live Session
+### Step 2: Write It to a USB Drive
 
-Boot from the USB drive to enter the live environment. The session logs in automatically.
+You'll need a USB flash drive (8 GB or larger is plenty) that you don't mind erasing — everything currently on it will be deleted.
+
+Free graphical tools like [Balena Etcher](https://etcher.balena.io) or [Ventoy](https://www.ventoy.net) make this easy — you just select the ISO file and the USB drive, and click "Flash."
+
+### Step 3: Try the Live Session
+
+A **live session** lets you try KibaOS directly from the USB drive, without installing anything or changing your computer in any way. This is a great way to check that your hardware (Wi-Fi, graphics, etc.) works well with KibaOS before committing to install it.
+
+1. Plug in the USB drive.
+2. Restart your computer and open the boot menu (usually by pressing a key like `F12`, `F2`, `Esc`, or `Del` right after powering on — it varies by computer).
+3. Choose the USB drive from the list.
+4. KibaOS will boot and log you in automatically.
 
 > [!NOTE]
-> No changes made in the live session are saved after reboot. To install KibaOS permanently, launch the **Calamares** installer from the desktop.
+> Anything you do in the live session — files you create, settings you change — is **not saved** once you restart. It's meant only for trying things out. To make KibaOS permanent, continue to Step 4.
 
-#### Default Credentials (Live Session Only)
+#### Default Login (Live Session Only)
+
+These accounts only exist while you're trying KibaOS from the USB drive — they are replaced by your own account when you install:
 
 | Account | Password |
 | ------- | -------- |
-| `user`  | `live`   |
-| `root`  | `root`   |
+| `liveuser` | `live` |
 
-### Installation
+### Step 4: Install KibaOS
 
-The **Calamares** installer guides you through:
+From the live desktop, open the **"Install KibaOS"** icon. This launches KibaOS's own built-in installer, which asks you a few simple questions one at a time:
 
-1. Language and locale selection
-2. Keyboard layout
-3. Disk partitioning (automatic or manual)
-4. User account creation
-5. Installation and bootloader setup
+1. Your preferred language and region
+2. Your keyboard layout
+3. Which disk to install onto
+4. Your username and password
+5. A short confirmation screen before anything is written to disk
 
-Post-install, update your system:
+After you confirm, the installer copies KibaOS onto your computer's disk, sets up the bootloader (the part that lets your computer find and start KibaOS when it turns on), and finishes by creating your personal user account.
 
-```bash
-sudo pacman -Syu
-```
+> [!CAUTION]
+> Installing KibaOS will erase the disk you choose in step 3 above. Make sure you've backed up anything important, and double check you're installing to the correct disk if your computer has more than one.
+
+Once installation finishes, restart your computer, remove the USB drive, and KibaOS will start normally from your computer's own disk.
 
 ---
 
-## Technical Details
-
-### Shell
-
-<img src="https://img.shields.io/badge/Shell-Zsh-blue?style=flat-square&logo=zsh&logoColor=white" alt="Shell: Zsh">
-
-KibaOS uses **Zsh** by default with a pre-configured system-wide config at **`/etc/zsh/zshrc`**:
-
-- Shared history across sessions.
-- Tab completion with menu select.
-- Autosuggestions & syntax highlighting.
-- Minimalist Dracula-themed prompt.
-
-**Useful Aliases:**
-
-- `ll` -> `ls -lah`
-- `update` -> `sudo pacman -Syu`
-- `install` -> `sudo pacman -S`
-
-### Theme
-
-<img src="https://img.shields.io/badge/Theme-Dracula-bd93f9?style=flat-square&logo=dracula&logoColor=white" alt="Theme: Dracula">
-
-KibaOS ships the **Dracula** color scheme system-wide using the official palette
-
-| Color      | Hex       | Role         |
-| ---------- | --------- | ------------ |
-| Background | `#282a36` | Primary BG   |
-| Purple     | `#bd93f9` | Accent Color |
-| Pink       | `#ff79c6` | Selection    |
-| Green      | `#50fa7b` | Success      |
-
-The scheme is applied to **Cutefish OS**, **Konsole**, **KWin** decorations, **Breeze Dark** panel, and **Plymouth**.
-
-### System Requirements
+## System Requirements
 
 | Component | Minimum                | Recommended         |
-| --------- | ---------------------- | ------------------- |
-| **CPU**   | 64-bit x86 (amd64)     | Dual-core or better |
-| **RAM**   | 2 GB                   | 4 GB                |
-| **Disk**  | 20 GB                  | **SSD** recommended |
-| **GPU**   | **OpenGL 2.0** support | Dedicated GPU       |
+| --------- | ---------------------- | -------------------- |
+| **CPU**   | 64-bit (x86_64)        | Dual-core or better |
+| **RAM**   | 2 GB                   | 4 GB                 |
+| **Disk**  | 20 GB free space       | An SSD is much faster than a traditional hard drive |
+| **Graphics** | A GPU supporting OpenGL 2.0 | A dedicated graphics card |
 
 ---
 
-## Build System
+## Everyday Use
 
-<p align="left">
-  <img src="https://img.shields.io/badge/Build-live--build-blue?style=flat-square" alt="Build: live-build">
-  <img src="https://img.shields.io/badge/CI-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white" alt="CI: GitHub Actions">
-  <img src="https://img.shields.io/badge/Infrastructure-Docker-2496ED?style=flat-square&logo=docker&logoColor=white" alt="Infrastructure: Docker">
-</p>
+### Running Windows Programs
 
-KibaOS is built using **live-build** inside a **Arch Linux Rolling** **Docker** container via **GitHub Actions**.
+KibaOS can run many Windows programs right out of the box. Just double-click the program's file, and it'll open and run — no extra setup needed.
 
-- **Orchestration:** `.github/workflows/kiba.yml`
-- **Automation:** Workflow runs on push to `main`, weekly schedules, and manual dispatch.
-- **Delivery:** Completed ISOs are automatically uploaded to **SourceForge** from the `main` branch.
+> [!TIP]
+> Not every Windows program will work perfectly — this depends on the program itself, not on KibaOS. Simpler desktop applications tend to work best.
 
-### Building Locally
+### Automatic Updates
 
-Requirements: **Docker**, a Linux host with at least 15 GB free space.
+KibaOS quietly checks for small, official patches in the background and applies them on their own, without interrupting your work. There's generally nothing you need to do — updates just happen.
+
+---
+
+## Building KibaOS Yourself
+
+If you'd like to build your own copy of the KibaOS ISO from source instead of downloading the prebuilt one, you'll need:
+
+- [Docker](https://www.docker.com) installed
+- A Linux computer with at least 15 GB of free disk space
 
 ```bash
 git clone https://github.com/WolfTech-Innovations/Kiba
@@ -220,7 +180,7 @@ docker run --rm --privileged \
 ```
 
 > [!NOTE]
-> The `build.sh` script is generated at build-time by the **GitHub Actions** workflow and contains the full configuration and customization hooks.
+> The `build.sh` script does the real work: it installs Arch Linux's `archiso` tool, configures the Budgie desktop, builds KibaOS's custom graphical installer, sets up automatic updates, and finally packages everything into a bootable ISO file. The official KibaOS releases on SourceForge are built automatically using this exact same script, run by GitHub Actions (a service that builds and tests projects automatically) every time changes are pushed to the project or on a regular weekly schedule.
 
 ---
 
@@ -230,28 +190,29 @@ docker run --rm --privileged \
 Kiba/
 ├── .github/
 │   └── workflows/
-│       └── kiba.yml           # Main build and release workflow
+│       └── kiba.yml           # Tells GitHub Actions when and how to build KibaOS
 ├── branding/
-│   └── kibaos_banner.png      # KibaOS brand assets
-├── docs/                      # In-depth documentation
-└── README.md                  # Project documentation
+│   └── kibaos_banner.png      # KibaOS logo and brand images
+├── build.sh                   # The full build script — the heart of the project
+└── README.md                  # This file
 ```
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. Please open an issue before starting significant work, thanks!
+Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. If you're planning a larger change, please open an issue first so we can talk it through — thanks!
 
 ---
 
 ## License
 
-KibaOS is a distribution, not a single codebase. Individual components are subject to their own licenses. The build scripts and configuration files in this repository are released under the **MIT License**.
+KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Budgie, Wine, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
 ## About
 
-KibaOS is a **WolfTech Innovations** project.
-[Visit our GitHub](https://github.com/WolfTech-Innovations) | [**Acknowledgments**](./ACKNOWLEDGMENTS.md)
+KibaOS is a **Kiba Labs** project.
+
+[Visit our GitHub](https://github.com/WolfTech-Innovations)
