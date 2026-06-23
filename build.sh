@@ -196,15 +196,22 @@ gnome-music
 gnome-todo
 plymouth
 archinstall
+squashfs-tools
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
 # mkinitcpio
 # ══════════════════════════════════════════════════════════════════════════
-# archiso.conf — used only by the LIVE environment (memdisk/archiso hooks)
+# archiso.conf — used only by the LIVE environment (memdisk/archiso hooks).
+# "plymouth" is included so the live boot can show our splash theme, and
+# "kms" so the framebuffer is set up early enough (before "archiso") for
+# plymouth to actually have a surface to draw on. Both must be added here —
+# mkarchiso only ever bakes THIS file's hooks into the live ISO's initramfs
+# (per linux.preset's archiso_config= below); installed.conf is irrelevant
+# to the live build and is never read by mkarchiso.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
-HOOKS=(base udev keyboard keymap modconf memdisk archiso block filesystems)
+HOOKS=(base udev plymouth keyboard keymap modconf kms memdisk archiso block filesystems)
 INITRAMFS
 
 # installed.conf — used by the INSTALLED system after the OOBE installer runs initcpio.
@@ -256,10 +263,51 @@ options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G nomodeset syste
 ENTRY_SAFE
 
 SYSLINUX_CFG="${PROFILE}/syslinux/syslinux.cfg"
+SYSLINUX_HEAD="${PROFILE}/syslinux/archiso_head.cfg"
+SYSLINUX_SYS="${PROFILE}/syslinux/archiso_sys.cfg"
+
+# Cosmetic label renames — note syslinux.cfg itself is releng's top-level
+# file and only contains INCLUDEs; it has no UI/TIMEOUT/MENU directives of
+# its own, so renaming text here does nothing about menu behaviour.
 if [ -f "${SYSLINUX_CFG}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'   "${SYSLINUX_CFG}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g' "${SYSLINUX_CFG}"
-  cat >> "${SYSLINUX_CFG}" << 'SYSLINUX_SAFE'
+fi
+
+# archiso_head.cfg is the file that actually controls whether the BIOS/
+# legacy boot menu shows at all (UI/MENU/TIMEOUT/PROMPT live here in the
+# releng profile, not in syslinux.cfg). Comment out UI so the menu system
+# never activates, set PROMPT 0 and TIMEOUT 0 to auto-boot immediately, and
+# point DEFAULT at our entry — mirroring loader.conf on the UEFI side.
+if [ -f "${SYSLINUX_HEAD}" ]; then
+  sed -i 's/Arch Linux/KibaOS/g'    "${SYSLINUX_HEAD}"
+  sed -i 's/ARCH_[0-9]*/KIBAOS/g'   "${SYSLINUX_HEAD}"
+  sed -i '/^\s*UI /s/^/#/'          "${SYSLINUX_HEAD}"
+  if grep -q '^\s*TIMEOUT' "${SYSLINUX_HEAD}"; then
+    sed -i 's/^\s*TIMEOUT.*/TIMEOUT 0/' "${SYSLINUX_HEAD}"
+  else
+    echo 'TIMEOUT 0' >> "${SYSLINUX_HEAD}"
+  fi
+  if grep -q '^\s*PROMPT' "${SYSLINUX_HEAD}"; then
+    sed -i 's/^\s*PROMPT.*/PROMPT 0/' "${SYSLINUX_HEAD}"
+  else
+    echo 'PROMPT 0' >> "${SYSLINUX_HEAD}"
+  fi
+  if grep -q '^\s*DEFAULT' "${SYSLINUX_HEAD}"; then
+    sed -i 's/^\s*DEFAULT.*/DEFAULT kibaos/' "${SYSLINUX_HEAD}"
+  else
+    echo 'DEFAULT kibaos' >> "${SYSLINUX_HEAD}"
+  fi
+fi
+
+# Boot entries themselves (LABEL ...) live in archiso_sys.cfg for the
+# releng profile. Rename the existing entry's label to "kibaos" to match
+# DEFAULT above, and append our safe-mode entry alongside it.
+if [ -f "${SYSLINUX_SYS}" ]; then
+  sed -i 's/Arch Linux/KibaOS/g'    "${SYSLINUX_SYS}"
+  sed -i 's/ARCH_[0-9]*/KIBAOS/g'   "${SYSLINUX_SYS}"
+  sed -i 's/^LABEL arch$/LABEL kibaos/' "${SYSLINUX_SYS}"
+  cat >> "${SYSLINUX_SYS}" << 'SYSLINUX_SAFE'
 
 LABEL kibaos-safe
   MENU LABEL KibaOS (safe mode)
@@ -414,12 +462,14 @@ sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/login
 # ══════════════════════════════════════════════════════════════════════════
 WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/file_000000004b64720cabf43ce95dda0a0d.png?raw=true"
 LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
+INSTALLER_LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/1419ece4c5c2dbfaa9c0b65f0055b6d70e6b4dbd/branding/installer.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.png"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
 LOGO_256="/usr/share/kibaos/logo-256.png"
 LOGO_96="/usr/share/kibaos/logo-96.png"
 LOGO_48="/usr/share/kibaos/logo-48.png"
 LOGO_32="/usr/share/kibaos/logo-32.png"
+INSTALLER_LOGO="/usr/share/kibaos/installer-logo.png"
 
 mkdir -p /usr/share/kibaos /usr/share/pixmaps
 
@@ -452,6 +502,16 @@ cp "${LOGO_256}" /usr/share/icons/hicolor/256x256/apps/kibaos.png
 cp "${LOGO_48}"  /usr/share/icons/hicolor/48x48/apps/kibaos.png
 cp "${LOGO_32}"  /usr/share/icons/hicolor/32x32/apps/kibaos.png
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
+
+# ── OOBE installer logo — separate art from the generic distro logo above ──
+curl -fL --retry 5 --retry-delay 3 -o "${INSTALLER_LOGO}.raw" "${INSTALLER_LOGO_URL}" || true
+if [ -f "${INSTALLER_LOGO}.raw" ] && file "${INSTALLER_LOGO}.raw" | grep -qi 'image'; then
+  magick "${INSTALLER_LOGO}.raw" -filter Lanczos -resize 256x256 "${INSTALLER_LOGO}"
+  rm -f "${INSTALLER_LOGO}.raw"
+else
+  rm -f "${INSTALLER_LOGO}.raw"
+  cp "${LOGO_256}" "${INSTALLER_LOGO}"   # fallback: reuse the generic logo
+fi
 
 # ══════════════════════════════════════════════════════════════════════════
 # AUR PACKAGES
@@ -727,7 +787,7 @@ public class KibaOOBE : Adw.Application {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 32);
 
         // Logo
-        var logo = new Gtk.Image.from_file ("/usr/share/kibaos/logo-256.png") {
+        var logo = new Gtk.Image.from_file ("/usr/share/kibaos/installer-logo.png") {
             pixel_size = 80,
             halign     = Gtk.Align.START
         };
@@ -1469,7 +1529,8 @@ cat > /usr/local/bin/kibaos-oobe-backend << 'OOBEBACKEND'
 # KibaOS OOBE backend
 # Strategy:
 #   1. archinstall for partition layout + formatting + bootloader
-#   2. rsync the live squashfs onto the new root (preserves ALL KibaOS customisations)
+#   2. unsquashfs the live system image straight onto the new root
+#      (preserves ALL KibaOS customisations, no intermediate mount needed)
 #   3. chroot to configure locale/keymap/hostname/user
 #   4. Remove live-only artefacts (installer, liveuser, autologin, squashfs tools)
 #   5. Enable services, rebuild initramfs
@@ -1609,79 +1670,132 @@ except Exception as e:
     fail(f"Mount failed: {e}\n{traceback.format_exc()}")
 
 # ── 5. Find the live squashfs ────────────────────────────────────────────
+# Auto-locate strategy, in order of preference:
+#   a) ask the kernel directly where the boot medium is mounted (findmnt),
+#      which is correct regardless of archiso version/layout/copytoram state
+#   b) fall back to the conventional archiso path, in case findmnt is for
+#      some reason unavailable this boot
+#   c) last resort: search every real (non-virtual) mounted filesystem for
+#      the image by name, which also covers copytoram (image copied to a
+#      tmpfs under /run) and any non-standard mount point
 progress(18, "Locating KibaOS system image…")
-SQUASHFS_CANDIDATES = [
-    "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs",
-    "/run/archiso/bootmnt/arch/x86_64/airootfs.erofs",
-    "/run/mnt/arch/x86_64/airootfs.sfs",
-]
+
+IMG_NAMES = ("airootfs.sfs", "airootfs.erofs")
 SQUASHFS_SRC = None
-for c in SQUASHFS_CANDIDATES:
-    if pathlib.Path(c).exists():
-        SQUASHFS_SRC = c
-        break
+
+def _scan_dir_for_image(root):
+    for name in IMG_NAMES:
+        for hit in pathlib.Path(root).rglob(name):
+            return str(hit)
+    return None
+
+# (a) Ask the kernel where the boot medium actually is right now.
+try:
+    bootmnt = sp.run(["findmnt", "-n", "-o", "TARGET", "/run/archiso/bootmnt"],
+                      capture_output=True, text=True)
+    if bootmnt.returncode == 0 and bootmnt.stdout.strip():
+        SQUASHFS_SRC = _scan_dir_for_image(bootmnt.stdout.strip())
+except Exception:
+    pass
+
+# (b) Conventional archiso layout, as a quick direct check.
 if not SQUASHFS_SRC:
-    # Last resort: find it
-    r = sp.run(["find", "/run", "-name", "airootfs.sfs", "-o", "-name", "airootfs.erofs"],
-               capture_output=True, text=True)
-    for line in r.stdout.strip().splitlines():
-        if line:
-            SQUASHFS_SRC = line.strip()
+    for c in (
+        "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs",
+        "/run/archiso/bootmnt/arch/x86_64/airootfs.erofs",
+        "/run/archiso/copytoram/arch/x86_64/airootfs.sfs",   # copytoram=y
+        "/run/archiso/copytoram/arch/x86_64/airootfs.erofs",
+        "/run/mnt/arch/x86_64/airootfs.sfs",
+    ):
+        if pathlib.Path(c).exists():
+            SQUASHFS_SRC = c
             break
+
+# (c) Last resort: walk every real mounted filesystem, skipping virtual/
+# pseudo filesystems so this doesn't wander into /proc or /sys forever.
 if not SQUASHFS_SRC:
-    fail("Could not locate the KibaOS system image (airootfs.sfs). "
-         "Make sure you're booted from the KibaOS live USB.")
+    SKIP_FSTYPES = {
+        "proc", "sysfs", "devtmpfs", "devpts", "tmpfs", "cgroup", "cgroup2",
+        "pstore", "bpf", "tracefs", "mqueue", "hugetlbfs", "debugfs",
+        "securityfs", "autofs", "overlay",
+    }
+    try:
+        mounts = sp.run(
+            ["findmnt", "-rno", "TARGET,FSTYPE"], capture_output=True, text=True
+        ).stdout.strip().splitlines()
+    except Exception:
+        mounts = []
+    for line in mounts:
+        parts = line.rsplit(" ", 1)
+        if len(parts) != 2:
+            continue
+        target, fstype = parts
+        if fstype in SKIP_FSTYPES:
+            continue
+        hit = _scan_dir_for_image(target)
+        if hit:
+            SQUASHFS_SRC = hit
+            break
+    # Absolute last resort, in case findmnt itself is unavailable.
+    if not SQUASHFS_SRC:
+        SQUASHFS_SRC = _scan_dir_for_image("/run") or _scan_dir_for_image("/mnt")
+
+if not SQUASHFS_SRC:
+    fail("Could not locate the KibaOS system image (airootfs.sfs/.erofs) on "
+         "any mounted filesystem. Make sure you're booted from the KibaOS "
+         "live USB and that the USB drive is still connected.")
 
 tee(f"  squashfs: {SQUASHFS_SRC}")
 
-# ── 6. Mount squashfs and rsync to new root ──────────────────────────────
+# ── 6. Extract squashfs straight onto the new root with unsquashfs ───────
+# unsquashfs extracts the image directly — no intermediate mount needed,
+# and no copy of "live-session-only" runtime state (since the source here
+# is the pristine image file, not the live overlay filesystem in use right
+# now). This also avoids relying on rsync's flaky live percentage parsing
+# and unsquashfs's own progress bar (which is known to behave erratically
+# when stdout isn't a real terminal), so progress is reported in coarse,
+# honest steps instead of a fabricated live percentage.
 progress(22, "Copying KibaOS to your computer (this takes a few minutes)…")
-SQMNT = pathlib.Path(tempfile.mkdtemp(prefix="kibaos-sq-"))
 try:
     fs_type = "squashfs" if SQUASHFS_SRC.endswith(".sfs") else "erofs"
-    run(["mount", "-t", fs_type, "-o", "loop,ro", SQUASHFS_SRC, str(SQMNT)])
-except Exception as e:
-    fail(f"Could not mount system image: {e}")
-
-try:
-    # rsync with progress — parse % for the UI
-    proc = sp.Popen(
-        [
-            "rsync", "-aHAX",
-            "--info=progress2",
-            "--exclude=/run/*",
-            "--exclude=/proc/*",
-            "--exclude=/sys/*",
-            "--exclude=/dev/*",
-            "--exclude=/tmp/*",
-            "--exclude=/home/liveuser",           # live session home
-            "--exclude=/root/.bash_history",
-            str(SQMNT) + "/",
-            str(MNT) + "/",
-        ],
-        stdout=sp.PIPE, stderr=log_fh, text=True
-    )
-    for line in proc.stdout:
-        line = line.rstrip()
-        if not line:
-            continue
-        tee(line)
-        # parse "  1,234,567  42%  12.34MB/s    0:00:05"
-        import re
-        m = re.search(r'(\d+)%', line)
-        if m:
-            pct = int(m.group(1))
-            progress(22 + pct * 48 // 100, f"Copying files… {pct}%")
-    proc.wait()
-    if proc.returncode not in (0, 23, 24):   # 23/24 = partial/vanished (ok)
-        fail(f"rsync exited with code {proc.returncode}")
+    if fs_type == "squashfs":
+        # -f: overwrite MNT (already exists, since partitions are mounted there)
+        # -d: destination, -no-progress: avoid the unreliable live progress bar
+        r = sp.run(
+            ["unsquashfs", "-f", "-d", str(MNT), "-no-progress", SQUASHFS_SRC],
+            capture_output=True, text=True,
+        )
+        tee(r.stdout)
+        if r.returncode == 1:   # 1 = fatal; 0 = ok; other non-zero = non-fatal warnings
+            fail(f"unsquashfs failed (exit {r.returncode}): {r.stderr.strip()}")
+        elif r.returncode != 0:
+            tee(f"  unsquashfs warnings (non-fatal, exit {r.returncode}): {r.stderr.strip()}")
+    else:
+        # EROFS has no "unsquash"-style extractor; mount it read-only and
+        # copy out, since there's no image-to-image extraction tool for it.
+        SQMNT = pathlib.Path(tempfile.mkdtemp(prefix="kibaos-sq-"))
+        try:
+            run(["mount", "-t", "erofs", "-o", "loop,ro", SQUASHFS_SRC, str(SQMNT)])
+            run(["cp", "-a", "-T", str(SQMNT), str(MNT)])
+        finally:
+            sp.run(["umount", str(SQMNT)], capture_output=True)
+            SQMNT.rmdir()
 except Exception as e:
     fail(f"File copy failed: {e}\n{traceback.format_exc()}")
-finally:
-    sp.run(["umount", str(SQMNT)], capture_output=True)
-    SQMNT.rmdir()
 
 progress(72, "Finalising system…")
+
+# Live-session-only leftovers that legitimately belong in the image (since
+# it's the same files the live session boots from) but never the installed
+# system. rsync used to handle this via --exclude; unsquashfs has no such
+# flag, so remove these explicitly now that they're extracted.
+import shutil as _shutil
+for leftover in ("home/liveuser", "root/.bash_history"):
+    p = MNT / leftover
+    if p.is_dir():
+        _shutil.rmtree(p, ignore_errors=True)
+    elif p.exists():
+        p.unlink(missing_ok=True)
 
 # ── 7. Bind-mount kernel filesystems for chroot ──────────────────────────
 for fs in ["proc", "sys", "dev"]:
@@ -1772,9 +1886,14 @@ try:
         elif p.exists():
             p.unlink(missing_ok=True)
 
-    # Remove archiso-specific packages if installed (squashfs-tools, mkinitcpio-archiso)
-    chroot(["pacman", "-Rns", "--noconfirm",
-            "archiso", "mkinitcpio-archiso", "squashfs-tools"])
+    # Remove archiso-specific packages if installed (best-effort: "archiso" and
+    # "squashfs-tools" are build-host-only packages, not part of packages.x86_64,
+    # so they aren't actually installed in the airootfs. pacman -R treats all
+    # targets atomically — one missing target fails the whole command and removes
+    # nothing, which previously aborted the install here. Use a non-raising call.)
+    sp.run(["arch-chroot", str(MNT), "pacman", "-Rns", "--noconfirm",
+            "archiso", "mkinitcpio-archiso", "squashfs-tools"],
+           capture_output=True)
 
     # Remove "Install KibaOS" from SDDM / app menu on the installed system
     sp.run(["arch-chroot", str(MNT),
@@ -2053,10 +2172,15 @@ ShowDelay=0
 DeviceTimeout=8
 PLYMOUTHD
 
-# Set theme THEN rebuild initramfs so the hook embeds the correct theme
+# Set the theme now so it's in place before mkarchiso runs its own
+# mkinitcpio pass over linux.preset (archiso_config=archiso.conf, set above
+# with the plymouth/kms hooks already added). We do NOT manually re-run
+# mkinitcpio here: mkarchiso always rebuilds /boot/initramfs-linux.img from
+# linux.preset right after customize_airootfs.sh finishes, so any manual
+# rebuild in here just gets overwritten — and running it against the wrong
+# config (installed.conf, which is for the INSTALLED system, not this live
+# ISO) was actively wrong on top of being redundant.
 plymouth-set-default-theme kibaos 2>/dev/null || true
-mkinitcpio -c /etc/mkinitcpio.conf.d/installed.conf \
-           -g /boot/initramfs-linux.img 2>/dev/null || true
 echo "=== Boot splash: Plymouth kibaos theme installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
