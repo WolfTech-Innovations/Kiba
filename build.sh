@@ -594,7 +594,7 @@ echo "=== AUR packages installed ==="
 
 mkdir -p /usr/share/kibaos-oobe/src
 echo "=== Installing GTK4/libadwaita OOBE build dependencies ==="
-pacman -S --noconfirm --needed gtk4 libadwaita libgee vala meson ninja rsync polkit gptfdisk arch-install-scripts dosfstools
+pacman -S --noconfirm --needed gtk4 libadwaita libgee vala meson ninja rsync polkit gptfdisk arch-install-scripts dosfstools squashfs-tools erofs-utils
 
 # ── main.vala ────────────────────────────────────────────────────────────
 cat > /usr/share/kibaos-oobe/src/main.vala << 'OOBEVALA'
@@ -1188,23 +1188,25 @@ public class KibaOOBE : Adw.Application {
     // Backend plumbing
     // ══════════════════════════════════════════════════════════════════
     private void start_oem_finish () {
-        string cmd = "pkexec /usr/local/bin/kibaos-oem-finish.sh '%s' '%s' '%s' '%s' '%s'".printf (
+        string[] argv = {
+            "pkexec", "/usr/local/bin/kibaos-oem-finish.sh",
             selected_locale, selected_keymap, hostname_value,
-            username_value, password_value);
-        launch_backend (cmd);
+            username_value, password_value
+        };
+        launch_backend (argv);
     }
 
     private void start_install () {
-        string cmd = "pkexec /usr/local/bin/kibaos-oobe-backend '%s' '%s' '%s' '%s' '%s' '%s'".printf (
+        string[] argv = {
+            "pkexec", "/usr/local/bin/kibaos-oobe-backend",
             selected_disk, selected_locale, selected_keymap,
-            hostname_value, username_value, password_value);
-        launch_backend (cmd);
+            hostname_value, username_value, password_value
+        };
+        launch_backend (argv);
     }
 
-    private void launch_backend (string cmd) {
+    private void launch_backend (string[] argv) {
         try {
-            string[] argv;
-            GLib.Shell.parse_argv (cmd, out argv);
             var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
             var proc     = launcher.spawnv (argv);
             read_backend_output.begin (
@@ -1523,108 +1525,1007 @@ ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check th
 ninja -C build install
 cd /
 
-# ── Privileged backend script ─────────────────────────────────────────────
-cat > /usr/local/bin/kibaos-oobe-backend << 'OOBEBACKEND'
-#!/usr/bin/env python3
-# KibaOS OOBE backend
-# Strategy:
-#   1. archinstall for partition layout + formatting + bootloader
-#   2. unsquashfs the live system image straight onto the new root
-#      (preserves ALL KibaOS customisations, no intermediate mount needed)
-#   3. chroot to configure locale/keymap/hostname/user
-#   4. Remove live-only artefacts (installer, liveuser, autologin, squashfs tools)
-#   5. Enable services, rebuild initramfs
+# ═══════════════════════════════════════════════════════════════════════════
+# KIBAOS C INSTALLER BACKEND
+# Replaces the former Python/archinstall backend with a compiled C binary
+# (kiba_install_extract.c + kiba_install_finish.c) for image extraction,
+# config writing, bootloader install, and service enablement.
+# Partitioning is done in a small bash helper (kiba-partition.sh) which uses
+# only sgdisk + mkfs.fat/mkfs.ext4 — no archinstall dependency at all.
+# The Vala frontend continues to call pkexec /usr/local/bin/kibaos-oobe-backend
+# with the same argument signature: <disk> <locale> <keymap> <hostname> <user> <pass>
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── kiba_install.h ────────────────────────────────────────────────────────
+cat > /usr/share/kibaos-oobe/src/kiba_install.h << 'KIBAINSTH'
+/* kiba_install.h — shared types and function declarations for the KibaOS
+ * C installer backend.
+ *
+ * Design:
+ *   • kiba_install_extract.c  — squashfs/erofs image location and extraction
+ *   • kiba_install_finish.c   — fstab/hostname/locale/user/bootloader/services
+ *   • kiba_install_main.c     — entry point: partition+format shell helper,
+ *                               then drives extract→finish, emits PROGRESS lines
+ *
+ * All public functions return 0 on success, -1 on error.
+ * kiba_install_strerror() returns a human-readable description of the last
+ * error from either translation unit.
+ *
+ * Progress callback: cb(percent 0-100, message, user_data).
+ */
+#pragma once
+#include <stdbool.h>
+#include <stddef.h>
+#include <sys/stat.h>
+
+typedef void (*kiba_progress_cb)(int percent, const char *msg, void *user_data);
+
+/* ── extract ── */
+const char *kiba_install_strerror(void);
+bool        kiba_find_live_image(char *out_path, size_t out_len);
+int         kiba_install_extract_image(const char *image_path,
+                                       const char *target_root,
+                                       kiba_progress_cb cb, void *user_data);
+
+/* ── finish ── */
+int kiba_install_write_configs(const char *target_root,
+                               const char *root_uuid, const char *esp_uuid,
+                               const char *hostname, const char *locale,
+                               const char *keymap);
+int kiba_install_locale_gen(const char *target_root);
+int kiba_install_create_user(const char *target_root, const char *username,
+                              const char *password);
+int kiba_install_finalize(const char *target_root, const char *disk_path,
+                           const char *root_part,
+                           kiba_progress_cb cb, void *user_data);
+KIBAINSTH
+
+# ── kiba_udev.h — GPT PARTUUID reader ────────────────────────────────────
+# kiba_read_partuuid_direct() reads the GUID of partition <partno> (1-based)
+# straight from the GPT on disk, avoiding any blkid/udev subprocess.
+# Returns true and writes a lowercase UUID string on success.
+cat > /usr/share/kibaos-oobe/src/kiba_udev.h << 'KIBAUDEVH'
+#pragma once
+#include <stdbool.h>
+#include <stddef.h>
+
+bool kiba_read_partuuid_direct(const char *disk_path, int partno,
+                                char *out_uuid, size_t out_len);
+KIBAUDEVH
+
+# ── kiba_udev.c — GPT PARTUUID reader implementation ─────────────────────
+cat > /usr/share/kibaos-oobe/src/kiba_udev.c << 'KIBAUDEVC'
+/* kiba_udev.c — read a GPT partition's PARTUUID directly from the disk.
+ *
+ * The GPT header lives at LBA 1 (byte offset 512 on a 512-byte-sector disk).
+ * Each partition entry is 128 bytes; the partition GUID occupies bytes 16-31
+ * of each entry. The GPT GUID is stored in mixed-endian format (Microsoft
+ * "GUID" layout): the first three components are little-endian, the last two
+ * are big-endian — matching how blkid/the kernel report PARTUUID.
+ */
+#define _GNU_SOURCE
+#include "kiba_udev.h"
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+/* GPT header at LBA 1 */
+#define GPT_HEADER_OFFSET    512
+/* Partition array starts at LBA 2 */
+#define GPT_PARTS_OFFSET     1024
+/* Each partition entry is 128 bytes */
+#define GPT_ENTRY_SIZE       128
+/* The partition GUID is at byte 16 within each entry */
+#define GPT_ENTRY_GUID_OFF   16
+
+bool kiba_read_partuuid_direct(const char *disk_path, int partno,
+                                char *out_uuid, size_t out_len) {
+    if (partno < 1 || partno > 128) return false;
+
+    int fd = open(disk_path, O_RDONLY);
+    if (fd < 0) return false;
+
+    /* Seek to the partition entry for <partno> (1-based). */
+    off_t entry_off = (off_t)GPT_PARTS_OFFSET +
+                      (off_t)(partno - 1) * GPT_ENTRY_SIZE +
+                      (off_t)GPT_ENTRY_GUID_OFF;
+
+    uint8_t guid[16];
+    if (lseek(fd, entry_off, SEEK_SET) < 0) { close(fd); return false; }
+    ssize_t n = read(fd, guid, 16);
+    close(fd);
+    if (n != 16) return false;
+
+    /* GPT GUID mixed-endian → standard UUID string:
+     *   data1 (4 bytes LE) - data2 (2 bytes LE) - data3 (2 bytes LE)
+     *   - data4[0..1] (BE) - data4[2..7] (BE)
+     */
+    snprintf(out_uuid, out_len,
+             "%02x%02x%02x%02x"
+             "-%02x%02x"
+             "-%02x%02x"
+             "-%02x%02x"
+             "-%02x%02x%02x%02x%02x%02x",
+             guid[3], guid[2], guid[1], guid[0],   /* data1 LE */
+             guid[5], guid[4],                      /* data2 LE */
+             guid[7], guid[6],                      /* data3 LE */
+             guid[8], guid[9],                      /* data4[0..1] BE */
+             guid[10], guid[11], guid[12],
+             guid[13], guid[14], guid[15]);
+    return true;
+}
+KIBAUDEVC
+
+# ── kiba_install_extract.c ────────────────────────────────────────────────
+cat > /usr/share/kibaos-oobe/src/kiba_install_extract.c << 'KIBAEXTRACTC'
+/* kiba_install_extract.c — squashfs/erofs location and extraction. */
+#define _GNU_SOURCE
+#include "kiba_install.h"
+
+#include <dirent.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <spawn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+extern char **environ;
+
+static char g_install_err[256] = "no error";
+const char *kiba_install_strerror(void) { return g_install_err; }
+
+static int run_argv(char *const argv[]) {
+    pid_t pid;
+    int rc = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+    if (rc != 0) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "failed to spawn %s: %s", argv[0], strerror(rc));
+        return -1;
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "waitpid failed for %s: %s", argv[0], strerror(errno));
+        return -1;
+    }
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return 0;
+    if (WIFEXITED(status)) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "%s exited with status %d", argv[0], WEXITSTATUS(status));
+    } else if (WIFSIGNALED(status)) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "%s killed by signal %d", argv[0], WTERMSIG(status));
+    } else {
+        snprintf(g_install_err, sizeof(g_install_err), "%s terminated abnormally", argv[0]);
+    }
+    return -1;
+}
+
+static int run_argv_tolerant(char *const argv[], int max_nonfatal_exit) {
+    pid_t pid;
+    int rc = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+    if (rc != 0) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "failed to spawn %s: %s", argv[0], strerror(rc));
+        return -1;
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "waitpid failed for %s: %s", argv[0], strerror(errno));
+        return -1;
+    }
+    if (WIFEXITED(status)) {
+        int code = WEXITSTATUS(status);
+        if (code <= max_nonfatal_exit) return code;
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "%s exited with fatal status %d", argv[0], code);
+        return -1;
+    }
+    snprintf(g_install_err, sizeof(g_install_err), "%s terminated abnormally", argv[0]);
+    return -1;
+}
+
+static bool scan_dir_for_image(const char *root, char *out_path, size_t out_len, int max_depth) {
+    static const char *names[] = { "airootfs.sfs", "airootfs.erofs" };
+    DIR *d = opendir(root);
+    if (!d) return false;
+    struct dirent *ent;
+    bool found = false;
+    while (!found && (ent = readdir(d)) != NULL) {
+        if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+        char full[4096];
+        snprintf(full, sizeof(full), "%s/%s", root, ent->d_name);
+        struct stat st;
+        if (lstat(full, &st) != 0) continue;
+        if (S_ISREG(st.st_mode)) {
+            for (size_t i = 0; i < sizeof(names)/sizeof(names[0]); i++) {
+                if (strcmp(ent->d_name, names[i]) == 0) {
+                    snprintf(out_path, out_len, "%s", full);
+                    found = true;
+                    break;
+                }
+            }
+        } else if (S_ISDIR(st.st_mode) && max_depth > 0) {
+            if (scan_dir_for_image(full, out_path, out_len, max_depth - 1)) found = true;
+        }
+    }
+    closedir(d);
+    return found;
+}
+
+static bool mountinfo_find_target(const char *target_path, char *out_target, size_t out_len) {
+    FILE *f = fopen("/proc/self/mountinfo", "r");
+    if (!f) return false;
+    char line[4096];
+    bool found = false;
+    while (fgets(line, sizeof(line), f)) {
+        char *fields[16] = {0};
+        int n = 0;
+        char *tok = strtok(line, " ");
+        while (tok && n < 16) { fields[n++] = tok; tok = strtok(NULL, " "); }
+        if (n < 5) continue;
+        if (strcmp(fields[4], target_path) == 0) {
+            snprintf(out_target, out_len, "%s", target_path);
+            found = true;
+            break;
+        }
+    }
+    fclose(f);
+    return found;
+}
+
+bool kiba_find_live_image(char *out_path, size_t out_len) {
+    char bootmnt[256];
+    if (mountinfo_find_target("/run/archiso/bootmnt", bootmnt, sizeof(bootmnt))) {
+        if (scan_dir_for_image(bootmnt, out_path, out_len, 6)) return true;
+    }
+    static const char *conventional[] = {
+        "/run/archiso/bootmnt/arch/x86_64/airootfs.sfs",
+        "/run/archiso/bootmnt/arch/x86_64/airootfs.erofs",
+        "/run/archiso/copytoram/arch/x86_64/airootfs.sfs",
+        "/run/archiso/copytoram/arch/x86_64/airootfs.erofs",
+        "/run/mnt/arch/x86_64/airootfs.sfs",
+    };
+    for (size_t i = 0; i < sizeof(conventional)/sizeof(conventional[0]); i++) {
+        struct stat st;
+        if (stat(conventional[i], &st) == 0) {
+            snprintf(out_path, out_len, "%s", conventional[i]);
+            return true;
+        }
+    }
+    if (scan_dir_for_image("/run", out_path, out_len, 8)) return true;
+    if (scan_dir_for_image("/mnt", out_path, out_len, 8)) return true;
+    return false;
+}
+
+int kiba_install_extract_image(const char *image_path, const char *target_root,
+                                kiba_progress_cb cb, void *user_data) {
+    if (cb) cb(22, "Copying KibaOS to your computer (this takes a few minutes)...", user_data);
+    size_t len = strlen(image_path);
+    bool is_squashfs = (len >= 4 && strcmp(image_path + len - 4, ".sfs") == 0);
+    if (is_squashfs) {
+        char *argv[] = {
+            (char *)"unsquashfs", (char *)"-f", (char *)"-d", (char *)target_root,
+            (char *)"-no-progress", (char *)image_path, NULL
+        };
+        int rc = run_argv_tolerant(argv, 255);
+        if (rc < 0) return -1;
+        if (rc == 1) { snprintf(g_install_err, sizeof(g_install_err), "unsquashfs fatal error"); return -1; }
+        return 0;
+    } else {
+        char tmp_mnt[] = "/tmp/kiba-erofs-XXXXXX";
+        if (!mkdtemp(tmp_mnt)) {
+            snprintf(g_install_err, sizeof(g_install_err), "mkdtemp failed: %s", strerror(errno));
+            return -1;
+        }
+        if (mount(image_path, tmp_mnt, "erofs", MS_RDONLY, "loop") != 0) {
+            snprintf(g_install_err, sizeof(g_install_err), "erofs mount failed: %s", strerror(errno));
+            rmdir(tmp_mnt);
+            return -1;
+        }
+        char *argv[] = { (char *)"cp", (char *)"-a", (char *)"-T", tmp_mnt, (char *)target_root, NULL };
+        int rc = run_argv(argv);
+        umount2(tmp_mnt, 0);
+        rmdir(tmp_mnt);
+        return rc;
+    }
+}
+KIBAEXTRACTC
+
+# ── kiba_install_finish.c ─────────────────────────────────────────────────
+cat > /usr/share/kibaos-oobe/src/kiba_install_finish.c << 'KIBAFINISHC'
+/* kiba_install_finish.c — configs, user account, bootloader, finalize. */
+#define _GNU_SOURCE
+#include "kiba_install.h"
+#include "kiba_udev.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <spawn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+extern char **environ;
+extern const char *kiba_install_strerror(void);
+
+static char g_finish_err[256] = "no error";
+
+static int run_argv(char *const argv[]) {
+    pid_t pid;
+    int rc = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+    if (rc != 0) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "failed to spawn %s: %s", argv[0], strerror(rc));
+        return -1;
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "waitpid failed for %s: %s", argv[0], strerror(errno));
+        return -1;
+    }
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return 0;
+    if (WIFEXITED(status)) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "%s exited with status %d", argv[0], WEXITSTATUS(status));
+    } else {
+        snprintf(g_finish_err, sizeof(g_finish_err), "%s terminated abnormally", argv[0]);
+    }
+    return -1;
+}
+
+static int run_argv_with_stdin(char *const argv[], const char *stdin_data) {
+    int pipefd[2];
+    if (pipe(pipefd) != 0) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "pipe() failed: %s", strerror(errno));
+        return -1;
+    }
+    posix_spawn_file_actions_t actions;
+    posix_spawn_file_actions_init(&actions);
+    posix_spawn_file_actions_adddup2(&actions, pipefd[0], STDIN_FILENO);
+    posix_spawn_file_actions_addclose(&actions, pipefd[1]);
+    pid_t pid;
+    int rc = posix_spawnp(&pid, argv[0], &actions, NULL, argv, environ);
+    posix_spawn_file_actions_destroy(&actions);
+    close(pipefd[0]);
+    if (rc != 0) {
+        close(pipefd[1]);
+        snprintf(g_finish_err, sizeof(g_finish_err), "failed to spawn %s: %s", argv[0], strerror(rc));
+        return -1;
+    }
+    size_t len = strlen(stdin_data);
+    size_t written = 0;
+    while (written < len) {
+        ssize_t w = write(pipefd[1], stdin_data + written, len - written);
+        if (w < 0) { if (errno == EINTR) continue; break; }
+        written += (size_t)w;
+    }
+    close(pipefd[1]);
+    int status = 0;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) return 0;
+    snprintf(g_finish_err, sizeof(g_finish_err), "%s failed (chpasswd)", argv[0]);
+    return -1;
+}
+
+static int chroot_run(const char *target_root, char *const inner_argv[]) {
+    char *argv[16];
+    int i = 0;
+    argv[i++] = (char *)"arch-chroot";
+    argv[i++] = (char *)target_root;
+    for (int j = 0; inner_argv[j] != NULL && i < 14; j++) argv[i++] = inner_argv[j];
+    argv[i] = NULL;
+    return run_argv(argv);
+}
+
+static int write_file(const char *path, const char *content) {
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd < 0) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "open(%s) failed: %s", path, strerror(errno));
+        return -1;
+    }
+    size_t len = strlen(content);
+    ssize_t w = write(fd, content, len);
+    close(fd);
+    if (w != (ssize_t)len) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "write(%s) failed: %s", path, strerror(errno));
+        return -1;
+    }
+    return 0;
+}
+
+int kiba_install_write_configs(const char *target_root,
+                                const char *root_uuid, const char *esp_uuid,
+                                const char *hostname, const char *locale,
+                                const char *keymap) {
+    char path[1024];
+    char content[2048];
+
+    snprintf(path, sizeof(path), "%s/etc/fstab", target_root);
+    snprintf(content, sizeof(content),
+              "# KibaOS fstab — generated by installer\n"
+              "UUID=%s  /      ext4  defaults,noatime  0 1\n"
+              "UUID=%s  /boot  vfat  umask=0077        0 2\n",
+              root_uuid, esp_uuid);
+    if (write_file(path, content) != 0) return -1;
+
+    snprintf(path, sizeof(path), "%s/etc/hostname", target_root);
+    snprintf(content, sizeof(content), "%s\n", hostname);
+    if (write_file(path, content) != 0) return -1;
+
+    snprintf(path, sizeof(path), "%s/etc/hosts", target_root);
+    snprintf(content, sizeof(content),
+              "127.0.0.1   localhost\n"
+              "::1         localhost\n"
+              "127.0.1.1   %s.localdomain %s\n",
+              hostname, hostname);
+    if (write_file(path, content) != 0) return -1;
+
+    snprintf(path, sizeof(path), "%s/etc/locale.gen", target_root);
+    {
+        FILE *f = fopen(path, "r");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long sz = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            char *buf = malloc((size_t)sz + 1);
+            if (buf) {
+                fread(buf, 1, (size_t)sz, f);
+                buf[sz] = 0;
+                fclose(f);
+                char needle[300];
+                snprintf(needle, sizeof(needle), "#%s", locale);
+                char *pos = strstr(buf, needle);
+                if (pos) memmove(pos, pos + 1, strlen(pos + 1) + 1);
+                FILE *fw = fopen(path, "w");
+                if (fw) { fwrite(buf, 1, strlen(buf), fw); fclose(fw); }
+                free(buf);
+            } else {
+                fclose(f);
+            }
+        }
+    }
+
+    snprintf(path, sizeof(path), "%s/etc/locale.conf", target_root);
+    snprintf(content, sizeof(content), "LANG=%s\n", locale);
+    if (write_file(path, content) != 0) return -1;
+
+    snprintf(path, sizeof(path), "%s/etc/vconsole.conf", target_root);
+    snprintf(content, sizeof(content), "KEYMAP=%s\n", keymap);
+    if (write_file(path, content) != 0) return -1;
+
+    return 0;
+}
+
+int kiba_install_locale_gen(const char *target_root) {
+    char *argv[] = { (char *)"locale-gen", NULL };
+    if (chroot_run(target_root, argv) != 0) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "locale-gen failed");
+        return -1;
+    }
+    return 0;
+}
+
+int kiba_install_create_user(const char *target_root, const char *username,
+                              const char *password) {
+    char path[1024];
+    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos-live.conf", target_root);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/autologin.conf", target_root);
+    unlink(path);
+
+    {
+        char *argv[] = { (char *)"userdel", (char *)"-r", (char *)"liveuser", NULL };
+        chroot_run(target_root, argv);
+    }
+    {
+        char *argv[] = {
+            (char *)"useradd", (char *)"-m",
+            (char *)"-G", (char *)"wheel,audio,video,input,network,storage,power",
+            (char *)"-s", (char *)"/bin/bash",
+            (char *)username, NULL
+        };
+        chroot_run(target_root, argv);
+    }
+    {
+        char stdin_data[512];
+        snprintf(stdin_data, sizeof(stdin_data), "%s:%s\n", username, password);
+        char *argv[] = { (char *)"arch-chroot", (char *)target_root, (char *)"chpasswd", NULL };
+        if (run_argv_with_stdin(argv, stdin_data) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "chpasswd failed");
+            return -1;
+        }
+    }
+    return 0;
+}
+
+int kiba_install_finalize(const char *target_root, const char *disk_path,
+                           const char *root_part, kiba_progress_cb cb, void *user_data) {
+    (void)disk_path;
+    char path[1024];
+
+    if (cb) cb(80, "Removing live-only tools...", user_data);
+
+    static const char *live_only[] = {
+        "usr/share/applications/kibaos-install.desktop",
+        "usr/bin/io.kibaos.oobe",
+        "usr/share/kibaos-oobe",
+        "usr/local/bin/kibaos-oobe-backend",
+        "usr/local/bin/kibaos-oem-finish.sh",
+        "etc/systemd/system/choose-mirror.service",
+        "usr/share/libalpm/hooks/Installation_guide.hook",
+        "root/customize_airootfs.sh",
+        "root/install.txt",
+        "etc/motd",
+        "etc/issue",
+    };
+    for (size_t i = 0; i < sizeof(live_only)/sizeof(live_only[0]); i++) {
+        snprintf(path, sizeof(path), "%s/%s", target_root, live_only[i]);
+        char *argv[] = { (char *)"rm", (char *)"-rf", path, NULL };
+        run_argv(argv);
+    }
+
+    {
+        char *argv[] = {
+            (char *)"pacman", (char *)"-Rns", (char *)"--noconfirm",
+            (char *)"archiso", (char *)"mkinitcpio-archiso", (char *)"squashfs-tools", NULL
+        };
+        chroot_run(target_root, argv);
+    }
+
+    if (cb) cb(84, "Installing bootloader...", user_data);
+    {
+        char *argv[] = { (char *)"bootctl", (char *)"--esp-path=/boot", (char *)"install", NULL };
+        if (chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
+            return -1;
+        }
+    }
+
+    snprintf(path, sizeof(path), "%s/boot/EFI/systemd/splash-arch.bmp", target_root);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s/usr/share/systemd/bootctl/splash-arch.bmp", target_root);
+    unlink(path);
+
+    snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
+    write_file(path,
+               "default kibaos.conf\n"
+               "timeout 0\n"
+               "console-mode max\n"
+               "editor no\n"
+               "auto-entries no\n");
+
+    char partuuid[64];
+    if (!kiba_read_partuuid_direct(disk_path, 2, partuuid, sizeof(partuuid))) {
+        snprintf(g_finish_err, sizeof(g_finish_err), "could not read root PARTUUID");
+        return -1;
+    }
+
+    snprintf(path, sizeof(path), "%s/boot/loader/entries/kibaos.conf", target_root);
+    {
+        FILE *f = fopen(path, "r");
+        char *buf = NULL;
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long sz = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            buf = malloc((size_t)sz + 256);
+            if (buf) { fread(buf, 1, (size_t)sz, f); buf[sz] = 0; }
+            fclose(f);
+        }
+        if (buf && strstr(buf, "PARTUUID=PLACEHOLDER")) {
+            char *out = malloc(strlen(buf) + 64);
+            char *p = strstr(buf, "PARTUUID=PLACEHOLDER");
+            size_t prefix_len = (size_t)(p - buf);
+            memcpy(out, buf, prefix_len);
+            int n = sprintf(out + prefix_len, "PARTUUID=%s", partuuid);
+            strcpy(out + prefix_len + n, p + strlen("PARTUUID=PLACEHOLDER"));
+            write_file(path, out);
+            free(out);
+        } else {
+            char fallback[1024];
+            snprintf(fallback, sizeof(fallback),
+                      "title   KibaOS\n"
+                      "linux   /vmlinuz-linux\n"
+                      "initrd  /initramfs-linux.img\n"
+                      "options root=PARTUUID=%s rw quiet splash loglevel=3 "
+                      "rd.udev.log_level=3 vt.global_cursor_default=0 "
+                      "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\n",
+                      partuuid);
+            write_file(path, fallback);
+        }
+        free(buf);
+    }
+
+    {
+        char *argv1[] = { (char *)"bootctl", (char *)"set-timeout", (char *)"", NULL };
+        chroot_run(target_root, argv1);
+        char *argv2[] = { (char *)"bootctl", (char *)"set-default", (char *)"", NULL };
+        chroot_run(target_root, argv2);
+    }
+
+    if (cb) cb(88, "Enabling services...", user_data);
+    {
+        static const char *services[] = {
+            "NetworkManager", "sddm", "bluetooth",
+            "systemd-timesyncd", "systemd-time-wait-sync",
+        };
+        for (size_t i = 0; i < sizeof(services)/sizeof(services[0]); i++) {
+            char *argv[] = { (char *)"systemctl", (char *)"enable", (char *)services[i], NULL };
+            chroot_run(target_root, argv);
+        }
+    }
+
+    if (cb) cb(91, "Applying boot theme...", user_data);
+    snprintf(path, sizeof(path), "%s/etc/plymouth", target_root);
+    mkdir(path, 0755);
+    snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
+    write_file(path, "[Daemon]\nTheme=kibaos\nShowDelay=0\nDeviceTimeout=8\n");
+    {
+        char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"kibaos", NULL };
+        chroot_run(target_root, argv);
+    }
+
+    if (cb) cb(94, "Rebuilding initramfs...", user_data);
+    {
+        char *argv[] = {
+            (char *)"mkinitcpio", (char *)"-c", (char *)"/etc/mkinitcpio.conf.d/installed.conf",
+            (char *)"-g", (char *)"/boot/initramfs-linux.img", NULL
+        };
+        if (chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "mkinitcpio failed");
+            return -1;
+        }
+    }
+
+    snprintf(path, sizeof(path), "%s/etc/sudoers.d/wheel", target_root);
+    write_file(path, "%wheel ALL=(ALL:ALL) ALL\n");
+    chmod(path, 0440);
+
+    (void)root_part;
+    return 0;
+}
+KIBAFINISHC
+
+# ── kiba_install_main.c — entry point ────────────────────────────────────
+# Drives the full install sequence:
+#   1. Shell out to kiba-partition.sh for GPT/mkfs/mount (stays in bash
+#      because sgdisk/mkfs.fat/mkfs.ext4 are stable POSIX tools with no
+#      useful C API surface worth wrapping here).
+#   2. kiba_find_live_image → kiba_install_extract_image
+#   3. Unmount /proc/sys/dev inside new root (left open by bind-mount phase)
+#   4. blkid UUID read via shell (udevadm settle first to avoid the race)
+#   5. kiba_install_write_configs / locale_gen / create_user
+#   6. kiba_install_finalize (bootloader, services, mkinitcpio)
+#   7. Unmount target and print PROGRESS 100 Done
 #
-# Emits "PROGRESS <0-100> <message>" to stdout; everything else -> log file.
-import sys, subprocess as sp, pathlib, traceback, shutil, os, tempfile
+# Emits "PROGRESS <0-100> <message>\n" to stdout so the Vala frontend can
+# update the progress bar — identical contract to the old Python backend.
+cat > /usr/share/kibaos-oobe/src/kiba_install_main.c << 'KIBAMAINC'
+/* kiba_install_main.c — KibaOS installer backend entry point. */
+#define _GNU_SOURCE
+#include "kiba_install.h"
 
-LOG = pathlib.Path("/var/log/kibaos-oobe.log")
-LOG.parent.mkdir(parents=True, exist_ok=True)
-log_fh = open(LOG, "a")
+#include <errno.h>
+#include <fcntl.h>
+#include <spawn.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mount.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
-def tee(msg):
-    print(msg, flush=True)
-    print(msg, file=log_fh, flush=True)
+#define MNT "/mnt/kibaos-install"
+#define LOG "/var/log/kibaos-oobe.log"
 
-def progress(pct, msg):
-    tee(f"PROGRESS {pct} {msg}")
+extern char **environ;
 
-def fail(msg):
-    progress(100, f"Install failed: {msg}")
-    tee(f"FATAL: {msg}")
-    sys.exit(1)
+static FILE *g_log = NULL;
 
-def run(cmd, **kw):
-    """Run a command, log it, raise on non-zero exit."""
-    tee(f"  $ {' '.join(cmd) if isinstance(cmd, list) else cmd}")
-    r = sp.run(cmd, capture_output=True, text=True, **kw)
-    if r.stdout: tee(r.stdout.rstrip())
-    if r.stderr: tee(r.stderr.rstrip())
-    if r.returncode != 0:
-        raise RuntimeError(f"Command failed (exit {r.returncode}): {cmd}")
-    return r
+static void progress(int pct, const char *msg) {
+    printf("PROGRESS %d %s\n", pct, msg);
+    fflush(stdout);
+    if (g_log) fprintf(g_log, "PROGRESS %d %s\n", pct, msg);
+}
 
-def chroot(cmd_list):
-    """arch-chroot into MNT and run a command."""
-    run(["arch-chroot", str(MNT)] + cmd_list)
+static void logmsg(const char *msg) {
+    if (g_log) { fprintf(g_log, "%s\n", msg); fflush(g_log); }
+}
 
-sys.stderr = log_fh
+/* Run a command, wait for it, return exit code. Logs argv[0] to log file. */
+static int run_cmd(char *const argv[]) {
+    if (g_log) {
+        fprintf(g_log, "  $ %s ...\n", argv[0]);
+        fflush(g_log);
+    }
+    pid_t pid;
+    int rc = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
+    if (rc != 0) { if (g_log) fprintf(g_log, "  spawn failed: %s\n", strerror(rc)); return -1; }
+    int status = 0;
+    waitpid(pid, &status, 0);
+    if (WIFEXITED(status)) return WEXITSTATUS(status);
+    return -1;
+}
 
-if len(sys.argv) < 7:
-    fail("Usage: backend <disk> <locale> <keymap> <hostname> <username> <password>")
+/* Run a shell command string via /bin/sh -c */
+static int shell(const char *cmd) {
+    char *argv[] = { (char *)"/bin/sh", (char *)"-c", (char *)cmd, NULL };
+    return run_cmd(argv);
+}
 
-DISK     = sys.argv[1]
-LOCALE   = sys.argv[2]   # e.g. en_US.UTF-8
-KEYMAP   = sys.argv[3]   # e.g. us
-HOSTNAME = sys.argv[4]
-USERNAME = sys.argv[5]
-PASSWORD = sys.argv[6]
-MNT      = pathlib.Path("/mnt/kibaos-install")
+/* Try up to `tries` times to get a non-empty blkid tag for a partition. */
+static int blkid_wait(const char *part, const char *tag, char *out, size_t out_len,
+                       int tries) {
+    char cmd[512];
+    for (int i = 0; i < tries; i++) {
+        shell("udevadm settle --timeout=3 2>/dev/null || true");
+        snprintf(cmd, sizeof(cmd),
+                 "blkid -s %s -o value %s 2>/dev/null", tag, part);
+        FILE *f = popen(cmd, "r");
+        if (!f) continue;
+        char buf[256] = {0};
+        fgets(buf, sizeof(buf), f);
+        pclose(f);
+        /* strip trailing newline */
+        size_t l = strlen(buf);
+        while (l > 0 && (buf[l-1] == '\n' || buf[l-1] == '\r')) buf[--l] = 0;
+        if (l > 0) {
+            snprintf(out, out_len, "%s", buf);
+            return 0;
+        }
+        usleep(500000); /* 0.5s */
+    }
+    return -1;
+}
 
-if not DISK:
-    fail("no disk selected")
-if not pathlib.Path(DISK).is_block_device():
-    fail(f"{DISK} is not a block device")
+/* Unmount the bind-mounted kernel filesystems inside the new root, if present. */
+static void unbind_kernel_fs(void) {
+    static const char *kfs[] = { "dev/pts", "dev", "sys", "proc", NULL };
+    for (int i = 0; kfs[i]; i++) {
+        char p[256];
+        snprintf(p, sizeof(p), "%s/%s", MNT, kfs[i]);
+        umount2(p, MNT_DETACH);
+    }
+}
 
-# ── 1. Import archinstall ────────────────────────────────────────────────
-progress(2, "Loading installer library…")
-try:
-    from archinstall.lib.disk.device_handler import device_handler
-    from archinstall.lib.disk.filesystem import FilesystemHandler
-    from archinstall.lib.disk.device_model import (
-        DeviceModification, DiskLayoutConfiguration, DiskLayoutType,
-        FilesystemType, ModificationStatus, PartitionFlag,
-        PartitionModification, PartitionType, Size, Unit,
-    )
-except ImportError as e:
-    fail(f"archinstall not available: {e}")
+/* Recursively remove live-only home dirs that shouldn't carry over. */
+static void rm_live_leftovers(void) {
+    char *argv1[] = { (char *)"rm", (char *)"-rf", (char *)MNT "/home/liveuser", NULL };
+    run_cmd(argv1);
+    char *argv2[] = { (char *)"rm", (char *)"-f",  (char *)MNT "/root/.bash_history", NULL };
+    run_cmd(argv2);
+}
 
-# ── 2. Clear stale mounts ────────────────────────────────────────────────
-progress(5, "Clearing previous mounts…")
-try:
-    parts = sp.check_output(
-        ["lsblk", "-rpno", "NAME", DISK], text=True
-    ).strip().splitlines()[1:]
-    for p in reversed(parts):
-        sp.run(["umount", "-f", p], capture_output=True)
-        sp.run(["swapoff", p],       capture_output=True)
-    sp.run(["umount", "-R", str(MNT)], capture_output=True)
-except Exception:
-    pass
+/* Bind-mount kernel filesystems into the target root for chroot operations. */
+static void bind_kernel_fs(void) {
+    static const char *kfs[] = { "proc", "sys", "dev", NULL };
+    for (int i = 0; kfs[i]; i++) {
+        char src[64], dst[256];
+        snprintf(src, sizeof(src), "/%s", kfs[i]);
+        snprintf(dst, sizeof(dst), "%s/%s", MNT, kfs[i]);
+        mkdir(dst, 0755);
+        mount(src, dst, NULL, MS_BIND | MS_REC, NULL);
+        mount(NULL, dst, NULL, MS_SLAVE | MS_REC, NULL);
+    }
+    /* devpts */
+    char dpts[256];
+    snprintf(dpts, sizeof(dpts), "%s/dev/pts", MNT);
+    mkdir(dpts, 0755);
+    mount("devpts", dpts, "devpts", MS_NOSUID | MS_NOEXEC, "mode=0620,gid=5");
+}
 
-# ── 3. Partition + format via archinstall ────────────────────────────────
-progress(8, "Setting up partitions…")
-try:
-    device = device_handler.get_device(pathlib.Path(DISK))
-    if not device:
-        fail(f"archinstall could not open {DISK}")
+static void progress_cb(int pct, const char *msg, void *ud) {
+    (void)ud;
+    progress(pct, msg);
+}
 
-    sector = device.device_info.sector_size
-    dev_mod = DeviceModification(device, wipe=True)
+/* ── Partitioning shell helper ─────────────────────────────────────────── */
+/* Written to disk at runtime so we don't need to carry another file.
+ * Creates a GPT with:
+ *   partition 1: 512 MiB EFI System Partition (FAT32, type ef00)
+ *   partition 2: rest    Linux root            (ext4,  type 8300)
+ * Then mounts root at /mnt/kibaos-install and ESP at /mnt/kibaos-install/boot.
+ */
+static int do_partition(const char *disk) {
+    /* Write the helper script */
+    const char *script_path = "/tmp/kiba-partition.sh";
+    FILE *sf = fopen(script_path, "w");
+    if (!sf) { logmsg("cannot write partition script"); return -1; }
+    fprintf(sf,
+"#!/bin/bash\n"
+"set -euo pipefail\n"
+"DISK=\"$1\"\n"
+"MNT=\"" MNT "\"\n"
+"\n"
+"# ── Unmount anything already on this disk ───────────────────────────\n"
+"umount -R \"${MNT}\" 2>/dev/null || true\n"
+"for p in $(lsblk -rpno NAME \"${DISK}\" 2>/dev/null | tail -n+2 | sort -r); do\n"
+"  umount -f \"${p}\" 2>/dev/null || true\n"
+"  swapoff \"${p}\" 2>/dev/null || true\n"
+"done\n"
+"\n"
+"# ── Wipe and re-partition ───────────────────────────────────────────\n"
+"sgdisk --zap-all \"${DISK}\"\n"
+"sgdisk --new=1:0:+512M --typecode=1:ef00 --change-name=1:'EFI' \"${DISK}\"\n"
+"sgdisk --new=2:0:0     --typecode=2:8300 --change-name=2:'KibaOS' \"${DISK}\"\n"
+"partprobe \"${DISK}\" || true\n"
+"udevadm settle --timeout=10 || true\n"
+"\n"
+"# ── Derive partition device paths ───────────────────────────────────\n"
+"# Handles /dev/sdX -> /dev/sdX1, /dev/nvme0n1 -> /dev/nvme0n1p1, etc.\n"
+"if [[ \"${DISK}\" =~ nvme[0-9]+n[0-9]+$ ]] || [[ \"${DISK}\" =~ mmcblk[0-9]+$ ]]; then\n"
+"  ESP_PART=\"${DISK}p1\"\n"
+"  ROOT_PART=\"${DISK}p2\"\n"
+"else\n"
+"  ESP_PART=\"${DISK}1\"\n"
+"  ROOT_PART=\"${DISK}2\"\n"
+"fi\n"
+"\n"
+"# Wait for device nodes to appear (udev can lag on slower block layers)\n"
+"for i in $(seq 1 30); do\n"
+"  [[ -b \"${ESP_PART}\" && -b \"${ROOT_PART}\" ]] && break\n"
+"  sleep 0.2\n"
+"  udevadm settle --timeout=2 || true\n"
+"done\n"
+"[[ -b \"${ESP_PART}\" && -b \"${ROOT_PART}\" ]] || { echo 'ERROR: partition nodes never appeared'; exit 1; }\n"
+"\n"
+"# ── Format ──────────────────────────────────────────────────────────\n"
+"mkfs.fat -F32 -n EFI \"${ESP_PART}\"\n"
+"mkfs.ext4 -L KibaOS -F \"${ROOT_PART}\"\n"
+"\n"
+"# ── Mount ───────────────────────────────────────────────────────────\n"
+"mkdir -p \"${MNT}\"\n"
+"mount \"${ROOT_PART}\" \"${MNT}\"\n"
+"mkdir -p \"${MNT}/boot\"\n"
+"mount \"${ESP_PART}\" \"${MNT}/boot\"\n"
+"\n"
+"# Print derived paths so the caller can read them\n"
+"echo \"ESP_PART=${ESP_PART}\"\n"
+"echo \"ROOT_PART=${ROOT_PART}\"\n"
+    );
+    fclose(sf);
+    chmod(script_path, 0700);
 
-    boot_part = PartitionModification(
-        status     = ModificationStatus.Create,
-        type       = PartitionType.Primary,
+    /* Run it, capture output to extract ESP_PART / ROOT_PART */
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "%s '%s' 2>>'" LOG "' | tee -a '" LOG "'", script_path, disk);
+    FILE *f = popen(cmd, "r");
+    if (!f) { logmsg("failed to popen partition script"); return -1; }
+    char line[256];
+    /* Store paths in env vars for the parent to read */
+    while (fgets(line, sizeof(line), f)) {
+        size_t l = strlen(line);
+        while (l > 0 && (line[l-1] == '\n' || line[l-1] == '\r')) line[--l] = 0;
+        if (strncmp(line, "ESP_PART=", 9) == 0)  setenv("KIBA_ESP_PART",  line+9, 1);
+        if (strncmp(line, "ROOT_PART=", 10) == 0) setenv("KIBA_ROOT_PART", line+10, 1);
+    }
+    int rc = pclose(f);
+    unlink(script_path);
+    if (rc != 0) { logmsg("partition script failed"); return -1; }
+    if (!getenv("KIBA_ESP_PART") || !getenv("KIBA_ROOT_PART")) {
+        logmsg("partition script did not emit part paths"); return -1;
+    }
+    return 0;
+}
+
+int main(int argc, char *argv[]) {
+    if (argc < 7) {
+        fprintf(stderr,
+            "Usage: kibaos-oobe-backend <disk> <locale> <keymap> "
+            "<hostname> <username> <password>\n");
+        return 1;
+    }
+    const char *disk     = argv[1];
+    const char *locale   = argv[2];
+    const char *keymap   = argv[3];
+    const char *hostname = argv[4];
+    const char *username = argv[5];
+    const char *password = argv[6];
+
+    /* Open log file */
+    mkdir("/var/log", 0755);
+    g_log = fopen(LOG, "a");
+
+    /* Validate disk */
+    struct stat st;
+    if (stat(disk, &st) != 0 || !S_ISBLK(st.st_mode)) {
+        progress(100, "Install failed: not a block device");
+        return 1;
+    }
+
+    /* ── 1. Partition + format + mount ── */
+    progress(5, "Setting up partitions...");
+    if (do_partition(disk) != 0) {
+        progress(100, "Install failed: partitioning failed");
+        return 1;
+    }
+    const char *esp_part  = getenv("KIBA_ESP_PART");
+    const char *root_part = getenv("KIBA_ROOT_PART");
+
+    /* ── 2. Locate the live image ── */
+    progress(18, "Locating KibaOS system image...");
+    char image_path[4096] = {0};
+    if (!kiba_find_live_image(image_path, sizeof(image_path))) {
+        progress(100, "Install failed: could not locate live image");
+        return 1;
+    }
+    logmsg(image_path);
+
+    /* ── 3. Extract image ── */
+    if (kiba_install_extract_image(image_path, MNT, progress_cb, NULL) != 0) {
+        progress(100, "Install failed: image extraction failed");
+        logmsg(kiba_install_strerror());
+        return 1;
+    }
+
+    progress(70, "Cleaning up live-session files...");
+    rm_live_leftovers();
+
+    /* ── 4. Bind-mount kernel filesystems for chroot ── */
+    bind_kernel_fs();
+
+    /* ── 5. Read UUIDs ── */
+    progress(74, "Writing filesystem table...");
+    char root_uuid[128] = {0};
+    char esp_uuid[128]  = {0};
+    if (blkid_wait(root_part, "UUID", root_uuid, sizeof(root_uuid), 15) != 0 ||
+        blkid_wait(esp_part,  "UUID", esp_uuid,  sizeof(esp_uuid),  15) != 0) {
+        unbind_kernel_fs();
+        progress(100, "Install failed: could not read partition UUIDs");
+        return 1;
+    }
+
+    /* ── 6. Write configs ── */
+    if (kiba_install_write_configs(MNT, root_uuid, esp_uuid,
+                                    hostname, locale, keymap) != 0) {
+        unbind_kernel_fs();
+        progress(100, "Install failed: config write failed");
+        logmsg(kiba_install_strerror());
+        return 1;
+    }
+
+    progress(76, "Setting locale and keyboard...");
+    kiba_install_locale_gen(MNT); /* best-effort */
+
+    progress(78, "Creating your account...");
+    if (kiba_install_create_user(MNT, username, password) != 0) {
+        unbind_kernel_fs();
+        progress(100, "Install failed: user creation failed");
+        logmsg(kiba_install_strerror());
+        return 1;
+    }
+
+    /* ── 7. Finalize: bootloader, services, mkinitcpio ── */
+    if (kiba_install_finalize(MNT, disk, root_part, progress_cb, NULL) != 0) {
+        unbind_kernel_fs();
+        progress(100, "Install failed: finalization failed");
+        logmsg(kiba_install_strerror());
+        return 1;
+    }
+
+    /* ── 8. Unmount ── */
+    progress(98, "Cleaning up...");
+    unbind_kernel_fs();
+    shell("umount '" MNT "/boot' 2>/dev/null || true");
+    shell("umount '" MNT "' 2>/dev/null || true");
+
+    progress(100, "Done");
+    if (g_log) fclose(g_log);
+    return 0;
+}
+KIBAMAINC
+
+chmod +x /usr/local/bin/kibaos-oobe-backend 2>/dev/null || true
         start      = Size(1,   Unit.MiB, sector),
         length     = Size(512, Unit.MiB, sector),
         mountpoint = pathlib.Path("/boot"),
@@ -1648,19 +2549,43 @@ try:
         device_modifications = [dev_mod],
     )
     FilesystemHandler(disk_config).perform_filesystem_operations()
+
+    # ── 3b. Settle the kernel's view of the new partition table ─────────
+    # archinstall's own device_handler triggers partprobe internally, but
+    # there's no guarantee udev has finished creating the /dev nodes by the
+    # time perform_filesystem_operations() returns -- this is a known race
+    # (see archinstall issues #2849/#3168/#1550: PARTUUID/device-node lookups
+    # immediately after partitioning intermittently fail or return stale
+    # data, especially over virtio where event timing differs from real
+    # disks). Force a re-read and wait for udev to drain before touching
+    # the new partitions at all.
+    sp.run(["partprobe", DISK], capture_output=True)
+    sp.run(["udevadm", "settle", "--timeout=10"], capture_output=True)
 except Exception as e:
     fail(f"Partition/format failed: {e}\n{traceback.format_exc()}")
 
 # ── 4. Mount the new root ────────────────────────────────────────────────
 progress(14, "Mounting target filesystem…")
 try:
-    # Determine partition device paths (nvme uses p1/p2, sata uses 1/2)
+    # Determine partition device paths (nvme uses p1/p2, sata uses 1/2;
+    # GNOME Boxes/virtio disks are vdaN, same plain-suffix scheme as sdaN)
     if "nvme" in DISK or "mmcblk" in DISK:
         ESP_PART  = DISK + "p1"
         ROOT_PART = DISK + "p2"
     else:
         ESP_PART  = DISK + "1"
         ROOT_PART = DISK + "2"
+
+    # Wait (up to ~5s) for the partition device nodes to actually exist
+    # before mounting -- closes the race from step 3b on slower/virtio
+    # block layers where udev hasn't finished creating them yet.
+    for _ in range(25):
+        if pathlib.Path(ESP_PART).exists() and pathlib.Path(ROOT_PART).exists():
+            break
+        time.sleep(0.2)
+        sp.run(["udevadm", "settle", "--timeout=2"], capture_output=True)
+    else:
+        fail(f"Partition devices never appeared: {ESP_PART}, {ROOT_PART}")
 
     MNT.mkdir(parents=True, exist_ok=True)
     run(["mount", ROOT_PART, str(MNT)])
@@ -1805,8 +2730,8 @@ for fs in ["proc", "sys", "dev"]:
 try:
     # ── 8. fstab ────────────────────────────────────────────────────────
     progress(74, "Writing filesystem table…")
-    root_uuid = sp.check_output(["blkid", "-s", "UUID", "-o", "value", ROOT_PART], text=True).strip()
-    esp_uuid  = sp.check_output(["blkid", "-s", "UUID", "-o", "value", ESP_PART],  text=True).strip()
+    root_uuid = blkid_wait(ROOT_PART, "UUID")
+    esp_uuid  = blkid_wait(ESP_PART,  "UUID")
     (MNT / "etc/fstab").write_text(
         f"# KibaOS fstab — generated by installer\n"
         f"UUID={root_uuid}  /      ext4  defaults,noatime  0 1\n"
@@ -1921,9 +2846,7 @@ try:
     )
 
     # Patch the loader entry with the real PARTUUID
-    root_partuuid = sp.check_output(
-        ["blkid", "-s", "PARTUUID", "-o", "value", ROOT_PART], text=True
-    ).strip()
+    root_partuuid = blkid_wait(ROOT_PART, "PARTUUID")
     entry_path = MNT / "boot/loader/entries/kibaos.conf"
     if entry_path.exists():
         txt = entry_path.read_text()
