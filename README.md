@@ -1,6 +1,5 @@
 <div align="center">
-
-<img width="200" alt="KibaOS installer icon" src="https://github.com/user-attachments/assets/b0f5339d-0c6a-4dc9-82f8-506f5adef851" />
+<img width="200" alt="KibaOS installer icon" src="https://github.com/user-attachments/assets/60377ea4-3abe-489d-89dd-32a227782942" />
 
 # KibaOS
 
@@ -25,6 +24,7 @@
 
 </div>
 
+<img width="1000" alt="Desktop screenshot" src="https://github.com/user-attachments/assets/b0f5339d-0c6a-4dc9-82f8-506f5adef851" />
 ---
 
 KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Budgie** desktop environment and is designed so that anyone switching to simple can sit down and use it immediately, without having to configure anything first.
