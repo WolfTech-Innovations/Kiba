@@ -4585,7 +4585,7 @@ gtk-xft-hintstyle="hintslight"
 gtk-xft-rgba="rgb"
 GTK2SKEL
 
-dconf write /com/solus-project/budgie-panel/panels "@as []"
+dbus-run-session -- dconf write /com/solus-project/budgie-panel/panels "@as []" || true
 cat > /usr/share/glib-2.0/schemas/99-kibaos-budgie.gschema.override << 'EOF'
 [com.solus-project.budgie-panel]
 panels=@as []
