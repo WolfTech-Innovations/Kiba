@@ -7,7 +7,7 @@ sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 # ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
-grep -q '^alpm:' "${}/etc/group" 2>/dev/null || \
+grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
   echo 'alpm:x:951:' >> "${AIROOTFS}/etc/group"
 grep -q '^alpm:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
   echo 'alpm:!*:19000::::::' >> "${AIROOTFS}/etc/shadow"
