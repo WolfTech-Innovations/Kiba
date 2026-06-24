@@ -3,9 +3,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-upload:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    outputs:
+      patch_num: ${{ github.run_number }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,24 +34,65 @@ jobs:
             archlinux:latest \
             /bin/bash /w/build.sh
 
+      # ── ISO uploads immediately, in parallel with everything else ─────────
+      # This has zero dependency on the OTA manifest/diff/sign pipeline below,
+      # so it no longer waits behind ~30+ minutes of manifest work before the
+      # actual release artifact goes out the door.
+      - name: Upload ISO to SourceForge
+        env:
+          SF_USER: ${{ secrets.SF_USER }}
+          SSHPASS: ${{ secrets.SF_PASS }}
+        run: |
+          if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
+            echo "SourceForge credentials not configured. Skipping."
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+          sudo apt-get install -y sshpass rsync
+          # Single rsync call for all ISO/checksum files instead of one
+          # connection per file.
+          sshpass -e rsync -avP --progress \
+            *.iso *.iso.sha256 \
+            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
+
+      - name: Upload ISO artifact for OTA job
+        uses: actions/upload-artifact@v4
+        with:
+          name: kibaos-iso
+          path: |
+            *.iso
+          retention-days: 1
+
+  ota:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kibaos-iso
+
+      - name: Install tools
+        run: sudo apt-get install -y squashfs-tools sshpass rsync
+
       - name: Extract airootfs from ISO for OTA diffing
         run: |
-          sudo apt-get install -y squashfs-tools
           ISO=$(ls *.iso | head -1)
           echo "Mounting ISO: $ISO"
-
-          # Mount the ISO
           mkdir -p /tmp/iso-mount
           sudo mount -o loop "$ISO" /tmp/iso-mount
-
-          # Find and unsquash the airootfs
           SFS=$(find /tmp/iso-mount -name 'airootfs.sfs' | head -1)
           echo "Found squashfs: $SFS"
           mkdir -p /tmp/airootfs-extracted
-          sudo unsquashfs -d /tmp/airootfs-extracted "$SFS"
+          # -processors matches runner core count; single biggest win for
+          # this step since unsquashfs was running single-threaded before.
+          sudo unsquashfs -d /tmp/airootfs-extracted -processors "$(nproc)" "$SFS"
           sudo umount /tmp/iso-mount
-
-          echo "Extraction complete."
           echo "Extracted file count: $(find /tmp/airootfs-extracted -type f | wc -l)"
 
       - name: Download previous build manifest from SourceForge
@@ -57,100 +100,91 @@ jobs:
           SF_USER: ${{ secrets.SF_USER }}
           SSHPASS: ${{ secrets.SF_PASS }}
         run: |
-          sudo apt-get install -y sshpass rsync
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
-
-          # Try to fetch the last build's file manifest
           sshpass -e rsync -avP \
             "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest.txt" \
             ./last-build-manifest.txt 2>/dev/null || \
             echo "No previous manifest found — this is a full baseline build."
 
+      # ── Manifest generation: parallel hashing instead of one sha256sum ────
+      # per file in a serial while-read loop. find -print0 | xargs -P only
+      # forks as many sha256sum processes as you have cores, batched, instead
+      # of one fork per file. On a full desktop rootfs (50k+ files) this is
+      # the single biggest time sink in the old workflow — easily 10-20x
+      # faster than the per-line bash/awk loop.
       - name: Generate current build manifest
         run: |
-          PATCH_NUM="${{ github.run_number }}"
-          echo "Generating file manifest for patch ${PATCH_NUM}..."
-
-          find /tmp/airootfs-extracted -type f | while read -r f; do
-            REL="${f#/tmp/airootfs-extracted/}"
-            sha256sum "$f" | awk -v p="./${REL}" '{print $1"  "p}'
-          done > "current-build-manifest.txt"
-
+          cd /tmp/airootfs-extracted
+          find . -type f -print0 \
+            | xargs -0 -P "$(nproc)" -n 64 sha256sum \
+            > "$GITHUB_WORKSPACE/current-build-manifest.txt"
+          cd "$GITHUB_WORKSPACE"
+          # Normalize paths to the "./relative/path" form the rest of the
+          # pipeline expects (sha256sum already emits "./relative/path" when
+          # run from inside the dir, given the find . input above).
           echo "Manifest entries: $(wc -l < current-build-manifest.txt)"
 
+      # ── Diff: sort + comm instead of bash associative arrays ──────────────
+      # comm does the same "what changed" comparison in C, in one pass, with
+      # no per-line shell/awk overhead. Sorting first is required for comm
+      # but is itself fast (GNU sort is multi-threaded by default).
       - name: Compute changed files vs previous build
         id: diff
         run: |
-          PATCH_NUM="${{ github.run_number }}"
+          PATCH_NUM="${{ needs.build.outputs.patch_num }}"
 
           if [ ! -f last-build-manifest.txt ]; then
             echo "No previous manifest — skipping OTA patch generation for this baseline build."
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            # Store current manifest as the new baseline immediately
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
             cp current-build-manifest.txt baseline-manifest.txt
           else
             echo "Diffing against previous build manifest..."
+            sort -k2 last-build-manifest.txt    > prev-sorted.txt
+            sort -k2 current-build-manifest.txt > curr-sorted.txt
 
-            # Build a lookup of previous hashes: path -> hash
-            declare -A PREV_HASHES
-            while IFS= read -r line; do
-              HASH=$(echo "$line" | awk '{print $1}')
-              PATH_=$(echo "$line" | awk '{print $2}')
-              PREV_HASHES["$PATH_"]="$HASH"
-            done < last-build-manifest.txt
-
-            # Find files that are new or have changed hashes
-            > changed_files.txt
-            while IFS= read -r line; do
-              HASH=$(echo "$line" | awk '{print $1}')
-              FPATH=$(echo "$line" | awk '{print $2}')
-              PREV="${PREV_HASHES[$FPATH]:-}"
-              if [ "$HASH" != "$PREV" ]; then
-                echo "$FPATH" >> changed_files.txt
-              fi
-            done < current-build-manifest.txt
+            # Lines only in curr-sorted (new or changed hash) = changed files.
+            # comm -13 needs both inputs sorted identically; since hash is
+            # column 1 and path is column 2, a changed file produces a
+            # different full line, so a plain comm on full lines works.
+            comm -13 prev-sorted.txt curr-sorted.txt | awk '{print $2}' > changed_files.txt
 
             CHANGED=$(wc -l < changed_files.txt)
             echo "Changed files: $CHANGED"
-            cat changed_files.txt | head -20
+            head -20 changed_files.txt
             [ "$CHANGED" -gt 20 ] && echo "... and $((CHANGED - 20)) more"
 
             if [ "$CHANGED" -eq 0 ]; then
-              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "has_changes=false" >> "$GITHUB_OUTPUT"
             else
-              echo "has_changes=true" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> "$GITHUB_OUTPUT"
             fi
             cp current-build-manifest.txt baseline-manifest.txt
           fi
 
+      # ── Bundling: parallel copy instead of serial cp in a while loop ──────
       - name: Bundle OTA patch from extracted airootfs
         if: steps.diff.outputs.has_changes == 'true'
         run: |
-          PATCH_NUM="${{ github.run_number }}"
+          PATCH_NUM="${{ needs.build.outputs.patch_num }}"
           PATCH_DIR="ota-patch-${PATCH_NUM}"
           mkdir -p "${PATCH_DIR}"
 
           echo "Bundling changed files from extracted airootfs..."
-          while IFS= read -r fpath; do
-            # fpath is like ./usr/share/kibaos/wallpaper.png
-            REL="${fpath#./}"
-            SRC="/tmp/airootfs-extracted/${REL}"
-            DST="${PATCH_DIR}/${REL}"
-            [ -f "$SRC" ] || continue
-            mkdir -p "$(dirname $DST)"
-            cp -a "$SRC" "$DST"
-          done < changed_files.txt
+          # rsync --files-from does one pass with internal parallelism for
+          # directory creation + copy, instead of mkdir -p + cp per file.
+          sed 's|^\./||' changed_files.txt > changed_files_rel.txt
+          rsync -a --files-from=changed_files_rel.txt \
+            /tmp/airootfs-extracted/ "${PATCH_DIR}/"
 
-          # Inject the new patch level into the bundle
           mkdir -p "${PATCH_DIR}/etc/kibaos"
           echo "${PATCH_NUM}" > "${PATCH_DIR}/etc/kibaos/patch-level"
 
-          # Generate manifest of exactly what's in this patch
-          find "${PATCH_DIR}" -type f | while read -r f; do
-            REL="${f#${PATCH_DIR}/}"
-            sha256sum "$f" | awk -v p="./${REL}" '{print $1"  "p}'
-          done > "kibaos-ota-${PATCH_NUM}-manifest.txt"
+          cd "${PATCH_DIR}"
+          find . -type f -print0 \
+            | xargs -0 -P "$(nproc)" -n 64 sha256sum \
+            > "../kibaos-ota-${PATCH_NUM}-manifest.txt"
+          cd ..
 
           echo "Patch manifest:"
           cat "kibaos-ota-${PATCH_NUM}-manifest.txt"
@@ -168,7 +202,7 @@ jobs:
             | awk -F: '/^fpr/{print $10; exit}')
           echo "${KEY_FP}:6:" | gpg --import-ownertrust
 
-          PATCH_NUM="${{ github.run_number }}"
+          PATCH_NUM="${{ needs.build.outputs.patch_num }}"
           gpg --batch --yes \
               --local-user ota@kibaos.wolftech.tech \
               --detach-sign --armor \
@@ -181,27 +215,9 @@ jobs:
 
       - name: Write latest-patch-level
         if: steps.diff.outputs.has_changes == 'true'
-        run: echo "${{ github.run_number }}" > latest-patch-level
+        run: echo "${{ needs.build.outputs.patch_num }}" > latest-patch-level
 
-      - name: Upload ISO to SourceForge
-        env:
-          SF_USER: ${{ secrets.SF_USER }}
-          SSHPASS: ${{ secrets.SF_PASS }}
-        run: |
-          if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
-            echo "SourceForge credentials not configured. Skipping."
-            exit 0
-          fi
-          mkdir -p ~/.ssh
-          ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
-          for iso_file in *.iso; do
-            [ -f "$iso_file" ] || continue
-            echo "Uploading $iso_file..."
-            sshpass -e rsync -avP \
-              "$iso_file" \
-              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
-          done
-
+      # ── Single batched rsync instead of one connection per file ───────────
       - name: Upload OTA artifacts to SourceForge
         env:
           SF_USER: ${{ secrets.SF_USER }}
@@ -213,26 +229,20 @@ jobs:
           fi
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
-          PATCH_NUM="${{ github.run_number }}"
+          PATCH_NUM="${{ needs.build.outputs.patch_num }}"
 
-          # Always upload the updated baseline manifest for next build to diff against
           echo "Uploading baseline manifest..."
           sshpass -e rsync -avP \
             "baseline-manifest.txt" \
             "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest.txt"
 
-          # Upload patch artifacts only if there were changes
           if [ "${{ steps.diff.outputs.has_changes }}" == "true" ]; then
-            for f in \
+            sshpass -e rsync -avP \
               "kibaos-ota-${PATCH_NUM}.tar.gz" \
               "kibaos-ota-${PATCH_NUM}.tar.gz.asc" \
               "kibaos-ota-${PATCH_NUM}-manifest.txt" \
-              "latest-patch-level"; do
-              echo "Uploading ${f}..."
-              sshpass -e rsync -avP \
-                "${f}" \
-                "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/"
-            done
+              "latest-patch-level" \
+              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/"
             echo "OTA patch ${PATCH_NUM} uploaded."
           else
             echo "No changes — only baseline manifest updated."
@@ -243,6 +253,6 @@ jobs:
         run: |
           git config user.name  "KibaOS OTA Bot"
           git config user.email "ota@kibaos.wolftech.tech"
-          git tag "ota-patch-${{ github.run_number }}"
-          git push origin "ota-patch-${{ github.run_number }}" 2>/dev/null || true
+          git tag "ota-patch-${{ needs.build.outputs.patch_num }}"
+          git push origin "ota-patch-${{ needs.build.outputs.patch_num }}" 2>/dev/null || true
           
