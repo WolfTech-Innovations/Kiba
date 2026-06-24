@@ -359,9 +359,24 @@ cat > "${AIROOTFS}/root/customize_airootfs.sh" << 'CUSTOMIZE'
 #!/usr/bin/env bash
 set -e
 
-dbus-uuidgen > /etc/machine-id
-eval $(dbus-launch --sh-syntax)
-export DBUS_SESSION_BUS_ADDRESS
+rm -f /etc/machine-id
+touch /etc/machine-id
+
+# ── create system users/groups declared via sysusers.d (polkitd, etc.) ─────
+# pacman normally triggers this via a post-install hook on a running system,
+# but that hook doesn't fire reliably when packages are unpacked straight
+# into an airootfs, so users like polkitd never get created and polkitd
+# fails to start (-> "Could not activate remote peer 'org.freedesktop.
+# PolicyKit1': startup job failed"). Run it explicitly here.
+systemd-sysusers
+systemd-tmpfiles --create 2>/dev/null || true
+
+# ── polkitd fallback ────────────────────────────────────────────────────────
+# Belt-and-suspenders: if systemd-sysusers above didn't run/succeed in this
+# chroot context, this guarantees the polkitd user still exists so polkitd
+# can actually start (otherwise: "Could not activate remote peer
+# 'org.freedesktop.PolicyKit1': startup job failed").
+id polkitd &>/dev/null || useradd -r -U -M -d /run/polkit -s /usr/bin/nologin polkitd
 
 # ── alpm user ──────────────────────────────────────────────────────────────
 useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
@@ -455,6 +470,7 @@ chmod 750 /home/liveuser
 sed -i 's/#Storage=auto/Storage=volatile/'                    /etc/systemd/journald.conf
 sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/'   /etc/systemd/logind.conf
 sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
+sed -i 's/#IdleAction=ignore/IdleAction=ignore/'               /etc/systemd/logind.conf
 
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
@@ -584,8 +600,8 @@ echo "=== AUR packages installed ==="
 #     the person actually asked for, themed in KibaOS's own navy/glass
 #     palette (matching gtk-3.0/gtk.css's colors elsewhere in this script).
 #   - Backend: a privileged C binary (kibaos-oobe-backend), called via
-#     pkexec with a plain argv array (no shell string, no quoting/
-#     injection surface). Disk partitioning (GPT) and the udev-settle
+#     sudo with a plain argv array (no shell string, no quoting/
+#     injection surface, no D-Bus/polkit dependency). Disk partitioning (GPT) and the udev-settle
 #     wait are hand-implemented in libkibadisk against raw ioctls --
 #     no archinstall, no parted/sgdisk, no blkid/partprobe subprocess
 #     for the disk-critical path. The handful of remaining external
@@ -1195,7 +1211,7 @@ public class KibaOOBE : Adw.Application {
     // ══════════════════════════════════════════════════════════════════
     private void start_oem_finish () {
         string[] argv = {
-            "pkexec", "/usr/local/bin/kibaos-oem-finish.sh",
+            "sudo", "/usr/local/bin/kibaos-oem-finish.sh",
             selected_locale, selected_keymap, hostname_value,
             username_value, password_value
         };
@@ -1204,7 +1220,7 @@ public class KibaOOBE : Adw.Application {
 
     private void start_install () {
         string[] argv = {
-            "pkexec", "/usr/local/bin/kibaos-oobe-backend",
+            "sudo", "/usr/local/bin/kibaos-oobe-backend",
             selected_disk, selected_locale, selected_keymap,
             hostname_value, username_value, password_value
         };
@@ -1541,7 +1557,7 @@ cd /
 # unsquashfs, mkfs.fat, mkfs.ext4, useradd/chpasswd, bootctl, mkinitcpio,
 # locale-gen, pacman -- all invoked via posix_spawn argv arrays, never a
 # shell, so there's no string-quoting/injection surface anywhere in this
-# backend (mirrors the argv fix already applied on the Vala/pkexec side).
+# backend (mirrors the argv fix already applied on the Vala/sudo side).
 echo "=== Building libkibadisk (disk/install backend library) ==="
 mkdir -p /usr/share/kibaos-oobe/src/disk
 cd /usr/share/kibaos-oobe/src/disk
@@ -2932,7 +2948,7 @@ KIBA_SRC_END_FINC
 cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 /* kibaos_oobe_backend_main.c — the privileged install orchestrator.
  *
- * Invoked exactly as before: `pkexec /usr/local/bin/kibaos-oobe-backend
+ * Invoked via sudo (no D-Bus/polkit dependency): `sudo /usr/local/bin/kibaos-oobe-backend
  * <disk> <locale> <keymap> <hostname> <username> <password>` — argv,
  * no shell, per the injection fix already applied on the Vala side.
  *
@@ -3251,23 +3267,10 @@ echo "on a normal end-user installation."
 OEMPREPARE
 chmod +x /usr/local/bin/kibaos-oem-prepare
 
-# ── polkit rule: allow both backends to run via pkexec without a password
-# prompt loop mid-install (the user already authenticates once via the
-# account-creation step in the UI; this just lets pkexec itself proceed
-# without re-prompting for the *root* password, which liveuser doesn't
-# have set anyway — sudoers NOPASSWD already covers liveuser elsewhere
-# in this build script). ───────────────────────────────────────────────────
-mkdir -p /etc/polkit-1/rules.d
-cat > /etc/polkit-1/rules.d/49-kibaos-oobe.rules << 'POLKITRULE'
-polkit.addRule(function(action, subject) {
-    if (action.id == "org.freedesktop.policykit.exec" &&
-        (action.lookup("program") == "/usr/local/bin/kibaos-oobe-backend" ||
-         action.lookup("program") == "/usr/local/bin/kibaos-oem-finish.sh") &&
-        subject.isInGroup("wheel")) {
-        return polkit.Result.YES;
-    }
-});
-POLKITRULE
+# NOTE: both OOBE backends launch via `sudo` (covered by the liveuser
+# NOPASSWD sudoers rule above), not `pkexec`, specifically so the installer
+# doesn't depend on D-Bus/polkit being healthy mid-install. No polkit rule
+# is needed here as a result.
 
 if [ -x /usr/bin/io.kibaos.oobe ]; then
   echo "=== KibaOS OOBE installer is the active install path ==="
@@ -4084,9 +4087,23 @@ plugins = \
     idle \
     wm-actions \
     command \
-    session-lock \
     shortcuts-inhibit \
     blur
+
+# session-lock is intentionally NOT loaded above. This is a live/installer
+# session — nothing in this image wires up a lockscreen UI (gtklock is
+# installed but never invoked), so if anything ever triggered a lock here
+# (idle timeout, a stray keybinding, a client using the wlr session-lock
+# protocol) the user would be stuck on a black surface with no way back in,
+# potentially mid-install. Easiest, safest fix: don't load the plugin at all.
+
+# DPMS-off and the built-in cube/black-screen "screensaver" are both
+# disabled outright (-1) for the same reason: someone can walk away from a
+# multi-minute unattended install and the screen going dark/off must never
+# be mistaken for the session being gone. -1 disables a timeout entirely.
+[idle]
+dpms_timeout = -1
+screensaver_timeout = -1
 
 # No labwc-style bridge exists for Wayfire — this is what actually starts
 # the Budgie shell. Without it, Wayfire boots to an empty compositor.
@@ -4728,6 +4745,23 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 OEMAUTOCFG
 
+# ── Live-session autostart: launches the OOBE installer automatically on
+# the regular live boot (the 'liveuser' autologin session), so the person
+# lands straight in the installer instead of an empty desktop. Gated to
+# liveuser specifically (via `whoami`) so this never fires after a real
+# install, on the OEM-finish account (which has its own autostart entry
+# above), or for any other account this .config/autostart skeleton gets
+# copied into down the line. ─────────────────────────────────────────────
+cat > "${SKEL}/.config/autostart/kibaos-install-launch.desktop" << 'LIVELAUNCH'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Installer
+Exec=sh -c '[ "$(whoami)" = "liveuser" ] && exec /usr/bin/io.kibaos.oobe'
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+LIVELAUNCH
+
 mkdir -p /etc/systemd/zram-generator.conf.d
 cat > /etc/systemd/zram-generator.conf << 'ZRAM'
 [zram0]
@@ -4808,7 +4842,7 @@ PS1='\[\e[1;36m\][KibaOS]\[\e[0m\] \[\e[32m\]\u@\h\[\e[0m\]:\[\e[34m\]\w\[\e[0m\
 alias ls='ls --color=auto'
 alias ll='ls -lah --color=auto'
 alias grep='grep --color=auto'
-alias install='sudo pkexec /usr/bin/io.kibaos.oobe'
+alias install='io.kibaos.oobe'
 alias update='sudo pacman -Syu'
 fastfetch 2>/dev/null || true
 export XDG_CONFIG_HOME="$HOME/.config"
