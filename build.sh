@@ -3144,7 +3144,7 @@ ar rcs libkibadisk.a kiba_gpt.o kiba_fs.o kiba_udev.o kiba_install_extract.o kib
 
 echo "=== Building kibaos-oobe-backend (privileged install orchestrator) ==="
 gcc -O2 -Wall -o /usr/local/bin/kibaos-oobe-backend kibaos_oobe_backend_main.c \
-    -L. -lkibadisk \
+    -L. -lkibadisk -lfdisk \
     || { echo "FATAL: kibaos-oobe-backend failed to compile/link" >&2; exit 1; }
 chmod +x /usr/local/bin/kibaos-oobe-backend
 cd /
