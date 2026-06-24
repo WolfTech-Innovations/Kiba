@@ -368,7 +368,7 @@ touch /etc/machine-id
 # into an airootfs, so users like polkitd never get created and polkitd
 # fails to start (-> "Could not activate remote peer 'org.freedesktop.
 # PolicyKit1': startup job failed"). Run it explicitly here.
-systemd-sysusers
+systemd-sysusers || true
 systemd-tmpfiles --create 2>/dev/null || true
 
 # ── polkitd fallback ────────────────────────────────────────────────────────
