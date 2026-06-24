@@ -251,7 +251,7 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
@@ -306,6 +306,20 @@ if [ -f "${SYSLINUX_SYS}" ]; then
   sed -i 's/Arch Linux/KibaOS/g'    "${SYSLINUX_SYS}"
   sed -i 's/ARCH_[0-9]*/KIBAOS/g'   "${SYSLINUX_SYS}"
   sed -i 's/^LABEL arch$/LABEL kibaos/' "${SYSLINUX_SYS}"
+  # The default entry's APPEND line is still whatever releng's stock
+  # profile shipped (no quiet/splash) -- only the label name was renamed
+  # above. Without this, BIOS/syslinux boots verbosely with no Plymouth
+  # splash even though the UEFI/systemd-boot entry (kibaos.conf) has the
+  # right params, since the two boot paths are configured independently.
+  awk '
+    /^LABEL kibaos$/ { in_kibaos=1 }
+    /^LABEL / && $0 !~ /^LABEL kibaos$/ { in_kibaos=0 }
+    in_kibaos && /^[[:space:]]*APPEND/ {
+      print "  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0"
+      next
+    }
+    { print }
+  ' "${SYSLINUX_SYS}" > "${SYSLINUX_SYS}.tmp" && mv "${SYSLINUX_SYS}.tmp" "${SYSLINUX_SYS}"
   cat >> "${SYSLINUX_SYS}" << 'SYSLINUX_SAFE'
 
 LABEL kibaos-safe
@@ -540,45 +554,7 @@ pacman -S --noconfirm --needed \
   ki18n kio kservice kpackage kdeclarative \
   kiconthemes kwidgetsaddons
 
-AUR_BUILD="/tmp/aur-build"
-mkdir -p "${AUR_BUILD}"
-for pkg in libinput-gestures; do
-  echo "=== Building ${pkg} from AUR ==="
-  git clone --depth=1 "https://aur.archlinux.org/${pkg}.git" "${AUR_BUILD}/${pkg}"
-  chown -R builduser:builduser "${AUR_BUILD}/${pkg}"
-  cd "${AUR_BUILD}/${pkg}"
-  # Bolt: Optimize AUR builds by using all cores and skipping compression
-  # NOTE: runuser, not sudo -u — sudo is a setuid binary and setuid binaries
-  # are unreliable/broken on nosuid-mounted chroot filesystems (confirmed:
-  # this is exactly the "strange sudo error" multiple Arch forum threads
-  # report when running sudo inside arch-chroot/Docker-based archiso
-  # builds). runuser does the same "run this as another user" job but is
-  # meant to be invoked by a process that's already root, which is exactly
-  # our situation inside customize_airootfs.sh — no setuid escalation
-  # needed at all since we start as root already.
-  runuser -u builduser -- env MAKEFLAGS="-j$(nproc)" PKGEXT='.pkg.tar' makepkg -si --noconfirm --skippgpcheck
-  cd /
-done
-
-# ── ChromeOS-theme: manual install to avoid gnome-shell dependency ─────────
-echo "=== Installing ChromeOS-theme ==="
-git clone --depth=1 "https://github.com/vinceliuice/ChromeOS-theme.git" "${AUR_BUILD}/ChromeOS-theme"
-cd "${AUR_BUILD}/ChromeOS-theme"
-# Install only the GTK theme files directly, bypassing the installer's
-# gnome-shell dependency check
-mkdir -p /usr/share/themes
-for variant in ChromeOS ChromeOS-Dark; do
-  [ -d "themes/${variant}" ] && \
-    cp -r "themes/${variant}" /usr/share/themes/ || true
-done
-# Fallback: run installer with --dest if theme dirs not pre-built
-if [ ! -d /usr/share/themes/ChromeOS-Dark ]; then
-  bash install.sh --dest /usr/share/themes --color dark 2>/dev/null || true
-  bash install.sh --dest /usr/share/themes --color light 2>/dev/null || true
-fi
 cd /
-
-cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
@@ -1638,9 +1614,18 @@ typedef struct {
     kiba_guid_t type_guid;
     kiba_guid_t unique_guid;   /* if all-zero, libfdisk generates one */
     uint64_t    first_lba;
-    uint64_t    last_lba;      /* inclusive */
+    uint64_t    last_lba;      /* inclusive. Pass KIBA_GPT_LAST_LBA_REST to
+                                 * consume all remaining space on the disk --
+                                 * this defers to libfdisk's own last-usable-LBA
+                                 * (which already accounts for the backup GPT
+                                 * header + entry array at the end of the disk)
+                                 * instead of recomputing it by hand. */
     uint64_t    attributes;
 } kiba_gpt_partition_t;
+
+/* Sentinel for last_lba: "use all remaining space on the disk." Never a
+ * legitimate LBA value, so safe to reuse as a flag. */
+#define KIBA_GPT_LAST_LBA_REST UINT64_MAX
 
 typedef struct {
     int      fd;                 /* open O_RDWR on the whole-disk block device */
@@ -1819,7 +1804,14 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
         if (!pa) { rc = -ENOMEM; goto out; }
 
         fdisk_partition_set_start(pa, p->first_lba);
-        fdisk_partition_set_size(pa, p->last_lba - p->first_lba + 1);
+        if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
+            /* Let libfdisk pick the end -- it already knows the real
+             * last usable LBA for this disk (accounts for the backup
+             * GPT header + entry array), so we don't have to guess. */
+            fdisk_partition_end_follow_default(pa, 1);
+        } else {
+            fdisk_partition_set_size(pa, p->last_lba - p->first_lba + 1);
+        }
 
         /* Partition type GUID */
         struct fdisk_parttype *ptype = NULL;
@@ -2833,6 +2825,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
                       "linux   /vmlinuz-linux\n"
                       "initrd  /initramfs-linux.img\n"
                       "options root=PARTUUID=%s rw quiet splash loglevel=3 "
+                      "systemd.show_status=auto rd.systemd.show_status=auto "
                       "rd.udev.log_level=3 vt.global_cursor_default=0 "
                       "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\n",
                       partuuid);
@@ -2861,6 +2854,15 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     if (cb) cb(91, "Applying boot theme...", user_data);
+    snprintf(path, sizeof(path), "%s/etc/sysctl.d", target_root);
+    mkdir(path, 0755);
+    snprintf(path, sizeof(path), "%s/etc/sysctl.d/20-quiet-printk.conf", target_root);
+    /* Belt-and-suspenders for silent boot: loglevel=3 on the kernel cmdline
+     * only filters what reaches the console at the level it's set; this
+     * sysctl additionally caps the kernel's own default console log level,
+     * catching messages cmdline filtering alone sometimes misses. */
+    write_file(path, "kernel.printk = 3 3 3 3\n");
+
     snprintf(path, sizeof(path), "%s/etc/plymouth", target_root);
     mkdir(path, 0755);
     snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
@@ -2996,9 +2998,18 @@ int main(int argc, char **argv) {
     uint64_t esp_first  = first_usable;
     uint64_t esp_last   = esp_first + esp_sectors - 1;
     uint64_t root_first = esp_last + 1;
-    uint64_t root_last  = total_sectors - 1 - 1 - entry_array_sectors - 1;
+    /* Root partition consumes the rest of the disk. We deliberately do NOT
+     * hand-compute the last usable LBA here -- that previously tried to
+     * dead-reckon where the backup GPT header + entry array sit at the end
+     * of the disk, and a one-sector mismatch against libfdisk's own
+     * calculation made fdisk_add_partition() reject it with EINVAL ("The
+     * last usable GPT sector is X, but Y is requested"). Passing the
+     * KIBA_GPT_LAST_LBA_REST sentinel defers to libfdisk's own
+     * last_usable_lba, which fdisk_create_disklabel() already derived
+     * correctly for this exact disk/sector size. */
+    uint64_t root_last  = KIBA_GPT_LAST_LBA_REST;
 
-    if (root_last <= root_first) {
+    if (root_first >= total_sectors) {
         close(disk_fd);
         fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
     }
@@ -3328,11 +3339,11 @@ plymouth-set-default-theme kibaos 2>/dev/null || true
 echo "=== Boot splash: Plymouth kibaos theme installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME — system-wide ChromeOS-Dark + KibaOS pill panel override
+# GTK THEME — system-wide Adwaita-dark base + KibaOS pill panel override
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
-gtk-theme-name = "ChromeOS-Dark"
+gtk-theme-name = "Adwaita-dark"
 gtk-icon-theme-name = "Papirus-Dark"
 gtk-font-name = "Noto Sans 11"
 gtk-cursor-theme-size = 24
@@ -3348,7 +3359,7 @@ GTK2RC
 mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
-gtk-theme-name=ChromeOS-Dark
+gtk-theme-name=Adwaita-dark
 gtk-icon-theme-name=Papirus-Dark
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -3358,8 +3369,7 @@ gtk-xft-hintstyle=hintslight
 gtk-xft-rgba=rgb
 GTK3RC
 
-# ── GTK3 pill panel CSS — appended on top of ChromeOS-Dark ───────────────
-# ChromeOS-theme provides the base window/widget styling.
+# ── GTK3 pill panel CSS — KibaOS's own theming, applied directly ────────
 # This overrides just the Budgie panel to be a floating liquid glass pill.
 cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 /* ════════════════════════════════════════════════════════════════════════
@@ -3389,7 +3399,7 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
  * motion. Verify visually.
  * ════════════════════════════════════════════════════════════════════════ */
 
-/* === KibaOS: Floating liquid glass pill panel (override on ChromeOS-Dark) === */
+/* === KibaOS: Floating liquid glass pill panel === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
     border-radius: 999px;
@@ -3563,184 +3573,6 @@ switch {
     transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
 }
 GTK3PANEL
-
-# Append pill CSS into ChromeOS-Dark's gtk.css so it takes effect even
-# when GTK loads the theme directory directly instead of /etc/gtk-3.0/gtk.css
-CHROMEOS_GTK3="/usr/share/themes/ChromeOS-Dark/gtk-3.0/gtk.css"
-if [ -f "${CHROMEOS_GTK3}" ]; then
-  cat >> "${CHROMEOS_GTK3}" << 'CHROMEOS_PILL_APPEND'
-
-/* === KibaOS pill panel override (organic motion language — see primary
- * gtk-3.0/gtk.css above for the full settle/fade/spring documentation) === */
-.budgie-panel {
-    margin: 0 120px 8px 120px;
-    border-radius: 999px;
-    background-image: none;
-    background-color: rgba(12, 20, 35, 0.55);
-    border-top: 1px solid rgba(255, 255, 255, 0.18);
-    border-left: 1px solid rgba(255, 255, 255, 0.10);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.35);
-    box-shadow:
-        0 8px 40px rgba(0, 0, 0, 0.55),
-        0 2px 8px  rgba(0, 0, 0, 0.30),
-        inset 0 1px 0 rgba(255, 255, 255, 0.14),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.20);
-    padding: 0 10px;
-}
-.budgie-panel .budgie-applet-button,
-.budgie-panel button.flat {
-    border-radius: 999px;
-    background: transparent;
-    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-.budgie-panel .budgie-applet-button:hover,
-.budgie-panel button.flat:hover {
-    background-color: rgba(255, 255, 255, 0.10);
-    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.budgie-panel .budgie-applet-button:active,
-.budgie-panel button.flat:active {
-    background-color: rgba(0, 153, 204, 0.25);
-    transition: background-color 90ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.budgie-panel .launcher:checked,
-.budgie-panel .launcher.running {
-    border-bottom: 2px solid #0099cc;
-    border-radius: 0;
-    transition: border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* === KibaOS: Raven (notification + quick-settings sidebar) as a floating glass card === */
-frame.raven-frame,
-.raven-background {
-    margin: 8px 8px 8px 0;
-    border-radius: 22px;
-    background-color: rgba(16, 24, 40, 0.72);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow:
-        0 12px 48px rgba(0, 0, 0, 0.50),
-        inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    opacity: 1;
-    transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-frame.raven-frame > border { border-style: none; box-shadow: none; }
-.raven-header,
-.raven-section-header {
-    color: #e8eef5;
-    font-weight: 600;
-    padding: 14px 18px 6px 18px;
-}
-.raven-background row,
-.raven-background list row {
-    margin: 5px 12px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-.raven-background row:hover {
-    background-color: rgba(255, 255, 255, 0.10);
-    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.raven-background button.toggle,
-.raven-background .quick-toggle {
-    border-radius: 16px;
-    background-color: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    padding: 10px;
-    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0),
-                border-color    220ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-.raven-background button.toggle:checked,
-.raven-background .quick-toggle:checked {
-    background-color: rgba(0, 153, 204, 0.35);
-    border-color: rgba(0, 153, 204, 0.6);
-    transition: background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
-                border-color    160ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.raven-background scale trough {
-    border-radius: 999px;
-    background-color: rgba(255, 255, 255, 0.10);
-    min-height: 6px;
-}
-.raven-background scale highlight {
-    border-radius: 999px;
-    background-color: #0099cc;
-    transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.raven-background scale slider {
-    background-color: #ffffff;
-    border-radius: 999px;
-    min-width: 14px;
-    min-height: 14px;
-}
-
-/* === KibaOS: Budgie Menu (app launcher popover) as a floating glass card === */
-popover.budgie-menu,
-.budgie-menu-window {
-    border-radius: 22px;
-    background-color: rgba(16, 24, 40, 0.80);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.50);
-    transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-.budgie-menu-window entry,
-popover.budgie-menu entry {
-    border-radius: 999px;
-    background-color: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.10);
-    padding: 8px 16px;
-    color: #e8eef5;
-    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0),
-                border-color    200ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-.budgie-menu-window entry:focus,
-popover.budgie-menu entry:focus {
-    background-color: rgba(255, 255, 255, 0.12);
-    border-color: rgba(0, 153, 204, 0.6);
-    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
-                border-color    140ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-button.budgie-menu-launcher {
-    border-radius: 14px;
-    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-button.budgie-menu-launcher:hover {
-    background-color: rgba(0, 153, 204, 0.20);
-    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* === KibaOS: GTK places sidebar (Nemo + GTK open/save dialogs) glass card === */
-placessidebar {
-    background-color: transparent;
-    border-radius: 18px;
-}
-placessidebar row {
-    border-radius: 12px;
-    margin: 2px 6px;
-    transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-placessidebar row:selected {
-    background-color: rgba(0, 153, 204, 0.25);
-    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* === KibaOS: switches everywhere — the one spot using the "spring"
- * overshoot curve, since the knob's positional travel actually shows it === */
-switch slider {
-    transition: margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-switch:checked {
-    background-color: rgba(0, 153, 204, 0.85);
-    transition: background-color 220ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-switch {
-    transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
-}
-CHROMEOS_PILL_APPEND
-fi
 
 # ── GTK4 CSS OVERRIDE ─────────────────────────────────────────────────────
 mkdir -p /etc/gtk-4.0
@@ -4528,7 +4360,7 @@ NEMODESKTOP
 
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
-gtk-theme-name=ChromeOS-Dark
+gtk-theme-name=Adwaita-dark
 gtk-icon-theme-name=Papirus-Dark
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -4545,7 +4377,7 @@ cp /etc/gtk-3.0/gtk.css "${SKEL}/.config/gtk-3.0/gtk.css"
 cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
-gtk-theme-name="ChromeOS-Dark"
+gtk-theme-name="Adwaita-dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Noto Sans 11"
 gtk-cursor-theme-size=24
@@ -4573,7 +4405,7 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
-gsettings set org.gnome.desktop.interface gtk-theme               'ChromeOS-Dark'
+gsettings set org.gnome.desktop.interface gtk-theme               'Adwaita-dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
@@ -4743,16 +4575,6 @@ compression-algorithm = zstd
 ZRAM
 
 mkdir -p "${SKEL}/.config"
-cat > "${SKEL}/.config/libinput-gestures.conf" << 'GESTURES'
-gesture swipe left  3  dbus-send --session --type=method_call \
-  --dest=org.gnome.Shell /org/gnome/Shell \
-  org.gnome.Shell.Eval string:'Main.wm.actionMoveWorkspaceRight()'
-gesture swipe right 3  dbus-send --session --type=method_call \
-  --dest=org.gnome.Shell /org/gnome/Shell \
-  org.gnome.Shell.Eval string:'Main.wm.actionMoveWorkspaceLeft()'
-gesture swipe up    4  /usr/local/bin/kibaos-expose
-gesture pinch in    2  xdotool key super+d
-GESTURES
 
 mkdir -p "${SKEL}/.config/fontconfig"
 cat > "${SKEL}/.config/fontconfig/fonts.conf" << 'FONTCONF'
@@ -4798,16 +4620,6 @@ Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 POLKIT
-
-cat > "${SKEL}/.config/autostart/libinput-gestures.desktop" << 'GESTURESAUTO'
-[Desktop Entry]
-Type=Application
-Name=Libinput Gestures
-Exec=libinput-gestures-setup start
-Hidden=false
-NoDisplay=true
-X-GNOME-Autostart-enabled=true
-GESTURESAUTO
 
 cat > "${SKEL}/.bashrc" << 'BASHRC'
 [[ $- != *i* ]] && return
@@ -4961,7 +4773,7 @@ XDG_SESSION_TYPE=wayland
 QT_AUTO_SCREEN_SCALE_FACTOR=1
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-GTK_THEME=ChromeOS-Dark
+GTK_THEME=Adwaita-dark
 QT_STYLE_OVERRIDE=kvantum
 XCURSOR_THEME=Adwaita
 XCURSOR_SIZE=24
