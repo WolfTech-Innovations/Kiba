@@ -1808,8 +1808,7 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     if (!guid_is_zero(&disk->disk_guid)) {
         char disk_guid_str[37];
         guid_to_str(&disk->disk_guid, disk_guid_str);
-        struct fdisk_label *lbl = fdisk_get_label(cxt, NULL);
-        if (lbl) fdisk_gpt_set_disklabel_id_from_string(cxt, disk_guid_str);
+        fdisk_set_disklabel_id_from_string(cxt, disk_guid_str);
     }
 
     /* ── Add each partition ──────────────────────────────────────── */
@@ -4907,6 +4906,41 @@ Terminal=false
 Type=Application
 Categories=System;
 ABOUTDESK
+
+# ── Hide Avahi network browser (avahi-discover / avahi-ui-tools) ──────────
+# Avahi pulls in a "Network Browser" launcher we don't want in the app grid.
+# Override both the avahi-discover and bssh/bvnc desktop files with NoDisplay.
+for _avahi_desk in avahi-discover bssh bvnc; do
+  if [ -f "/usr/share/applications/${_avahi_desk}.desktop" ]; then
+    cp "/usr/share/applications/${_avahi_desk}.desktop" \
+       "/usr/share/applications/${_avahi_desk}.desktop.bak" 2>/dev/null || true
+    printf '[Desktop Entry]\nNoDisplay=true\n' \
+      >> "/usr/share/applications/${_avahi_desk}.desktop"
+  fi
+done
+
+# ── Hide gnome-terminal from the app launcher / shortcuts ─────────────────
+# Terminal access is available via right-click and other paths; we don't want
+# it pinned or visible in the main shortcut list.
+if [ -f "/usr/share/applications/org.gnome.Terminal.desktop" ]; then
+  sed -i 's/^NoDisplay=.*/NoDisplay=true/' \
+      "/usr/share/applications/org.gnome.Terminal.desktop" || true
+  grep -q '^NoDisplay=' "/usr/share/applications/org.gnome.Terminal.desktop" \
+    || echo 'NoDisplay=true' >> "/usr/share/applications/org.gnome.Terminal.desktop"
+fi
+
+# ── Rename budgie-control-center to "Settings" ─────────────────────────────
+# The upstream desktop file calls it "Budgie Control Center"; rebrand to the
+# simpler, consumer-friendly label "Settings".
+for _bcc_desk in budgie-control-center.desktop \
+                 org.buddiesofbudgie.BudgieControlCenter.desktop; do
+  if [ -f "/usr/share/applications/${_bcc_desk}" ]; then
+    sed -i 's/^Name=.*/Name=Settings/' \
+        "/usr/share/applications/${_bcc_desk}" || true
+    # Strip any localised Name[xx]=… lines so they don't override our label
+    sed -i '/^Name\[/d' "/usr/share/applications/${_bcc_desk}" || true
+  fi
+done
 
 mkdir -p /home/liveuser/Desktop
 for src_desktop in kibaos-install kibaos-about; do
