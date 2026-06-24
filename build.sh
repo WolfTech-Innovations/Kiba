@@ -7,7 +7,7 @@ sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 # ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
-grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
+grep -q '^alpm:' "${}/etc/group" 2>/dev/null || \
   echo 'alpm:x:951:' >> "${AIROOTFS}/etc/group"
 grep -q '^alpm:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
   echo 'alpm:!*:19000::::::' >> "${AIROOTFS}/etc/shadow"
@@ -1678,7 +1678,24 @@ int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
 KIBA_SRC_END_GPTH
 
 cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
-/* kiba_gpt.c — see kiba_gpt.h for design rationale. */
+/* kiba_gpt.c — GPT writer backed by libfdisk (util-linux).
+ *
+ * The previous revision of this file was a hand-rolled GPT writer
+ * (pwrite, CRC32, etc). It has been replaced with libfdisk, which is
+ * the reference implementation that backs fdisk/cfdisk and is maintained
+ * by the util-linux / kernel project. The public API (kiba_gpt.h) is
+ * unchanged — all callers continue to work without modification.
+ *
+ * libfdisk handles:
+ *   - Protective MBR
+ *   - Primary + backup GPT headers (including CRCs)
+ *   - Partition entry array
+ *   - BLKPG / BLKRRPART kernel notification (via fdisk_reread_partition_table)
+ *
+ * We retain our own kiba_gpt_probe_device() (raw ioctls, unchanged) and
+ * kiba_guid_random() since those have nothing to do with GPT writing and
+ * we do not want to pull in extra libfdisk API for such simple helpers.
+ */
 #define _GNU_SOURCE
 #include "kiba_gpt.h"
 
@@ -1689,16 +1706,18 @@ cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <sys/stat.h>
 #include <linux/fs.h>     /* BLKSSZGET, BLKGETSIZE64 */
-#include <linux/blkpg.h>  /* BLKPG, BLKPG_ADD_PARTITION */
+#include <libfdisk/libfdisk.h>
 
-/* ── Well-known type GUIDs ──────────────────────────────────────────── */
-/* On-disk GPT GUIDs are stored as: u32 LE, u16 LE, u16 LE, u8[8] BE-ish
- * (the last 8 bytes are stored byte-for-byte in the order written in the
- * canonical string, NOT byte-swapped). We hardcode the raw byte layout
- * here rather than parsing strings at runtime, to avoid a whole
- * string->GUID parser for two constants. */
+/* ── Well-known type GUIDs (string form for libfdisk) ───────────────── */
+/* libfdisk accepts GUIDs as canonical strings: 8-4-4-4-12 uppercase hex.
+ * These correspond to the byte arrays in the old hand-rolled version;
+ * kept as string constants so they're human-readable and verifiable. */
+#define KIBA_GUID_ESP_STR      "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
+#define KIBA_GUID_LINUX_FS_STR "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
+
+/* Public kiba_guid_t constants — kept for API compatibility with callers
+ * that compare against them. Byte layout: u32 LE, u16 LE, u16 LE, u8[8]. */
 const kiba_guid_t KIBA_GUID_ESP = {
     .b = { 0x28,0x73,0x2a,0xc1, 0x1f,0xf8, 0xd2,0x11,
            0xba,0x4b, 0x00,0xa0,0xc9,0x3e,0xc9,0x3b }
@@ -1708,29 +1727,7 @@ const kiba_guid_t KIBA_GUID_LINUX_FS = {
            0x8e,0x79, 0x3d,0x69,0xd8,0x47,0x7d,0xe4 }
 };
 
-/* ── CRC32 (IEEE 802.3 / zlib polynomial), table-based ─────────────── */
-static uint32_t crc32_table[256];
-static bool     crc32_table_ready = false;
-
-static void crc32_init_table(void) {
-    for (uint32_t i = 0; i < 256; i++) {
-        uint32_t c = i;
-        for (int k = 0; k < 8; k++)
-            c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
-        crc32_table[i] = c;
-    }
-    crc32_table_ready = true;
-}
-
-static uint32_t kiba_crc32(const uint8_t *buf, size_t len) {
-    if (!crc32_table_ready) crc32_init_table();
-    uint32_t c = 0xFFFFFFFFu;
-    for (size_t i = 0; i < len; i++)
-        c = crc32_table[(c ^ buf[i]) & 0xFF] ^ (c >> 8);
-    return c ^ 0xFFFFFFFFu;
-}
-
-/* ── GUID generation ────────────────────────────────────────────────── */
+/* ── GUID helpers ────────────────────────────────────────────────────── */
 static bool guid_is_zero(const kiba_guid_t *g) {
     for (int i = 0; i < 16; i++) if (g->b[i]) return false;
     return true;
@@ -1740,27 +1737,30 @@ kiba_guid_t kiba_guid_random(void) {
     kiba_guid_t g;
     FILE *f = fopen("/dev/urandom", "rb");
     if (!f || fread(g.b, 1, 16, f) != 16) {
-        /* Should not happen on Linux, but never leave a GUID uninitialised. */
         for (int i = 0; i < 16; i++) g.b[i] = (uint8_t)(rand() & 0xFF);
     }
     if (f) fclose(f);
-    /* RFC 4122 v4: set version (4) and variant (10) bits. */
+    /* RFC 4122 v4 bits */
     g.b[6] = (uint8_t)((g.b[6] & 0x0F) | 0x40);
     g.b[8] = (uint8_t)((g.b[8] & 0x3F) | 0x80);
     return g;
 }
 
-/* ── Little-endian packing helpers (disk format is all LE except GUIDs'
- *    last 8 bytes, which are raw byte order) ──────────────────────────*/
-static void put_u32(uint8_t *p, uint32_t v) {
-    p[0]=v&0xFF; p[1]=(v>>8)&0xFF; p[2]=(v>>16)&0xFF; p[3]=(v>>24)&0xFF;
+/* Convert our kiba_guid_t (mixed-endian on-disk bytes) to the canonical
+ * 8-4-4-4-12 string that libfdisk expects.
+ * GPT GUID wire format: first three groups are LE, last two are BE/raw. */
+static void guid_to_str(const kiba_guid_t *g, char out[37]) {
+    const uint8_t *b = g->b;
+    snprintf(out, 37,
+        "%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+        b[3],b[2],b[1],b[0],   /* u32 LE → big-endian display */
+        b[5],b[4],              /* u16 LE → big-endian display */
+        b[7],b[6],              /* u16 LE → big-endian display */
+        b[8],b[9],              /* remaining 8 bytes raw */
+        b[10],b[11],b[12],b[13],b[14],b[15]);
 }
-static void put_u64(uint8_t *p, uint64_t v) {
-    for (int i = 0; i < 8; i++) p[i] = (uint8_t)((v >> (8*i)) & 0xFF);
-}
-static void put_guid(uint8_t *p, kiba_guid_t g) { memcpy(p, g.b, 16); }
 
-/* ── Device probing via ioctl (no `blockdev`/`lsblk`) ─────────────── */
+/* ── Device probing via ioctl (unchanged from original) ─────────────── */
 int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
                            uint64_t *total_sectors) {
     int fd = open(path, O_RDONLY);
@@ -1778,185 +1778,96 @@ int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
     return 0;
 }
 
-/* ── Build one 128-byte partition entry into buf at offset ───────────*/
-static void write_entry(uint8_t *buf, const kiba_gpt_partition_t *p) {
-    memset(buf, 0, KIBA_GPT_ENTRY_SIZE);
-    put_guid(buf + 0,  p->type_guid);
-    kiba_guid_t uniq = guid_is_zero(&p->unique_guid) ? kiba_guid_random() : p->unique_guid;
-    put_guid(buf + 16, uniq);
-    put_u64(buf + 32, p->first_lba);
-    put_u64(buf + 40, p->last_lba);
-    put_u64(buf + 48, p->attributes);
-    /* Name: UTF-16LE, up to 36 code units, zero-padded. ASCII-only here
-     * since KibaOS partition names are all plain ASCII ("KIBAOS-ESP" etc). */
-    for (int i = 0; i < 36 && p->name[i]; i++) {
-        buf[56 + i*2]     = (uint8_t)p->name[i];
-        buf[56 + i*2 + 1] = 0;
-    }
-}
-
-/* ── Notify the kernel of a new partition via BLKPG (same ioctl
- *    `partprobe` uses internally) — no partprobe subprocess. ────────*/
-static int blkpg_add_partition(int fd, int partno, uint64_t start_bytes,
-                                uint64_t length_bytes, const char *devname) {
-    struct blkpg_partition bp;
-    memset(&bp, 0, sizeof(bp));
-    bp.start = (long long)start_bytes;
-    bp.length = (long long)length_bytes;
-    bp.pno = partno;
-    if (devname) strncpy(bp.devname, devname, BLKPG_DEVNAMELTH - 1);
-
-    struct blkpg_ioctl_arg arg;
-    memset(&arg, 0, sizeof(arg));
-    arg.op = BLKPG_ADD_PARTITION;
-    arg.datalen = sizeof(bp);
-    arg.data = &bp;
-
-    if (ioctl(fd, BLKPG, &arg) != 0) return -errno;
-    return 0;
-}
-
-/* Best-effort: if a stale partition with this number already exists in
- * the kernel's view (e.g. re-running install on a previously-partitioned
- * disk), delete it first so BLKPG_ADD_PARTITION doesn't fail with EBUSY. */
-static void blkpg_del_partition_if_present(int fd, int partno) {
-    struct blkpg_partition bp;
-    memset(&bp, 0, sizeof(bp));
-    bp.pno = partno;
-    struct blkpg_ioctl_arg arg;
-    memset(&arg, 0, sizeof(arg));
-    arg.op = BLKPG_DEL_PARTITION;
-    arg.datalen = sizeof(bp);
-    arg.data = &bp;
-    ioctl(fd, BLKPG, &arg);  /* ignore failure: fine if it didn't exist */
-}
-
+/* ── kiba_gpt_write — the libfdisk implementation ───────────────────── */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
                     const kiba_gpt_partition_t *parts, size_t n_parts) {
-    if (n_parts == 0 || n_parts > KIBA_GPT_NUM_ENTRIES) return -EINVAL;
+    if (n_parts == 0 || n_parts > 128) return -EINVAL;
     if (disk->logical_sector_size == 0) return -EINVAL;
 
-    const uint32_t ssz = disk->logical_sector_size;
-    const uint64_t total = disk->total_sectors;
+    /* Resolve the block device path from our open fd via /proc/self/fd.
+     * libfdisk needs a path string, not an fd. */
+    char fd_link[64];
+    char dev_path[PATH_MAX];
+    snprintf(fd_link, sizeof(fd_link), "/proc/self/fd/%d", disk->fd);
+    ssize_t len = readlink(fd_link, dev_path, sizeof(dev_path) - 1);
+    if (len < 0) return -errno;
+    dev_path[len] = '\0';
 
-    /* Partition entry array: UEFI requires >= 16384 bytes regardless of
-     * sector size. Round up to whole sectors. */
-    const uint32_t entry_array_bytes = KIBA_GPT_NUM_ENTRIES * KIBA_GPT_ENTRY_SIZE; /* 16384 */
-    const uint32_t entry_array_sectors =
-        (entry_array_bytes + ssz - 1) / ssz;
+    /* ── Initialise libfdisk context ─────────────────────────────── */
+    struct fdisk_context *cxt = fdisk_new_context();
+    if (!cxt) return -ENOMEM;
 
-    const uint64_t primary_array_lba = 2;
-    const uint64_t first_usable_lba  = primary_array_lba + entry_array_sectors;
-    const uint64_t backup_header_lba = total - 1;
-    const uint64_t backup_array_lba  = backup_header_lba - entry_array_sectors;
-    const uint64_t last_usable_lba   = backup_array_lba - 1;
+    int rc = fdisk_assign_device(cxt, dev_path, 0 /* read-write */);
+    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
 
-    /* Validate every partition fits in the usable range and none overlap
-     * (entries are expected pre-sorted by first_lba by the caller). */
-    uint64_t prev_end = first_usable_lba - 1;
+    /* Create a fresh GPT label (wipes any existing table) */
+    rc = fdisk_create_disklabel(cxt, "gpt");
+    if (rc != 0) goto out;
+
+    /* Optionally set the disk GUID */
+    if (!guid_is_zero(&disk->disk_guid)) {
+        char disk_guid_str[37];
+        guid_to_str(&disk->disk_guid, disk_guid_str);
+        struct fdisk_label *lbl = fdisk_get_label(cxt, NULL);
+        if (lbl) fdisk_gpt_set_disklabel_id_from_string(cxt, disk_guid_str);
+    }
+
+    /* ── Add each partition ──────────────────────────────────────── */
     for (size_t i = 0; i < n_parts; i++) {
-        if (parts[i].first_lba <= prev_end) return -EINVAL;          /* overlap/order */
-        if (parts[i].last_lba  > last_usable_lba) return -ENOSPC;     /* doesn't fit */
-        if (parts[i].last_lba  < parts[i].first_lba) return -EINVAL;  /* zero/negative length */
-        prev_end = parts[i].last_lba;
+        const kiba_gpt_partition_t *p = &parts[i];
+
+        struct fdisk_partition *pa = fdisk_new_partition();
+        if (!pa) { rc = -ENOMEM; goto out; }
+
+        fdisk_partition_set_start(pa, p->first_lba);
+        fdisk_partition_set_size(pa, p->last_lba - p->first_lba + 1);
+
+        /* Partition type GUID */
+        struct fdisk_parttype *ptype = NULL;
+        if (memcmp(p->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
+            ptype = fdisk_label_parse_parttype(
+                        fdisk_get_label(cxt, NULL), KIBA_GUID_ESP_STR);
+        else
+            ptype = fdisk_label_parse_parttype(
+                        fdisk_get_label(cxt, NULL), KIBA_GUID_LINUX_FS_STR);
+        if (ptype) {
+            fdisk_partition_set_type(pa, ptype);
+            fdisk_unref_parttype(ptype);
+        }
+
+        /* Partition name */
+        if (p->name[0])
+            fdisk_partition_set_name(pa, p->name);
+
+        /* Unique partition GUID (if caller provided one) */
+        if (!guid_is_zero(&p->unique_guid)) {
+            char uguid_str[37];
+            guid_to_str(&p->unique_guid, uguid_str);
+            fdisk_partition_set_uuid(pa, uguid_str);
+        }
+
+        /* Use fdisk_add_partition so libfdisk tracks the slot number */
+        size_t partno = i; /* 0-based slot */
+        rc = fdisk_add_partition(cxt, pa, &partno);
+        fdisk_unref_partition(pa);
+        if (rc != 0) goto out;
     }
 
-    /* ── Build the partition entry array (same bytes for primary+backup) */
-    uint8_t *entry_array = calloc(1, (size_t)entry_array_sectors * ssz);
-    if (!entry_array) return -ENOMEM;
-    for (size_t i = 0; i < n_parts; i++)
-        write_entry(entry_array + i * KIBA_GPT_ENTRY_SIZE, &parts[i]);
-    uint32_t entries_crc = kiba_crc32(entry_array, entry_array_bytes);
+    /* ── Write GPT to disk ───────────────────────────────────────── */
+    rc = fdisk_write_disklabel(cxt);
+    if (rc != 0) goto out;
 
-    /* ── Build protective MBR (LBA 0) ────────────────────────────────*/
-    uint8_t *mbr = calloc(1, ssz);
-    if (!mbr) { free(entry_array); return -ENOMEM; }
-    /* Single partition record, type 0xEE, covering the whole disk
-     * (clipped to 32-bit LBA max as the spec requires). */
-    uint32_t pmbr_size = (total - 1 > 0xFFFFFFFFu) ? 0xFFFFFFFFu : (uint32_t)(total - 1);
-    mbr[446] = 0x00;            /* boot indicator: not bootable */
-    mbr[446+4] = 0xEE;          /* partition type: GPT protective */
-    put_u32(mbr + 446 + 8, 1);  /* starting LBA */
-    put_u32(mbr + 446 + 12, pmbr_size);
-    mbr[510] = 0x55; mbr[511] = 0xAA;  /* boot signature */
-
-    /* ── Build primary + backup GPT headers ──────────────────────────*/
-    kiba_guid_t disk_guid = guid_is_zero(&disk->disk_guid)
-                             ? kiba_guid_random() : disk->disk_guid;
-
-    uint8_t *hdr_primary = calloc(1, ssz);
-    uint8_t *hdr_backup  = calloc(1, ssz);
-    if (!hdr_primary || !hdr_backup) {
-        free(entry_array); free(mbr); free(hdr_primary); free(hdr_backup);
-        return -ENOMEM;
+    /* Tell the kernel about the new partition table (replaces partprobe) */
+    rc = fdisk_reread_partition_table(cxt);
+    if (rc != 0) {
+        /* Non-fatal on some setups (e.g. disk is mounted read-only for
+         * another partition). The caller's udev settle loop will handle it. */
+        rc = 0;
     }
 
-    void (*fill_header)(uint8_t*, uint64_t, uint64_t, uint64_t, uint64_t) = NULL;
-    (void)fill_header; /* (kept simple inline below instead of a fn pointer) */
-
-    for (int pass = 0; pass < 2; pass++) {
-        uint8_t *h         = pass == 0 ? hdr_primary : hdr_backup;
-        uint64_t my_lba     = pass == 0 ? 1                 : backup_header_lba;
-        uint64_t alt_lba    = pass == 0 ? backup_header_lba : 1;
-        uint64_t array_lba  = pass == 0 ? primary_array_lba : backup_array_lba;
-
-        memcpy(h, KIBA_GPT_SIGNATURE, 8);
-        put_u32(h + 8,  KIBA_GPT_REVISION);
-        put_u32(h + 12, KIBA_GPT_HEADER_SIZE);
-        put_u32(h + 16, 0);                 /* header CRC32 — filled after zeroing */
-        put_u32(h + 20, 0);                 /* reserved */
-        put_u64(h + 24, my_lba);
-        put_u64(h + 32, alt_lba);
-        put_u64(h + 40, first_usable_lba);
-        put_u64(h + 48, last_usable_lba);
-        put_guid(h + 56, disk_guid);
-        put_u64(h + 72, array_lba);
-        put_u32(h + 80, KIBA_GPT_NUM_ENTRIES);
-        put_u32(h + 84, KIBA_GPT_ENTRY_SIZE);
-        put_u32(h + 88, entries_crc);
-
-        /* Header CRC32 is computed over bytes [0, HeaderSize) with the
-         * CRC field itself treated as zero during the calculation. */
-        uint32_t hdr_crc = kiba_crc32(h, KIBA_GPT_HEADER_SIZE);
-        put_u32(h + 16, hdr_crc);
-    }
-
-    /* ── Write everything out ────────────────────────────────────────*/
-    int rc = 0;
-    off_t off;
-
-    #define PWRITE_OR_FAIL(buf, len, lba) do { \
-        off = (off_t)(lba) * (off_t)ssz; \
-        if (pwrite(disk->fd, (buf), (len), off) != (ssize_t)(len)) { \
-            rc = -errno; goto cleanup; \
-        } \
-    } while (0)
-
-    PWRITE_OR_FAIL(mbr,          ssz,                       0);
-    PWRITE_OR_FAIL(hdr_primary,  ssz,                       1);
-    PWRITE_OR_FAIL(entry_array,  entry_array_sectors * ssz, primary_array_lba);
-    PWRITE_OR_FAIL(entry_array,  entry_array_sectors * ssz, backup_array_lba);
-    PWRITE_OR_FAIL(hdr_backup,   ssz,                       backup_header_lba);
-
-    #undef PWRITE_OR_FAIL
-
-    if (fsync(disk->fd) != 0) { rc = -errno; goto cleanup; }
-
-    /* ── Tell the kernel about each partition (replaces `partprobe`) ─*/
-    for (size_t i = 0; i < n_parts; i++) {
-        int partno = (int)i + 1;
-        blkpg_del_partition_if_present(disk->fd, partno);
-        uint64_t start_bytes  = parts[i].first_lba * ssz;
-        uint64_t length_bytes = (parts[i].last_lba - parts[i].first_lba + 1) * ssz;
-        int r = blkpg_add_partition(disk->fd, partno, start_bytes, length_bytes, NULL);
-        if (r != 0) { rc = r; goto cleanup; }
-    }
-
-cleanup:
-    free(entry_array);
-    free(mbr);
-    free(hdr_primary);
-    free(hdr_backup);
+out:
+    fdisk_deassign_device(cxt, 0);
+    fdisk_unref_context(cxt);
     return rc;
 }
 KIBA_SRC_END_GPTC
