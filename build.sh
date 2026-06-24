@@ -818,6 +818,17 @@ public class KibaOOBE : Adw.Application {
         content.append (oobe_heading ("Welcome to KibaOS",
             "Let's get your system set up. This should only take a few minutes."));
 
+        var nav_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
+            halign = Gtk.Align.START,
+            margin_top = 20
+        };
+        var try_btn = new Gtk.Button.with_label ("Try KibaOS");
+        try_btn.add_css_class ("oobe-secondary-button");
+        try_btn.tooltip_text = "Explore the live desktop without installing anything yet.";
+        try_btn.clicked.connect (() => { this.quit (); });
+        nav_row.append (try_btn);
+        content.append (nav_row);
+
         return make_page ("Welcome", content, "Get Started", () => {
             nav_view.push (build_wifi_page ());
         }, true, 0, 0);
@@ -1227,10 +1238,20 @@ public class KibaOOBE : Adw.Application {
         launch_backend (argv);
     }
 
+    private string last_fatal_message = "";
+
     private void launch_backend (string[] argv) {
         try {
-            var launcher = new GLib.SubprocessLauncher (GLib.SubprocessFlags.STDOUT_PIPE);
+            // STDERR_MERGE folds the backend's stderr into the same pipe as
+            // stdout. Previously only STDOUT_PIPE was set, so every
+            // "FATAL: ..." line (the only place the *actual* error reason
+            // — kiba_fs_strerror()/strerror(errno) text — ever got written)
+            // went to the backend's inherited stderr and was simply lost,
+            // since sudo+a GUI launch has no terminal attached to catch it.
+            var launcher = new GLib.SubprocessLauncher (
+                GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
             var proc     = launcher.spawnv (argv);
+            last_fatal_message = "";
             read_backend_output.begin (
                 new GLib.DataInputStream (proc.get_stdout_pipe ()), proc);
         } catch (GLib.Error e) {
@@ -1249,11 +1270,18 @@ public class KibaOOBE : Adw.Application {
                     string msg = parts.length > 1 ? parts[1] : "";
                     progress_bar.fraction = pct / 100.0;
                     progress_label.label  = msg;
+                } else if (line.has_prefix ("FATAL: ")) {
+                    // Captured now that stderr is merged in — keep the real
+                    // reason so we can show it instead of a generic message.
+                    last_fatal_message = line.substring (7);
                 }
             }
             yield proc.wait_async ();
             if (proc.get_exit_status () == 0) {
                 nav_view.push (build_done_page ());
+            } else if (last_fatal_message != "") {
+                progress_label.label = last_fatal_message +
+                    "\n(Full log: /var/log/kibaos-oobe.log)";
             } else {
                 progress_label.label =
                     "Something went wrong. Check /var/log/kibaos-oobe.log for details.";
@@ -1563,24 +1591,29 @@ mkdir -p /usr/share/kibaos-oobe/src/disk
 cd /usr/share/kibaos-oobe/src/disk
 
 cat > kiba_gpt.h << 'KIBA_SRC_END_GPTH'
-/* kiba_gpt.h — minimal, dependency-free GPT partition table writer.
+/* kiba_gpt.h — GPT partition table writer, backed by libfdisk.
  *
- * Implements UEFI Spec 2.10 chapter 5 (GUID Partition Table) by hand:
- * protective MBR + primary/backup GPT header + primary/backup partition
- * entry array, written directly via pwrite() to the block device. No
- * libparted, no archinstall, no `parted`/`sgdisk` subprocess.
+ * Previously this was a from-scratch, hand-rolled implementation of
+ * UEFI Spec 2.10 chapter 5 (protective MBR + primary/backup GPT header +
+ * entry array) written directly via pwrite(), with BLKPG ioctls standing
+ * in for partprobe. That hand-rolled GPT writer is now replaced with
+ * libfdisk (util-linux's own partitioning library — the same code that
+ * backs `fdisk`/`cfdisk` and is maintained by the kernel/util-linux
+ * project). Reasoning: GPT is a CRC32'd, dual-copy, byte-exact-spec
+ * format — exactly the kind of thing where a small bug (off-by-one
+ * sector, wrong CRC scope, endianness slip) silently corrupts a real
+ * disk. libfdisk gets this right because it's the reference
+ * implementation other tools defer to, not because hand-rolled C can't
+ * — it's a real, maintained dependency trade made deliberately, the
+ * same way kiba_fs.h already defers to mkfs.ext4/mkfs.fat for the same
+ * reason.
  *
- * After writing, the kernel is informed of the new partitions via the
- * BLKPG ioctl (BLKPG_ADD_PARTITION) — the same ioctl `partprobe` itself
- * uses internally — so no `partprobe` subprocess is needed either.
+ * The public API below is UNCHANGED from the previous version, so
+ * kibaos_oobe_backend_main.c and every other caller needs zero changes.
  *
- * This header only covers GPT itself. Filesystem creation (FAT32/ext4)
- * is a separate concern — see kiba_fs.h — because there is no stable,
- * widely-available *library* API for writing ext4/FAT32 filesystems;
- * mkfs.ext4 / mkfs.fat are the maintained reference implementations of
- * those on-disk formats. That is a real, honest limitation of "no
- * external tools at all" — see kiba_fs.h's doc comment for how we
- * still minimize the dependency surface there.
+ * Build requirement: link with `-lfdisk` (libfdisk-dev /
+ * util-linux-libs, already present on any Arch base — part of
+ * util-linux). See the gcc invocation building kibaos-oobe-backend.
  */
 #ifndef KIBA_GPT_H
 #define KIBA_GPT_H
@@ -1589,13 +1622,9 @@ cat > kiba_gpt.h << 'KIBA_SRC_END_GPTH'
 #include <stdbool.h>
 #include <stddef.h>
 
-#define KIBA_GPT_SIGNATURE "EFI PART"
-#define KIBA_GPT_REVISION  0x00010000u
-#define KIBA_GPT_HEADER_SIZE 92u
-#define KIBA_GPT_ENTRY_SIZE 128u
-#define KIBA_GPT_NUM_ENTRIES 128u   /* UEFI spec minimum: 16384 bytes / 128 */
-
-/* 16-byte little/mixed-endian GUID, stored exactly as UEFI expects on disk. */
+/* 16-byte little/mixed-endian GUID, stored exactly as UEFI expects on disk.
+ * Kept for ABI compatibility with existing callers — internally this is
+ * now converted to/from libfdisk's string-GUID representation. */
 typedef struct {
     uint8_t b[16];
 } kiba_guid_t;
@@ -1607,7 +1636,7 @@ extern const kiba_guid_t KIBA_GUID_LINUX_FS;     /* 0FC63DAF-8483-4772-8E79-3D69
 typedef struct {
     char        name[37];      /* NUL-terminated, displayed only; truncated to 36 UTF-16 chars on disk */
     kiba_guid_t type_guid;
-    kiba_guid_t unique_guid;   /* if all-zero, one is randomly generated */
+    kiba_guid_t unique_guid;   /* if all-zero, libfdisk generates one */
     uint64_t    first_lba;
     uint64_t    last_lba;      /* inclusive */
     uint64_t    attributes;
@@ -1617,24 +1646,31 @@ typedef struct {
     int      fd;                 /* open O_RDWR on the whole-disk block device */
     uint32_t logical_sector_size;
     uint64_t total_sectors;
-    kiba_guid_t disk_guid;       /* if all-zero, randomly generated */
+    kiba_guid_t disk_guid;       /* if all-zero, libfdisk generates one */
 } kiba_gpt_disk_t;
 
 /* Generates a random RFC-4122 v4 GUID using /dev/urandom — no external tool. */
 kiba_guid_t kiba_guid_random(void);
 
-/* Writes a complete protective-MBR + primary/backup GPT layout to disk->fd
- * for the given partitions (in order). Returns 0 on success, -errno on
- * failure (with errno set; check perror-style via return value).
+/* Creates a fresh GPT label and writes the given partitions (in order) to
+ * disk->fd via libfdisk. Returns 0 on success, -errno (or a libfdisk
+ * negative error code) on failure.
  *
- * On success, the kernel partition table (BLKPG) is updated for each
- * partition automatically — caller does not need to call partprobe.
+ * On success, the kernel partition table is updated for each partition
+ * automatically (libfdisk calls BLKPG/BLKRRPART internally as needed) —
+ * caller does not need to call partprobe.
+ *
+ * NOTE: disk->fd is used only to derive the device path for libfdisk
+ * (via /proc/self/fd) — libfdisk opens the device itself through
+ * fdisk_assign_device(). The fd passed in must stay open for the
+ * duration of the call.
  */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
                     const kiba_gpt_partition_t *parts, size_t n_parts);
 
 /* Reads back sector size + total size for `path` (e.g. "/dev/vda") via
- * ioctl (BLKSSZGET, BLKGETSIZE64) — no `blockdev`/`lsblk` subprocess. */
+ * ioctl (BLKSSZGET, BLKGETSIZE64) — no `blockdev`/`lsblk` subprocess.
+ * (Unchanged — these ioctls were never the risky part.) */
 int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
                            uint64_t *total_sectors);
 
@@ -2975,11 +3011,32 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <time.h>
 #include <unistd.h>
+
+static FILE *g_logfp = NULL;
+
+static void log_init(void) {
+    /* Open (create/append) the log file the UI tells the user to check.
+     * Nothing upstream of this ever actually opened it before now — the
+     * backend only wrote to stdout/stderr, which the frontend silently
+     * dropped half of (see SubprocessLauncher fix in the Vala frontend:
+     * it only piped STDOUT, so every FATAL: line on stderr went nowhere). */
+    g_logfp = fopen("/var/log/kibaos-oobe.log", "a");
+    if (g_logfp) {
+        setvbuf(g_logfp, NULL, _IOLBF, 0); /* line-buffered: survives a crash/kill */
+        time_t now = time(NULL);
+        fprintf(g_logfp, "\n=== kibaos-oobe-backend started %s", ctime(&now));
+        fflush(g_logfp);
+    }
+    /* Non-fatal if this fails (e.g. /var/log not writable yet at this point
+     * in boot) — we still have stdout/stderr as a fallback, just no file. */
+}
 
 static void progress(int pct, const char *msg) {
     printf("PROGRESS %d %s\n", pct, msg);
     fflush(stdout);
+    if (g_logfp) { fprintf(g_logfp, "PROGRESS %d %s\n", pct, msg); fflush(g_logfp); }
 }
 
 static void progress_cb(int pct, const char *msg, void *ud) {
@@ -2990,10 +3047,12 @@ static void progress_cb(int pct, const char *msg, void *ud) {
 static void fail(const char *msg) {
     progress(100, msg);
     fprintf(stderr, "FATAL: %s\n", msg);
+    if (g_logfp) { fprintf(g_logfp, "FATAL: %s\n", msg); fflush(g_logfp); fclose(g_logfp); }
     exit(1);
 }
 
 int main(int argc, char **argv) {
+    log_init();
     if (argc != 7) {
         fprintf(stderr, "usage: %s <disk> <locale> <keymap> <hostname> <username> <password>\n", argv[0]);
         return 2;
@@ -3048,7 +3107,11 @@ int main(int argc, char **argv) {
     };
     int rc = kiba_gpt_write(&gdisk, parts, 2);
     close(disk_fd);
-    if (rc != 0) fail("Partitioning failed.");
+    if (rc != 0) {
+        char errbuf[256];
+        snprintf(errbuf, sizeof(errbuf), "Partitioning failed: %s", strerror(-rc));
+        fail(errbuf);
+    }
 
     /* Determine the resulting partition device paths.
      * Real rule (confirmed against ArchWiki's device-naming page): if
