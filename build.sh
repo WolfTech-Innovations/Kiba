@@ -815,7 +815,7 @@ public class KibaOOBE : Adw.Application {
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // Page 2: Wi-Fi  (animated icon, network list)
+    // Page 2: Wi-Fi  (animated icon, network list, actual connection)
     // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_wifi_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 24);
@@ -828,62 +828,52 @@ public class KibaOOBE : Adw.Application {
         };
         canvas.add_css_class ("oobe-wifi-canvas");
 
-        // Animation tick state (boxed in an array so closures can capture it)
-        double[] tick   = { 0.0 };   // 0..1 repeating
-        double[] wiggle = { 0.0 };   // small side-sway for the playful bounce
+        double[] tick   = { 0.0 };
+        double[] wiggle = { 0.0 };
         uint[]   src_id = { 0 };
 
         canvas.set_draw_func ((da, cr, w, h) => {
             double t      = tick[0];
             double cx     = w / 2.0;
             double cy     = h / 2.0 + 8;
-            double r1     = 14.0, r2 = 26.0, r3 = 38.0;  // arc radii
-            double sw     = 4.5;                           // stroke width
+            double r1     = 14.0, r2 = 26.0, r3 = 38.0;
+            double sw     = 4.5;
 
-            // Arc opacity: arcs fade in from outer to inner as t grows
             double a3 = double.max (0, double.min (1, t * 3));
             double a2 = double.max (0, double.min (1, t * 3 - 0.6));
             double a1 = double.max (0, double.min (1, t * 3 - 1.2));
 
-            // ── Outer arc ───────────────────────────────────────────────
             cr.set_line_width (sw);
             cr.set_line_cap (Cairo.LineCap.ROUND);
-            cr.set_source_rgba (0.0, 0.60, 0.80, a3 * 0.85);
             double start_angle = Math.PI * (1.0 + 0.18);
             double end_angle   = Math.PI * (2.0 - 0.18);
+
+            cr.set_source_rgba (0.0, 0.60, 0.80, a3 * 0.85);
             cr.arc (cx, cy, r3, start_angle, end_angle);
             cr.stroke ();
 
-            // ── Middle arc ──────────────────────────────────────────────
             cr.set_source_rgba (0.0, 0.60, 0.80, a2 * 0.90);
             cr.arc (cx, cy, r2, start_angle, end_angle);
             cr.stroke ();
 
-            // ── Inner arc ───────────────────────────────────────────────
             cr.set_source_rgba (0.0, 0.60, 0.80, a1 * 0.95);
             cr.arc (cx, cy, r1, start_angle, end_angle);
             cr.stroke ();
 
-            // ── Dot + ripple ─────────────────────────────────────────────
-            // dot phase: pulses from 0→1→0 at 1.2× speed
-            double dp = (t * 1.4) % 1.0;
-            // ripple ring expands outward and fades
+            double dp    = (t * 1.4) % 1.0;
             double rip_r = 6.0 + dp * 18.0;
             double rip_a = (1.0 - dp) * 0.55;
 
-            // ripple circle
             cr.set_source_rgba (0.0, 0.60, 0.80, rip_a);
             cr.set_line_width (2.0);
             cr.arc (cx, cy + r3 - 2.0 + wiggle[0] * 3.0, rip_r, 0, 2 * Math.PI);
             cr.stroke ();
 
-            // solid dot
             cr.set_source_rgba (0.0, 0.60, 0.80, 1.0);
             cr.arc (cx, cy + r3 - 2.0 + wiggle[0] * 3.0, 5.5, 0, 2 * Math.PI);
             cr.fill ();
         });
 
-        // Tick function driving the animation (60 fps)
         src_id[0] = GLib.Timeout.add (16, () => {
             tick[0]   = (tick[0] + 0.012) % 1.0;
             wiggle[0] = Math.sin (tick[0] * Math.PI * 6.0) * 0.4;
@@ -891,7 +881,6 @@ public class KibaOOBE : Adw.Application {
             return GLib.Source.CONTINUE;
         });
 
-        // Stop animation when widget is destroyed
         canvas.destroy.connect (() => {
             if (src_id[0] != 0) { GLib.Source.remove (src_id[0]); src_id[0] = 0; }
         });
@@ -900,15 +889,14 @@ public class KibaOOBE : Adw.Application {
         content.append (oobe_heading ("Connect to Wi-Fi",
             "Choose a network to continue. You can also skip this step."));
 
-        // Network list — populated via iwctl (NetworkManager was dropped in
-        // favor of iwd for a lighter network stack; see customize_airootfs.sh)
-        var list_box = new Gtk.ListBox ();
-        list_box.add_css_class ("oobe-list");
-        list_box.selection_mode = Gtk.SelectionMode.SINGLE;
+        // Status label shown below the list ("Connecting…", "Connected ✓", errors)
+        var status_label = new Gtk.Label ("") {
+            halign = Gtk.Align.CENTER,
+            wrap   = true
+        };
+        status_label.add_css_class ("oobe-subtitle");
 
-        // Find the first wireless device iwd manages, trigger a scan, then
-        // read back its station list. Best-effort; if iwd/iwctl is absent
-        // or there's no wireless hardware, show the "no networks" note.
+        // ── Discover the first iwd-managed wireless device ────────────────
         string wifi_dev = "";
         try {
             string dev_out = "";
@@ -921,14 +909,28 @@ public class KibaOOBE : Adw.Application {
             }
         } catch (GLib.SpawnError e) {}
 
+        // Capture for closures
+        string[] dev_box = { wifi_dev };
+
+        // ── Build network list ────────────────────────────────────────────
+        var list_box = new Gtk.ListBox ();
+        list_box.add_css_class ("oobe-list");
+        list_box.selection_mode = Gtk.SelectionMode.SINGLE;
+
+        // Each row stores its SSID and whether it needs a password in widget data.
+        // We use a simple parallel arrays approach since Vala/GTK4 has no
+        // set_data on widgets without GObject subclassing tricks.
+        string[] ssid_list    = {};
+        bool[]   secured_list = {};
+
         string raw_nets = "";
-        if (wifi_dev != "") {
+        if (dev_box[0] != "") {
             try {
                 string scan_out = "";
                 GLib.Process.spawn_command_line_sync (
-                    "iwctl station %s scan".printf (wifi_dev), out scan_out);
+                    "iwctl station %s scan".printf (dev_box[0]), out scan_out);
                 GLib.Process.spawn_command_line_sync (
-                    "iwctl station %s get-networks".printf (wifi_dev), out raw_nets);
+                    "iwctl station %s get-networks".printf (dev_box[0]), out raw_nets);
             } catch (GLib.SpawnError e) {}
         }
 
@@ -936,36 +938,39 @@ public class KibaOOBE : Adw.Application {
         bool any = false;
         foreach (var line in raw_nets.split ("\n")) {
             var trimmed = line.strip ();
-            // Skip header/separator/blank lines; data rows are the only ones
-            // with 2+ whitespace-separated columns after a >=4-space gap.
             if (trimmed == "" || trimmed.has_prefix ("---") ||
                 trimmed.has_prefix ("Network name") ||
                 trimmed.down ().has_prefix ("available networks")) continue;
-            // iwd marks the currently-connected network with a leading ">";
-            // strip it so it doesn't end up glued onto the SSID.
             if (trimmed.has_prefix (">")) trimmed = trimmed.substring (1).strip ();
-            // Columns are separated by runs of 4+ spaces (SSIDs may contain
-            // single spaces, so a naive single-space split would break them).
             var cols = GLib.Regex.split_simple ("\\s{4,}", trimmed);
             if (cols.length < 3) continue;
             string ssid = cols[0].strip ();
             if (ssid == "" || seen.contains (ssid)) continue;
             seen.add (ssid);
-            string security = cols[1].strip ().down ();
+            string security    = cols[1].strip ().down ();
             string signal_bars = cols[2].strip ();
-            bool   secured  = security != "" && security != "open";
-            // iwd reports signal as 1-4 asterisks rather than a percentage;
-            // approximate a percentage from the bar count for the subtitle.
-            int    bars     = signal_bars.length;
-            string signal   = "%d".printf (int.min (100, bars * 25));
-            string icon_name = "network-wireless-signal-good-symbolic";
+            bool   secured     = security != "" && security != "open";
+            int    bars        = signal_bars.length;
+            string signal_pct  = "%d%%".printf (int.min (100, bars * 25));
+
+            // Choose signal icon based on bar count
+            string icon_name;
+            if      (bars >= 4) icon_name = "network-wireless-signal-excellent-symbolic";
+            else if (bars == 3) icon_name = "network-wireless-signal-good-symbolic";
+            else if (bars == 2) icon_name = "network-wireless-signal-ok-symbolic";
+            else                icon_name = "network-wireless-signal-weak-symbolic";
+
             var row = new Adw.ActionRow () {
-                title    = ssid,
-                subtitle = "%s%%".printf (signal)
+                title       = ssid,
+                subtitle    = signal_pct,
+                activatable = true
             };
             row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
             if (secured) row.add_suffix (new Gtk.Image.from_icon_name ("system-lock-screen-symbolic"));
             list_box.append (row);
+
+            ssid_list    += ssid;
+            secured_list += secured;
             any = true;
         }
         if (!any) {
@@ -973,11 +978,147 @@ public class KibaOOBE : Adw.Application {
             row.add_prefix (new Gtk.Image.from_icon_name ("network-offline-symbolic"));
             list_box.append (row);
         }
+
         content.append (list_box);
+        content.append (status_label);
+
+        // ── Row activation: password dialog → iwctl connect ──────────────
+        // Captures: dev_box, ssid_list, secured_list, status_label, window
+        list_box.row_activated.connect ((row) => {
+            int idx = row.get_index ();
+            if (idx < 0 || idx >= ssid_list.length) return;
+
+            string ssid    = ssid_list[idx];
+            bool   secured = secured_list[idx];
+
+            if (secured) {
+                // ── Password dialog ───────────────────────────────────────
+                var dialog = new Adw.MessageDialog (window,
+                    "Enter Wi-Fi Password",
+                    "Enter the password for "%s".".printf (ssid));
+
+                var pw_entry = new Gtk.PasswordEntry () {
+                    show_peek_icon = true,
+                    placeholder_text = "Password"
+                };
+                pw_entry.add_css_class ("oobe-entry");
+                dialog.set_extra_child (pw_entry);
+
+                dialog.add_response ("cancel", "Cancel");
+                dialog.add_response ("connect", "Connect");
+                dialog.set_response_appearance ("connect", Adw.ResponseAppearance.SUGGESTED);
+                dialog.set_default_response ("connect");
+                dialog.set_close_response ("cancel");
+
+                // Allow pressing Enter in the password field to confirm
+                pw_entry.activate.connect (() => {
+                    dialog.response ("connect");
+                });
+
+                dialog.response.connect ((resp) => {
+                    if (resp != "connect") { dialog.destroy (); return; }
+                    string password = pw_entry.get_text ();
+                    dialog.destroy ();
+
+                    if (password == "") {
+                        status_label.label = "Password cannot be empty.";
+                        return;
+                    }
+
+                    status_label.label = "Connecting to %s…".printf (ssid);
+                    do_connect_async (dev_box[0], ssid, password, status_label);
+                });
+
+                dialog.present ();
+
+            } else {
+                // ── Open network — connect directly ───────────────────────
+                status_label.label = "Connecting to %s…".printf (ssid);
+                do_connect_async (dev_box[0], ssid, null, status_label);
+            }
+        });
 
         return make_page ("Wi-Fi", content, "Next", () => {
             nav_view.push (build_locale_page ());
         }, false, 1, 6);
+    }
+
+    // ── Async connect helper ─────────────────────────────────────────────────
+    // Runs `iwctl station <dev> connect <ssid> [--passphrase <pw>]` in a
+    // background GLib.Thread so the GTK main loop stays responsive, then
+    // polls `iwctl station <dev> show` on the main thread for up to 15 s to
+    // confirm association. Updates status_label on each step.
+    private void do_connect_async (string dev, string ssid,
+                                    string? password,
+                                    Gtk.Label status_label) {
+        // Build argv — no shell, no quoting/injection surface
+        string[] argv_arr;
+        if (password != null) {
+            argv_arr = { "iwctl", "station", dev, "connect", ssid,
+                         "--passphrase", password };
+        } else {
+            argv_arr = { "iwctl", "station", dev, "connect", ssid };
+        }
+
+        // Kick the blocking iwctl call off the main thread.
+        // When it finishes, schedule the polling phase back on the main loop.
+        string[]  argv_copy   = argv_arr;
+        string    dev_copy    = dev;
+        string    ssid_copy   = ssid;
+        unowned Gtk.Label lbl = status_label;
+
+        new GLib.Thread<void> ("kibaos-wifi-connect", () => {
+            bool   ok  = false;
+            string err = "";
+            try {
+                int exit_status = 0;
+                GLib.Process.spawn_sync (
+                    null, argv_copy, null,
+                    GLib.SpawnFlags.SEARCH_PATH         |
+                    GLib.SpawnFlags.STDOUT_TO_DEV_NULL  |
+                    GLib.SpawnFlags.STDERR_TO_DEV_NULL,
+                    null, null, null, out exit_status);
+                ok  = (exit_status == 0);
+                err = ok ? "" : "iwctl exit %d".printf (exit_status);
+            } catch (GLib.SpawnError e) {
+                err = e.message;
+            }
+
+            // Marshal result back to the GTK main thread
+            bool   ok_f  = ok;
+            string err_f = err;
+            GLib.Idle.add (() => {
+                if (!ok_f) {
+                    lbl.label = "Could not connect: %s".printf (err_f);
+                    return GLib.Source.REMOVE;
+                }
+                // Start polling for association on the main thread
+                lbl.label = "Verifying connection…";
+                int[] attempts = { 0 };
+                GLib.Timeout.add (500, () => {
+                    attempts[0]++;
+                    bool associated = false;
+                    try {
+                        string show_out = "";
+                        GLib.Process.spawn_command_line_sync (
+                            "iwctl station %s show".printf (dev_copy),
+                            out show_out);
+                        associated = show_out.down ().contains ("connected");
+                    } catch (GLib.SpawnError e) {}
+
+                    if (associated) {
+                        lbl.label = "Connected to %s ✓".printf (ssid_copy);
+                        return GLib.Source.REMOVE;
+                    }
+                    if (attempts[0] >= 30) {   // 30 × 500 ms = 15 s
+                        lbl.label = "Timed out — check the password and try again.";
+                        return GLib.Source.REMOVE;
+                    }
+                    return GLib.Source.CONTINUE;
+                });
+                return GLib.Source.REMOVE;
+            });
+        });
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -1318,16 +1459,17 @@ cat > /usr/share/kibaos-oobe/src/meson.build << 'OOBEMESON'
 project('kibaos-oobe', 'vala', 'c', version: '1.0')
 
 cc = meson.get_compiler('c')
-m_dep = cc.find_library('m', required: true)
+m_dep       = cc.find_library('m', required: true)
+threads_dep = dependency('threads')   # needed for GLib.Thread
 
-gtk4_dep = dependency('gtk4')
+gtk4_dep    = dependency('gtk4')
 adwaita_dep = dependency('libadwaita-1')
-gee_dep = dependency('gee-0.8')
+gee_dep     = dependency('gee-0.8')
 
 executable(
   'io.kibaos.oobe',
   'main.vala',
-  dependencies: [gtk4_dep, adwaita_dep, gee_dep, m_dep],
+  dependencies: [gtk4_dep, adwaita_dep, gee_dep, m_dep, threads_dep],
   install: true
 )
 OOBEMESON
@@ -1626,7 +1768,10 @@ cd /usr/share/kibaos-network-applet/src
 cat > meson.build << 'NETAPPLETMESON'
 project('kibaos-network-applet', 'vala', 'c', version: '1.0')
 
-gtk_dep      = dependency('gtk4')
+# Do NOT add gtk+-3.0 or gtk4 explicitly — budgie-3.0 is a GTK3 library and
+# pulls in gtk+-3.0 transitively. Adding gtk4 here causes valac to receive
+# both --pkg gtk4 and --pkg gtk+-3.0, producing thousands of conflicting
+# definitions. Let budgie-3.0's own pkg-config Requires: handle GTK.
 budgie_dep   = dependency('budgie-3.0')
 peas_dep     = dependency('libpeas-2')
 gee_dep      = dependency('gee-0.8')
@@ -1634,7 +1779,7 @@ gee_dep      = dependency('gee-0.8')
 shared_module(
   'kibaosnetworkapplet',
   'NetworkApplet.vala',
-  dependencies: [gtk_dep, budgie_dep, peas_dep, gee_dep],
+  dependencies: [budgie_dep, peas_dep, gee_dep],
   install: true,
   install_dir: join_paths(get_option('libdir'), 'budgie-desktop', 'plugins', 'kibaos-network-applet')
 )
@@ -1658,8 +1803,8 @@ NETAPPLETPLUGIN
 
 cat > NetworkApplet.vala << 'NETAPPLETVALA'
 /* KibaOS Network Applet — Budgie panel icon backed by iwd (iwctl), not
- * NetworkManager. See the build-script comment above this block for why
- * this exists in-tree rather than as an off-the-shelf Budgie applet. */
+ * NetworkManager. Uses GTK3 only (budgie-3.0 is a GTK3 library; mixing
+ * in gtk4 or libadwaita here causes thousands of vapi conflicts). */
 
 public class KibaNetworkAppletPlugin : GLib.Object, Budgie.Plugin {
     public Budgie.Applet get_panel_widget (string uuid) {
@@ -1668,65 +1813,68 @@ public class KibaNetworkAppletPlugin : GLib.Object, Budgie.Plugin {
 }
 
 public class KibaNetworkApplet : Budgie.Applet {
-    private Gtk.Button       icon_button;
-    private Gtk.Image        icon_image;
-    private Gtk.Popover?     popover = null;
-    private Gtk.ListBox      list_box;
+    private Gtk.ToggleButton  icon_button;
+    private Gtk.Image         icon_image;
+    private Gtk.Popover?      popover = null;
+    private Gtk.ListBox       list_box;
     private unowned Budgie.PopoverManager? manager = null;
-    private string           wifi_device = "";
-    private uint             poll_src_id = 0;
+    private string            wifi_device = "";
+    private uint              poll_src_id = 0;
 
     public KibaNetworkApplet (string uuid) {
         Object ();
 
-        icon_image  = new Gtk.Image.from_icon_name ("network-wireless-signal-good-symbolic");
-        icon_button = new Gtk.Button ();
-        icon_button.add_css_class ("flat");
-        icon_button.set_child (icon_image);
+        // GTK3: Gtk.Image.new_from_icon_name takes a size param
+        icon_image  = new Gtk.Image.from_icon_name (
+            "network-wireless-signal-good-symbolic", Gtk.IconSize.MENU);
+        icon_button = new Gtk.ToggleButton ();
+        icon_button.get_style_context ().add_class ("flat");
+        icon_button.add (icon_image);
         icon_button.tooltip_text = "Network";
+        icon_button.relief = Gtk.ReliefStyle.NONE;
 
+        // GTK3 ListBox — no append(), use add()
         list_box = new Gtk.ListBox ();
-        list_box.add_css_class ("oobe-list"); /* reuse the OOBE glass-list look */
+        list_box.get_style_context ().add_class ("network-list");
         list_box.selection_mode = Gtk.SelectionMode.NONE;
 
-        var scroller = new Gtk.ScrolledWindow () {
-            min_content_width  = 280,
-            min_content_height = 60,
-            max_content_height = 320,
-            propagate_natural_height = true,
-        };
-        scroller.set_child (list_box);
+        var scroller = new Gtk.ScrolledWindow (null, null);
+        scroller.set_size_request (280, -1);
+        scroller.max_content_height = 320;
+        scroller.propagate_natural_height = true;
+        scroller.add (list_box);
 
-        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
-            margin_top = 8, margin_bottom = 8, margin_start = 8, margin_end = 8
-        };
-        var heading = new Gtk.Label ("Wi-Fi") {
-            halign = Gtk.Align.START,
-            margin_bottom = 4
-        };
-        heading.add_css_class ("title-4");
-        box.append (heading);
-        box.append (scroller);
+        var heading = new Gtk.Label ("<b>Wi-Fi</b>");
+        heading.use_markup = true;
+        heading.halign = Gtk.Align.START;
+        heading.margin_bottom = 4;
 
-        popover = new Gtk.Popover ();
-        popover.set_child (box);
-        popover.set_parent (icon_button);
+        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6);
+        box.margin = 8;
+        box.pack_start (heading, false, false, 0);
+        box.pack_start (scroller, true, true, 0);
+        box.show_all ();
 
-        // Left-click (Budgie/GTK's default Gtk.Button activation, no extra
-        // signal wiring beyond connecting "clicked") opens the list.
-        icon_button.clicked.connect (() => {
-            refresh_networks ();
-            popover.popup ();
+        // GTK3 Popover — relative_to instead of set_parent
+        popover = new Gtk.Popover (icon_button);
+        popover.add (box);
+
+        icon_button.toggled.connect (() => {
+            if (icon_button.active) {
+                refresh_networks ();
+                popover.show_all ();
+                popover.popup ();
+            }
+        });
+        popover.closed.connect (() => {
+            icon_button.active = false;
         });
 
         this.add (icon_button);
-        icon_button.show ();
-        this.show ();
+        this.show_all ();
 
         find_wifi_device ();
         update_status_icon ();
-        // Periodically refresh the status icon (connected/disconnected/
-        // signal strength) even while the popover is closed.
         poll_src_id = GLib.Timeout.add_seconds (10, () => {
             update_status_icon ();
             return GLib.Source.CONTINUE;
@@ -1754,10 +1902,6 @@ public class KibaNetworkApplet : Budgie.Applet {
         } catch (GLib.SpawnError e) {}
     }
 
-    /* Reflects current link state on the panel icon: signal-strength bars
-     * when connected over Wi-Fi, a wired icon when on Ethernet via
-     * networkd, or an offline icon when neither is up. Best-effort —
-     * iwctl/networkctl absence just falls back to the offline icon. */
     private void update_status_icon () {
         bool wifi_connected = false;
         bool wired_connected = false;
@@ -1772,8 +1916,7 @@ public class KibaNetworkApplet : Budgie.Applet {
             GLib.Process.spawn_command_line_sync ("networkctl list", out link_out);
             foreach (var line in link_out.split ("\n")) {
                 if (line.contains ("ether") && line.down ().contains ("routable")) {
-                    wired_connected = true;
-                    break;
+                    wired_connected = true; break;
                 }
             }
         } catch (GLib.SpawnError e) {}
@@ -1782,23 +1925,21 @@ public class KibaNetworkApplet : Budgie.Applet {
         if (wifi_connected)       icon_name = "network-wireless-signal-good-symbolic";
         else if (wired_connected) icon_name = "network-wired-symbolic";
         else                      icon_name = "network-wireless-offline-symbolic";
-        icon_image.set_from_icon_name (icon_name);
+        icon_image.set_from_icon_name (icon_name, Gtk.IconSize.MENU);
     }
 
-    /* Same scan/parse approach as the OOBE Wi-Fi page (iwctl's table
-     * output, columns separated by 4+ spaces, ">" prefix on the active
-     * network stripped). Kept independent rather than shared code since
-     * the OOBE app and this applet are separate executables/modules. */
     private void refresh_networks () {
-        while (list_box.get_first_child () != null) {
-            list_box.remove (list_box.get_first_child ());
+        // GTK3: iterate children via get_children()
+        foreach (var child in list_box.get_children ()) {
+            list_box.remove (child);
         }
 
         if (wifi_device == "") {
             find_wifi_device ();
             if (wifi_device == "") {
-                var row = new Adw.ActionRow () { title = "No Wi-Fi hardware found" };
-                list_box.append (row);
+                var row = make_row ("No Wi-Fi hardware found", false);
+                list_box.add (row);
+                list_box.show_all ();
                 return;
             }
         }
@@ -1831,31 +1972,49 @@ public class KibaNetworkApplet : Budgie.Applet {
             string security = cols[1].strip ().down ();
             bool   secured  = security != "" && security != "open";
 
-            var row = new Adw.ActionRow () { title = ssid, activatable = true };
-            row.add_prefix (new Gtk.Image.from_icon_name ("network-wireless-signal-good-symbolic"));
-            if (secured) row.add_suffix (new Gtk.Image.from_icon_name ("system-lock-screen-symbolic"));
-            row.activated.connect (() => { connect_to_network (ssid); });
-            list_box.append (row);
+            var row = make_row (ssid, secured);
+            // Capture ssid by value for the closure
+            string ssid_copy = ssid;
+            row.button_press_event.connect ((e) => {
+                if (e.button == 1) { connect_to_network (ssid_copy); return true; }
+                return false;
+            });
+            list_box.add (row);
             any = true;
         }
         if (!any) {
-            var row = new Adw.ActionRow () { title = "No networks found nearby" };
-            list_box.append (row);
+            list_box.add (make_row ("No networks found nearby", false));
         }
+        list_box.show_all ();
     }
 
-    /* iwd's own agent handles the passphrase prompt over its D-Bus
-     * interface for secured networks when invoked interactively; for a
-     * background spawn like this, iwctl falls back to its own terminal
-     * prompt which won't be visible here, so this is best-effort for
-     * open networks and already-known (saved) secured networks. A full
-     * in-applet password dialog is a reasonable follow-up but out of
-     * scope for matching the OOBE page's existing (also display-only at
-     * connect-time) behavior. */
+    /* Build a plain GTK3 ListBoxRow: icon + label [+ lock icon if secured] */
+    private Gtk.ListBoxRow make_row (string label_text, bool secured) {
+        var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
+        hbox.margin = 6;
+        hbox.pack_start (
+            new Gtk.Image.from_icon_name (
+                "network-wireless-signal-good-symbolic", Gtk.IconSize.MENU),
+            false, false, 0);
+        var lbl = new Gtk.Label (label_text);
+        lbl.halign = Gtk.Align.START;
+        hbox.pack_start (lbl, true, true, 0);
+        if (secured) {
+            hbox.pack_end (
+                new Gtk.Image.from_icon_name (
+                    "system-lock-screen-symbolic", Gtk.IconSize.MENU),
+                false, false, 0);
+        }
+        var row = new Gtk.ListBoxRow ();
+        row.add (hbox);
+        return row;
+    }
+
     private void connect_to_network (string ssid) {
         try {
             GLib.Process.spawn_command_line_async (
-                "iwctl station %s connect \"%s\"".printf (wifi_device, ssid.replace ("\"", "")));
+                "iwctl station %s connect \"%s\"".printf (
+                    wifi_device, ssid.replace ("\"", "")));
         } catch (GLib.SpawnError e) {}
         GLib.Timeout.add_seconds (3, () => { update_status_icon (); return GLib.Source.REMOVE; });
     }
