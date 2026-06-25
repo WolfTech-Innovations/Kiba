@@ -162,7 +162,7 @@ pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
-firefox
+chromium
 ntfs-3g
 exfatprogs
 polkit
