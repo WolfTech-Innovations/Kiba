@@ -110,6 +110,7 @@ power-profiles-daemon
 xdg-user-dirs
 noto-fonts
 noto-fonts-emoji
+network-manager-applet
 noto-fonts-cjk
 bluez-utils
 gnome-weather
@@ -583,7 +584,8 @@ echo "=== AUR packages installed ==="
 #     kiba_install_*.c) and kibaos_oobe_backend_main.c for the
 #     orchestrator that ties it together.
 # ══════════════════════════════════════════════════════════════════════════
-
+mkdir -p ~/.config/autostart
+cp /etc/xdg/autostart/nm-applet.desktop ~/.config/autostart/
 mkdir -p /usr/share/kibaos-oobe/src
 echo "=== Installing GTK4/libadwaita OOBE build dependencies ==="
 pacman -S --noconfirm --needed gtk4 libadwaita libgee vala meson ninja rsync polkit arch-install-scripts dosfstools
