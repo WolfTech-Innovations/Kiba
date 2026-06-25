@@ -5475,6 +5475,16 @@ DHCP=yes
 IPv6AcceptRA=yes
 NETWORKD_WIFI
 
+# NOTE: arch-chroot (which mkarchiso uses to run this very script) bind-mounts
+# the HOST's /etc/resolv.conf into the chroot so pacman/pacstrap can resolve
+# DNS while packages are installed. That means /etc/resolv.conf here is the
+# target of an active mount — a bare `rm -f` fails with "Device or resource
+# busy" because you can't unlink a file that's currently mounted over.
+# Confirmed mechanism: https://bugs.archlinux.org/task/64490 and the
+# ArchWiki chroot page ("device is busy... a sub-mount still exists").
+# Fix: unmount the bind mount first (ignore failure if for some reason it's
+# already not mounted), THEN remove/replace it with our symlink.
+umount /etc/resolv.conf 2>/dev/null || true
 rm -f /etc/resolv.conf
 ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
