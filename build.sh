@@ -134,7 +134,6 @@ sddm
 budgie
 budgie-desktop-view
 budgie-desktop-services
-budgie-control-center
 swaybg
 grim
 slurp
@@ -157,14 +156,13 @@ eog
 evince
 papirus-icon-theme
 accountsservice
-firefox
 sassc
 kvantum
 pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
-pavucontrol
+firefox
 ntfs-3g
 exfatprogs
 polkit
@@ -185,12 +183,8 @@ xdotool
 v4l2loopback-dkms
 xdg-utils
 gawk
-gnome-online-accounts
-gnome-online-accounts-gtk
-gvfs-goa
 gnome-calendar
 gnome-notes
-geary
 gnome-music
 gnome-todo
 plymouth
