@@ -989,7 +989,7 @@ public class KibaOOBE : Adw.Application {
                 // ── Password dialog ───────────────────────────────────────
                 var dialog = new Adw.MessageDialog (window,
                     "Enter Wi-Fi Password",
-                    """Enter the password for "%s".""".printf (ssid));
+                    "Enter the password for \"%s\".".printf (ssid));
 
                 var pw_entry = new Gtk.PasswordEntry () {
                     show_peek_icon = true,
@@ -1811,12 +1811,46 @@ public class KibaNetworkApplet : Budgie.Applet {
     private Gtk.Image         icon_image;
     private Gtk.Popover?      popover = null;
     private Gtk.ListBox       list_box;
+    private Gtk.Label         subtitle_label;
     private unowned Budgie.PopoverManager? manager = null;
     private string            wifi_device = "";
     private uint              poll_src_id = 0;
 
     public KibaNetworkApplet (string uuid) {
         Object ();
+
+        // ── Frosted-glass card styling, matching the shell's quick-settings
+        // look: rounded corners, soft translucent background, subtle border,
+        // hover highlight on rows. Scoped to this applet's own CSS classes so
+        // it never bleeds into the rest of the panel/theme.
+        var css = new Gtk.CssProvider ();
+        try {
+            css.load_from_data ("""
+                .kiba-network-popover {
+                    background-color: alpha(@theme_bg_color, 0.86);
+                    border-radius: 16px;
+                    border: 1px solid alpha(#ffffff, 0.10);
+                }
+                .kiba-network-title {
+                    font-weight: 700;
+                    font-size: 1.05em;
+                }
+                .kiba-network-subtitle {
+                    opacity: 0.6;
+                    font-size: 0.9em;
+                }
+                .kiba-network-row {
+                    border-radius: 12px;
+                    padding: 2px;
+                }
+                .kiba-network-row:hover {
+                    background-color: alpha(@theme_selected_bg_color, 0.12);
+                }
+                .kiba-network-row.connected {
+                    background-color: alpha(@theme_selected_bg_color, 0.18);
+                }
+                """, -1);
+        } catch (GLib.Error e) {}
 
         // GTK3: Gtk.Image.new_from_icon_name takes a size param
         icon_image  = new Gtk.Image.from_icon_name (
@@ -1833,20 +1867,33 @@ public class KibaNetworkApplet : Budgie.Applet {
         list_box.selection_mode = Gtk.SelectionMode.NONE;
 
         var scroller = new Gtk.ScrolledWindow (null, null);
-        scroller.set_size_request (280, -1);
-        scroller.max_content_height = 320;
+        scroller.set_size_request (300, -1);
+        scroller.max_content_height = 340;
         scroller.propagate_natural_height = true;
         scroller.add (list_box);
 
-        var heading = new Gtk.Label ("<b>Wi-Fi</b>");
-        heading.use_markup = true;
-        heading.halign = Gtk.Align.START;
-        heading.margin_bottom = 4;
+        // Two-line header: bold "Wi-Fi" title + muted connection-state
+        // subtitle, mirroring the shell's "Good morning, Alex / Hope you
+        // have a wonderful day!" and quick-settings tile labeling pattern.
+        var title_label = new Gtk.Label ("Wi-Fi");
+        title_label.get_style_context ().add_class ("kiba-network-title");
+        title_label.halign = Gtk.Align.START;
+
+        subtitle_label = new Gtk.Label ("Not connected");
+        subtitle_label.get_style_context ().add_class ("kiba-network-subtitle");
+        subtitle_label.halign = Gtk.Align.START;
+
+        var header_box = new Gtk.Box (Gtk.Orientation.VERTICAL, 2);
+        header_box.pack_start (title_label, false, false, 0);
+        header_box.pack_start (subtitle_label, false, false, 0);
+        header_box.margin_bottom = 8;
 
         var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6);
-        box.margin = 8;
-        box.pack_start (heading, false, false, 0);
+        box.margin = 12;
+        box.pack_start (header_box, false, false, 0);
         box.pack_start (scroller, true, true, 0);
+        box.get_style_context ().add_class ("kiba-network-popover");
+        box.get_style_context ().add_provider (css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
         box.show_all ();
 
         // GTK3 Popover — relative_to instead of set_parent
@@ -1952,12 +1999,14 @@ public class KibaNetworkApplet : Budgie.Applet {
 
         var seen = new Gee.HashSet<string> ();
         bool any = false;
+        string connected_ssid = "";
         foreach (var line in raw_nets.split ("\n")) {
             var trimmed = line.strip ();
             if (trimmed == "" || trimmed.has_prefix ("---") ||
                 trimmed.has_prefix ("Network name") ||
                 trimmed.down ().has_prefix ("available networks")) continue;
-            if (trimmed.has_prefix (">")) trimmed = trimmed.substring (1).strip ();
+            bool is_connected = trimmed.has_prefix (">");
+            if (is_connected) trimmed = trimmed.substring (1).strip ();
             var cols = GLib.Regex.split_simple ("\\s{4,}", trimmed);
             if (cols.length < 3) continue;
             string ssid = cols[0].strip ();
@@ -1965,27 +2014,33 @@ public class KibaNetworkApplet : Budgie.Applet {
             seen.add (ssid);
             string security = cols[1].strip ().down ();
             bool   secured  = security != "" && security != "open";
+            if (is_connected) connected_ssid = ssid;
 
-            var row = make_row (ssid, secured);
-            // Capture ssid by value for the closure
-            string ssid_copy = ssid;
+            var row = make_row (ssid, secured, is_connected);
+            // Capture ssid/secured by value for the closure
+            string ssid_copy    = ssid;
+            bool   secured_copy = secured;
             row.button_press_event.connect ((e) => {
-                if (e.button == 1) { connect_to_network (ssid_copy); return true; }
+                if (e.button == 1) { connect_to_network (ssid_copy, secured_copy); return true; }
                 return false;
             });
             list_box.add (row);
             any = true;
         }
         if (!any) {
-            list_box.add (make_row ("No networks found nearby", false));
+            list_box.add (make_row ("No networks found nearby", false, false));
         }
+        subtitle_label.label = (connected_ssid != "") ? connected_ssid : "Not connected";
         list_box.show_all ();
     }
 
-    /* Build a plain GTK3 ListBoxRow: icon + label [+ lock icon if secured] */
-    private Gtk.ListBoxRow make_row (string label_text, bool secured) {
-        var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
-        hbox.margin = 6;
+    /* Build a GTK3 ListBoxRow styled as a rounded "card" tile, matching the
+     * shell's quick-settings tile look: icon + label, lock icon and a
+     * connected indicator right-aligned, hover/connected background via
+     * the .kiba-network-row CSS class set up in the constructor. */
+    private Gtk.ListBoxRow make_row (string label_text, bool secured, bool connected = false) {
+        var hbox = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10);
+        hbox.margin = 8;
         hbox.pack_start (
             new Gtk.Image.from_icon_name (
                 "network-wireless-signal-good-symbolic", Gtk.IconSize.MENU),
@@ -1993,24 +2048,101 @@ public class KibaNetworkApplet : Budgie.Applet {
         var lbl = new Gtk.Label (label_text);
         lbl.halign = Gtk.Align.START;
         hbox.pack_start (lbl, true, true, 0);
+        if (connected) {
+            hbox.pack_end (
+                new Gtk.Image.from_icon_name (
+                    "emblem-ok-symbolic", Gtk.IconSize.MENU),
+                false, false, 0);
+        }
         if (secured) {
             hbox.pack_end (
                 new Gtk.Image.from_icon_name (
                     "system-lock-screen-symbolic", Gtk.IconSize.MENU),
-                false, false, 0);
+                false, false, 4);
         }
         var row = new Gtk.ListBoxRow ();
+        row.get_style_context ().add_class ("kiba-network-row");
+        if (connected) row.get_style_context ().add_class ("connected");
         row.add (hbox);
         return row;
     }
 
-    private void connect_to_network (string ssid) {
-        try {
-            GLib.Process.spawn_command_line_async (
-                "iwctl station %s connect \"%s\"".printf (
-                    wifi_device, ssid.replace ("\"", "")));
-        } catch (GLib.SpawnError e) {}
-        GLib.Timeout.add_seconds (3, () => { update_status_icon (); return GLib.Source.REMOVE; });
+    private void connect_to_network (string ssid, bool secured) {
+        if (secured) {
+            // GTK3 dialog — popover stays open underneath until this resolves.
+            var dialog = new Gtk.Dialog.with_buttons (
+                "Enter Wi-Fi Password",
+                (Gtk.Window) this.get_toplevel (),
+                Gtk.DialogFlags.MODAL,
+                "_Cancel", Gtk.ResponseType.CANCEL,
+                "_Connect", Gtk.ResponseType.OK);
+            dialog.set_default_response (Gtk.ResponseType.OK);
+
+            var label = new Gtk.Label ("Enter the password for \"%s\".".printf (ssid));
+            label.margin = 8;
+
+            var pw_entry = new Gtk.Entry ();
+            pw_entry.visibility   = false;   // mask characters
+            pw_entry.input_purpose = Gtk.InputPurpose.PASSWORD;
+            pw_entry.margin = 8;
+            pw_entry.activate.connect (() => { dialog.response (Gtk.ResponseType.OK); });
+
+            var content = dialog.get_content_area ();
+            content.pack_start (label, false, false, 0);
+            content.pack_start (pw_entry, false, false, 0);
+            dialog.show_all ();
+
+            dialog.response.connect ((resp) => {
+                if (resp != Gtk.ResponseType.OK) { dialog.destroy (); return; }
+                string password = pw_entry.text;
+                dialog.destroy ();
+                if (password == "") return;
+                do_connect_async (ssid, password);
+            });
+
+            dialog.run ();
+        } else {
+            do_connect_async (ssid, null);
+        }
+    }
+
+    // Runs `iwctl station <dev> connect <ssid> [--passphrase <pw>]` via direct
+    // argv (no shell, no quoting/injection surface) in a background thread so
+    // the panel stays responsive, then refreshes the status icon on success.
+    private void do_connect_async (string ssid, string? password) {
+        string[] argv_arr;
+        if (password != null) {
+            argv_arr = { "iwctl", "station", wifi_device, "connect", ssid,
+                         "--passphrase", password };
+        } else {
+            argv_arr = { "iwctl", "station", wifi_device, "connect", ssid };
+        }
+        string[] argv_copy = argv_arr;
+
+        new GLib.Thread<void> ("kibaos-applet-wifi-connect", () => {
+            bool ok = false;
+            try {
+                int exit_status = 0;
+                GLib.Process.spawn_sync (
+                    null, argv_copy, null,
+                    GLib.SpawnFlags.SEARCH_PATH         |
+                    GLib.SpawnFlags.STDOUT_TO_DEV_NULL  |
+                    GLib.SpawnFlags.STDERR_TO_DEV_NULL,
+                    null, null, null, out exit_status);
+                ok = (exit_status == 0);
+            } catch (GLib.SpawnError e) {}
+
+            bool ok_f = ok;
+            GLib.Idle.add (() => {
+                update_status_icon ();
+                if (!ok_f) {
+                    icon_button.tooltip_text = "Could not connect to network";
+                } else {
+                    icon_button.tooltip_text = "Network";
+                }
+                return GLib.Source.REMOVE;
+            });
+        });
     }
 }
 
