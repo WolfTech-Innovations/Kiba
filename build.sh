@@ -106,7 +106,6 @@ curl
 wget
 git
 mesa
-networkmanager
 power-profiles-daemon
 xdg-user-dirs
 noto-fonts
@@ -118,7 +117,7 @@ gnome-clocks
 gnome-calculator
 sof-firmware
 thermald
-network-manager-applet
+iwd
 xorg-xwayland
 layer-shell-qt
 budgie-session
@@ -160,7 +159,7 @@ papirus-icon-theme
 accountsservice
 firefox
 sassc
-network-manager-applet
+kvantum
 pipewire
 pipewire-pulse
 pipewire-alsa
@@ -251,7 +250,7 @@ cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRY'
 title   KibaOS
 linux   /arch/boot/x86_64/vmlinuz-linux
 initrd  /arch/boot/x86_64/initramfs-linux.img
-options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0
+options archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
 ENTRY
 
 cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRY_SAFE'
@@ -315,7 +314,7 @@ if [ -f "${SYSLINUX_SYS}" ]; then
     /^LABEL kibaos$/ { in_kibaos=1 }
     /^LABEL / && $0 !~ /^LABEL kibaos$/ { in_kibaos=0 }
     in_kibaos && /^[[:space:]]*APPEND/ {
-      print "  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0"
+      print "  APPEND archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1"
       next
     }
     { print }
@@ -485,6 +484,11 @@ sed -i 's/#Storage=auto/Storage=volatile/'                    /etc/systemd/journ
 sed -i 's/#HandleLidSwitch=suspend/HandleLidSwitch=ignore/'   /etc/systemd/logind.conf
 sed -i 's/#HandleSuspendKey=suspend/HandleSuspendKey=ignore/' /etc/systemd/logind.conf
 sed -i 's/#IdleAction=ignore/IdleAction=ignore/'               /etc/systemd/logind.conf
+# Explicitly zero out the idle-action timer so logind never fires it,
+# and suppress the hibernate/power keys too — this is a live/install session,
+# nothing should put the machine to sleep mid-install.
+grep -q 'IdleActionSec'  /etc/systemd/logind.conf || echo 'IdleActionSec=0'  >> /etc/systemd/logind.conf
+grep -q 'HandleHibernateKey' /etc/systemd/logind.conf || echo 'HandleHibernateKey=ignore' >> /etc/systemd/logind.conf
 
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
@@ -896,30 +900,65 @@ public class KibaOOBE : Adw.Application {
         content.append (oobe_heading ("Connect to Wi-Fi",
             "Choose a network to continue. You can also skip this step."));
 
-        // Network list — populated via nmcli
+        // Network list — populated via iwctl (NetworkManager was dropped in
+        // favor of iwd for a lighter network stack; see customize_airootfs.sh)
         var list_box = new Gtk.ListBox ();
         list_box.add_css_class ("oobe-list");
         list_box.selection_mode = Gtk.SelectionMode.SINGLE;
 
-        // Scan for networks (best-effort; if nmcli is absent, show a note)
-        string raw_nets = "";
+        // Find the first wireless device iwd manages, trigger a scan, then
+        // read back its station list. Best-effort; if iwd/iwctl is absent
+        // or there's no wireless hardware, show the "no networks" note.
+        string wifi_dev = "";
         try {
-            GLib.Process.spawn_command_line_sync (
-                "nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list", out raw_nets);
+            string dev_out = "";
+            GLib.Process.spawn_command_line_sync ("iwctl device list", out dev_out);
+            foreach (var line in dev_out.split ("\n")) {
+                var trimmed = line.strip ();
+                if (trimmed == "" || trimmed.has_prefix ("Name") || trimmed.has_prefix ("---")) continue;
+                var cols = trimmed.split (" ");
+                if (cols.length > 0 && cols[0] != "") { wifi_dev = cols[0]; break; }
+            }
         } catch (GLib.SpawnError e) {}
+
+        string raw_nets = "";
+        if (wifi_dev != "") {
+            try {
+                string scan_out = "";
+                GLib.Process.spawn_command_line_sync (
+                    "iwctl station %s scan".printf (wifi_dev), out scan_out);
+                GLib.Process.spawn_command_line_sync (
+                    "iwctl station %s get-networks".printf (wifi_dev), out raw_nets);
+            } catch (GLib.SpawnError e) {}
+        }
 
         var seen = new Gee.HashSet<string> ();
         bool any = false;
         foreach (var line in raw_nets.split ("\n")) {
-            var parts = line.strip ().split (":", 3);
-            if (parts.length < 2) continue;
-            string ssid = parts[0].strip ();
-            if (ssid == "" || ssid == "--" || seen.contains (ssid)) continue;
+            var trimmed = line.strip ();
+            // Skip header/separator/blank lines; data rows are the only ones
+            // with 2+ whitespace-separated columns after a >=4-space gap.
+            if (trimmed == "" || trimmed.has_prefix ("---") ||
+                trimmed.has_prefix ("Network name") ||
+                trimmed.down ().has_prefix ("available networks")) continue;
+            // iwd marks the currently-connected network with a leading ">";
+            // strip it so it doesn't end up glued onto the SSID.
+            if (trimmed.has_prefix (">")) trimmed = trimmed.substring (1).strip ();
+            // Columns are separated by runs of 4+ spaces (SSIDs may contain
+            // single spaces, so a naive single-space split would break them).
+            var cols = GLib.Regex.split_simple ("\\s{4,}", trimmed);
+            if (cols.length < 3) continue;
+            string ssid = cols[0].strip ();
+            if (ssid == "" || seen.contains (ssid)) continue;
             seen.add (ssid);
-            string signal   = parts.length > 1 ? parts[1] : "";
-            bool   secured  = parts.length > 2 && parts[2] != "" && parts[2] != "--";
-            string icon_name = secured ? "network-wireless-signal-good-symbolic"
-                                       : "network-wireless-signal-good-symbolic";
+            string security = cols[1].strip ().down ();
+            string signal_bars = cols[2].strip ();
+            bool   secured  = security != "" && security != "open";
+            // iwd reports signal as 1-4 asterisks rather than a percentage;
+            // approximate a percentage from the bar count for the subtitle.
+            int    bars     = signal_bars.length;
+            string signal   = "%d".printf (int.min (100, bars * 25));
+            string icon_name = "network-wireless-signal-good-symbolic";
             var row = new Adw.ActionRow () {
                 title    = ssid,
                 subtitle = "%s%%".printf (signal)
@@ -1115,7 +1154,7 @@ public class KibaOOBE : Adw.Application {
         summary.add_css_class ("oobe-summary-box");
 
         OobeSummaryItem[] items = {
-            { "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : selected_disk },
+            { "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : GLib.Path.get_basename (selected_disk) },
             { "preferences-desktop-locale-symbolic", "Language", selected_locale },
             { "input-keyboard-symbolic",   "Keyboard", selected_keymap },
             { "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value }
@@ -1550,6 +1589,290 @@ meson setup build --prefix=/usr || { echo "FATAL: meson setup failed for kibaos-
 ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check the Vala compile errors above." >&2; exit 1; }
 ninja -C build install
 cd /
+
+# ══════════════════════════════════════════════════════════════════════════
+# KIBAOS NETWORK APPLET — Budgie panel icon for iwd
+#
+# Budgie's built-in network indicator (and the only third-party Budgie
+# network applet, danielpinto8zz6/budgie-network-applet) both hard-depend
+# on NetworkManager. Since this build drops NetworkManager for the lighter
+# iwd + systemd-networkd stack (see customize_airootfs.sh), there is no
+# existing Budgie applet that talks to iwd — so this is a small in-tree
+# applet, same approach as the OOBE installer above.
+#
+# Arch's "budgie" package (10.10.2) ships its Vala bindings under the
+# RENAMED budgie-3.0 API (confirmed via the package's own file list —
+# usr/share/vala/vapi/budgie-3.0.vapi), not the older budgie-1.0 most
+# third-party-applet docs still reference, and is NOT split into a
+# separate "-devel" package the way Fedora/openSUSE do it — the .vapi/
+# .pc/.gir files are already present from the plain "budgie" install.
+# libpeas (for the [ModuleInit] plugin-registration hook) is the one
+# additional dev dependency pulled in below.
+#
+# Behavior: a single panel icon. Left-click (Budgie's default applet
+# button action — no extra wiring needed, this is just what clicking
+# any flat panel button already does) opens a Gtk.Popover containing
+# the iwd "available networks" list, refreshed on open via `iwctl
+# station <dev> scan` + `get-networks`. Selecting a network attempts
+# `iwctl station <dev> connect <ssid>` (iwctl itself prompts for a
+# passphrase on the *server* side over its own D-Bus interface when
+# the network is secured, so no separate password dialog is needed
+# here — iwd's agent handles that).
+echo "=== Building KibaOS network applet (iwd, replaces nm-applet) ==="
+pacman -S --noconfirm --needed libpeas
+mkdir -p /usr/share/kibaos-network-applet/src
+cd /usr/share/kibaos-network-applet/src
+
+cat > meson.build << 'NETAPPLETMESON'
+project('kibaos-network-applet', 'vala', 'c', version: '1.0')
+
+gtk_dep      = dependency('gtk4')
+budgie_dep   = dependency('budgie-3.0')
+peas_dep     = dependency('libpeas-2')
+gee_dep      = dependency('gee-0.8')
+
+shared_module(
+  'kibaosnetworkapplet',
+  'NetworkApplet.vala',
+  dependencies: [gtk_dep, budgie_dep, peas_dep, gee_dep],
+  install: true,
+  install_dir: join_paths(get_option('libdir'), 'budgie-desktop', 'plugins', 'kibaos-network-applet')
+)
+
+install_data(
+  'kibaos-network-applet.plugin',
+  install_dir: join_paths(get_option('libdir'), 'budgie-desktop', 'plugins', 'kibaos-network-applet')
+)
+NETAPPLETMESON
+
+cat > kibaos-network-applet.plugin << 'NETAPPLETPLUGIN'
+[Plugin]
+Module=kibaosnetworkapplet
+Loader=c
+Name=KibaOS Network
+Description=Wi-Fi and wired network status (iwd-backed)
+Authors=WolfTech Innovations
+Copyright=WolfTech Innovations
+Website=https://github.com/WolfTech-Innovations
+NETAPPLETPLUGIN
+
+cat > NetworkApplet.vala << 'NETAPPLETVALA'
+/* KibaOS Network Applet — Budgie panel icon backed by iwd (iwctl), not
+ * NetworkManager. See the build-script comment above this block for why
+ * this exists in-tree rather than as an off-the-shelf Budgie applet. */
+
+public class KibaNetworkAppletPlugin : GLib.Object, Budgie.Plugin {
+    public Budgie.Applet get_panel_widget (string uuid) {
+        return new KibaNetworkApplet (uuid);
+    }
+}
+
+public class KibaNetworkApplet : Budgie.Applet {
+    private Gtk.Button       icon_button;
+    private Gtk.Image        icon_image;
+    private Gtk.Popover?     popover = null;
+    private Gtk.ListBox      list_box;
+    private unowned Budgie.PopoverManager? manager = null;
+    private string           wifi_device = "";
+    private uint             poll_src_id = 0;
+
+    public KibaNetworkApplet (string uuid) {
+        Object ();
+
+        icon_image  = new Gtk.Image.from_icon_name ("network-wireless-signal-good-symbolic");
+        icon_button = new Gtk.Button ();
+        icon_button.add_css_class ("flat");
+        icon_button.set_child (icon_image);
+        icon_button.tooltip_text = "Network";
+
+        list_box = new Gtk.ListBox ();
+        list_box.add_css_class ("oobe-list"); /* reuse the OOBE glass-list look */
+        list_box.selection_mode = Gtk.SelectionMode.NONE;
+
+        var scroller = new Gtk.ScrolledWindow () {
+            min_content_width  = 280,
+            min_content_height = 60,
+            max_content_height = 320,
+            propagate_natural_height = true,
+        };
+        scroller.set_child (list_box);
+
+        var box = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) {
+            margin_top = 8, margin_bottom = 8, margin_start = 8, margin_end = 8
+        };
+        var heading = new Gtk.Label ("Wi-Fi") {
+            halign = Gtk.Align.START,
+            margin_bottom = 4
+        };
+        heading.add_css_class ("title-4");
+        box.append (heading);
+        box.append (scroller);
+
+        popover = new Gtk.Popover ();
+        popover.set_child (box);
+        popover.set_parent (icon_button);
+
+        // Left-click (Budgie/GTK's default Gtk.Button activation, no extra
+        // signal wiring beyond connecting "clicked") opens the list.
+        icon_button.clicked.connect (() => {
+            refresh_networks ();
+            popover.popup ();
+        });
+
+        this.add (icon_button);
+        icon_button.show ();
+        this.show ();
+
+        find_wifi_device ();
+        update_status_icon ();
+        // Periodically refresh the status icon (connected/disconnected/
+        // signal strength) even while the popover is closed.
+        poll_src_id = GLib.Timeout.add_seconds (10, () => {
+            update_status_icon ();
+            return GLib.Source.CONTINUE;
+        });
+        this.destroy.connect (() => {
+            if (poll_src_id != 0) { GLib.Source.remove (poll_src_id); poll_src_id = 0; }
+        });
+    }
+
+    public override void update_popovers (Budgie.PopoverManager? manager) {
+        manager.register_popover (this.icon_button, this.popover);
+        this.manager = manager;
+    }
+
+    private void find_wifi_device () {
+        try {
+            string dev_out = "";
+            GLib.Process.spawn_command_line_sync ("iwctl device list", out dev_out);
+            foreach (var line in dev_out.split ("\n")) {
+                var trimmed = line.strip ();
+                if (trimmed == "" || trimmed.has_prefix ("Name") || trimmed.has_prefix ("---")) continue;
+                var cols = GLib.Regex.split_simple ("\\s{2,}", trimmed);
+                if (cols.length > 0 && cols[0] != "") { wifi_device = cols[0]; break; }
+            }
+        } catch (GLib.SpawnError e) {}
+    }
+
+    /* Reflects current link state on the panel icon: signal-strength bars
+     * when connected over Wi-Fi, a wired icon when on Ethernet via
+     * networkd, or an offline icon when neither is up. Best-effort —
+     * iwctl/networkctl absence just falls back to the offline icon. */
+    private void update_status_icon () {
+        bool wifi_connected = false;
+        bool wired_connected = false;
+        try {
+            string status_out = "";
+            if (wifi_device != "") {
+                GLib.Process.spawn_command_line_sync (
+                    "iwctl station %s show".printf (wifi_device), out status_out);
+                wifi_connected = status_out.down ().contains ("connected");
+            }
+            string link_out = "";
+            GLib.Process.spawn_command_line_sync ("networkctl list", out link_out);
+            foreach (var line in link_out.split ("\n")) {
+                if (line.contains ("ether") && line.down ().contains ("routable")) {
+                    wired_connected = true;
+                    break;
+                }
+            }
+        } catch (GLib.SpawnError e) {}
+
+        string icon_name;
+        if (wifi_connected)       icon_name = "network-wireless-signal-good-symbolic";
+        else if (wired_connected) icon_name = "network-wired-symbolic";
+        else                      icon_name = "network-wireless-offline-symbolic";
+        icon_image.set_from_icon_name (icon_name);
+    }
+
+    /* Same scan/parse approach as the OOBE Wi-Fi page (iwctl's table
+     * output, columns separated by 4+ spaces, ">" prefix on the active
+     * network stripped). Kept independent rather than shared code since
+     * the OOBE app and this applet are separate executables/modules. */
+    private void refresh_networks () {
+        while (list_box.get_first_child () != null) {
+            list_box.remove (list_box.get_first_child ());
+        }
+
+        if (wifi_device == "") {
+            find_wifi_device ();
+            if (wifi_device == "") {
+                var row = new Adw.ActionRow () { title = "No Wi-Fi hardware found" };
+                list_box.append (row);
+                return;
+            }
+        }
+
+        try {
+            string scan_out = "";
+            GLib.Process.spawn_command_line_sync (
+                "iwctl station %s scan".printf (wifi_device), out scan_out);
+        } catch (GLib.SpawnError e) {}
+
+        string raw_nets = "";
+        try {
+            GLib.Process.spawn_command_line_sync (
+                "iwctl station %s get-networks".printf (wifi_device), out raw_nets);
+        } catch (GLib.SpawnError e) {}
+
+        var seen = new Gee.HashSet<string> ();
+        bool any = false;
+        foreach (var line in raw_nets.split ("\n")) {
+            var trimmed = line.strip ();
+            if (trimmed == "" || trimmed.has_prefix ("---") ||
+                trimmed.has_prefix ("Network name") ||
+                trimmed.down ().has_prefix ("available networks")) continue;
+            if (trimmed.has_prefix (">")) trimmed = trimmed.substring (1).strip ();
+            var cols = GLib.Regex.split_simple ("\\s{4,}", trimmed);
+            if (cols.length < 3) continue;
+            string ssid = cols[0].strip ();
+            if (ssid == "" || seen.contains (ssid)) continue;
+            seen.add (ssid);
+            string security = cols[1].strip ().down ();
+            bool   secured  = security != "" && security != "open";
+
+            var row = new Adw.ActionRow () { title = ssid, activatable = true };
+            row.add_prefix (new Gtk.Image.from_icon_name ("network-wireless-signal-good-symbolic"));
+            if (secured) row.add_suffix (new Gtk.Image.from_icon_name ("system-lock-screen-symbolic"));
+            row.activated.connect (() => { connect_to_network (ssid); });
+            list_box.append (row);
+            any = true;
+        }
+        if (!any) {
+            var row = new Adw.ActionRow () { title = "No networks found nearby" };
+            list_box.append (row);
+        }
+    }
+
+    /* iwd's own agent handles the passphrase prompt over its D-Bus
+     * interface for secured networks when invoked interactively; for a
+     * background spawn like this, iwctl falls back to its own terminal
+     * prompt which won't be visible here, so this is best-effort for
+     * open networks and already-known (saved) secured networks. A full
+     * in-applet password dialog is a reasonable follow-up but out of
+     * scope for matching the OOBE page's existing (also display-only at
+     * connect-time) behavior. */
+    private void connect_to_network (string ssid) {
+        try {
+            GLib.Process.spawn_command_line_async (
+                "iwctl station %s connect \"%s\"".printf (wifi_device, ssid.replace ("\"", "")));
+        } catch (GLib.SpawnError e) {}
+        GLib.Timeout.add_seconds (3, () => { update_status_icon (); return GLib.Source.REMOVE; });
+    }
+}
+
+[ModuleInit]
+public void peas_register_types (TypeModule module) {
+    var object_module = module as Peas.ObjectModule;
+    object_module.register_extension_type (typeof (Budgie.Plugin), typeof (KibaNetworkAppletPlugin));
+}
+NETAPPLETVALA
+
+meson setup build --prefix=/usr --libdir=/usr/lib || { echo "FATAL: meson setup failed for kibaos-network-applet — check budgie-3.0/libpeas-2 pkg-config availability." >&2; exit 1; }
+ninja -C build || { echo "FATAL: ninja build failed for kibaos-network-applet — check the Vala compile errors above." >&2; exit 1; }
+ninja -C build install
+cd /
+echo "=== KibaOS network applet built and installed ==="
 
 # ── Privileged backend script ─────────────────────────────────────────────
 # ── Privileged backend: libkibadisk + kibaos-oobe-backend ─────────────────
@@ -4824,7 +5147,56 @@ systemctl enable systemd-timesyncd
 systemctl enable systemd-time-wait-sync
 
 systemctl enable sddm
-systemctl enable NetworkManager.service
+
+# ── Network stack: iwd (Wi-Fi/Ethernet daemon) + systemd-networkd ─────────
+# Lighter than NetworkManager: no D-Bus-heavy NM daemon, no nm-applet
+# process, just iwd (handles link bring-up + its own embedded DHCP
+# client) and systemd-networkd doing routing/IP config.
+#
+# DNS: systemd-networkd alone does NOT reliably write /etc/resolv.conf
+# (confirmed dead end — Arch users hit silent resolution failures trying
+# exactly this). The simplest fix that actually works is to keep
+# systemd-resolved (it ships with systemd already, no extra daemon) but
+# skip its 127.0.0.53 stub resolver entirely: symlink /etc/resolv.conf
+# straight to /run/systemd/resolve/resolv.conf, the "uplink" file that
+# resolved keeps filled with the real DHCP-provided nameserver IPs. No
+# stub in the path, no separate caching daemon, no extra moving part —
+# every program reads real DNS servers directly.
+mkdir -p /etc/iwd
+cat > /etc/iwd/main.conf << 'IWDCONF'
+[General]
+EnableNetworkConfiguration=false
+
+[Network]
+NameResolvingService=systemd
+IWDCONF
+
+mkdir -p /etc/systemd/network
+cat > /etc/systemd/network/20-wired.network << 'NETWORKD_WIRED'
+[Match]
+Name=en*
+Name=eth*
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+NETWORKD_WIRED
+cat > /etc/systemd/network/25-wireless.network << 'NETWORKD_WIFI'
+[Match]
+Name=wl*
+
+[Network]
+DHCP=yes
+IPv6AcceptRA=yes
+NETWORKD_WIFI
+
+rm -f /etc/resolv.conf
+ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+
+systemctl enable iwd
+systemctl enable systemd-networkd
+systemctl enable systemd-networkd-wait-online
+systemctl enable systemd-resolved
 
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
