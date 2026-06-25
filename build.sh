@@ -4237,7 +4237,7 @@ cat > /usr/share/glib-2.0/schemas/zz-kibaos-budgie.gschema.override << 'BUDGIEOV
 enable-built-in-theme=false
 BUDGIEOVERRIDE
 glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
-
+systemctl enable NetworkManager
 # ══════════════════════════════════════════════════════════════════════════
 # SDDM — custom KibaOS frosted-glass greeter theme
 # ══════════════════════════════════════════════════════════════════════════
