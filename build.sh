@@ -126,7 +126,7 @@ gcc
 debugedit
 base-devel
 wine
-NetworkManager
+networkmanager
 wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
