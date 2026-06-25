@@ -142,6 +142,7 @@ slurp
 swayidle
 gtklock
 wlopm
+util-linux
 nemo
 nemo-fileroller
 gnome-terminal
@@ -2173,29 +2174,26 @@ mkdir -p /usr/share/kibaos-oobe/src/disk
 cd /usr/share/kibaos-oobe/src/disk
 
 cat > kiba_gpt.h << 'KIBA_SRC_END_GPTH'
-/* kiba_gpt.h — GPT partition table writer, backed by libfdisk.
+/* kiba_gpt.h — GPT partition table writer, backed by sfdisk.
  *
- * Previously this was a from-scratch, hand-rolled implementation of
- * UEFI Spec 2.10 chapter 5 (protective MBR + primary/backup GPT header +
- * entry array) written directly via pwrite(), with BLKPG ioctls standing
- * in for partprobe. That hand-rolled GPT writer is now replaced with
- * libfdisk (util-linux's own partitioning library — the same code that
- * backs `fdisk`/`cfdisk` and is maintained by the kernel/util-linux
- * project). Reasoning: GPT is a CRC32'd, dual-copy, byte-exact-spec
- * format — exactly the kind of thing where a small bug (off-by-one
- * sector, wrong CRC scope, endianness slip) silently corrupts a real
- * disk. libfdisk gets this right because it's the reference
- * implementation other tools defer to, not because hand-rolled C can't
- * — it's a real, maintained dependency trade made deliberately, the
- * same way kiba_fs.h already defers to mkfs.ext4/mkfs.fat for the same
- * reason.
+ * Implementation history:
+ *   v1 — hand-rolled pwrite() + CRC32 + BLKPG ioctls
+ *   v2 — libfdisk API (fdisk_add_partition et al.) — caused EINVAL from
+ *         fdisk_add_partition() because libfdisk requires the start LBA to
+ *         be explicitly marked as user-specified via a separate flag call
+ *         that the API doesn't make obvious; any off-by-one in the
+ *         last-usable-LBA calculation also triggered the same error.
+ *   v3 (current) — sfdisk JSON input via popen(). sfdisk is the scriptable
+ *         front-end to libfdisk (same binary, util-linux), accepts a clean
+ *         JSON layout description, and handles all edge cases (sector
+ *         alignment, backup GPT placement, BLKPG notification) internally
+ *         with zero API surface for us to misuse. No -lfdisk link needed.
  *
- * The public API below is UNCHANGED from the previous version, so
- * kibaos_oobe_backend_main.c and every other caller needs zero changes.
+ * The public C API (kiba_gpt_disk_t / kiba_gpt_partition_t / kiba_gpt_write)
+ * is UNCHANGED — kibaos_oobe_backend_main.c needs zero modifications.
  *
- * Build requirement: link with `-lfdisk` (libfdisk-dev /
- * util-linux-libs, already present on any Arch base — part of
- * util-linux). See the gcc invocation building kibaos-oobe-backend.
+ * Build requirement: none beyond libc. sfdisk is part of util-linux and
+ * is present in every Arch base install.
  */
 #ifndef KIBA_GPT_H
 #define KIBA_GPT_H
@@ -2204,64 +2202,41 @@ cat > kiba_gpt.h << 'KIBA_SRC_END_GPTH'
 #include <stdbool.h>
 #include <stddef.h>
 
-/* 16-byte little/mixed-endian GUID, stored exactly as UEFI expects on disk.
- * Kept for ABI compatibility with existing callers — internally this is
- * now converted to/from libfdisk's string-GUID representation. */
+/* 16-byte mixed-endian GUID, UEFI on-disk layout. */
 typedef struct {
     uint8_t b[16];
 } kiba_guid_t;
 
-/* Well-known partition type GUIDs (UEFI Spec 2.10 Table 5-7 + Linux conventions) */
-extern const kiba_guid_t KIBA_GUID_ESP;          /* C12A7328-F81F-11D2-BA4B-00A0C93EC93B */
-extern const kiba_guid_t KIBA_GUID_LINUX_FS;     /* 0FC63DAF-8483-4772-8E79-3D69D8477DE4 */
+/* Well-known partition type GUIDs (UEFI Spec 2.10 Table 5-7 + Linux) */
+extern const kiba_guid_t KIBA_GUID_ESP;       /* C12A7328-F81F-11D2-BA4B-00A0C93EC93B */
+extern const kiba_guid_t KIBA_GUID_LINUX_FS;  /* 0FC63DAF-8483-4772-8E79-3D69D8477DE4 */
 
 typedef struct {
-    char        name[37];      /* NUL-terminated, displayed only; truncated to 36 UTF-16 chars on disk */
+    char        name[37];      /* partition label (GPT name field) */
     kiba_guid_t type_guid;
-    kiba_guid_t unique_guid;   /* if all-zero, libfdisk generates one */
+    kiba_guid_t unique_guid;   /* all-zero → sfdisk generates one */
     uint64_t    first_lba;
-    uint64_t    last_lba;      /* inclusive. Pass KIBA_GPT_LAST_LBA_REST to
-                                 * consume all remaining space on the disk --
-                                 * this defers to libfdisk's own last-usable-LBA
-                                 * (which already accounts for the backup GPT
-                                 * header + entry array at the end of the disk)
-                                 * instead of recomputing it by hand. */
+    uint64_t    last_lba;      /* inclusive. KIBA_GPT_LAST_LBA_REST = fill rest */
     uint64_t    attributes;
 } kiba_gpt_partition_t;
 
-/* Sentinel for last_lba: "use all remaining space on the disk." Never a
- * legitimate LBA value, so safe to reuse as a flag. */
+/* Sentinel: "consume all remaining space." sfdisk size="" does this. */
 #define KIBA_GPT_LAST_LBA_REST UINT64_MAX
 
 typedef struct {
-    int      fd;                 /* open O_RDWR on the whole-disk block device */
-    uint32_t logical_sector_size;
-    uint64_t total_sectors;
-    kiba_guid_t disk_guid;       /* if all-zero, libfdisk generates one */
+    int         fd;                  /* open O_RDWR on the whole-disk device */
+    uint32_t    logical_sector_size;
+    uint64_t    total_sectors;
+    kiba_guid_t disk_guid;           /* all-zero → sfdisk generates one */
 } kiba_gpt_disk_t;
 
-/* Generates a random RFC-4122 v4 GUID using /dev/urandom — no external tool. */
 kiba_guid_t kiba_guid_random(void);
 
-/* Creates a fresh GPT label and writes the given partitions (in order) to
- * disk->fd via libfdisk. Returns 0 on success, -errno (or a libfdisk
- * negative error code) on failure.
- *
- * On success, the kernel partition table is updated for each partition
- * automatically (libfdisk calls BLKPG/BLKRRPART internally as needed) —
- * caller does not need to call partprobe.
- *
- * NOTE: disk->fd is used only to derive the device path for libfdisk
- * (via /proc/self/fd) — libfdisk opens the device itself through
- * fdisk_assign_device(). The fd passed in must stay open for the
- * duration of the call.
- */
+/* Write GPT via sfdisk. Returns 0 on success, -errno on failure. */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
                     const kiba_gpt_partition_t *parts, size_t n_parts);
 
-/* Reads back sector size + total size for `path` (e.g. "/dev/vda") via
- * ioctl (BLKSSZGET, BLKGETSIZE64) — no `blockdev`/`lsblk` subprocess.
- * (Unchanged — these ioctls were never the risky part.) */
+/* Probe sector size + total sectors via ioctl. No subprocess. */
 int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
                            uint64_t *total_sectors);
 
@@ -2269,46 +2244,54 @@ int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
 KIBA_SRC_END_GPTH
 
 cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
-/* kiba_gpt.c — GPT writer backed by libfdisk (util-linux).
+/* kiba_gpt.c — GPT writer backed by sfdisk (util-linux scriptable front-end).
  *
- * The previous revision of this file was a hand-rolled GPT writer
- * (pwrite, CRC32, etc). It has been replaced with libfdisk, which is
- * the reference implementation that backs fdisk/cfdisk and is maintained
- * by the util-linux / kernel project. The public API (kiba_gpt.h) is
- * unchanged — all callers continue to work without modification.
+ * Why sfdisk instead of the libfdisk C API?
+ *   The libfdisk API requires the caller to call fdisk_partition_start_
+ *   follow_default(pa, 0) explicitly before fdisk_partition_set_start()
+ *   will be honoured; omitting that flag causes fdisk_add_partition() to
+ *   return EINVAL ("invalid argument") even when the LBA values are
+ *   perfectly legal. sfdisk exposes the same libfdisk internals through a
+ *   clean JSON input format that has no such footguns — it is the
+ *   canonical scripting interface for libfdisk and is what Arch's
+ *   archinstall itself uses.
  *
- * libfdisk handles:
- *   - Protective MBR
- *   - Primary + backup GPT headers (including CRCs)
- *   - Partition entry array
- *   - BLKPG / BLKRRPART kernel notification (via fdisk_reread_partition_table)
+ * sfdisk JSON format (--json):
+ *   {
+ *     "label": "gpt",
+ *     "device": "/dev/sda",
+ *     "partitions": [
+ *       { "node": "/dev/sda1", "start": N, "size": S,
+ *         "type": "GUID", "name": "label", "uuid": "GUID" },
+ *       { "node": "/dev/sda2", "start": N, "size": 0,   ← 0 = rest of disk
+ *         "type": "GUID", "name": "label" }
+ *     ]
+ *   }
  *
- * We retain our own kiba_gpt_probe_device() (raw ioctls, unchanged) and
- * kiba_guid_random() since those have nothing to do with GPT writing and
- * we do not want to pull in extra libfdisk API for such simple helpers.
+ * kiba_gpt_write() builds that JSON string in memory, then pipes it into
+ *   sfdisk --no-reread --no-tell-kernel <dev>
+ * followed by a single partprobe call to notify the kernel. No libfdisk
+ * link dependency. No API surface to misuse.
  */
 #define _GNU_SOURCE
 #include "kiba_gpt.h"
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
-#include <linux/fs.h>     /* BLKSSZGET, BLKGETSIZE64 */
-#include <libfdisk/libfdisk.h>
+#include <sys/wait.h>
+#include <linux/fs.h>   /* BLKSSZGET, BLKGETSIZE64 */
 
-/* ── Well-known type GUIDs (string form for libfdisk) ───────────────── */
-/* libfdisk accepts GUIDs as canonical strings: 8-4-4-4-12 uppercase hex.
- * These correspond to the byte arrays in the old hand-rolled version;
- * kept as string constants so they're human-readable and verifiable. */
+/* ── Well-known type GUIDs (sfdisk string form) ─────────────────────── */
 #define KIBA_GUID_ESP_STR      "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
 #define KIBA_GUID_LINUX_FS_STR "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
 
-/* Public kiba_guid_t constants — kept for API compatibility with callers
- * that compare against them. Byte layout: u32 LE, u16 LE, u16 LE, u8[8]. */
+/* Public GUID constants — kept for API compat with main.c comparisons. */
 const kiba_guid_t KIBA_GUID_ESP = {
     .b = { 0x28,0x73,0x2a,0xc1, 0x1f,0xf8, 0xd2,0x11,
            0xba,0x4b, 0x00,0xa0,0xc9,0x3e,0xc9,0x3b }
@@ -2327,145 +2310,184 @@ static bool guid_is_zero(const kiba_guid_t *g) {
 kiba_guid_t kiba_guid_random(void) {
     kiba_guid_t g;
     FILE *f = fopen("/dev/urandom", "rb");
-    if (!f || fread(g.b, 1, 16, f) != 16) {
+    if (!f || fread(g.b, 1, 16, f) != 16)
         for (int i = 0; i < 16; i++) g.b[i] = (uint8_t)(rand() & 0xFF);
-    }
     if (f) fclose(f);
-    /* RFC 4122 v4 bits */
-    g.b[6] = (uint8_t)((g.b[6] & 0x0F) | 0x40);
-    g.b[8] = (uint8_t)((g.b[8] & 0x3F) | 0x80);
+    g.b[6] = (uint8_t)((g.b[6] & 0x0F) | 0x40);   /* version 4 */
+    g.b[8] = (uint8_t)((g.b[8] & 0x3F) | 0x80);   /* variant 1 */
     return g;
 }
 
-/* Convert our kiba_guid_t (mixed-endian on-disk bytes) to the canonical
- * 8-4-4-4-12 string that libfdisk expects.
- * GPT GUID wire format: first three groups are LE, last two are BE/raw. */
+/* Convert kiba_guid_t (mixed-endian on-disk) → canonical 8-4-4-4-12 string.
+ * GPT wire format: first three fields are stored LE on disk; the string
+ * representation byte-reverses them back to big-endian for display. */
 static void guid_to_str(const kiba_guid_t *g, char out[37]) {
     const uint8_t *b = g->b;
     snprintf(out, 37,
         "%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
-        b[3],b[2],b[1],b[0],   /* u32 LE → big-endian display */
-        b[5],b[4],              /* u16 LE → big-endian display */
-        b[7],b[6],              /* u16 LE → big-endian display */
-        b[8],b[9],              /* remaining 8 bytes raw */
+        b[3],b[2],b[1],b[0],
+        b[5],b[4],
+        b[7],b[6],
+        b[8],b[9],
         b[10],b[11],b[12],b[13],b[14],b[15]);
 }
 
-/* ── Device probing via ioctl (unchanged from original) ─────────────── */
+/* ── Device probing via ioctl (unchanged) ───────────────────────────── */
 int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
                            uint64_t *total_sectors) {
     int fd = open(path, O_RDONLY);
     if (fd < 0) return -errno;
-
     int ssz = 0;
     if (ioctl(fd, BLKSSZGET, &ssz) != 0) { int e = errno; close(fd); return -e; }
-
     uint64_t bytes = 0;
     if (ioctl(fd, BLKGETSIZE64, &bytes) != 0) { int e = errno; close(fd); return -e; }
-
     close(fd);
     *sector_size   = (uint32_t)ssz;
     *total_sectors = bytes / (uint64_t)ssz;
     return 0;
 }
 
-/* ── kiba_gpt_write — the libfdisk implementation ───────────────────── */
+/* ── kiba_gpt_write — sfdisk JSON pipeline ──────────────────────────── */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
                     const kiba_gpt_partition_t *parts, size_t n_parts) {
     if (n_parts == 0 || n_parts > 128) return -EINVAL;
     if (disk->logical_sector_size == 0) return -EINVAL;
 
-    /* Resolve the block device path from our open fd via /proc/self/fd.
-     * libfdisk needs a path string, not an fd. */
-    char fd_link[64];
-    char dev_path[PATH_MAX];
+    /* Resolve device path from the open fd via /proc/self/fd. */
+    char fd_link[64], dev_path[PATH_MAX];
     snprintf(fd_link, sizeof(fd_link), "/proc/self/fd/%d", disk->fd);
     ssize_t len = readlink(fd_link, dev_path, sizeof(dev_path) - 1);
     if (len < 0) return -errno;
     dev_path[len] = '\0';
 
-    /* ── Initialise libfdisk context ─────────────────────────────── */
-    struct fdisk_context *cxt = fdisk_new_context();
-    if (!cxt) return -ENOMEM;
+    /* ── Build sfdisk JSON ───────────────────────────────────────── */
+    /* Allocate a generous buffer: ~512 bytes per partition is plenty. */
+    size_t bufsz = 512 + n_parts * 512;
+    char *json = malloc(bufsz);
+    if (!json) return -ENOMEM;
 
-    int rc = fdisk_assign_device(cxt, dev_path, 0 /* read-write */);
-    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
-
-    /* Create a fresh GPT label (wipes any existing table) */
-    rc = fdisk_create_disklabel(cxt, "gpt");
-    if (rc != 0) goto out;
-
-    /* Optionally set the disk GUID */
-    if (!guid_is_zero(&disk->disk_guid)) {
-        char disk_guid_str[37];
+    char disk_guid_str[37] = "";
+    if (!guid_is_zero(&disk->disk_guid))
         guid_to_str(&disk->disk_guid, disk_guid_str);
-        fdisk_set_disklabel_id_from_string(cxt, disk_guid_str);
-    }
 
-    /* ── Add each partition ──────────────────────────────────────── */
+    int pos = 0;
+    pos += snprintf(json + pos, bufsz - pos,
+        "{\n"
+        "  \"label\": \"gpt\",\n"
+        "  \"device\": \"%s\"%s%s%s,\n"
+        "  \"partitions\": [\n",
+        dev_path,
+        disk_guid_str[0] ? ",\n  \"id\": \"" : "",
+        disk_guid_str[0] ? disk_guid_str   : "",
+        disk_guid_str[0] ? "\""             : "");
+
+    /* Determine partition node name prefix (e.g. /dev/sda → /dev/sda1,
+     * /dev/nvme0n1 → /dev/nvme0n1p1). Rule: trailing digit → add 'p'. */
+    size_t dlen = strlen(dev_path);
+    const char *sep = (dlen > 0 && dev_path[dlen-1] >= '0'
+                       && dev_path[dlen-1] <= '9') ? "p" : "";
+
     for (size_t i = 0; i < n_parts; i++) {
         const kiba_gpt_partition_t *p = &parts[i];
 
-        struct fdisk_partition *pa = fdisk_new_partition();
-        if (!pa) { rc = -ENOMEM; goto out; }
-
-        fdisk_partition_set_start(pa, p->first_lba);
-        if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
-            /* Let libfdisk pick the end -- it already knows the real
-             * last usable LBA for this disk (accounts for the backup
-             * GPT header + entry array), so we don't have to guess. */
-            fdisk_partition_end_follow_default(pa, 1);
-        } else {
-            fdisk_partition_set_size(pa, p->last_lba - p->first_lba + 1);
-        }
-
-        /* Partition type GUID */
-        struct fdisk_parttype *ptype = NULL;
+        /* Type GUID string */
+        const char *type_str;
         if (memcmp(p->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
-            ptype = fdisk_label_parse_parttype(
-                        fdisk_get_label(cxt, NULL), KIBA_GUID_ESP_STR);
+            type_str = KIBA_GUID_ESP_STR;
         else
-            ptype = fdisk_label_parse_parttype(
-                        fdisk_get_label(cxt, NULL), KIBA_GUID_LINUX_FS_STR);
-        if (ptype) {
-            fdisk_partition_set_type(pa, ptype);
-            fdisk_unref_parttype(ptype);
-        }
+            type_str = KIBA_GUID_LINUX_FS_STR;
 
-        /* Partition name */
-        if (p->name[0])
-            fdisk_partition_set_name(pa, p->name);
-
-        /* Unique partition GUID (if caller provided one) */
-        if (!guid_is_zero(&p->unique_guid)) {
-            char uguid_str[37];
+        /* Unique GUID (optional) */
+        char uguid_str[37] = "";
+        if (!guid_is_zero(&p->unique_guid))
             guid_to_str(&p->unique_guid, uguid_str);
-            fdisk_partition_set_uuid(pa, uguid_str);
-        }
 
-        /* Use fdisk_add_partition so libfdisk tracks the slot number */
-        size_t partno = i; /* 0-based slot */
-        rc = fdisk_add_partition(cxt, pa, &partno);
-        fdisk_unref_partition(pa);
-        if (rc != 0) goto out;
+        /* Size in sectors, or 0 meaning "fill remaining space" */
+        uint64_t size_sectors = (p->last_lba == KIBA_GPT_LAST_LBA_REST)
+                                 ? 0
+                                 : (p->last_lba - p->first_lba + 1);
+
+        pos += snprintf(json + pos, bufsz - pos,
+            "    {\n"
+            "      \"node\": \"%s%s%zu\",\n"
+            "      \"start\": %llu,\n"
+            "      \"size\": %llu,\n"
+            "      \"type\": \"%s\"%s%s%s%s%s%s\n"
+            "    }%s\n",
+            dev_path, sep, i + 1,
+            (unsigned long long)p->first_lba,
+            (unsigned long long)size_sectors,
+            type_str,
+            p->name[0]      ? ",\n      \"name\": \""  : "",
+            p->name[0]      ? p->name                  : "",
+            p->name[0]      ? "\""                      : "",
+            uguid_str[0]    ? ",\n      \"uuid\": \""  : "",
+            uguid_str[0]    ? uguid_str                 : "",
+            uguid_str[0]    ? "\""                      : "",
+            (i + 1 < n_parts) ? "," : "");
+    }
+    pos += snprintf(json + pos, bufsz - pos, "  ]\n}\n");
+
+    /* ── Pipe JSON into sfdisk ───────────────────────────────────── */
+    /* sfdisk --json reads the layout from stdin and writes the GPT.
+     * --no-reread  : don't fail if the kernel still thinks the disk is
+     *                in use (we'll call partprobe ourselves).
+     * --force      : suppress "this will destroy data" interactive prompt. */
+    const char *argv[] = {
+        "sfdisk", "--json", "--no-reread", "--force", dev_path, NULL
+    };
+
+    int pipefd[2];
+    if (pipe(pipefd) != 0) { free(json); return -errno; }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        int e = errno;
+        close(pipefd[0]); close(pipefd[1]);
+        free(json);
+        return -e;
     }
 
-    /* ── Write GPT to disk ───────────────────────────────────────── */
-    rc = fdisk_write_disklabel(cxt);
-    if (rc != 0) goto out;
-
-    /* Tell the kernel about the new partition table (replaces partprobe) */
-    rc = fdisk_reread_partition_table(cxt);
-    if (rc != 0) {
-        /* Non-fatal on some setups (e.g. disk is mounted read-only for
-         * another partition). The caller's udev settle loop will handle it. */
-        rc = 0;
+    if (pid == 0) {
+        /* Child: read from pipe stdin, redirect stdout/stderr to /dev/null
+         * so the OOBE frontend only sees our own progress lines. */
+        close(pipefd[1]);
+        dup2(pipefd[0], STDIN_FILENO);
+        close(pipefd[0]);
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) { dup2(devnull, STDOUT_FILENO); dup2(devnull, STDERR_FILENO); close(devnull); }
+        execvp("sfdisk", (char *const *)argv);
+        _exit(127);
     }
 
-out:
-    fdisk_deassign_device(cxt, 0);
-    fdisk_unref_context(cxt);
-    return rc;
+    /* Parent: write JSON, close write end, wait. */
+    close(pipefd[0]);
+    size_t written = 0, jslen = (size_t)pos;
+    while (written < jslen) {
+        ssize_t n = write(pipefd[1], json + written, jslen - written);
+        if (n < 0 && errno == EINTR) continue;
+        if (n <= 0) break;
+        written += (size_t)n;
+    }
+    close(pipefd[1]);
+    free(json);
+
+    int wstatus = 0;
+    while (waitpid(pid, &wstatus, 0) < 0 && errno == EINTR) {}
+    if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0)
+        return -EIO;
+
+    /* Notify the kernel of the new partition table (non-fatal if busy). */
+    pid_t pp = fork();
+    if (pp == 0) {
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) { dup2(devnull, STDOUT_FILENO); dup2(devnull, STDERR_FILENO); close(devnull); }
+        execlp("partprobe", "partprobe", dev_path, (char *)NULL);
+        _exit(0);
+    }
+    if (pp > 0) while (waitpid(pp, NULL, 0) < 0 && errno == EINTR) {}
+
+    return 0;
 }
 KIBA_SRC_END_GPTC
 
@@ -3761,7 +3783,7 @@ ar rcs libkibadisk.a kiba_gpt.o kiba_fs.o kiba_udev.o kiba_install_extract.o kib
 
 echo "=== Building kibaos-oobe-backend (privileged install orchestrator) ==="
 gcc -O2 -Wall -o /usr/local/bin/kibaos-oobe-backend kibaos_oobe_backend_main.c \
-    -L. -lkibadisk -lfdisk \
+    -L. -lkibadisk \
     || { echo "FATAL: kibaos-oobe-backend failed to compile/link" >&2; exit 1; }
 chmod +x /usr/local/bin/kibaos-oobe-backend
 cd /
