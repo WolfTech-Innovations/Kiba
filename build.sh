@@ -989,7 +989,7 @@ public class KibaOOBE : Adw.Application {
                 // ── Password dialog ───────────────────────────────────────
                 var dialog = new Adw.MessageDialog (window,
                     "Enter Wi-Fi Password",
-                    "Enter the password for "%s".".printf (ssid));
+                    """Enter the password for "%s".""".printf (ssid));
 
                 var pw_entry = new Gtk.PasswordEntry () {
                     show_peek_icon = true,
