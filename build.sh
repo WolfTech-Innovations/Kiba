@@ -125,6 +125,7 @@ gcc
 debugedit
 base-devel
 wine
+NetworkManager
 wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
@@ -147,9 +148,6 @@ gnome-disk-utility
 gnome-backgrounds
 gnome-keyring
 gnome-settings-daemon
-gvfs
-gvfs-mtp
-gvfs-smb
 file-roller
 gedit
 eog
@@ -162,11 +160,9 @@ pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
-chromium
+falkon
 ntfs-3g
 exfatprogs
-polkit
-polkit-kde-agent
 udisks2
 upower
 scrot
