@@ -1649,32 +1649,8 @@ ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check th
 ninja -C build install
 cd /
 
-# ══════════════════════════════════════════════════════════════════════════
-# NETWORK APPLET — budgie-network-applet (NetworkManager-backed)
-#
-# Budgie's built-in network indicator, and the third-party
-# danielpinto8zz6/budgie-network-applet, both hard-depend on NetworkManager.
-# Since this build now uses NetworkManager as the network stack (see
-# customize_airootfs.sh and the OOBE installer's enabled-services list),
-# we build the real upstream applet from source rather than maintaining
-# an in-tree iwd-backed one. It is a GTK3 Vala/Meson project, same build
-# shape as the rest of this script's source-built components. (The newer
-# in-tree version of this applet now lives folded into the monolithic
-# UbuntuBudgie/budgie-extras repo, but danielpinto8zz6's original
-# standalone repo is simpler to build on its own and is still maintained.)
-echo "=== Building budgie-network-applet (NetworkManager) ==="
-pacman -S --noconfirm --needed libnm network-manager-applet git meson ninja vala libgee
-mkdir -p /usr/src
-cd /usr/src
-git clone --depth 1 https://github.com/danielpinto8zz6/budgie-network-applet.git \
-  || { echo "FATAL: failed to clone budgie-network-applet — check network access." >&2; exit 1; }
-cd budgie-network-applet
-meson setup build --prefix=/usr --libdir=/usr/lib \
-  || { echo "FATAL: meson setup failed for budgie-network-applet — check libnm/budgie-3.0 pkg-config availability." >&2; exit 1; }
-ninja -C build || { echo "FATAL: ninja build failed for budgie-network-applet — check the Vala compile errors above." >&2; exit 1; }
-ninja -C build install
-cd /
-echo "=== budgie-network-applet built and installed ==="
+# network-manager-applet (nm-applet) is already in the package list and
+# autostarted via /etc/xdg/autostart/nm-applet.desktop — nothing to build.
 
 # ── Privileged backend script ─────────────────────────────────────────────
 # ── Privileged backend: libkibadisk + kibaos-oobe-backend ─────────────────
