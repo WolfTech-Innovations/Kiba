@@ -5129,6 +5129,9 @@ dd if="${ISO}.iso" bs=512 skip="${EFIOFF}" count="${EFISZ}" \
 xorriso \
   -indev  "${ISO}.iso" \
   -outdev "${ISO}.iso.tmp" \
+  -pathspecs on \
+  -changes_pending yes \
+  -add /boot/grub/bios.img="${BIOSWORK}/bios.img" \
   -boot_image grub grub2_mbr="${GRUB_I386}/boot_hybrid.img" \
   -boot_image any partition_table=on \
   -boot_image any partition_offset=16 \
@@ -5139,8 +5142,6 @@ xorriso \
   -boot_image any next \
   -boot_image any replay \
   -append_partition 2 0xef "${BIOSWORK}/efi.img" \
-  -changes_pending yes \
-  -add /boot/grub/bios.img="${BIOSWORK}/bios.img" \
   --
 
 umount "${MNTISO}"
