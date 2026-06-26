@@ -20,7 +20,7 @@ pacman-key --populate archlinux
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
-  archiso base-devel git squashfs-tools libisoburn mtools dosfstools grub grub-pc-bin \
+  archiso base-devel git squashfs-tools libisoburn mtools dosfstools grub grub \
   cmake ninja meson grub \
   openssl curl imagemagick
 
