@@ -126,7 +126,7 @@ gcc
 debugedit
 base-devel
 wine
-networkmanager
+NetworkManager
 wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
@@ -142,7 +142,6 @@ slurp
 swayidle
 gtklock
 wlopm
-util-linux
 nemo
 nemo-fileroller
 gnome-terminal
@@ -630,18 +629,34 @@ public class KibaOOBE : Adw.Application {
 
     private bool detect_already_on_computer () {
         if (GLib.FileUtils.test (OEM_MARKER, GLib.FileTest.EXISTS)) return true;
+
+        /* If we can resolve /run/archiso/bootmnt at all, we are running
+         * the live ISO right now -- full stop. This is true whether the
+         * live medium is a real USB stick, an optical drive, or (the
+         * case that was broken here) a VM's virtual CD/HDD: VirtualBox,
+         * QEMU, and friends frequently report "removable" = 0 for their
+         * virtual block devices regardless of what kind of media they
+         * are emulating, since that sysfs flag is a hint from the
+         * (virtual) hardware/driver and is not reliably set by
+         * emulators. Previously this function went on to consult that
+         * removable flag as a *fallback* signal for "already-installed
+         * machine," which meant any VM booting the live ISO got
+         * misdetected as already-installed and the OOBE skipped the
+         * disk-selection/install pages entirely -- this is the actual
+         * bug behind "installer won't work on VMs."
+         *
+         * The unambiguous signal for "already installed, doing OEM
+         * first-boot setup" is OEM_MARKER above, which only exists
+         * because our own image-prep step wrote it. There is no good
+         * reason to second-guess that with a sysfs heuristic; if we are
+         * provably running off archiso live media, this can never be an
+         * OEM first-boot, regardless of what the underlying block
+         * device's removable flag says. */
         string src = "";
         try { GLib.Process.spawn_command_line_sync (
                 "findmnt -n -o SOURCE /run/archiso/bootmnt", out src); }
         catch (GLib.SpawnError e) { return false; }
-        src = src.strip ();
-        if (src == "") return false;
-        string removable_path = "/sys/block/%s/removable".printf (
-            strip_partition_suffix (GLib.Path.get_basename (src)));
-        string removable_content = "";
-        try { GLib.FileUtils.get_contents (removable_path, out removable_content); }
-        catch (GLib.FileError e) { return false; }
-        return removable_content.strip () == "0";
+        return src.strip () == "";
     }
 
     public KibaOOBE () {
@@ -1181,7 +1196,17 @@ public class KibaOOBE : Adw.Application {
             var parts   = trimmed.split (" ", 2);
             string devpath = parts[0];
             string rest    = parts.length > 1 ? parts[1].strip () : "";
-            if (rest.has_suffix (" 1") || rest == "1") continue;
+            /* Exclude the live boot device by its actual device-node
+             * identity (the only reliable signal) -- NOT by lsblk's RM
+             * (removable) column. RM is hint-driven by the underlying
+             * hardware/driver and is not trustworthy in VMs: VirtualBox,
+             * QEMU, and friends often report RM=1 for emulated SATA/IDE
+             * disks regardless of whether the guest OS is "removable
+             * media" in any meaningful sense. Filtering on RM==1 here
+             * previously meant a VM's only virtual disk could get
+             * excluded from the storage picker entirely, leaving zero
+             * install targets -- the second half of "installer won't
+             * work on VMs." */
             if (GLib.Path.get_basename (devpath) == boot_dev) continue;
             string label = rest;
             try { label = /\s+[01]$/.replace (label, -1, 0, ""); }
@@ -2223,6 +2248,15 @@ typedef struct {
 /* Sentinel: "consume all remaining space." sfdisk size="" does this. */
 #define KIBA_GPT_LAST_LBA_REST UINT64_MAX
 
+/* GPT partition entry attribute bits (UEFI Spec 2.10 Table 5-8).
+ * Bit 2 is the "Legacy BIOS Bootable" flag -- this is the GPT analogue
+ * of the MBR "active/boot" flag. Many BIOS/CSM and hybrid UEFI-CSM
+ * firmware implementations refuse to list a GPT disk as bootable at
+ * all unless some partition has this bit set, even though pure-UEFI
+ * boot is only supposed to need the ESP type GUID. Setting it on the
+ * ESP costs nothing under UEFI and fixes "BIOS can't find the OS". */
+#define KIBA_GPT_ATTR_LEGACY_BIOS_BOOTABLE ((uint64_t)1 << 2)
+
 typedef struct {
     int         fd;                  /* open O_RDWR on the whole-disk device */
     uint32_t    logical_sector_size;
@@ -2402,6 +2436,21 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
         if (!guid_is_zero(&p->unique_guid))
             guid_to_str(&p->unique_guid, uguid_str);
 
+        /* GPT attribute bits, e.g. KIBA_GPT_ATTR_LEGACY_BIOS_BOOTABLE.
+         * sfdisk's --json schema wants this as the GUID-partition-attrs
+         * string form "GUID:<bit>[,GUID:<bit>...]" -- one "GUID:N" token
+         * per set bit, comma-separated. Build it bit-by-bit since more
+         * than one flag could legally be set at once. */
+        char attrs_str[256] = "";
+        if (p->attributes != 0) {
+            int apos = 0;
+            for (int bit = 0; bit < 64; bit++) {
+                if (!(p->attributes & ((uint64_t)1 << bit))) continue;
+                apos += snprintf(attrs_str + apos, sizeof(attrs_str) - apos,
+                                  "%sGUID:%d", apos ? "," : "", bit);
+            }
+        }
+
         /* Size in sectors, or 0 meaning "fill remaining space" */
         uint64_t size_sectors = (p->last_lba == KIBA_GPT_LAST_LBA_REST)
                                  ? 0
@@ -2412,7 +2461,7 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
             "      \"node\": \"%s%s%zu\",\n"
             "      \"start\": %llu,\n"
             "      \"size\": %llu,\n"
-            "      \"type\": \"%s\"%s%s%s%s%s%s\n"
+            "      \"type\": \"%s\"%s%s%s%s%s%s%s%s%s\n"
             "    }%s\n",
             dev_path, sep, i + 1,
             (unsigned long long)p->first_lba,
@@ -2424,6 +2473,9 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
             uguid_str[0]    ? ",\n      \"uuid\": \""  : "",
             uguid_str[0]    ? uguid_str                 : "",
             uguid_str[0]    ? "\""                      : "",
+            attrs_str[0]    ? ",\n      \"attrs\": \"" : "",
+            attrs_str[0]    ? attrs_str                 : "",
+            attrs_str[0]    ? "\""                      : "",
             (i + 1 < n_parts) ? "," : "");
     }
     pos += snprintf(json + pos, bufsz - pos, "  ]\n}\n");
@@ -3407,59 +3459,48 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     unlink(path);
 
     snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
-    write_file(path,
+    if (write_file(path,
                "default kibaos.conf\n"
                "timeout 0\n"
                "console-mode max\n"
                "editor no\n"
-               "auto-entries no\n");
+               "auto-entries no\n") != 0) {
+        return -1;
+    }
 
-    /* Patch the loader entry with the real PARTUUID, read directly from
-     * the GPT bytes we wrote ourselves -- no blkid subprocess. */
+    /* Read the real root PARTUUID directly from the GPT bytes we wrote
+     * ourselves -- no blkid subprocess. */
     char partuuid[64];
     if (!kiba_read_partuuid_direct(disk_path, /* partno */ 2, partuuid, sizeof(partuuid))) {
         snprintf(g_finish_err, sizeof(g_finish_err), "could not read root PARTUUID");
         return -1;
     }
 
+    /* Write the boot entry directly. (There is no pre-existing template
+     * with a PARTUUID=PLACEHOLDER token in the installed system's /boot
+     * -- the only such template lives in the live ISO's own efiboot
+     * profile, which is a separate file used only to boot the install
+     * medium itself. So we always generate this entry from scratch.) */
     snprintf(path, sizeof(path), "%s/boot/loader/entries/kibaos.conf", target_root);
     {
-        FILE *f = fopen(path, "r");
-        char *buf = NULL;
-        if (f) {
-            fseek(f, 0, SEEK_END);
-            long sz = ftell(f);
-            fseek(f, 0, SEEK_SET);
-            buf = malloc((size_t)sz + 256);
-            if (buf) {
-                size_t got = fread(buf, 1, (size_t)sz, f);
-                buf[got] = 0;
-            }
-            fclose(f);
+        char entries_dir[1024];
+        snprintf(entries_dir, sizeof(entries_dir), "%s/boot/loader/entries", target_root);
+        mkdir(entries_dir, 0755); /* defensive: bootctl install normally creates this */
+
+        char entry[1024];
+        snprintf(entry, sizeof(entry),
+                  "title   KibaOS\n"
+                  "linux   /vmlinuz-linux\n"
+                  "initrd  /initramfs-linux.img\n"
+                  "options root=PARTUUID=%s rw quiet splash loglevel=3 "
+                  "systemd.show_status=auto rd.systemd.show_status=auto "
+                  "rd.udev.log_level=3 vt.global_cursor_default=0 "
+                  "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\n",
+                  partuuid);
+        if (write_file(path, entry) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "could not write boot entry %s", path);
+            return -1;
         }
-        if (buf && strstr(buf, "PARTUUID=PLACEHOLDER")) {
-            char *out = malloc(strlen(buf) + 64);
-            char *p = strstr(buf, "PARTUUID=PLACEHOLDER");
-            size_t prefix_len = (size_t)(p - buf);
-            memcpy(out, buf, prefix_len);
-            int n = sprintf(out + prefix_len, "PARTUUID=%s", partuuid);
-            strcpy(out + prefix_len + n, p + strlen("PARTUUID=PLACEHOLDER"));
-            write_file(path, out);
-            free(out);
-        } else {
-            char fallback[1024];
-            snprintf(fallback, sizeof(fallback),
-                      "title   KibaOS\n"
-                      "linux   /vmlinuz-linux\n"
-                      "initrd  /initramfs-linux.img\n"
-                      "options root=PARTUUID=%s rw quiet splash loglevel=3 "
-                      "systemd.show_status=auto rd.systemd.show_status=auto "
-                      "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                      "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\n",
-                      partuuid);
-            write_file(path, fallback);
-        }
-        free(buf);
     }
 
     {
@@ -3650,7 +3691,8 @@ int main(int argc, char **argv) {
     };
     kiba_gpt_partition_t parts[2] = {
         { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
-          .first_lba = esp_first,  .last_lba = esp_last,  .attributes = 0 },
+          .first_lba = esp_first,  .last_lba = esp_last,
+          .attributes = KIBA_GPT_ATTR_LEGACY_BIOS_BOOTABLE },
         { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
           .first_lba = root_first, .last_lba = root_last, .attributes = 0 },
     };
