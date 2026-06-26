@@ -2235,6 +2235,7 @@ typedef struct {
 /* Well-known partition type GUIDs (UEFI Spec 2.10 Table 5-7 + Linux) */
 extern const kiba_guid_t KIBA_GUID_ESP;       /* C12A7328-F81F-11D2-BA4B-00A0C93EC93B */
 extern const kiba_guid_t KIBA_GUID_LINUX_FS;  /* 0FC63DAF-8483-4772-8E79-3D69D8477DE4 */
+extern const kiba_guid_t KIBA_GUID_BIOS_BOOT; /* 21686148-6449-6E6F-744E-656564454649 */
 
 typedef struct {
     char        name[37];      /* partition label (GPT name field) */
@@ -2324,6 +2325,7 @@ cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
 /* ── Well-known type GUIDs (sfdisk string form) ─────────────────────── */
 #define KIBA_GUID_ESP_STR      "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
 #define KIBA_GUID_LINUX_FS_STR "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
+#define KIBA_GUID_BIOS_BOOT_STR "21686148-6449-6E6F-744E-656564454649"
 
 /* Public GUID constants — kept for API compat with main.c comparisons. */
 const kiba_guid_t KIBA_GUID_ESP = {
@@ -2333,6 +2335,10 @@ const kiba_guid_t KIBA_GUID_ESP = {
 const kiba_guid_t KIBA_GUID_LINUX_FS = {
     .b = { 0xaf,0x3d,0xc6,0x0f, 0x83,0x84, 0x72,0x47,
            0x8e,0x79, 0x3d,0x69,0xd8,0x47,0x7d,0xe4 }
+};
+const kiba_guid_t KIBA_GUID_BIOS_BOOT = {
+    .b = { 0x48,0x61,0x68,0x21, 0x49,0x64, 0x6f,0x6e,
+           0x74,0x4e, 0x65,0x65,0x64,0x45,0x46,0x49 }
 };
 
 /* ── GUID helpers ────────────────────────────────────────────────────── */
@@ -2428,6 +2434,8 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
         const char *type_str;
         if (memcmp(p->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
             type_str = KIBA_GUID_ESP_STR;
+        else if (memcmp(p->type_guid.b, KIBA_GUID_BIOS_BOOT.b, 16) == 0)
+            type_str = KIBA_GUID_BIOS_BOOT_STR;
         else
             type_str = KIBA_GUID_LINUX_FS_STR;
 
@@ -3445,10 +3453,39 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     if (cb) cb(84, "Installing bootloader...", user_data);
+    /* Hybrid GRUB: install both BIOS (i386-pc, embeds core.img into the
+     * KIBAOS-BIOSBOOT partition we carved out during partitioning) and
+     * UEFI (x86_64-efi, writes into the ESP) targets onto the same disk.
+     * One shared --boot-directory means grub-mkconfig only needs to run
+     * once afterward. This intentionally always installs both targets
+     * regardless of how the *installer itself* booted -- we're choosing
+     * boot flexibility on the *installed* disk, not mirroring the live
+     * environment's firmware mode. */
     {
-        char *argv[] = { (char *)"bootctl", (char *)"--esp-path=/boot", (char *)"install", NULL };
-        if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
+        char *argv_bios[] = {
+            (char *)"grub-install",
+            (char *)"--target=i386-pc",
+            (char *)"--boot-directory=/boot",
+            (char *)disk_path,
+            NULL
+        };
+        if (chroot_run(target_root, argv_bios) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install (BIOS) failed");
+            return -1;
+        }
+    }
+    {
+        char *argv_efi[] = {
+            (char *)"grub-install",
+            (char *)"--target=x86_64-efi",
+            (char *)"--efi-directory=/boot",
+            (char *)"--boot-directory=/boot",
+            (char *)"--bootloader-id=KibaOS",
+            (char *)"--removable",
+            NULL
+        };
+        if (chroot_run(target_root, argv_efi) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install (UEFI) failed");
             return -1;
         }
     }
@@ -3458,56 +3495,38 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     snprintf(path, sizeof(path), "%s/usr/share/systemd/bootctl/splash-arch.bmp", target_root);
     unlink(path);
 
-    snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
+    /* GRUB config: silent/quiet menu (we don't want a visible boot menu
+     * any more than the old systemd-boot setup did), short timeout, our
+     * own distributor branding. /etc/default/grub is read by
+     * grub-mkconfig below to produce the real /boot/grub/grub.cfg. */
+    snprintf(path, sizeof(path), "%s/etc/default/grub", target_root);
     if (write_file(path,
-               "default kibaos.conf\n"
-               "timeout 0\n"
-               "console-mode max\n"
-               "editor no\n"
-               "auto-entries no\n") != 0) {
+               "GRUB_DEFAULT=0\n"
+               "GRUB_TIMEOUT=0\n"
+               "GRUB_TIMEOUT_STYLE=hidden\n"
+               "GRUB_DISTRIBUTOR=KibaOS\n"
+               "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
+               "systemd.show_status=auto rd.systemd.show_status=auto "
+               "rd.udev.log_level=3 vt.global_cursor_default=0 "
+               "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\"\n"
+               "GRUB_CMDLINE_LINUX=\"\"\n"
+               "GRUB_DISABLE_OS_PROBER=true\n"
+               "GRUB_GFXMODE=auto\n"
+               "GRUB_GFXPAYLOAD_LINUX=keep\n") != 0) {
         return -1;
     }
 
-    /* Read the real root PARTUUID directly from the GPT bytes we wrote
-     * ourselves -- no blkid subprocess. */
-    char partuuid[64];
-    if (!kiba_read_partuuid_direct(disk_path, /* partno */ 2, partuuid, sizeof(partuuid))) {
-        snprintf(g_finish_err, sizeof(g_finish_err), "could not read root PARTUUID");
-        return -1;
-    }
-
-    /* Write the boot entry directly. (There is no pre-existing template
-     * with a PARTUUID=PLACEHOLDER token in the installed system's /boot
-     * -- the only such template lives in the live ISO's own efiboot
-     * profile, which is a separate file used only to boot the install
-     * medium itself. So we always generate this entry from scratch.) */
-    snprintf(path, sizeof(path), "%s/boot/loader/entries/kibaos.conf", target_root);
+    if (cb) cb(87, "Generating bootloader configuration...", user_data);
     {
-        char entries_dir[1024];
-        snprintf(entries_dir, sizeof(entries_dir), "%s/boot/loader/entries", target_root);
-        mkdir(entries_dir, 0755); /* defensive: bootctl install normally creates this */
-
-        char entry[1024];
-        snprintf(entry, sizeof(entry),
-                  "title   KibaOS\n"
-                  "linux   /vmlinuz-linux\n"
-                  "initrd  /initramfs-linux.img\n"
-                  "options root=PARTUUID=%s rw quiet splash loglevel=3 "
-                  "systemd.show_status=auto rd.systemd.show_status=auto "
-                  "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                  "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\n",
-                  partuuid);
-        if (write_file(path, entry) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "could not write boot entry %s", path);
+        char *argv[] = {
+            (char *)"grub-mkconfig",
+            (char *)"-o", (char *)"/boot/grub/grub.cfg",
+            NULL
+        };
+        if (chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-mkconfig failed");
             return -1;
         }
-    }
-
-    {
-        char *argv1[] = { (char *)"bootctl", (char *)"set-timeout", (char *)"", NULL };
-        chroot_run(target_root, argv1);
-        char *argv2[] = { (char *)"bootctl", (char *)"set-default", (char *)"", NULL };
-        chroot_run(target_root, argv2);
     }
 
     if (cb) cb(88, "Enabling services...", user_data);
@@ -3659,12 +3678,18 @@ int main(int argc, char **argv) {
     int disk_fd = open(disk, O_RDWR);
     if (disk_fd < 0) fail("Could not open disk for writing.");
 
-    /* Layout: 512MiB ESP (FAT32) + remainder as Linux root (ext4),
-     * matching the layout the old archinstall-based backend used. */
+    /* Layout: 1MiB BIOS boot partition (for hybrid GRUB on BIOS/CSM) +
+     * 512MiB ESP (FAT32) + remainder as Linux root (ext4). The BIOS boot
+     * partition carries no filesystem -- GRUB's core.img is embedded into
+     * it directly by `grub-install --target=i386-pc`, since legacy BIOS
+     * has no GPT-aware firmware to read a filesystem off the ESP. */
+    uint64_t bios_boot_sectors = (1ull * 1024 * 1024) / ssz;
     uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
     uint64_t entry_array_sectors = (128 * 128 + ssz - 1) / ssz;
     uint64_t first_usable = 2 + entry_array_sectors;
-    uint64_t esp_first  = first_usable;
+    uint64_t bios_boot_first = first_usable;
+    uint64_t bios_boot_last  = bios_boot_first + bios_boot_sectors - 1;
+    uint64_t esp_first  = bios_boot_last + 1;
     uint64_t esp_last   = esp_first + esp_sectors - 1;
     uint64_t root_first = esp_last + 1;
     /* Root partition consumes the rest of the disk. We deliberately do NOT
@@ -3689,14 +3714,17 @@ int main(int argc, char **argv) {
         .total_sectors = total_sectors,
         .disk_guid = {{0}},
     };
-    kiba_gpt_partition_t parts[2] = {
+    kiba_gpt_partition_t parts[3] = {
+        { .name = "KIBAOS-BIOSBOOT", .type_guid = KIBA_GUID_BIOS_BOOT, .unique_guid = {{0}},
+          .first_lba = bios_boot_first, .last_lba = bios_boot_last,
+          .attributes = KIBA_GPT_ATTR_LEGACY_BIOS_BOOTABLE },
         { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
           .first_lba = esp_first,  .last_lba = esp_last,
-          .attributes = KIBA_GPT_ATTR_LEGACY_BIOS_BOOTABLE },
+          .attributes = 0 },
         { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
           .first_lba = root_first, .last_lba = root_last, .attributes = 0 },
     };
-    int rc = kiba_gpt_write(&gdisk, parts, 2);
+    int rc = kiba_gpt_write(&gdisk, parts, 3);
     close(disk_fd);
     if (rc != 0) {
         char errbuf[256];
@@ -3719,11 +3747,11 @@ int main(int argc, char **argv) {
     size_t disk_len = strlen(disk);
     bool disk_ends_in_digit = disk_len > 0 && disk[disk_len - 1] >= '0' && disk[disk_len - 1] <= '9';
     if (disk_ends_in_digit) {
-        snprintf(esp_part,  sizeof(esp_part),  "%sp1", disk);
-        snprintf(root_part, sizeof(root_part), "%sp2", disk);
+        snprintf(esp_part,  sizeof(esp_part),  "%sp2", disk);
+        snprintf(root_part, sizeof(root_part), "%sp3", disk);
     } else {
-        snprintf(esp_part,  sizeof(esp_part),  "%s1", disk);
-        snprintf(root_part, sizeof(root_part), "%s2", disk);
+        snprintf(esp_part,  sizeof(esp_part),  "%s2", disk);
+        snprintf(root_part, sizeof(root_part), "%s3", disk);
     }
 
     /* Wait for the kernel/udev to settle before touching the new
