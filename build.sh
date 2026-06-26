@@ -20,8 +20,8 @@ pacman-key --populate archlinux
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
-  archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
-  cmake ninja meson \
+  archiso base-devel git squashfs-tools libisoburn mtools dosfstools grub \
+  cmake ninja meson grub \
   openssl curl imagemagick
 
 # ── Paths ─────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ iso_application="KibaOS — A friendly Budgie desktop built on Arch Linux"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
-bootmodes=('bios.grub.mbr' 'bios.grub.eltorito' 'uefi-ia32.grub.esp' 'uefi-x64.grub.esp')
+bootmodes=('uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
@@ -87,6 +87,7 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
+syslinux
 grub
 base
 linux
