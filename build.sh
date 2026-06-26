@@ -49,7 +49,7 @@ iso_application="KibaOS — A friendly Budgie desktop built on Arch Linux"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
-bootmodes=('uefi.grub')
+bootmodes=('bios.syslinux.mbr' 'uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
@@ -5066,88 +5066,12 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
-# BIOS hybrid stub — embed i386-pc GRUB into the ISO's MBR so the same
-# image boots on legacy BIOS machines (e.g. pre-2011 hardware) without any
-# changes to the UEFI GRUB config or the ISO 9660 structure.
-#
-# How it works:
-#   1. Mount the ISO read-only via loopback to get the GRUB i386-pc modules
-#   2. Run grub-install --target=i386-pc into a temp dir pointed at the ISO
-#   3. Use xorriso to splice the resulting MBR boot code + core.img back
-#      into the ISO as an El Torito BIOS entry, producing a new hybrid ISO
-#
-# The UEFI ESP and grub.cfg are completely untouched — both boot paths
-# land in the same GRUB environment and read the same config.
+# BIOS support via ISOLINUX
+# mkarchiso handles this natively via bootmodes=('bios.syslinux.mbr').
+# No post-processing needed — syslinux is in the package list and the
+# profiledef bootmode entry tells mkarchiso to embed ISOLINUX automatically.
 # ══════════════════════════════════════════════════════════════════════════
-# ══════════════════════════════════════════════════════════════════════════
-# BIOS hybrid stub — splice a GRUB i386-pc El Torito entry into the
-# mkarchiso-built UEFI ISO so the same image also boots on legacy BIOS.
-#
-# Technique (confirmed against Debian wiki + xorriso mailing list):
-#   1. grub-mkimage builds a minimal i386-pc core.img (iso9660 + biosdisk)
-#   2. Prepend cdboot.img → bios.img (the El Torito BIOS boot image)
-#   3. xorriso -as mkisofs rewrites the ISO, keeping the existing UEFI ESP
-#      via -boot_image any replay, and adding the BIOS entry alongside it
-#      using --grub2-mbr (hybrid MBR) + -eltorito-boot.
-#
-# Both BIOS and UEFI paths end up in the same GRUB and read the same
-# grub.cfg — zero config duplication.
-# ══════════════════════════════════════════════════════════════════════════
-echo "=== Embedding BIOS hybrid stub ==="
-
-BIOSWORK="${WORKDIR}/_bioswork"
-mkdir -p "${BIOSWORK}"
-
-GRUB_I386=/usr/lib/grub/i386-pc
-
-# Build a minimal BIOS core.img: only needs to locate /boot/grub on the ISO
-grub-mkimage \
-  --directory   "${GRUB_I386}" \
-  --prefix      '(cd0)/boot/grub' \
-  --output      "${BIOSWORK}/core.img" \
-  --format      i386-pc-eltorito \
-  biosdisk iso9660 part_gpt part_msdos normal search search_fs_file
-
-# Prepend cdboot.img to produce the El Torito BIOS boot image
-cat "${GRUB_I386}/cdboot.img" "${BIOSWORK}/core.img" > "${BIOSWORK}/bios.img"
-
-# Mount the mkarchiso ISO read-only and extract its EFI partition image.
-# (-indev is a native xorriso flag and cannot be used inside -as mkisofs mode,
-# so we mount + dd instead and use native xorriso for the remaster step.)
-MNTISO="${BIOSWORK}/mnt"
-mkdir -p "${MNTISO}"
-mount -o loop,ro "${ISO}.iso" "${MNTISO}"
-
-EFIOFF=$(partx -g -o START   -n 2 "${ISO}.iso" | tr -d ' ')
-EFISZ=$( partx -g -o SECTORS -n 2 "${ISO}.iso" | tr -d ' ')
-dd if="${ISO}.iso" bs=512 skip="${EFIOFF}" count="${EFISZ}" \
-   of="${BIOSWORK}/efi.img" status=none
-
-# Remaster in native xorriso mode so -indev is valid.
-# -boot_image any replay  preserves the existing UEFI El Torito entry.
-# The BIOS El Torito entry is added before it via grub2_mbr + bin_path.
-xorriso \
-  -indev  "${ISO}.iso" \
-  -outdev "${ISO}.iso.tmp" \
-  -pathspecs on \
-  -changes_pending yes \
-  -add /boot/grub/bios.img="${BIOSWORK}/bios.img" \
-  -boot_image grub grub2_mbr="${GRUB_I386}/boot_hybrid.img" \
-  -boot_image any partition_table=on \
-  -boot_image any partition_offset=16 \
-  -boot_image any cat_path="/boot/grub/boot.cat" \
-  -boot_image grub bin_path="/boot/grub/bios.img" \
-  -boot_image any boot_info_table=on \
-  -boot_image grub grub2_boot_info=on \
-  -boot_image any next \
-  -boot_image any replay \
-  -append_partition 2 0xef "${BIOSWORK}/efi.img" \
-  --
-
-umount "${MNTISO}"
-mv "${ISO}.iso.tmp" "${ISO}.iso"
-rm -rf "${BIOSWORK}"
-echo "=== BIOS hybrid stub embedded ==="
+echo "=== BIOS (ISOLINUX) support handled by mkarchiso via profiledef ==="
 
 sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
 echo "╔══════════════════════════════════════╗"
