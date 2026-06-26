@@ -20,8 +20,8 @@ pacman-key --populate archlinux
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
-  archiso base-devel git squashfs-tools libisoburn mtools dosfstools grub grub \
-  cmake ninja meson grub \
+  archiso base-devel git squashfs-tools libisoburn mtools dosfstools grub \
+  cmake ninja meson \
   openssl curl imagemagick
 
 # ── Paths ─────────────────────────────────────────────────────────────────
@@ -5111,25 +5111,39 @@ grub-mkimage \
 # Prepend cdboot.img to produce the El Torito BIOS boot image
 cat "${GRUB_I386}/cdboot.img" "${BIOSWORK}/core.img" > "${BIOSWORK}/bios.img"
 
-# Copy the bios.img into a staging tree so xorriso can graft it in
-STAGING="${BIOSWORK}/iso"
-mkdir -p "${STAGING}/boot/grub"
-cp "${BIOSWORK}/bios.img" "${STAGING}/boot/grub/bios.img"
+# Mount the mkarchiso ISO read-only and extract its EFI partition image.
+# (-indev is a native xorriso flag and cannot be used inside -as mkisofs mode,
+# so we mount + dd instead and use native xorriso for the remaster step.)
+MNTISO="${BIOSWORK}/mnt"
+mkdir -p "${MNTISO}"
+mount -o loop,ro "${ISO}.iso" "${MNTISO}"
 
-# Remaster: preserve existing UEFI boot equipment, add BIOS El Torito entry
-xorriso -as mkisofs \
+EFIOFF=$(partx -g -o START   -n 2 "${ISO}.iso" | tr -d ' ')
+EFISZ=$( partx -g -o SECTORS -n 2 "${ISO}.iso" | tr -d ' ')
+dd if="${ISO}.iso" bs=512 skip="${EFIOFF}" count="${EFISZ}" \
+   of="${BIOSWORK}/efi.img" status=none
+
+# Remaster in native xorriso mode so -indev is valid.
+# -boot_image any replay  preserves the existing UEFI El Torito entry.
+# The BIOS El Torito entry is added before it via grub2_mbr + bin_path.
+xorriso \
   -indev  "${ISO}.iso" \
   -outdev "${ISO}.iso.tmp" \
-  --grub2-mbr "${GRUB_I386}/boot_hybrid.img" \
-  -eltorito-boot boot/grub/bios.img \
-    -no-emul-boot -boot-load-size 4 -boot-info-table --grub2-boot-info \
-  -eltorito-catalog boot/grub/bios.cat \
-  -eltorito-alt-boot \
-    -boot_image any replay \
+  -boot_image grub grub2_mbr="${GRUB_I386}/boot_hybrid.img" \
+  -boot_image any partition_table=on \
+  -boot_image any partition_offset=16 \
+  -boot_image any cat_path="/boot/grub/boot.cat" \
+  -boot_image grub bin_path="/boot/grub/bios.img" \
+  -boot_image any boot_info_table=on \
+  -boot_image grub grub2_boot_info=on \
+  -boot_image any next \
+  -boot_image any replay \
   -append_partition 2 0xef "${BIOSWORK}/efi.img" \
-  -graft-points \
-    /boot/grub/bios.img="${BIOSWORK}/bios.img"
+  -changes_pending yes \
+  -add /boot/grub/bios.img="${BIOSWORK}/bios.img" \
+  --
 
+umount "${MNTISO}"
 mv "${ISO}.iso.tmp" "${ISO}.iso"
 rm -rf "${BIOSWORK}"
 echo "=== BIOS hybrid stub embedded ==="
