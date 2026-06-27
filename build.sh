@@ -2692,6 +2692,7 @@ cat > kiba_install_finish.c << 'KIBA_SRC_END_FINC'
 #include <errno.h>
 #include <fcntl.h>
 #include <spawn.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2723,6 +2724,36 @@ static int run_argv(char *const argv[]) {
         snprintf(g_finish_err, sizeof(g_finish_err), "%s terminated abnormally", argv[0]);
     }
     return -1;
+}
+
+/* Variadic convenience wrapper around run_argv for simple, fixed-shape
+ * commands (e.g. "mkdir", "-p", dir, NULL). Pass the command and each
+ * argument as separate `const char *`, terminated by a NULL sentinel --
+ * mirrors execl()-style call sites. Capped at KIBA_RUN_CMD_MAX_ARGS
+ * arguments; still no shell involved anywhere. */
+#define KIBA_RUN_CMD_MAX_ARGS 16
+static int run_cmd(const char *first, ...) {
+    char *argv[KIBA_RUN_CMD_MAX_ARGS];
+    int argc = 0;
+
+    argv[argc++] = (char *)first;
+
+    va_list ap;
+    va_start(ap, first);
+    for (;;) {
+        if (argc >= KIBA_RUN_CMD_MAX_ARGS - 1) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "run_cmd: too many arguments (max %d)", KIBA_RUN_CMD_MAX_ARGS - 1);
+            va_end(ap);
+            return -1;
+        }
+        const char *arg = va_arg(ap, const char *);
+        if (arg == NULL) break;
+        argv[argc++] = (char *)arg;
+    }
+    va_end(ap);
+
+    argv[argc] = NULL;
+    return run_argv(argv);
 }
 
 /* Like run_argv, but writes `stdin_data` to the child's stdin before
