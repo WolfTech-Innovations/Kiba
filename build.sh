@@ -20,7 +20,7 @@ pacman-key --populate archlinux
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
-  archiso base-devel git squashfs-tools libisoburn mtools dosfstools limine \
+  archiso base-devel git squashfs-tools libisoburn mtools dosfstools limine grub-install \
   cmake ninja meson \
   openssl curl imagemagick
 
@@ -45,11 +45,11 @@ cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
 iso_name="kibaos"
 iso_label="KIBAOS"
 iso_publisher="WolfTech Innovations <https://github.com/WolfTech-Innovations>"
-iso_application="KibaOS — A friendly Budgie desktop built on Arch Linux"
+iso_application="KibaOS — A friendly OS for all"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
-bootmodes=()
+bootmodes=('uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
