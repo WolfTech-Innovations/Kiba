@@ -3079,7 +3079,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
     write_file(path, "[Daemon]\nTheme=kibaos\nShowDelay=0\nDeviceTimeout=8\n");
     {
-        char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"kibaos", NULL };
+        char *argv[] = { (char *)"a-set-default-theme", (char *)"kibaos", NULL };
         chroot_run(target_root, argv);
     }
 
@@ -5131,62 +5131,60 @@ fi
 # ════════════════════════════════════════════════════════════════════════
 # Limine hybrid ISO — BIOS + UEFI
 #
-# mkarchiso (uefi.grub mode) lays out the kernel/initrd correctly but uses
-# GRUB as the EFI bootloader. We remaster the ISO here to replace GRUB with
-# Limine for both BIOS (El Torito + MBR) and UEFI (El Torito + EFI app),
-# keeping the existing /arch/ squashfs/kernel tree completely intact.
+# Method (from official Limine USAGE.md v12.x):
+#   Extract the mkarchiso ISO into a flat directory, overlay Limine files
+#   on top, then call xorriso on that clean directory tree. This avoids
+#   the existing GRUB El Torito boot catalog in the mkarchiso ISO from
+#   conflicting with the new Limine BIOS El Torito entry — which was the
+#   root cause of BIOS boot failure when using -graft-points over a
+#   mounted ISO.
 #
-# Method (from official Limine USAGE.md):
-#   1. Copy limine-bios-cd.bin, limine-uefi-cd.bin, limine-bios.sys into
-#      a staging dir so xorriso can graft them in alongside the ISO tree.
-#   2. xorriso -as mkisofs: graft Limine files + existing ISO tree, set
-#      BIOS El Torito (-b limine-bios-cd.bin) and UEFI El Torito
-#      (-eltorito-alt-boot -e limine-uefi-cd.bin) — exact pattern from
-#      Limine's own test.mk.
-#   3. limine bios-install writes stage-1 MBR into the image for USB boot.
+#   1. bsdtar -xf: extract entire mkarchiso ISO tree to a flat directory.
+#   2. Overlay limine-bios-cd.bin, limine-uefi-cd.bin, limine-bios.sys,
+#      limine.conf, and BOOTX64.EFI into that directory.
+#   3. xorriso -as mkisofs: build a fresh hybrid image from the clean
+#      flat tree — no existing boot catalog to conflict.
+#   4. limine bios-install: write stage-1 MBR into the image.
 # ════════════════════════════════════════════════════════════════════════
 echo "=== Embedding Limine (BIOS + UEFI) ==="
 
+# Ensure bsdtar (libarchive) is available
+pacman -S --noconfirm --needed libarchive
+
 LIMINE_SHARE=/usr/share/limine
-LIMINE_WORK="${WORKDIR}/_limine"
-mkdir -p "${LIMINE_WORK}/limine"
+LIMINE_ROOT="${WORKDIR}/_limine_root"
+mkdir -p "${LIMINE_ROOT}"
 
-# Stage Limine boot files
-cp "${LIMINE_SHARE}/limine-bios-cd.bin"  "${LIMINE_WORK}/limine/"
-cp "${LIMINE_SHARE}/limine-uefi-cd.bin"  "${LIMINE_WORK}/limine/"
-cp "${LIMINE_SHARE}/limine-bios.sys"     "${LIMINE_WORK}/limine/"
-mkdir -p "${LIMINE_WORK}/EFI/BOOT"
-cp "${LIMINE_SHARE}/BOOTX64.EFI"         "${LIMINE_WORK}/EFI/BOOT/"
+# Step 1: Extract the mkarchiso ISO into a flat directory tree
+bsdtar -xf "${ISO}.iso" -C "${LIMINE_ROOT}"
 
-# Mount the mkarchiso ISO so we can graft its contents into the new image
-MNTISO="${LIMINE_WORK}/mnt"
-mkdir -p "${MNTISO}"
-mount -o loop,ro "${ISO}.iso" "${MNTISO}"
+# Step 2: Overlay Limine files
+mkdir -p "${LIMINE_ROOT}/limine"
+cp "${LIMINE_SHARE}/limine-bios-cd.bin"  "${LIMINE_ROOT}/limine/"
+cp "${LIMINE_SHARE}/limine-uefi-cd.bin"  "${LIMINE_ROOT}/limine/"
+cp "${LIMINE_SHARE}/limine-bios.sys"     "${LIMINE_ROOT}/limine/"
+cp "${PROFILE}/limine/limine.conf"       "${LIMINE_ROOT}/limine/"
+mkdir -p "${LIMINE_ROOT}/EFI/BOOT"
+cp "${LIMINE_SHARE}/BOOTX64.EFI"         "${LIMINE_ROOT}/EFI/BOOT/"
 
-# Remaster: graft Limine files + existing ISO tree into a new hybrid image.
-# Pattern taken directly from limine/test.mk (the project's own CI).
+# Step 3: Build a fresh hybrid ISO from the clean flat tree.
+# -b path is relative inside the root directory.
+# Pattern taken directly from Limine USAGE.md (v12.x).
 xorriso -as mkisofs \
   -R -r -J \
   -b limine/limine-bios-cd.bin \
-    -no-emul-boot -boot-load-size 4 -boot-info-table \
+  -no-emul-boot -boot-load-size 4 -boot-info-table \
   -hfsplus -apm-block-size 2048 \
   --efi-boot limine/limine-uefi-cd.bin \
-    -efi-boot-part --efi-boot-image \
+  -efi-boot-part --efi-boot-image \
   --protective-msdos-label \
-  -graft-points \
-    /="${MNTISO}" \
-    /limine="${LIMINE_WORK}/limine" \
-    /EFI/BOOT/BOOTX64.EFI="${LIMINE_WORK}/EFI/BOOT/BOOTX64.EFI" \
-    /limine/limine.conf="${PROFILE}/limine/limine.conf" \
-  -o "${ISO}.iso.tmp"
+  "${LIMINE_ROOT}" -o "${ISO}.iso.tmp"
 
-umount "${MNTISO}"
-
-# Embed BIOS MBR stage-1 for USB/HDD legacy BIOS boot
+# Step 4: Embed BIOS MBR stage-1 for USB/HDD legacy BIOS boot
 limine bios-install "${ISO}.iso.tmp"
 
 mv "${ISO}.iso.tmp" "${ISO}.iso"
-rm -rf "${LIMINE_WORK}"
+rm -rf "${LIMINE_ROOT}"
 echo "=== Limine hybrid ISO complete ==="
 
 sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
