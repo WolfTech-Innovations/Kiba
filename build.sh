@@ -3090,7 +3090,9 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-
+#include <unistd.h>
+#include <sys/wait.h>
+#include <errno.h>
 static FILE *g_logfp = NULL;
 
 static void log_init(void) {
