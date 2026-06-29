@@ -45,7 +45,7 @@ cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
 iso_name="kibaos"
 iso_label="KIBAOS"
 iso_publisher="WolfTech Innovations <https://github.com/WolfTech-Innovations>"
-iso_application="KibaOS — A friendly OS for all"
+iso_application="KibaOS — A friendly Budgie desktop built on Arch Linux"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
@@ -2692,7 +2692,6 @@ cat > kiba_install_finish.c << 'KIBA_SRC_END_FINC'
 #include <errno.h>
 #include <fcntl.h>
 #include <spawn.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2724,36 +2723,6 @@ static int run_argv(char *const argv[]) {
         snprintf(g_finish_err, sizeof(g_finish_err), "%s terminated abnormally", argv[0]);
     }
     return -1;
-}
-
-/* Variadic convenience wrapper around run_argv for simple, fixed-shape
- * commands (e.g. "mkdir", "-p", dir, NULL). Pass the command and each
- * argument as separate `const char *`, terminated by a NULL sentinel --
- * mirrors execl()-style call sites. Capped at KIBA_RUN_CMD_MAX_ARGS
- * arguments; still no shell involved anywhere. */
-#define KIBA_RUN_CMD_MAX_ARGS 16
-static int run_cmd(const char *first, ...) {
-    char *argv[KIBA_RUN_CMD_MAX_ARGS];
-    int argc = 0;
-
-    argv[argc++] = (char *)first;
-
-    va_list ap;
-    va_start(ap, first);
-    for (;;) {
-        if (argc >= KIBA_RUN_CMD_MAX_ARGS - 1) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "run_cmd: too many arguments (max %d)", KIBA_RUN_CMD_MAX_ARGS - 1);
-            va_end(ap);
-            return -1;
-        }
-        const char *arg = va_arg(ap, const char *);
-        if (arg == NULL) break;
-        argv[argc++] = (char *)arg;
-    }
-    va_end(ap);
-
-    argv[argc] = NULL;
-    return run_argv(argv);
 }
 
 /* Like run_argv, but writes `stdin_data` to the child's stdin before
@@ -3079,7 +3048,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
     write_file(path, "[Daemon]\nTheme=kibaos\nShowDelay=0\nDeviceTimeout=8\n");
     {
-        char *argv[] = { (char *)"a-set-default-theme", (char *)"kibaos", NULL };
+        char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"kibaos", NULL };
         chroot_run(target_root, argv);
     }
 
@@ -3136,8 +3105,7 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <errno.h>      // errno, EINTR
-#include <sys/wait.h>   // waitpid()
+
 static FILE *g_logfp = NULL;
 
 static void log_init(void) {
@@ -3381,7 +3349,7 @@ gcc -O2 -Wall -c kiba_gpt.c -o kiba_gpt.o || { echo "FATAL: kiba_gpt.c failed to
 gcc -O2 -Wall -c kiba_fs.c -o kiba_fs.o || { echo "FATAL: kiba_fs.c failed to compile" >&2; exit 1; }
 gcc -O2 -Wall -c kiba_udev.c -o kiba_udev.o || { echo "FATAL: kiba_udev.c failed to compile" >&2; exit 1; }
 gcc -O2 -Wall -c kiba_install_extract.c -o kiba_install_extract.o || { echo "FATAL: kiba_install_extract.c failed to compile" >&2; exit 1; }
-gcc -O2 -Wall -Wimplicit-function-declaration -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration -c kiba_install_finish.c -o kiba_install_finish.o || { echo "FATAL: kiba_install_finish.c failed to compile" >&2; exit 1; }
+gcc -O2 -Wall -c kiba_install_finish.c -o kiba_install_finish.o || { echo "FATAL: kiba_install_finish.c failed to compile" >&2; exit 1; }
 ar rcs libkibadisk.a kiba_gpt.o kiba_fs.o kiba_udev.o kiba_install_extract.o kiba_install_finish.o
 
 echo "=== Building kibaos-oobe-backend (privileged install orchestrator) ==="
@@ -5131,60 +5099,62 @@ fi
 # ════════════════════════════════════════════════════════════════════════
 # Limine hybrid ISO — BIOS + UEFI
 #
-# Method (from official Limine USAGE.md v12.x):
-#   Extract the mkarchiso ISO into a flat directory, overlay Limine files
-#   on top, then call xorriso on that clean directory tree. This avoids
-#   the existing GRUB El Torito boot catalog in the mkarchiso ISO from
-#   conflicting with the new Limine BIOS El Torito entry — which was the
-#   root cause of BIOS boot failure when using -graft-points over a
-#   mounted ISO.
+# mkarchiso (uefi.grub mode) lays out the kernel/initrd correctly but uses
+# GRUB as the EFI bootloader. We remaster the ISO here to replace GRUB with
+# Limine for both BIOS (El Torito + MBR) and UEFI (El Torito + EFI app),
+# keeping the existing /arch/ squashfs/kernel tree completely intact.
 #
-#   1. bsdtar -xf: extract entire mkarchiso ISO tree to a flat directory.
-#   2. Overlay limine-bios-cd.bin, limine-uefi-cd.bin, limine-bios.sys,
-#      limine.conf, and BOOTX64.EFI into that directory.
-#   3. xorriso -as mkisofs: build a fresh hybrid image from the clean
-#      flat tree — no existing boot catalog to conflict.
-#   4. limine bios-install: write stage-1 MBR into the image.
+# Method (from official Limine USAGE.md):
+#   1. Copy limine-bios-cd.bin, limine-uefi-cd.bin, limine-bios.sys into
+#      a staging dir so xorriso can graft them in alongside the ISO tree.
+#   2. xorriso -as mkisofs: graft Limine files + existing ISO tree, set
+#      BIOS El Torito (-b limine-bios-cd.bin) and UEFI El Torito
+#      (-eltorito-alt-boot -e limine-uefi-cd.bin) — exact pattern from
+#      Limine's own test.mk.
+#   3. limine bios-install writes stage-1 MBR into the image for USB boot.
 # ════════════════════════════════════════════════════════════════════════
 echo "=== Embedding Limine (BIOS + UEFI) ==="
 
-# Ensure bsdtar (libarchive) is available
-pacman -S --noconfirm --needed libarchive
-
 LIMINE_SHARE=/usr/share/limine
-LIMINE_ROOT="${WORKDIR}/_limine_root"
-mkdir -p "${LIMINE_ROOT}"
+LIMINE_WORK="${WORKDIR}/_limine"
+mkdir -p "${LIMINE_WORK}/limine"
 
-# Step 1: Extract the mkarchiso ISO into a flat directory tree
-bsdtar -xf "${ISO}.iso" -C "${LIMINE_ROOT}"
+# Stage Limine boot files
+cp "${LIMINE_SHARE}/limine-bios-cd.bin"  "${LIMINE_WORK}/limine/"
+cp "${LIMINE_SHARE}/limine-uefi-cd.bin"  "${LIMINE_WORK}/limine/"
+cp "${LIMINE_SHARE}/limine-bios.sys"     "${LIMINE_WORK}/limine/"
+mkdir -p "${LIMINE_WORK}/EFI/BOOT"
+cp "${LIMINE_SHARE}/BOOTX64.EFI"         "${LIMINE_WORK}/EFI/BOOT/"
 
-# Step 2: Overlay Limine files
-mkdir -p "${LIMINE_ROOT}/limine"
-cp "${LIMINE_SHARE}/limine-bios-cd.bin"  "${LIMINE_ROOT}/limine/"
-cp "${LIMINE_SHARE}/limine-uefi-cd.bin"  "${LIMINE_ROOT}/limine/"
-cp "${LIMINE_SHARE}/limine-bios.sys"     "${LIMINE_ROOT}/limine/"
-cp "${PROFILE}/limine/limine.conf"       "${LIMINE_ROOT}/limine/"
-mkdir -p "${LIMINE_ROOT}/EFI/BOOT"
-cp "${LIMINE_SHARE}/BOOTX64.EFI"         "${LIMINE_ROOT}/EFI/BOOT/"
+# Mount the mkarchiso ISO so we can graft its contents into the new image
+MNTISO="${LIMINE_WORK}/mnt"
+mkdir -p "${MNTISO}"
+mount -o loop,ro "${ISO}.iso" "${MNTISO}"
 
-# Step 3: Build a fresh hybrid ISO from the clean flat tree.
-# -b path is relative inside the root directory.
-# Pattern taken directly from Limine USAGE.md (v12.x).
+# Remaster: graft Limine files + existing ISO tree into a new hybrid image.
+# Pattern taken directly from limine/test.mk (the project's own CI).
 xorriso -as mkisofs \
   -R -r -J \
   -b limine/limine-bios-cd.bin \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
+    -no-emul-boot -boot-load-size 4 -boot-info-table \
   -hfsplus -apm-block-size 2048 \
   --efi-boot limine/limine-uefi-cd.bin \
-  -efi-boot-part --efi-boot-image \
+    -efi-boot-part --efi-boot-image \
   --protective-msdos-label \
-  "${LIMINE_ROOT}" -o "${ISO}.iso.tmp"
+  -graft-points \
+    /="${MNTISO}" \
+    /limine="${LIMINE_WORK}/limine" \
+    /EFI/BOOT/BOOTX64.EFI="${LIMINE_WORK}/EFI/BOOT/BOOTX64.EFI" \
+    /limine/limine.conf="${PROFILE}/limine/limine.conf" \
+  -o "${ISO}.iso.tmp"
 
-# Step 4: Embed BIOS MBR stage-1 for USB/HDD legacy BIOS boot
+umount "${MNTISO}"
+
+# Embed BIOS MBR stage-1 for USB/HDD legacy BIOS boot
 limine bios-install "${ISO}.iso.tmp"
 
 mv "${ISO}.iso.tmp" "${ISO}.iso"
-rm -rf "${LIMINE_ROOT}"
+rm -rf "${LIMINE_WORK}"
 echo "=== Limine hybrid ISO complete ==="
 
 sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
