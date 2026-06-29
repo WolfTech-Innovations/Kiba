@@ -2945,12 +2945,9 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     if (cb) cb(84, "Installing bootloader...", user_data);
-    /* Limine: install both BIOS (MBR stage-1 via limine bios-install) and
-     * UEFI (BOOTX64.EFI into the ESP) from the same disk.
-     * Limine does not need a dedicated BIOS boot partition -- it embeds
-     * stage-1 into the MBR gap within GPT structures. */
+    /* Limine UEFI-only: write limine.conf and copy BOOTX64.EFI into the ESP. */
 
-    /* Write limine.conf into the ESP */
+    /* Write limine.conf */
     {
         char conf_path[512];
         snprintf(conf_path, sizeof(conf_path), "%s/boot/limine", target_root);
@@ -2959,7 +2956,6 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             return -1;
         }
         snprintf(conf_path, sizeof(conf_path), "%s/boot/limine/limine.conf", target_root);
-        /* Kernel cmdline: quiet Plymouth boot, no visible menu */
         if (write_file(conf_path,
                    "timeout: 0\n"
                    "default_entry: 1\n"
@@ -2983,7 +2979,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         }
     }
 
-    /* Copy Limine EFI files into ESP for UEFI boot */
+    /* Copy Limine EFI application into ESP */
     {
         char efi_dir[512];
         snprintf(efi_dir, sizeof(efi_dir), "%s/boot/EFI/BOOT", target_root);
@@ -2995,28 +2991,6 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         snprintf(efi_dst, sizeof(efi_dst), "%s/boot/EFI/BOOT/BOOTX64.EFI", target_root);
         if (run_cmd("cp", "/usr/share/limine/BOOTX64.EFI", efi_dst, NULL) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "copying BOOTX64.EFI failed");
-            return -1;
-        }
-        /* limine-bios.sys must be on the ESP for BIOS stage-2 */
-        char bios_sys_dst[512];
-        snprintf(bios_sys_dst, sizeof(bios_sys_dst), "%s/boot/limine/limine-bios.sys", target_root);
-        if (run_cmd("cp", "/usr/share/limine/limine-bios.sys", bios_sys_dst, NULL) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "copying limine-bios.sys failed");
-            return -1;
-        }
-    }
-
-    if (cb) cb(87, "Embedding Limine BIOS stage-1...", user_data);
-    /* limine bios-install writes the MBR stage-1 directly onto the disk.
-     * Must be run against the raw disk device, not a partition. */
-    {
-        char *argv[] = {
-            (char *)"limine", (char *)"bios-install",
-            (char *)disk_path,
-            NULL
-        };
-        if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "limine bios-install failed");
             return -1;
         }
     }
@@ -3218,6 +3192,10 @@ int main(int argc, char **argv) {
         snprintf(errbuf, sizeof(errbuf), "Partitioning failed: %s", strerror(-rc));
         fail(errbuf);
     }
+    /* Force all buffered writes to the block device out to disk before
+     * partprobe runs. Without this, the kernel's partition rescanner can
+     * read stale GPT data off the device if the page cache hasn't flushed. */
+    sync();
 
     /* Determine the resulting partition device paths.
      * Real rule (confirmed against ArchWiki's device-naming page): if
