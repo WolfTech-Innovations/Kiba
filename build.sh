@@ -2951,8 +2951,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         char conf_path[512];
         snprintf(conf_path, sizeof(conf_path), "%s/boot/limine", target_root);
-        if (run_cmd("mkdir", "-p", conf_path, NULL) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "mkdir /boot/limine failed");
+        if (mkdir(conf_path, 0755) != 0 && errno != EEXIST) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "mkdir /boot/limine failed: %s", strerror(errno));
             return -1;
         }
         snprintf(conf_path, sizeof(conf_path), "%s/boot/limine/limine.conf", target_root);
@@ -2981,15 +2981,26 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     /* Copy Limine EFI application into ESP */
     {
+        /* mkdir -p equivalent: create EFI then EFI/BOOT */
         char efi_dir[512];
+        snprintf(efi_dir, sizeof(efi_dir), "%s/boot/EFI", target_root);
+        mkdir(efi_dir, 0755);
         snprintf(efi_dir, sizeof(efi_dir), "%s/boot/EFI/BOOT", target_root);
-        if (run_cmd("mkdir", "-p", efi_dir, NULL) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "mkdir EFI/BOOT failed");
+        if (mkdir(efi_dir, 0755) != 0 && errno != EEXIST) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "mkdir EFI/BOOT failed: %s", strerror(errno));
             return -1;
         }
+        /* Copy BOOTX64.EFI from the live system into the target ESP.
+         * This is a host-side copy (source is /usr/share/limine on the
+         * live ISO, destination is the mounted ESP), so use run_argv not
+         * chroot_run. */
         char efi_dst[512];
         snprintf(efi_dst, sizeof(efi_dst), "%s/boot/EFI/BOOT/BOOTX64.EFI", target_root);
-        if (run_cmd("cp", "/usr/share/limine/BOOTX64.EFI", efi_dst, NULL) != 0) {
+        char *cp_argv[] = {
+            (char *)"cp", (char *)"/usr/share/limine/BOOTX64.EFI",
+            efi_dst, NULL
+        };
+        if (run_argv(cp_argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "copying BOOTX64.EFI failed");
             return -1;
         }
