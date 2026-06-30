@@ -91,6 +91,8 @@ limine
 base
 linux
 linux-firmware
+intel-ucode
+amd-ucode
 mkinitcpio
 mkinitcpio-archiso
 earlyoom
@@ -255,12 +257,16 @@ interface_resolution: 1920x1080
     protocol: linux
     kernel_path: boot():/arch/boot/x86_64/vmlinuz-linux
     kernel_cmdline: archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+    module_path: boot():/arch/boot/intel-ucode.img
+    module_path: boot():/arch/boot/amd-ucode.img
     module_path: boot():/arch/boot/x86_64/initramfs-linux.img
 
 /KibaOS (safe mode)
     protocol: linux
     kernel_path: boot():/arch/boot/x86_64/vmlinuz-linux
     kernel_cmdline: archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+    module_path: boot():/arch/boot/intel-ucode.img
+    module_path: boot():/arch/boot/amd-ucode.img
     module_path: boot():/arch/boot/x86_64/initramfs-linux.img
 LIMINECONF
 
@@ -2454,7 +2460,8 @@ int kiba_install_create_user(const char *target_root, const char *username,
  * /etc/default/grub to produce /boot/grub/grub.cfg, enables services,
  * rebuilds the initramfs. */
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, kiba_progress_cb cb, void *user_data);
+                           const char *root_part, const char *root_uuid,
+                           kiba_progress_cb cb, void *user_data);
 
 /* Human-readable description of the last failure from any kiba_install_*
  * function in this module. */
@@ -2911,8 +2918,10 @@ int kiba_install_create_user(const char *target_root, const char *username,
 }
 
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, kiba_progress_cb cb, void *user_data) {
+                           const char *root_part, const char *root_uuid,
+                           kiba_progress_cb cb, void *user_data) {
     (void)disk_path;
+    (void)root_part;
     char path[1024];
 
     if (cb) cb(80, "Removing live-only tools...", user_data);
@@ -2956,24 +2965,31 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             return -1;
         }
         snprintf(conf_path, sizeof(conf_path), "%s/boot/limine/limine.conf", target_root);
-        if (write_file(conf_path,
+        char conf_body[2048];
+        snprintf(conf_body, sizeof(conf_body),
                    "timeout: 0\n"
                    "default_entry: 1\n"
                    "\n"
                    "/KibaOS\n"
                    "    protocol: linux\n"
                    "    kernel_path: boot():/vmlinuz-linux\n"
-                   "    kernel_cmdline: quiet splash loglevel=3 systemd.show_status=auto "
+                   "    kernel_cmdline: root=UUID=%s rw quiet splash loglevel=3 systemd.show_status=auto "
                    "rd.systemd.show_status=auto rd.udev.log_level=3 "
                    "vt.global_cursor_default=0 clocksource=tsc tsc=reliable "
-                   "plymouth.use-simpledrm=1 rw\n"
+                   "plymouth.use-simpledrm=1\n"
+                   "    module_path: boot():/intel-ucode.img\n"
+                   "    module_path: boot():/amd-ucode.img\n"
                    "    module_path: boot():/initramfs-linux.img\n"
                    "\n"
                    "/KibaOS (fallback)\n"
                    "    protocol: linux\n"
                    "    kernel_path: boot():/vmlinuz-linux\n"
-                   "    kernel_cmdline: rw\n"
-                   "    module_path: boot():/initramfs-linux-fallback.img\n") != 0) {
+                   "    kernel_cmdline: root=UUID=%s rw\n"
+                   "    module_path: boot():/intel-ucode.img\n"
+                   "    module_path: boot():/amd-ucode.img\n"
+                   "    module_path: boot():/initramfs-linux-fallback.img\n",
+                   root_uuid, root_uuid);
+        if (write_file(conf_path, conf_body) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "writing limine.conf failed");
             return -1;
         }
@@ -3082,17 +3098,17 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include "kiba_udev.h"
 #include "kiba_install.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <errno.h>
+
 static FILE *g_logfp = NULL;
 
 static void log_init(void) {
@@ -3322,7 +3338,7 @@ int main(int argc, char **argv) {
     }
 
     /* ── 10. Bootloader, services, initramfs ─────────────────────────── */
-    if (kiba_install_finalize(target_root, disk, root_part, progress_cb, NULL) != 0) {
+    if (kiba_install_finalize(target_root, disk, root_part, root_uuid, progress_cb, NULL) != 0) {
         fail(kiba_install_strerror());
     }
 
