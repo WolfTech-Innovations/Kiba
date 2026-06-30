@@ -201,12 +201,21 @@ PACKAGES
 # to the live build and is never read by mkarchiso.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
+# Explicit MODULES: the build host's hardware doesn't determine what the
+# ISO needs to boot on. autodetect/block only pull in what's loaded at
+# build time, so without this, VMs using virtio (QEMU/KVM/Proxmox) or
+# Hyper-V can fail to find the boot device entirely since their storage
+# drivers were never compiled in.
+MODULES=(virtio virtio_pci virtio_blk virtio_scsi virtio_net virtio_console
+         ahci nvme sd_mod sr_mod usb_storage uas hv_storvsc hv_vmbus)
 HOOKS=(base udev plymouth keyboard keymap modconf kms memdisk archiso block filesystems)
 INITRAMFS
 
 # installed.conf — used by the INSTALLED system after the OOBE installer runs initcpio.
 # Must NOT include memdisk/archiso hooks (those are live-only).
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
+MODULES=(virtio virtio_pci virtio_blk virtio_scsi virtio_net virtio_console
+         ahci nvme sd_mod sr_mod usb_storage uas hv_storvsc hv_vmbus)
 HOOKS=(base udev plymouth autodetect modconf kms block keyboard keymap filesystems fsck)
 INSTALLED_HOOKS
 
