@@ -237,8 +237,8 @@ PRESET
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${PROFILE}/grub"
 # Limine config — written to /boot/limine/limine.conf on the ISO.
-# limine-bios-cd.bin, limine-uefi-cd.bin, and limine-bios.sys are copied
-# from /usr/share/limine/ during the post-processing step below.
+# limine-uefi-cd.bin and BOOTX64.EFI are copied from /usr/share/limine/
+# during the post-processing step below. UEFI-only, no BIOS support.
 mkdir -p "${PROFILE}/limine"
 
 # Splash wallpaper: place a kibaos-splash.png next to this script or
@@ -2963,7 +2963,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     if (cb) cb(84, "Installing bootloader...", user_data);
-    /* Limine UEFI-only: write limine.conf and copy BOOTX64.EFI into the ESP. */
+    /* Limine UEFI: write limine.conf and copy BOOTX64.EFI into the ESP. */
 
     /* Write limine.conf */
     {
@@ -3183,8 +3183,7 @@ int main(int argc, char **argv) {
     if (disk_fd < 0) fail("Could not open disk for writing.");
 
     /* Layout: 512MiB ESP (FAT32, p1) + remainder as Linux root (ext4, p2).
-     * Limine embeds BIOS stage-1 into the MBR gap -- no BIOS boot partition
-     * needed. limine bios-install handles both BIOS and UEFI from one disk. */
+     * UEFI-only: no BIOS boot partition needed. */
     uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
     uint64_t entry_array_sectors = (128 * 128 + ssz - 1) / ssz;
     uint64_t first_usable = 2 + entry_array_sectors;
@@ -3214,8 +3213,7 @@ int main(int argc, char **argv) {
         .disk_guid = {{0}},
     };
     /* Layout: 512MiB ESP (FAT32, p1) + remainder as Linux root (ext4, p2).
-     * Limine embeds its BIOS stage-1 into the MBR gap on GPT disks via
-     * limine bios-install, so no dedicated BIOS boot partition is needed. */
+     * UEFI-only: no BIOS boot partition needed. */
     kiba_gpt_partition_t parts[2] = {
         { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
           .first_lba = esp_first,  .last_lba = esp_last,
@@ -5113,32 +5111,26 @@ else
 fi
 
 # ════════════════════════════════════════════════════════════════════════
-# Limine hybrid ISO — BIOS + UEFI
+# Limine UEFI-only ISO
 #
 # mkarchiso (uefi.grub mode) lays out the kernel/initrd correctly but uses
-# GRUB as the EFI bootloader. We remaster the ISO here to replace GRUB with
-# Limine for both BIOS (El Torito + MBR) and UEFI (El Torito + EFI app),
-# keeping the existing /arch/ squashfs/kernel tree completely intact.
+# GRUB as the EFI bootloader. We remaster the ISO here to replace it with
+# Limine UEFI, keeping the /arch/ squashfs/kernel tree intact.
 #
 # Method (from official Limine USAGE.md):
-#   1. Copy limine-bios-cd.bin, limine-uefi-cd.bin, limine-bios.sys into
-#      a staging dir so xorriso can graft them in alongside the ISO tree.
+#   1. Copy limine-uefi-cd.bin and BOOTX64.EFI into a staging dir.
 #   2. xorriso -as mkisofs: graft Limine files + existing ISO tree, set
-#      BIOS El Torito (-b limine-bios-cd.bin) and UEFI El Torito
-#      (-eltorito-alt-boot -e limine-uefi-cd.bin) — exact pattern from
-#      Limine's own test.mk.
-#   3. limine bios-install writes stage-1 MBR into the image for USB boot.
+#      UEFI El Torito only (--efi-boot limine-uefi-cd.bin).
+#   No BIOS El Torito entry, no limine-bios.sys, no bios-install.
 # ════════════════════════════════════════════════════════════════════════
-echo "=== Embedding Limine (BIOS + UEFI) ==="
+echo "=== Embedding Limine (UEFI only) ==="
 
 LIMINE_SHARE=/usr/share/limine
 LIMINE_WORK="${WORKDIR}/_limine"
 mkdir -p "${LIMINE_WORK}/limine"
 
-# Stage Limine boot files
-cp "${LIMINE_SHARE}/limine-bios-cd.bin"  "${LIMINE_WORK}/limine/"
+# Stage Limine UEFI files only — no BIOS files needed
 cp "${LIMINE_SHARE}/limine-uefi-cd.bin"  "${LIMINE_WORK}/limine/"
-cp "${LIMINE_SHARE}/limine-bios.sys"     "${LIMINE_WORK}/limine/"
 mkdir -p "${LIMINE_WORK}/EFI/BOOT"
 cp "${LIMINE_SHARE}/BOOTX64.EFI"         "${LIMINE_WORK}/EFI/BOOT/"
 
@@ -5147,16 +5139,11 @@ MNTISO="${LIMINE_WORK}/mnt"
 mkdir -p "${MNTISO}"
 mount -o loop,ro "${ISO}.iso" "${MNTISO}"
 
-# Remaster: graft Limine files + existing ISO tree into a new hybrid image.
-# Pattern taken directly from limine/test.mk (the project's own CI).
+# Remaster: UEFI El Torito only — no -b BIOS entry, no --protective-msdos-label
 xorriso -as mkisofs \
   -R -r -J \
-  -b limine/limine-bios-cd.bin \
-    -no-emul-boot -boot-load-size 4 -boot-info-table \
-  -hfsplus -apm-block-size 2048 \
   --efi-boot limine/limine-uefi-cd.bin \
     -efi-boot-part --efi-boot-image \
-  --protective-msdos-label \
   -graft-points \
     /="${MNTISO}" \
     /limine="${LIMINE_WORK}/limine" \
@@ -5165,13 +5152,9 @@ xorriso -as mkisofs \
   -o "${ISO}.iso.tmp"
 
 umount "${MNTISO}"
-
-# Embed BIOS MBR stage-1 for USB/HDD legacy BIOS boot
-limine bios-install "${ISO}.iso.tmp"
-
 mv "${ISO}.iso.tmp" "${ISO}.iso"
 rm -rf "${LIMINE_WORK}"
-echo "=== Limine hybrid ISO complete ==="
+echo "=== Limine UEFI ISO complete ==="
 
 sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
 echo "╔══════════════════════════════════════╗"
