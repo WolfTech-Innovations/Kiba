@@ -47,6 +47,7 @@ jobs:
             echo "SourceForge credentials not configured. Skipping."
             exit 0
           fi
+          sudo apt-get install -y sshpass rsync
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
           sudo apt-get install -y sshpass rsync
