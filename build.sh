@@ -20,7 +20,7 @@ pacman-key --populate archlinux
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
 pacman -S --noconfirm --needed \
-  archiso base-devel git squashfs-tools libisoburn mtools dosfstools limine grub \
+  archiso base-devel git squashfs-tools libisoburn mtools dosfstools grub \
   cmake ninja meson \
   openssl curl imagemagick
 
@@ -87,12 +87,11 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
-limine
+syslinux
+grub
 base
 linux
 linux-firmware
-intel-ucode
-amd-ucode
 mkinitcpio
 mkinitcpio-archiso
 earlyoom
@@ -201,21 +200,12 @@ PACKAGES
 # to the live build and is never read by mkarchiso.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
-# Explicit MODULES: the build host's hardware doesn't determine what the
-# ISO needs to boot on. autodetect/block only pull in what's loaded at
-# build time, so without this, VMs using virtio (QEMU/KVM/Proxmox) or
-# Hyper-V can fail to find the boot device entirely since their storage
-# drivers were never compiled in.
-MODULES=(virtio virtio_pci virtio_blk virtio_scsi virtio_net virtio_console
-         ahci nvme sd_mod sr_mod usb_storage uas hv_storvsc hv_vmbus)
 HOOKS=(base udev plymouth keyboard keymap modconf kms memdisk archiso block filesystems)
 INITRAMFS
 
 # installed.conf — used by the INSTALLED system after the OOBE installer runs initcpio.
 # Must NOT include memdisk/archiso hooks (those are live-only).
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
-MODULES=(virtio virtio_pci virtio_blk virtio_scsi virtio_net virtio_console
-         ahci nvme sd_mod sr_mod usb_storage uas hv_storvsc hv_vmbus)
 HOOKS=(base udev plymouth autodetect modconf kms block keyboard keymap filesystems fsck)
 INSTALLED_HOOKS
 
@@ -236,48 +226,21 @@ PRESET
 # Plymouth splash params: quiet splash loglevel=3 + simpledrm hint
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p "${PROFILE}/grub"
-# Limine config — written to /boot/limine/limine.conf on the ISO.
-# limine-uefi-cd.bin and BOOTX64.EFI are copied from /usr/share/limine/
-# during the post-processing step below. UEFI-only, no BIOS support.
-mkdir -p "${PROFILE}/limine"
+cat > "${PROFILE}/grub/grub.cfg" << 'GRUBCFG'
+set default=0
+set timeout=0
 
-# Splash wallpaper: place a kibaos-splash.png next to this script or
-# set LIMINE_WALLPAPER to an absolute path before running the build.
-# If no wallpaper is found the menu will use the default Limine theme.
-WALLPAPER_SRC="${SCRIPT_DIR:-$(dirname "$0")}/kibaos-splash.png"
-if [ -n "${LIMINE_WALLPAPER:-}" ] && [ -f "${LIMINE_WALLPAPER}" ]; then
-  WALLPAPER_SRC="${LIMINE_WALLPAPER}"
-fi
-if [ -f "${WALLPAPER_SRC}" ]; then
-  cp "${WALLPAPER_SRC}" "${PROFILE}/limine/kibaos-splash.png"
-  WALLPAPER_LINE="wallpaper: boot():/limine/kibaos-splash.png"
-else
-  WALLPAPER_LINE="# wallpaper: boot():/limine/kibaos-splash.png  (file not found at build time)"
-fi
+menuentry "KibaOS" {
+    set gfxpayload=keep
+    linux   /arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+    initrd  /arch/boot/x86_64/initramfs-linux.img
+}
 
-cat > "${PROFILE}/limine/limine.conf" << LIMINECONF
-# KibaOS Limine bootloader config
-timeout: 0
-default_entry: 1
-${WALLPAPER_LINE}
-interface_resolution: 1920x1080
-
-/KibaOS
-    protocol: linux
-    kernel_path: boot():/arch/boot/x86_64/vmlinuz-linux
-    kernel_cmdline: archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
-    module_path: boot():/arch/boot/intel-ucode.img
-    module_path: boot():/arch/boot/amd-ucode.img
-    module_path: boot():/arch/boot/x86_64/initramfs-linux.img
-
-/KibaOS (safe mode)
-    protocol: linux
-    kernel_path: boot():/arch/boot/x86_64/vmlinuz-linux
-    kernel_cmdline: archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G nomodeset systemd.unit=multi-user.target systemd.log_level=info
-    module_path: boot():/arch/boot/intel-ucode.img
-    module_path: boot():/arch/boot/amd-ucode.img
-    module_path: boot():/arch/boot/x86_64/initramfs-linux.img
-LIMINECONF
+menuentry "KibaOS (safe mode)" {
+    linux   /arch/boot/x86_64/vmlinuz-linux archisobasedir=arch archisolabel=KIBAOS cow_spacesize=1G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+    initrd  /arch/boot/x86_64/initramfs-linux.img
+}
+GRUBCFG
 
 # ══════════════════════════════════════════════════════════════════════════
 # pacman.conf tweaks
@@ -2469,8 +2432,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
  * /etc/default/grub to produce /boot/grub/grub.cfg, enables services,
  * rebuilds the initramfs. */
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, const char *root_uuid,
-                           kiba_progress_cb cb, void *user_data);
+                           const char *root_part, kiba_progress_cb cb, void *user_data);
 
 /* Human-readable description of the last failure from any kiba_install_*
  * function in this module. */
@@ -2927,10 +2889,8 @@ int kiba_install_create_user(const char *target_root, const char *username,
 }
 
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, const char *root_uuid,
-                           kiba_progress_cb cb, void *user_data) {
+                           const char *root_part, kiba_progress_cb cb, void *user_data) {
     (void)disk_path;
-    (void)root_part;
     char path[1024];
 
     if (cb) cb(80, "Removing live-only tools...", user_data);
@@ -2963,70 +2923,78 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     if (cb) cb(84, "Installing bootloader...", user_data);
-    /* Limine UEFI: write limine.conf and copy BOOTX64.EFI into the ESP. */
-
-    /* Write limine.conf */
+    /* Hybrid GRUB: install both BIOS (i386-pc, embeds core.img into the
+     * KIBAOS-BIOSBOOT partition we carved out during partitioning) and
+     * UEFI (x86_64-efi, writes into the ESP) targets onto the same disk.
+     * One shared --boot-directory means grub-mkconfig only needs to run
+     * once afterward. This intentionally always installs both targets
+     * regardless of how the *installer itself* booted -- we're choosing
+     * boot flexibility on the *installed* disk, not mirroring the live
+     * environment's firmware mode. */
     {
-        char conf_path[512];
-        snprintf(conf_path, sizeof(conf_path), "%s/boot/limine", target_root);
-        if (mkdir(conf_path, 0755) != 0 && errno != EEXIST) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "mkdir /boot/limine failed: %s", strerror(errno));
+        char *argv_bios[] = {
+            (char *)"grub-install",
+            (char *)"--target=i386-pc",
+            (char *)"--boot-directory=/boot",
+            (char *)disk_path,
+            NULL
+        };
+        if (chroot_run(target_root, argv_bios) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install (BIOS) failed");
             return -1;
         }
-        snprintf(conf_path, sizeof(conf_path), "%s/boot/limine/limine.conf", target_root);
-        char conf_body[2048];
-        snprintf(conf_body, sizeof(conf_body),
-                   "timeout: 0\n"
-                   "default_entry: 1\n"
-                   "\n"
-                   "/KibaOS\n"
-                   "    protocol: linux\n"
-                   "    kernel_path: boot():/vmlinuz-linux\n"
-                   "    kernel_cmdline: root=UUID=%s rw quiet splash loglevel=3 systemd.show_status=auto "
-                   "rd.systemd.show_status=auto rd.udev.log_level=3 "
-                   "vt.global_cursor_default=0 clocksource=tsc tsc=reliable "
-                   "plymouth.use-simpledrm=1\n"
-                   "    module_path: boot():/intel-ucode.img\n"
-                   "    module_path: boot():/amd-ucode.img\n"
-                   "    module_path: boot():/initramfs-linux.img\n"
-                   "\n"
-                   "/KibaOS (fallback)\n"
-                   "    protocol: linux\n"
-                   "    kernel_path: boot():/vmlinuz-linux\n"
-                   "    kernel_cmdline: root=UUID=%s rw\n"
-                   "    module_path: boot():/intel-ucode.img\n"
-                   "    module_path: boot():/amd-ucode.img\n"
-                   "    module_path: boot():/initramfs-linux-fallback.img\n",
-                   root_uuid, root_uuid);
-        if (write_file(conf_path, conf_body) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "writing limine.conf failed");
+    }
+    {
+        char *argv_efi[] = {
+            (char *)"grub-install",
+            (char *)"--target=x86_64-efi",
+            (char *)"--efi-directory=/boot",
+            (char *)"--boot-directory=/boot",
+            (char *)"--bootloader-id=KibaOS",
+            (char *)"--removable",
+            NULL
+        };
+        if (chroot_run(target_root, argv_efi) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install (UEFI) failed");
             return -1;
         }
     }
 
-    /* Copy Limine EFI application into ESP */
+    snprintf(path, sizeof(path), "%s/boot/EFI/systemd/splash-arch.bmp", target_root);
+    unlink(path);
+    snprintf(path, sizeof(path), "%s/usr/share/systemd/bootctl/splash-arch.bmp", target_root);
+    unlink(path);
+
+    /* GRUB config: silent/quiet menu (we don't want a visible boot menu
+     * any more than the old systemd-boot setup did), short timeout, our
+     * own distributor branding. /etc/default/grub is read by
+     * grub-mkconfig below to produce the real /boot/grub/grub.cfg. */
+    snprintf(path, sizeof(path), "%s/etc/default/grub", target_root);
+    if (write_file(path,
+               "GRUB_DEFAULT=0\n"
+               "GRUB_TIMEOUT=0\n"
+               "GRUB_TIMEOUT_STYLE=hidden\n"
+               "GRUB_DISTRIBUTOR=KibaOS\n"
+               "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
+               "systemd.show_status=auto rd.systemd.show_status=auto "
+               "rd.udev.log_level=3 vt.global_cursor_default=0 "
+               "clocksource=tsc tsc=reliable plymouth.use-simpledrm=1\"\n"
+               "GRUB_CMDLINE_LINUX=\"\"\n"
+               "GRUB_DISABLE_OS_PROBER=true\n"
+               "GRUB_GFXMODE=auto\n"
+               "GRUB_GFXPAYLOAD_LINUX=keep\n") != 0) {
+        return -1;
+    }
+
+    if (cb) cb(87, "Generating bootloader configuration...", user_data);
     {
-        /* mkdir -p equivalent: create EFI then EFI/BOOT */
-        char efi_dir[512];
-        snprintf(efi_dir, sizeof(efi_dir), "%s/boot/EFI", target_root);
-        mkdir(efi_dir, 0755);
-        snprintf(efi_dir, sizeof(efi_dir), "%s/boot/EFI/BOOT", target_root);
-        if (mkdir(efi_dir, 0755) != 0 && errno != EEXIST) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "mkdir EFI/BOOT failed: %s", strerror(errno));
-            return -1;
-        }
-        /* Copy BOOTX64.EFI from the live system into the target ESP.
-         * This is a host-side copy (source is /usr/share/limine on the
-         * live ISO, destination is the mounted ESP), so use run_argv not
-         * chroot_run. */
-        char efi_dst[512];
-        snprintf(efi_dst, sizeof(efi_dst), "%s/boot/EFI/BOOT/BOOTX64.EFI", target_root);
-        char *cp_argv[] = {
-            (char *)"cp", (char *)"/usr/share/limine/BOOTX64.EFI",
-            efi_dst, NULL
+        char *argv[] = {
+            (char *)"grub-mkconfig",
+            (char *)"-o", (char *)"/boot/grub/grub.cfg",
+            NULL
         };
-        if (run_argv(cp_argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "copying BOOTX64.EFI failed");
+        if (chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-mkconfig failed");
             return -1;
         }
     }
@@ -3107,14 +3075,12 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include "kiba_udev.h"
 #include "kiba_install.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -3182,12 +3148,18 @@ int main(int argc, char **argv) {
     int disk_fd = open(disk, O_RDWR);
     if (disk_fd < 0) fail("Could not open disk for writing.");
 
-    /* Layout: 512MiB ESP (FAT32, p1) + remainder as Linux root (ext4, p2).
-     * UEFI-only: no BIOS boot partition needed. */
+    /* Layout: 1MiB BIOS boot partition (for hybrid GRUB on BIOS/CSM) +
+     * 512MiB ESP (FAT32) + remainder as Linux root (ext4). The BIOS boot
+     * partition carries no filesystem -- GRUB's core.img is embedded into
+     * it directly by `grub-install --target=i386-pc`, since legacy BIOS
+     * has no GPT-aware firmware to read a filesystem off the ESP. */
+    uint64_t bios_boot_sectors = (1ull * 1024 * 1024) / ssz;
     uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
     uint64_t entry_array_sectors = (128 * 128 + ssz - 1) / ssz;
     uint64_t first_usable = 2 + entry_array_sectors;
-    uint64_t esp_first  = first_usable;
+    uint64_t bios_boot_first = first_usable;
+    uint64_t bios_boot_last  = bios_boot_first + bios_boot_sectors - 1;
+    uint64_t esp_first  = bios_boot_last + 1;
     uint64_t esp_last   = esp_first + esp_sectors - 1;
     uint64_t root_first = esp_last + 1;
     /* Root partition consumes the rest of the disk. We deliberately do NOT
@@ -3212,26 +3184,23 @@ int main(int argc, char **argv) {
         .total_sectors = total_sectors,
         .disk_guid = {{0}},
     };
-    /* Layout: 512MiB ESP (FAT32, p1) + remainder as Linux root (ext4, p2).
-     * UEFI-only: no BIOS boot partition needed. */
-    kiba_gpt_partition_t parts[2] = {
+    kiba_gpt_partition_t parts[3] = {
+        { .name = "KIBAOS-BIOSBOOT", .type_guid = KIBA_GUID_BIOS_BOOT, .unique_guid = {{0}},
+          .first_lba = bios_boot_first, .last_lba = bios_boot_last,
+          .attributes = KIBA_GPT_ATTR_LEGACY_BIOS_BOOTABLE },
         { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
           .first_lba = esp_first,  .last_lba = esp_last,
           .attributes = 0 },
         { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
           .first_lba = root_first, .last_lba = root_last, .attributes = 0 },
     };
-    int rc = kiba_gpt_write(&gdisk, parts, 2);
+    int rc = kiba_gpt_write(&gdisk, parts, 3);
     close(disk_fd);
     if (rc != 0) {
         char errbuf[256];
         snprintf(errbuf, sizeof(errbuf), "Partitioning failed: %s", strerror(-rc));
         fail(errbuf);
     }
-    /* Force all buffered writes to the block device out to disk before
-     * partprobe runs. Without this, the kernel's partition rescanner can
-     * read stale GPT data off the device if the page cache hasn't flushed. */
-    sync();
 
     /* Determine the resulting partition device paths.
      * Real rule (confirmed against ArchWiki's device-naming page): if
@@ -3248,30 +3217,16 @@ int main(int argc, char **argv) {
     size_t disk_len = strlen(disk);
     bool disk_ends_in_digit = disk_len > 0 && disk[disk_len - 1] >= '0' && disk[disk_len - 1] <= '9';
     if (disk_ends_in_digit) {
-        snprintf(esp_part,  sizeof(esp_part),  "%sp1", disk);
-        snprintf(root_part, sizeof(root_part), "%sp2", disk);
+        snprintf(esp_part,  sizeof(esp_part),  "%sp2", disk);
+        snprintf(root_part, sizeof(root_part), "%sp3", disk);
     } else {
-        snprintf(esp_part,  sizeof(esp_part),  "%s1", disk);
-        snprintf(root_part, sizeof(root_part), "%s2", disk);
+        snprintf(esp_part,  sizeof(esp_part),  "%s2", disk);
+        snprintf(root_part, sizeof(root_part), "%s3", disk);
     }
 
     /* Wait for the kernel/udev to settle before touching the new
-     * partition nodes. On slow/budget hardware (e.g. cheap HP laptops with
-     * NVMe or eMMC) udev can take much longer than 5s to populate device
-     * nodes after partprobe. We also explicitly re-run partprobe here as
-     * a belt-and-suspenders measure in case sfdisk's --no-reread left the
-     * kernel's view stale on this firmware. */
-    {
-        pid_t pp2 = fork();
-        if (pp2 == 0) {
-            int dn = open("/dev/null", O_WRONLY);
-            if (dn >= 0) { dup2(dn, STDOUT_FILENO); dup2(dn, STDERR_FILENO); close(dn); }
-            execlp("partprobe", "partprobe", disk, (char *)NULL);
-            _exit(0);
-        }
-        if (pp2 > 0) while (waitpid(pp2, NULL, 0) < 0 && errno == EINTR) {}
-    }
-    if (!kiba_wait_for_device(esp_part, 15000) || !kiba_wait_for_device(root_part, 15000)) {
+     * partition nodes -- the actual fix for the original bug report. */
+    if (!kiba_wait_for_device(esp_part, 5000) || !kiba_wait_for_device(root_part, 5000)) {
         fail("Partition devices never appeared after partitioning.");
     }
 
@@ -3345,7 +3300,7 @@ int main(int argc, char **argv) {
     }
 
     /* ── 10. Bootloader, services, initramfs ─────────────────────────── */
-    if (kiba_install_finalize(target_root, disk, root_part, root_uuid, progress_cb, NULL) != 0) {
+    if (kiba_install_finalize(target_root, disk, root_part, progress_cb, NULL) != 0) {
         fail(kiba_install_strerror());
     }
 
@@ -5110,51 +5065,89 @@ else
   exit 1
 fi
 
-# ════════════════════════════════════════════════════════════════════════
-# Limine UEFI-only ISO
+# ══════════════════════════════════════════════════════════════════════════
+# BIOS hybrid stub — embed i386-pc GRUB into the ISO's MBR so the same
+# image boots on legacy BIOS machines (e.g. pre-2011 hardware) without any
+# changes to the UEFI GRUB config or the ISO 9660 structure.
 #
-# mkarchiso (uefi.grub mode) lays out the kernel/initrd correctly but uses
-# GRUB as the EFI bootloader. We remaster the ISO here to replace it with
-# Limine UEFI, keeping the /arch/ squashfs/kernel tree intact.
+# How it works:
+#   1. Mount the ISO read-only via loopback to get the GRUB i386-pc modules
+#   2. Run grub-install --target=i386-pc into a temp dir pointed at the ISO
+#   3. Use xorriso to splice the resulting MBR boot code + core.img back
+#      into the ISO as an El Torito BIOS entry, producing a new hybrid ISO
 #
-# Method (from official Limine USAGE.md):
-#   1. Copy limine-uefi-cd.bin and BOOTX64.EFI into a staging dir.
-#   2. xorriso -as mkisofs: graft Limine files + existing ISO tree, set
-#      UEFI El Torito only (--efi-boot limine-uefi-cd.bin).
-#   No BIOS El Torito entry, no limine-bios.sys, no bios-install.
-# ════════════════════════════════════════════════════════════════════════
-echo "=== Embedding Limine (UEFI only) ==="
+# The UEFI ESP and grub.cfg are completely untouched — both boot paths
+# land in the same GRUB environment and read the same config.
+# ══════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════
+# BIOS hybrid stub — splice a GRUB i386-pc El Torito entry into the
+# mkarchiso-built UEFI ISO so the same image also boots on legacy BIOS.
+#
+# Technique (confirmed against Debian wiki + xorriso mailing list):
+#   1. grub-mkimage builds a minimal i386-pc core.img (iso9660 + biosdisk)
+#   2. Prepend cdboot.img → bios.img (the El Torito BIOS boot image)
+#   3. xorriso -as mkisofs rewrites the ISO, keeping the existing UEFI ESP
+#      via -boot_image any replay, and adding the BIOS entry alongside it
+#      using --grub2-mbr (hybrid MBR) + -eltorito-boot.
+#
+# Both BIOS and UEFI paths end up in the same GRUB and read the same
+# grub.cfg — zero config duplication.
+# ══════════════════════════════════════════════════════════════════════════
+echo "=== Embedding BIOS hybrid stub ==="
 
-LIMINE_SHARE=/usr/share/limine
-LIMINE_WORK="${WORKDIR}/_limine"
-mkdir -p "${LIMINE_WORK}/limine"
+BIOSWORK="${WORKDIR}/_bioswork"
+mkdir -p "${BIOSWORK}"
 
-# Stage Limine UEFI files only — no BIOS files needed
-cp "${LIMINE_SHARE}/limine-uefi-cd.bin"  "${LIMINE_WORK}/limine/"
-mkdir -p "${LIMINE_WORK}/EFI/BOOT"
-cp "${LIMINE_SHARE}/BOOTX64.EFI"         "${LIMINE_WORK}/EFI/BOOT/"
+GRUB_I386=/usr/lib/grub/i386-pc
 
-# Mount the mkarchiso ISO so we can graft its contents into the new image
-MNTISO="${LIMINE_WORK}/mnt"
+# Build a minimal BIOS core.img: only needs to locate /boot/grub on the ISO
+grub-mkimage \
+  --directory   "${GRUB_I386}" \
+  --prefix      '(cd0)/boot/grub' \
+  --output      "${BIOSWORK}/core.img" \
+  --format      i386-pc-eltorito \
+  biosdisk iso9660 part_gpt part_msdos normal search search_fs_file
+
+# Prepend cdboot.img to produce the El Torito BIOS boot image
+cat "${GRUB_I386}/cdboot.img" "${BIOSWORK}/core.img" > "${BIOSWORK}/bios.img"
+
+# Mount the mkarchiso ISO read-only and extract its EFI partition image.
+# (-indev is a native xorriso flag and cannot be used inside -as mkisofs mode,
+# so we mount + dd instead and use native xorriso for the remaster step.)
+MNTISO="${BIOSWORK}/mnt"
 mkdir -p "${MNTISO}"
 mount -o loop,ro "${ISO}.iso" "${MNTISO}"
 
-# Remaster: UEFI El Torito only — no -b BIOS entry, no --protective-msdos-label
-xorriso -as mkisofs \
-  -R -r -J \
-  --efi-boot limine/limine-uefi-cd.bin \
-    -efi-boot-part --efi-boot-image \
-  -graft-points \
-    /="${MNTISO}" \
-    /limine="${LIMINE_WORK}/limine" \
-    /EFI/BOOT/BOOTX64.EFI="${LIMINE_WORK}/EFI/BOOT/BOOTX64.EFI" \
-    /limine/limine.conf="${PROFILE}/limine/limine.conf" \
-  -o "${ISO}.iso.tmp"
+EFIOFF=$(partx -g -o START   -n 2 "${ISO}.iso" | tr -d ' ')
+EFISZ=$( partx -g -o SECTORS -n 2 "${ISO}.iso" | tr -d ' ')
+dd if="${ISO}.iso" bs=512 skip="${EFIOFF}" count="${EFISZ}" \
+   of="${BIOSWORK}/efi.img" status=none
+
+# Remaster in native xorriso mode so -indev is valid.
+# -boot_image any replay  preserves the existing UEFI El Torito entry.
+# The BIOS El Torito entry is added before it via grub2_mbr + bin_path.
+xorriso \
+  -indev  "${ISO}.iso" \
+  -outdev "${ISO}.iso.tmp" \
+  -pathspecs on \
+  -changes_pending yes \
+  -add /boot/grub/bios.img="${BIOSWORK}/bios.img" \
+  -boot_image grub grub2_mbr="${GRUB_I386}/boot_hybrid.img" \
+  -boot_image any partition_table=on \
+  -boot_image any partition_offset=16 \
+  -boot_image any cat_path="/boot/grub/boot.cat" \
+  -boot_image grub bin_path="/boot/grub/bios.img" \
+  -boot_image any boot_info_table=on \
+  -boot_image grub grub2_boot_info=on \
+  -boot_image any next \
+  -boot_image any replay \
+  -append_partition 2 0xef "${BIOSWORK}/efi.img" \
+  --
 
 umount "${MNTISO}"
 mv "${ISO}.iso.tmp" "${ISO}.iso"
-rm -rf "${LIMINE_WORK}"
-echo "=== Limine UEFI ISO complete ==="
+rm -rf "${BIOSWORK}"
+echo "=== BIOS hybrid stub embedded ==="
 
 sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
 echo "╔══════════════════════════════════════╗"
