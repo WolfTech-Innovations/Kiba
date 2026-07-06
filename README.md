@@ -2,7 +2,7 @@
 <img width="200" alt="KibaOS installer icon" src="https://github.com/user-attachments/assets/60377ea4-3abe-489d-89dd-32a227782942" />
 
 # KibaOS
-
+![OIN](https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/oin-member-2-0-horiz-1.png?raw=true)
 **A friendly, ready-to-use Linux desktop, built for people switching to simple.**
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/WolfTech-Innovations/Kiba/actions)
