@@ -157,11 +157,14 @@ evince
 papirus-icon-theme
 accountsservice
 sassc
+network-manager-applet
 kvantum
 pipewire
 pipewire-pulse
 pipewire-alsa
 wireplumber
+networkmanager
+
 chromium
 ntfs-3g
 exfatprogs
@@ -5343,10 +5346,8 @@ DHCP=yes
 IPv6AcceptRA=yes
 NETWORKD_WIFI
 
-rm -f /etc/resolv.conf
-ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 
-systemctl enable iwd
+systemctl enable NetworkManager
 systemctl enable systemd-networkd
 systemctl enable systemd-networkd-wait-online
 systemctl enable systemd-resolved
