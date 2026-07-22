@@ -490,10 +490,10 @@ grep -q 'HandleHibernateKey' /etc/systemd/logind.conf || echo 'HandleHibernateKe
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
-WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/file_000000004b64720cabf43ce95dda0a0d.png?raw=true"
+WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
 LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
 INSTALLER_LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/1419ece4c5c2dbfaa9c0b65f0055b6d70e6b4dbd/branding/installer.png?raw=true"
-WALLPAPER_DEST="/usr/share/kibaos/wallpaper.png"
+WALLPAPER_DEST="/usr/share/kibaos/wallpaper.jpg"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
 LOGO_256="/usr/share/kibaos/logo-256.png"
 LOGO_96="/usr/share/kibaos/logo-96.png"
@@ -3245,6 +3245,19 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     if (cb) cb(84, "Installing bootloader...", user_data);
     {
+        /* KibaOS only ships systemd-boot for the installed system, which
+         * requires real UEFI firmware (needs /sys/firmware/efi/efivars to
+         * write the NVRAM boot entry). Fail fast with a clear message
+         * instead of letting bootctl die with a cryptic error -- this
+         * also covers VMs, which are not supported. */
+        if (access("/sys/firmware/efi", F_OK) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err),
+                     "KibaOS requires UEFI boot. This system appears to have "
+                     "booted in BIOS/legacy mode. Virtual machines are not "
+                     "supported -- please install on real UEFI hardware.");
+            return -1;
+        }
+
         char *argv[] = { (char *)"bootctl", (char *)"--esp-path=/boot", (char *)"install", NULL };
         if (chroot_run(target_root, argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
@@ -4118,7 +4131,7 @@ glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 # ══════════════════════════════════════════════════════════════════════════
 SDDM_THEME_DIR="/usr/share/sddm/themes/kibaos"
 mkdir -p "${SDDM_THEME_DIR}"
-cp /usr/share/kibaos/wallpaper.png  "${SDDM_THEME_DIR}/background.png"  2>/dev/null || true
+cp /usr/share/kibaos/wallpaper.jpg  "${SDDM_THEME_DIR}/background.png"  2>/dev/null || true
 cp /usr/share/kibaos/logo-256.png   "${SDDM_THEME_DIR}/logo.png"        2>/dev/null || true
 
 cat > "${SDDM_THEME_DIR}/metadata.desktop" << 'SDDMMETA'
@@ -4895,8 +4908,8 @@ gsettings set org.gnome.desktop.interface color-scheme            'prefer-dark'
 gsettings set org.gnome.desktop.interface enable-animations       true
 gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
 
-gsettings set org.gnome.desktop.background picture-uri      'file:///usr/share/kibaos/wallpaper.png'
-gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.png'
+gsettings set org.gnome.desktop.background picture-uri      'file:///usr/share/kibaos/wallpaper.jpg'
+gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.jpg'
 gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
