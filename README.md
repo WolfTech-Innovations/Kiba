@@ -3,7 +3,7 @@
 
 # KibaOS
 ![OIN](https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/oin-member-2-0-horiz-1.png?raw=true)
-**A friendly, ready-to-use Linux desktop, built for people switching to simple.**
+**A friendly, ready-to-use ~~Linux~~ general OS desktop, built for people switching to simple.**
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/WolfTech-Innovations/Kiba/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3DDC97?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](#license)
@@ -24,7 +24,7 @@
 
 </div>
 
-<img width="1000" alt="Desktop screenshot" src="https://github.com/user-attachments/assets/b0f5339d-0c6a-4dc9-82f8-506f5adef851" />
+<img width="1000" alt="Desktop screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_000000008ac881f5beb3622a8ec72855.png?raw=true" />
 ---
 
 KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Budgie** desktop environment and is designed so that anyone switching to simple can sit down and use it immediately, without having to configure anything first.
