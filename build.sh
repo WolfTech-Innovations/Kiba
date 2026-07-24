@@ -394,7 +394,31 @@ mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+
+# CheckSpace is disabled for the airootfs pacstrap over in kibaos.sh's
+# PROFILE/pacman.conf, but that doesn't guarantee this chroot's own live
+# /etc/pacman.conf inherited the same edit — belt-and-suspenders it here too.
+# CheckSpace is a known false-positive source under overlay filesystems (its
+# statvfs() call misreports free space on overlay2, which is what most CI
+# runners use for Docker), and — critically — its "not enough free disk
+# space... Proceed with installation? [Y/n]" prompt does NOT reliably honor
+# --noconfirm the way the normal transaction-confirmation prompt does. In a
+# non-interactive CI shell with no stdin, that stray prompt is what actually
+# hangs/fails the step, not a real space shortage.
+sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 pacman -Syy --noconfirm
+
+# ── Reclaim disk before any further installs ────────────────────────────────
+# By this point mkarchiso has already pacstrapped the full ~195-package
+# packages.x86_64 list (chromium, wine, mesa, etc.) into this airootfs, and
+# every one of those .pkg.tar.zst downloads is still sitting in the cache —
+# previously nothing cleared it until the very end of the script. Later
+# steps in here (Kortex's own pacman installs, the Nuitka onefile compile,
+# building wayfire-plugins-extra from source) all need real scratch disk on
+# top of that, which is what was actually running the image out of space,
+# not any one install being oversized on its own. `-Scc` (double-c) drops
+# cached packages of every version, not just superseded ones.
+pacman -Scc --noconfirm
 
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
@@ -465,7 +489,7 @@ echo "=== Installing Kortex build + runtime dependencies ==="
 # core/extra, so plain `pacman -S nuitka` won't resolve on a stock mirror
 # without an AUR helper. Installing via pip avoids that dependency entirely.
 pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
-pip install --break-system-packages nuitka
+pip install --break-system-packages --no-cache-dir nuitka
 
 mkdir -p /usr/lib/kortex/kortexd/assets
 
@@ -5949,6 +5973,7 @@ WAYFIREINI
 # WAYFIRE_SOCKET env var automatically — no manual socket config required.
 echo "=== Building wayfire-plugins-extra (ipc, ipc-rules) ==="
 pacman -S --noconfirm --needed meson ninja cmake pkgconf git cairo glibmm wayland-protocols
+pacman -Scc --noconfirm
 
 git clone --depth=1 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
 cd /tmp/wayfire-plugins-extra
@@ -5962,7 +5987,7 @@ rm -rf /tmp/wayfire-plugins-extra
 # github.com/killown/wfctl) rather than the raw JSON-RPC protocol directly —
 # see core.py's WindowEventSource for why and its documented caveats.
 echo "=== Installing wfctl (Wayfire IPC client used by Kortex) ==="
-pip install --break-system-packages wfctl
+pip install --break-system-packages --no-cache-dir wfctl
 
 # ══════════════════════════════════════════════════════════════════════════
 # OTA UPDATE SYSTEM
