@@ -453,6 +453,1251 @@ cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
 WINEXML
 update-mime-database /usr/share/mime 2>/dev/null || true
 
+# ══════════════════════════════════════════════════════════════════════════
+# KORTEX — adaptive daemon (usage prediction, break reminders, layout
+# learning, driver/service auto-repair). Source is embedded here and
+# compiled to a native x86_64 binary with Nuitka at image-build time, same
+# pattern the OOBE build below uses for its Vala sources.
+# ══════════════════════════════════════════════════════════════════════════
+echo "=== Installing Kortex build + runtime dependencies ==="
+pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject python-nuitka patchelf
+
+mkdir -p /usr/lib/kortex/kortexd/assets
+
+cat > /usr/lib/kortex/kortexd/__init__.py << 'KORTEX_INIT_PY'
+"""
+Kept lazy on purpose: importing `kortexd` shouldn't require GTK4 to be
+installed just to use storage.py/models.py in isolation (tests, tuning
+scripts, a REPL on a dev box without the desktop stack).
+"""
+
+__all__ = ["KortexDaemon", "main"]
+__version__ = "0.1.0"
+
+
+def __getattr__(name):
+    if name in ("KortexDaemon", "main"):
+        from .core import KortexDaemon, main
+        return {"KortexDaemon": KortexDaemon, "main": main}[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+KORTEX_INIT_PY
+
+cat > /usr/lib/kortex/kortexd/storage.py << 'KORTEX_STORAGE_PY'
+"""
+kortexd.storage
+----------------
+Single sqlite3 backend for all Kortex state: usage counters (Beta params),
+session stats (Welford), placement history, friction events, repair history,
+and KDE anchor points. Kept as one file so the whole daemon has one source
+of truth and one lock.
+"""
+
+import sqlite3
+import time
+import json
+import os
+from contextlib import contextmanager
+
+DEFAULT_DB_PATH = os.path.expanduser("~/.local/share/kortex/kortex.db")
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS usage_beta (
+    app TEXT NOT NULL,
+    day_of_week INTEGER NOT NULL,   -- 0-6
+    hour_block INTEGER NOT NULL,    -- 0-23
+    alpha REAL NOT NULL DEFAULT 1.0,
+    beta REAL NOT NULL DEFAULT 1.0,
+    last_seen REAL NOT NULL DEFAULT 0,
+    PRIMARY KEY (app, day_of_week, hour_block)
+);
+
+CREATE TABLE IF NOT EXISTS session_stats (
+    app TEXT PRIMARY KEY,
+    count INTEGER NOT NULL DEFAULT 0,
+    mean REAL NOT NULL DEFAULT 0,
+    m2 REAL NOT NULL DEFAULT 0,      -- Welford running variance accumulator
+    session_start REAL,
+    last_updated REAL
+);
+
+CREATE TABLE IF NOT EXISTS placement (
+    app TEXT NOT NULL,
+    monitor INTEGER NOT NULL,
+    x REAL NOT NULL,
+    y REAL NOT NULL,
+    w REAL NOT NULL,
+    h REAL NOT NULL,
+    weight REAL NOT NULL DEFAULT 1.0,
+    updated REAL NOT NULL,
+    PRIMARY KEY (app, monitor)
+);
+
+CREATE TABLE IF NOT EXISTS friction_events (
+    app TEXT NOT NULL,
+    kind TEXT NOT NULL,             -- 'rage' | 'dead'
+    ts REAL NOT NULL,
+    x REAL,
+    y REAL
+);
+
+CREATE TABLE IF NOT EXISTS repair_beta (
+    failure_sig TEXT NOT NULL,
+    action TEXT NOT NULL,
+    alpha REAL NOT NULL DEFAULT 1.0,
+    beta REAL NOT NULL DEFAULT 1.0,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_attempt REAL,
+    PRIMARY KEY (failure_sig, action)
+);
+
+CREATE TABLE IF NOT EXISTS repair_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    failure_sig TEXT NOT NULL,
+    action TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    detail TEXT,
+    ts REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS kde_points (
+    domain TEXT NOT NULL,           -- 'usage' | 'failure' | 'placement'
+    key TEXT NOT NULL,              -- serialized feature vector
+    weight REAL NOT NULL,
+    ts REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS config (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+"""
+
+
+class Store:
+    def __init__(self, path: str = DEFAULT_DB_PATH):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self.path = path
+        self._conn = sqlite3.connect(path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        self._conn.executescript(SCHEMA)
+        self._conn.commit()
+
+    @contextmanager
+    def cursor(self):
+        cur = self._conn.cursor()
+        try:
+            yield cur
+            self._conn.commit()
+        except Exception:
+            self._conn.rollback()
+            raise
+        finally:
+            cur.close()
+
+    # ---- usage beta ----
+    def get_beta(self, app, dow, hour):
+        with self.cursor() as c:
+            c.execute(
+                "SELECT alpha, beta FROM usage_beta WHERE app=? AND day_of_week=? AND hour_block=?",
+                (app, dow, hour),
+            )
+            row = c.fetchone()
+            if row:
+                return row["alpha"], row["beta"]
+            return 1.0, 1.0  # uniform prior
+
+    def update_beta(self, app, dow, hour, hit: bool, decay: float = 1.0):
+        alpha, beta = self.get_beta(app, dow, hour)
+        alpha *= decay
+        beta *= decay
+        if hit:
+            alpha += 1.0
+        else:
+            beta += 1.0
+        with self.cursor() as c:
+            c.execute(
+                """INSERT INTO usage_beta (app, day_of_week, hour_block, alpha, beta, last_seen)
+                   VALUES (?,?,?,?,?,?)
+                   ON CONFLICT(app, day_of_week, hour_block)
+                   DO UPDATE SET alpha=excluded.alpha, beta=excluded.beta, last_seen=excluded.last_seen""",
+                (app, dow, hour, alpha, beta, time.time()),
+            )
+
+    def last_seen(self, app):
+        with self.cursor() as c:
+            c.execute("SELECT MAX(last_seen) as ls FROM usage_beta WHERE app=?", (app,))
+            row = c.fetchone()
+            return row["ls"] if row and row["ls"] else None
+
+    # ---- session stats (Welford) ----
+    def get_session_stats(self, app):
+        with self.cursor() as c:
+            c.execute("SELECT * FROM session_stats WHERE app=?", (app,))
+            row = c.fetchone()
+            if row:
+                return dict(row)
+            return {"app": app, "count": 0, "mean": 0.0, "m2": 0.0,
+                    "session_start": None, "last_updated": None}
+
+    def update_session_stats(self, app, session_length: float):
+        s = self.get_session_stats(app)
+        n = s["count"] + 1
+        delta = session_length - s["mean"]
+        mean = s["mean"] + delta / n
+        delta2 = session_length - mean
+        m2 = s["m2"] + delta * delta2
+        with self.cursor() as c:
+            c.execute(
+                """INSERT INTO session_stats (app, count, mean, m2, last_updated)
+                   VALUES (?,?,?,?,?)
+                   ON CONFLICT(app) DO UPDATE SET
+                     count=excluded.count, mean=excluded.mean, m2=excluded.m2,
+                     last_updated=excluded.last_updated""",
+                (app, n, mean, m2, time.time()),
+            )
+
+    def set_session_start(self, app, ts):
+        with self.cursor() as c:
+            c.execute(
+                """INSERT INTO session_stats (app, session_start)
+                   VALUES (?,?)
+                   ON CONFLICT(app) DO UPDATE SET session_start=excluded.session_start""",
+                (app, ts),
+            )
+
+    # ---- placement ----
+    def update_placement(self, app, monitor, x, y, w, h, decay=0.9):
+        with self.cursor() as c:
+            c.execute("SELECT weight FROM placement WHERE app=? AND monitor=?", (app, monitor))
+            row = c.fetchone()
+            weight = (row["weight"] * decay + 1.0) if row else 1.0
+            c.execute(
+                """INSERT INTO placement (app, monitor, x, y, w, h, weight, updated)
+                   VALUES (?,?,?,?,?,?,?,?)
+                   ON CONFLICT(app, monitor) DO UPDATE SET
+                     x=excluded.x, y=excluded.y, w=excluded.w, h=excluded.h,
+                     weight=excluded.weight, updated=excluded.updated""",
+                (app, monitor, x, y, w, h, weight, time.time()),
+            )
+
+    def get_placement_confidence(self, app, kappa=3.0):
+        with self.cursor() as c:
+            c.execute("SELECT SUM(weight) as tw FROM placement WHERE app=?", (app,))
+            row = c.fetchone()
+            total = row["tw"] or 0.0
+            return total / (total + kappa)
+
+    # ---- friction ----
+    def log_friction(self, app, kind, x=None, y=None):
+        with self.cursor() as c:
+            c.execute(
+                "INSERT INTO friction_events (app, kind, ts, x, y) VALUES (?,?,?,?,?)",
+                (app, kind, time.time(), x, y),
+            )
+
+    def friction_score(self, app, window_seconds=3600, rho=5.0):
+        cutoff = time.time() - window_seconds
+        with self.cursor() as c:
+            c.execute(
+                "SELECT COUNT(*) as n FROM friction_events WHERE app=? AND ts>=?",
+                (app, cutoff),
+            )
+            n = c.fetchone()["n"]
+            return n / (n + rho)
+
+    # ---- repair beta ----
+    def get_repair_beta(self, failure_sig, action):
+        with self.cursor() as c:
+            c.execute(
+                "SELECT alpha, beta, attempts FROM repair_beta WHERE failure_sig=? AND action=?",
+                (failure_sig, action),
+            )
+            row = c.fetchone()
+            if row:
+                return row["alpha"], row["beta"], row["attempts"]
+            return 1.0, 1.0, 0
+
+    def update_repair_beta(self, failure_sig, action, success: bool):
+        alpha, beta, attempts = self.get_repair_beta(failure_sig, action)
+        if success:
+            alpha += 1.0
+        else:
+            beta += 1.0
+        attempts += 1
+        with self.cursor() as c:
+            c.execute(
+                """INSERT INTO repair_beta (failure_sig, action, alpha, beta, attempts, last_attempt)
+                   VALUES (?,?,?,?,?,?)
+                   ON CONFLICT(failure_sig, action) DO UPDATE SET
+                     alpha=excluded.alpha, beta=excluded.beta,
+                     attempts=excluded.attempts, last_attempt=excluded.last_attempt""",
+                (failure_sig, action, alpha, beta, attempts, time.time()),
+            )
+        with self.cursor() as c:
+            c.execute(
+                "INSERT INTO repair_log (failure_sig, action, success, ts) VALUES (?,?,?,?)",
+                (failure_sig, action, int(success), time.time()),
+            )
+
+    # ---- KDE anchors ----
+    def add_kde_point(self, domain, key_vec, weight=1.0):
+        with self.cursor() as c:
+            c.execute(
+                "INSERT INTO kde_points (domain, key, weight, ts) VALUES (?,?,?,?)",
+                (domain, json.dumps(key_vec), weight, time.time()),
+            )
+
+    def get_kde_points(self, domain, limit=500):
+        with self.cursor() as c:
+            c.execute(
+                "SELECT key, weight, ts FROM kde_points WHERE domain=? ORDER BY ts DESC LIMIT ?",
+                (domain, limit),
+            )
+            return [(json.loads(r["key"]), r["weight"], r["ts"]) for r in c.fetchall()]
+
+    def prune_kde_points(self, domain, max_points=500):
+        with self.cursor() as c:
+            c.execute(
+                """DELETE FROM kde_points WHERE domain=? AND ts NOT IN (
+                       SELECT ts FROM kde_points WHERE domain=? ORDER BY ts DESC LIMIT ?
+                   )""",
+                (domain, domain, max_points),
+            )
+KORTEX_STORAGE_PY
+
+cat > /usr/lib/kortex/kortexd/models.py << 'KORTEX_MODELS_PY'
+"""
+kortexd.models
+--------------
+Pure-math layer. Every function here is deterministic and named after what
+it returns, so this module IS the spec:
+
+    C(a,t) = sigmoid( mu(a,t)*delta(a,t) + eps(a) + beta_p(a)
+                       + pi(a)*delta(a,t) - phi(a)
+                       + eta(f,act)*kappa(act)*delta(f) )
+
+No ML weights, no training step — everything updates online via closed-form
+rules (Beta posterior updates, Welford's algorithm, exponentially decayed KDE).
+"""
+
+import math
+import time
+
+# ---------------------------------------------------------------------------
+# Tunable constants (smoothing / decay). Keep centralized so tuning Kortex's
+# "feel" is a one-place edit, not a hunt through the codebase.
+# ---------------------------------------------------------------------------
+LAMBDA_RECENCY = 0.15       # recency decay rate (per day)
+LAMBDA_WEEKLY_FORGET = 0.95  # weekly decay applied to stale beta counts
+KDE_BANDWIDTH = 1.0
+KDE_TIME_DECAY = 0.98        # per-hour decay on KDE point weight
+PLACEMENT_KAPPA = 3.0
+FRICTION_RHO = 5.0
+DENSITY_TAU = 0.15           # min density before a signal is "trusted"
+
+WEIGHTS = {
+    "usage": 1.4,
+    "recency": 0.6,
+    "break": 1.0,
+    "placement": 0.8,
+    "friction": 1.2,
+    "repair": 1.5,
+}
+
+
+def sigmoid(x: float) -> float:
+    """sigma(x) = 1 / (1 + e^-x)"""
+    try:
+        return 1.0 / (1.0 + math.exp(-x))
+    except OverflowError:
+        return 0.0 if x < 0 else 1.0
+
+
+def normal_cdf(x: float) -> float:
+    """Phi(x) via erf — used for break-pressure tail probability."""
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2)))
+
+
+def beta_mean(alpha: float, beta: float) -> float:
+    """E[Beta(alpha, beta)] — posterior mean usage/success probability."""
+    return alpha / (alpha + beta) if (alpha + beta) > 0 else 0.5
+
+
+def gaussian_kernel(u: float) -> float:
+    return math.exp(-0.5 * u * u) / math.sqrt(2 * math.pi)
+
+
+def kde_density(point, anchors, h=KDE_BANDWIDTH, now=None):
+    """
+    delta(x) = sum_i K((x - x_i)/h) * decay^(hours since x_i)
+
+    `point` and each anchor's key are equal-length numeric vectors
+    (already normalized by the caller). Distance uses simple Euclidean norm
+    scaled by bandwidth h.
+    """
+    if not anchors:
+        return 0.0
+    now = now or time.time()
+    total = 0.0
+    for key_vec, weight, ts in anchors:
+        dist = math.sqrt(sum((a - b) ** 2 for a, b in zip(point, key_vec)))
+        hours = max(0.0, (now - ts) / 3600.0)
+        decay = KDE_TIME_DECAY ** hours
+        total += gaussian_kernel(dist / h) * weight * decay
+    # normalize roughly into [0,1]-ish range by anchor count so it doesn't
+    # blow up with a large history
+    return total / max(1, len(anchors))
+
+
+def usage_belief(alpha: float, beta: float) -> float:
+    """mu(a,t)"""
+    return beta_mean(alpha, beta)
+
+
+def recency_decay(last_seen_ts, now=None) -> float:
+    """eps(a) = e^(-lambda * days_since_last_use)"""
+    if last_seen_ts is None:
+        return 0.0
+    now = now or time.time()
+    days = max(0.0, (now - last_seen_ts) / 86400.0)
+    return math.exp(-LAMBDA_RECENCY * days)
+
+
+def break_pressure(current_session_s: float, mean_s: float, var_s: float) -> float:
+    """
+    beta_p(a) = 1 - Phi((T_a - mu_a) / sigma_a)
+
+    Spikes toward 1 as current session time exceeds the learned mean.
+    Falls back to 0 if we don't have enough history to estimate variance.
+    """
+    sigma = math.sqrt(var_s) if var_s > 0 else None
+    if sigma is None or sigma == 0 or mean_s == 0:
+        return 0.0
+    z = (current_session_s - mean_s) / sigma
+    return 1.0 - normal_cdf(z)
+
+
+def placement_consistency(total_weight: float, kappa=PLACEMENT_KAPPA) -> float:
+    """pi(a) = C_a / (C_a + kappa)"""
+    return total_weight / (total_weight + kappa)
+
+
+def friction_penalty(friction_count: float, rho=FRICTION_RHO) -> float:
+    """phi(a) = R_a / (R_a + rho)"""
+    return friction_count / (friction_count + rho)
+
+
+def repair_success_rate(alpha: float, beta: float) -> float:
+    """eta(f, action) = E[Beta(alpha_success, beta_fail)]"""
+    return beta_mean(alpha, beta)
+
+
+def action_confidence(risk: float) -> float:
+    """kappa(action) = 1 - Risk(action), risk in [0,1]"""
+    return max(0.0, 1.0 - risk)
+
+
+def confidence(
+    mu_a_t: float,
+    delta_a_t: float,
+    eps_a: float,
+    beta_p_a: float,
+    pi_a: float,
+    phi_a: float,
+    eta_f_act: float = 0.0,
+    kappa_act: float = 0.0,
+    delta_f: float = 0.0,
+    weights=None,
+) -> float:
+    """
+    C(a,t) = sigmoid( w1*mu*delta + w2*eps + w3*beta_p
+                        + w4*pi*delta - w5*phi
+                        + w6*eta*kappa*delta_f )
+
+    Density terms (delta) gate the usage/placement contributions so a single
+    lucky observation can't spike confidence — see DENSITY_TAU.
+    """
+    w = weights or WEIGHTS
+    usage_term = mu_a_t * delta_a_t if delta_a_t >= DENSITY_TAU else 0.0
+    placement_term = pi_a * delta_a_t if delta_a_t >= DENSITY_TAU else 0.0
+    repair_term = eta_f_act * kappa_act * delta_f
+
+    x = (
+        w["usage"] * usage_term
+        + w["recency"] * eps_a
+        + w["break"] * beta_p_a
+        + w["placement"] * placement_term
+        - w["friction"] * phi_a
+        + w["repair"] * repair_term
+    )
+    return sigmoid(x)
+
+
+def score_action(history_success: float, risk: float, attempts: int, lam=0.5) -> float:
+    """
+    A*(f) = argmax_a [ w1*H(a,f) + w2*(1-Risk(a)) + w3*e^(-lambda*attempts) ]
+
+    Returns the scalar score for one candidate action; caller takes argmax
+    over the action space.
+    """
+    return (
+        1.2 * history_success
+        + 0.8 * action_confidence(risk)
+        + 0.5 * math.exp(-lam * attempts)
+    )
+KORTEX_MODELS_PY
+
+cat > /usr/lib/kortex/kortexd/repair.py << 'KORTEX_REPAIR_PY'
+"""
+kortexd.repair
+--------------
+Detects device/service failures from journald + udev, then picks a fix from
+a FIXED, pre-written action table using score_action() from models.py.
+
+Kortex never generates or executes arbitrary commands. Every action here is
+a named Python function with a known blast radius. If nothing in the table
+fixes it, we escalate to the user instead of guessing further.
+"""
+
+import subprocess
+import time
+import re
+import math
+from dataclasses import dataclass, field
+from typing import Callable, Optional
+
+from . import models
+from .storage import Store
+
+# ---------------------------------------------------------------------------
+# Static risk table — how much state each action touches. 0 = trivial/safe,
+# 1 = high blast radius. Tune conservatively; when in doubt, rate it higher.
+# ---------------------------------------------------------------------------
+RISK = {
+    "reload_module": 0.15,
+    "restart_service": 0.25,
+    "reset_udev_rule": 0.20,
+    "reset_usb_port": 0.30,
+    "fallback_driver": 0.40,
+    "rollback_config": 0.60,
+    "noop_escalate": 0.0,
+}
+
+MAX_ATTEMPTS = 3
+
+
+@dataclass
+class FailureEvent:
+    signature: str          # e.g. "usb:disconnect_loop:0451:8442"
+    device: str
+    detail: str
+    ts: float = field(default_factory=time.time)
+
+
+# ---------------------------------------------------------------------------
+# Detection: EWMA / z-score control chart on event rate per device.
+# This is the "no ML, just statistics" fault detector.
+# ---------------------------------------------------------------------------
+class EWMAMonitor:
+    def __init__(self, alpha=0.3, k=3.0):
+        self.alpha = alpha
+        self.k = k
+        self._mean = {}
+        self._var = {}
+
+    def observe(self, key: str, value: float) -> bool:
+        """Returns True if `value` breaches the EWMA + k*sigma control limit."""
+        m = self._mean.get(key, value)
+        v = self._var.get(key, 0.0)
+        breach = False
+        if key in self._mean:
+            sigma = math.sqrt(v) if v > 0 else 0.0
+            if sigma > 0 and value > m + self.k * sigma:
+                breach = True
+        delta = value - m
+        m2 = m + self.alpha * delta
+        v2 = (1 - self.alpha) * (v + self.alpha * delta * delta)
+        self._mean[key] = m2
+        self._var[key] = v2
+        return breach
+
+
+# ---------------------------------------------------------------------------
+# Action space — each function takes the FailureEvent and returns (ok, detail)
+# ---------------------------------------------------------------------------
+def _run(cmd, timeout=15):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode == 0, (r.stdout + r.stderr).strip()[-500:]
+    except Exception as e:
+        return False, str(e)
+
+
+def act_reload_module(ev: FailureEvent):
+    mod = _extract_module(ev.detail)
+    if not mod:
+        return False, "no module name extracted"
+    _run(["modprobe", "-r", mod])
+    return _run(["modprobe", mod])
+
+
+def act_restart_service(ev: FailureEvent):
+    svc = _extract_service(ev.detail) or ev.device
+    return _run(["systemctl", "restart", svc])
+
+
+def act_reset_udev_rule(ev: FailureEvent):
+    ok1, _ = _run(["udevadm", "control", "--reload-rules"])
+    ok2, out = _run(["udevadm", "trigger", "--action=change"])
+    return (ok1 and ok2), out
+
+
+def act_reset_usb_port(ev: FailureEvent):
+    bus_port = _extract_usb_port(ev.detail)
+    if not bus_port:
+        return False, "no usb bus/port extracted"
+    path = f"/sys/bus/usb/devices/{bus_port}/authorized"
+    try:
+        with open(path, "w") as f:
+            f.write("0")
+        time.sleep(1)
+        with open(path, "w") as f:
+            f.write("1")
+        return True, f"cycled {bus_port}"
+    except Exception as e:
+        return False, str(e)
+
+
+def act_fallback_driver(ev: FailureEvent):
+    # Swap to a known-safe alternate driver binding, if one is configured.
+    alt = KNOWN_FALLBACKS.get(ev.device)
+    if not alt:
+        return False, "no fallback driver configured"
+    mod = _extract_module(ev.detail)
+    if mod:
+        _run(["modprobe", "-r", mod])
+    return _run(["modprobe", alt])
+
+
+def act_rollback_config(ev: FailureEvent):
+    # Reuses KibaOS's existing OTA snapshot infra rather than reinventing it.
+    return _run(["kibaos-ota", "rollback", "--reason", f"kortex:{ev.signature}"])
+
+
+def act_noop_escalate(ev: FailureEvent):
+    return False, "escalated to user, no automatic action taken"
+
+
+ACTIONS: dict[str, Callable[[FailureEvent], tuple]] = {
+    "reload_module": act_reload_module,
+    "restart_service": act_restart_service,
+    "reset_udev_rule": act_reset_udev_rule,
+    "reset_usb_port": act_reset_usb_port,
+    "fallback_driver": act_fallback_driver,
+    "rollback_config": act_rollback_config,
+    "noop_escalate": act_noop_escalate,
+}
+
+KNOWN_FALLBACKS: dict[str, str] = {
+    # "wifi:rtl8822ce": "rtw88_8822ce",
+}
+
+
+def _extract_module(text: str) -> Optional[str]:
+    m = re.search(r"module[:\s]+([a-zA-Z0-9_\-]+)", text, re.I)
+    return m.group(1) if m else None
+
+
+def _extract_service(text: str) -> Optional[str]:
+    m = re.search(r"([a-zA-Z0-9_\-]+\.service)", text)
+    return m.group(1) if m else None
+
+
+def _extract_usb_port(text: str) -> Optional[str]:
+    m = re.search(r"\b(\d+-[\d.]+)\b", text)
+    return m.group(1) if m else None
+
+
+# ---------------------------------------------------------------------------
+# Execution loop
+# ---------------------------------------------------------------------------
+class RepairEngine:
+    def __init__(self, store: Store, on_popup=None, on_result=None):
+        self.store = store
+        self.monitor = EWMAMonitor()
+        self.on_popup = on_popup      # callback(FailureEvent) -> fire "repair started" UI
+        self.on_result = on_result    # callback(FailureEvent, success, detail) -> update UI
+
+    def handle_failure(self, ev: FailureEvent):
+        if self.on_popup:
+            self.on_popup(ev)
+
+        density = models.kde_density(
+            point=_failure_vector(ev),
+            anchors=self.store.get_kde_points("failure"),
+        )
+        self.store.add_kde_point("failure", _failure_vector(ev), weight=1.0)
+        self.store.prune_kde_points("failure")
+
+        # Novel failure signatures (low density) get fewer automatic attempts
+        # before escalating — Kortex trusts its own history less here.
+        max_attempts = MAX_ATTEMPTS if density >= models.DENSITY_TAU else 1
+
+        tried = []
+        for attempt in range(max_attempts):
+            action = self._pick_action(ev, exclude=tried)
+            if action is None or action == "noop_escalate":
+                break
+            fn = ACTIONS[action]
+            success, detail = fn(ev)
+            self.store.update_repair_beta(ev.signature, action, success)
+            tried.append(action)
+            if self.on_result:
+                self.on_result(ev, success, detail, action, attempt + 1, max_attempts)
+            if success:
+                return True
+        # exhausted attempts, or nothing to try
+        if self.on_result and (not tried or not any(tried)):
+            self.on_result(ev, False, "no viable action found", "noop_escalate", 0, max_attempts)
+        return False
+
+    def _pick_action(self, ev: FailureEvent, exclude):
+        best, best_score = None, -1.0
+        for name in ACTIONS:
+            if name in exclude or name == "noop_escalate":
+                continue
+            alpha, beta, attempts = self.store.get_repair_beta(ev.signature, name)
+            hist = models.repair_success_rate(alpha, beta)
+            score = models.score_action(hist, RISK[name], attempts)
+            if score > best_score:
+                best, best_score = name, score
+        return best
+
+
+def _failure_vector(ev: FailureEvent):
+    # crude but stable feature hash -> numeric vector for KDE distance
+    h = abs(hash(ev.signature)) % 1000
+    return [h / 1000.0]
+
+
+# ---------------------------------------------------------------------------
+# journald / udev watcher (stub loop — wire to real subprocess.Popen streams)
+# ---------------------------------------------------------------------------
+FAILURE_PATTERNS = [
+    (re.compile(r"usb \S+: device descriptor read.*error", re.I), "usb_desc_error"),
+    (re.compile(r"link is not ready", re.I), "link_not_ready"),
+    (re.compile(r"firmware: failed to load", re.I), "firmware_load_fail"),
+    (re.compile(r"(\S+\.service): Failed with result", re.I), "service_failed"),
+]
+
+
+def watch_journal(engine: RepairEngine, poll_seconds=2):
+    """Tail `journalctl -f` and turn matching lines into FailureEvents."""
+    proc = subprocess.Popen(
+        ["journalctl", "-f", "-o", "short-monotonic"],
+        stdout=subprocess.PIPE, text=True, bufsize=1,
+    )
+    try:
+        for line in proc.stdout:
+            for pattern, tag in FAILURE_PATTERNS:
+                m = pattern.search(line)
+                if not m:
+                    continue
+                device = m.group(1) if m.groups() else "unknown"
+                sig = f"{tag}:{device}"
+                breach = engine.monitor.observe(sig, 1.0)
+                if breach or tag in ("firmware_load_fail", "usb_desc_error"):
+                    ev = FailureEvent(signature=sig, device=device, detail=line.strip())
+                    engine.handle_failure(ev)
+    finally:
+        proc.terminate()
+KORTEX_REPAIR_PY
+
+cat > /usr/lib/kortex/kortexd/notifier.py << 'KORTEX_NOTIFIER_PY'
+"""
+kortexd.notifier
+----------------
+Renders the repair-status popup. Styled to match KibaOS's own OOBE
+design language (white glass card, #0099cc accent, rounded corners)
+rather than a separate look — palette pulled straight from kibaos.sh's
+oobe.css block, so this reads as part of the OS, not a bolted-on toast.
+
+Built as a plain GTK4 layer-shell window (not a libnotify passthrough) so
+it can carry live progress state and a details expander. Falls back to a
+normal top-level Gtk.Window if gtk4-layer-shell isn't installed (e.g.
+during dev on non-Wayland).
+"""
+
+import os
+import gi
+
+gi.require_version("Gtk", "4.0")
+from gi.repository import Gtk, Gdk, GLib, Pango  # noqa: E402
+
+try:
+    gi.require_version("Gtk4LayerShell", "1.0")
+    from gi.repository import Gtk4LayerShell as LayerShell
+    HAVE_LAYER_SHELL = True
+except (ValueError, ImportError):
+    HAVE_LAYER_SHELL = False
+
+ASSET_DIR = os.path.join(os.path.dirname(__file__), "assets")
+
+# Palette lifted directly from kibaos.sh's oobe.css (.oobe-card,
+# .oobe-continue-button, .oobe-title) so Kortex's popup and the installer
+# read as the same product, not two different design systems.
+CSS = b"""
+.kortex-toast {
+    background:    rgba(255,255,255,0.92);
+    border:        1px solid rgba(255,255,255,0.70);
+    border-radius: 20px;
+    padding: 14px 16px;
+    box-shadow:
+        0 2px 4px  rgba(0,0,0,0.04),
+        0 8px 24px rgba(0,0,0,0.10);
+}
+.kortex-title {
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 14px;
+}
+.kortex-body {
+    color: #475569;
+    font-size: 12.5px;
+}
+.kortex-detail {
+    color: #64748b;
+    font-size: 11px;
+    font-family: monospace;
+}
+.kortex-icon-badge {
+    background: rgba(0,153,204,0.10);
+    border-radius: 14px;
+    padding: 6px;
+}
+.kortex-progress trough {
+    min-height: 4px;
+    border-radius: 4px;
+    background: rgba(0,0,0,0.08);
+}
+.kortex-progress progress {
+    min-height: 4px;
+    border-radius: 4px;
+    background: #0099cc;
+}
+"""
+
+
+def _apply_css():
+    provider = Gtk.CssProvider()
+    provider.load_from_data(CSS)
+    Gtk.StyleContext.add_provider_for_display(
+        Gdk.Display.get_default(), provider,
+        Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+    )
+
+
+class KortexToast(Gtk.Window):
+    """One popup instance, mutated across its lifecycle:
+    started -> (success | retrying | escalated)
+    """
+
+    def __init__(self, app, title, body):
+        super().__init__(application=app)
+        self.set_default_size(340, -1)
+        self.set_decorated(False)
+
+        if HAVE_LAYER_SHELL:
+            LayerShell.init_for_window(self)
+            LayerShell.set_layer(self, LayerShell.Layer.OVERLAY)
+            LayerShell.set_anchor(self, LayerShell.Edge.TOP, True)
+            LayerShell.set_anchor(self, LayerShell.Edge.RIGHT, True)
+            LayerShell.set_margin(self, LayerShell.Edge.TOP, 48)
+            LayerShell.set_margin(self, LayerShell.Edge.RIGHT, 16)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        outer.add_css_class("kortex-toast")
+        outer.set_margin_start(4)
+        outer.set_margin_end(4)
+        outer.set_margin_top(4)
+        outer.set_margin_bottom(4)
+
+        badge = Gtk.Box()
+        badge.add_css_class("kortex-icon-badge")
+        icon_path = os.path.join(ASSET_DIR, "kortex-icon.svg")
+        image = Gtk.Image.new_from_file(icon_path)
+        image.set_pixel_size(26)
+        badge.append(image)
+        outer.append(badge)
+
+        text_col = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        text_col.set_hexpand(True)
+
+        self.title_label = Gtk.Label(label=title, xalign=0)
+        self.title_label.add_css_class("kortex-title")
+        self.title_label.set_wrap(True)
+        text_col.append(self.title_label)
+
+        self.body_label = Gtk.Label(label=body, xalign=0)
+        self.body_label.add_css_class("kortex-body")
+        self.body_label.set_wrap(True)
+        self.body_label.set_max_width_chars(34)
+        text_col.append(self.body_label)
+
+        self.progress = Gtk.ProgressBar()
+        self.progress.add_css_class("kortex-progress")
+        self.progress.set_show_text(False)
+        self.progress.pulse()
+        text_col.append(self.progress)
+
+        self.detail_label = Gtk.Label(label="", xalign=0)
+        self.detail_label.add_css_class("kortex-detail")
+        self.detail_label.set_visible(False)
+        self.detail_label.set_wrap(True)
+        self.detail_label.set_max_width_chars(40)
+        text_col.append(self.detail_label)
+
+        outer.append(text_col)
+        self.set_child(outer)
+
+        self._pulse_id = GLib.timeout_add(120, self._pulse)
+        self._auto_close_id = None
+
+    def _pulse(self):
+        self.progress.pulse()
+        return True
+
+    def set_success(self, detail: str, auto_close_s=5):
+        self._stop_pulse()
+        self.progress.set_fraction(1.0)
+        self.title_label.set_label("Fixed \u2014 Kortex repaired the device")
+        self.body_label.set_label(detail or "Device is back online.")
+        self._schedule_close(auto_close_s)
+
+    def set_retrying(self, action: str, attempt: int, max_attempts: int):
+        self.body_label.set_label(
+            f"Trying fix {attempt}/{max_attempts}: {action.replace('_', ' ')}"
+        )
+
+    def set_escalated(self, tried_actions):
+        self._stop_pulse()
+        self.progress.set_fraction(1.0)
+        self.title_label.set_label("Couldn't auto-repair this one")
+        self.body_label.set_label("Here's what Kortex tried \u2014 tap for details.")
+        self.detail_label.set_label(", ".join(tried_actions) or "no safe action available")
+        self.detail_label.set_visible(True)
+        self._schedule_close(12)
+
+    def _stop_pulse(self):
+        if self._pulse_id:
+            GLib.source_remove(self._pulse_id)
+            self._pulse_id = None
+
+    def _schedule_close(self, seconds):
+        if self._auto_close_id:
+            GLib.source_remove(self._auto_close_id)
+        self._auto_close_id = GLib.timeout_add_seconds(seconds, self._close)
+
+    def _close(self):
+        self.close()
+        return False
+
+
+class KortexNotifier:
+    """Owns the GTK application loop; kortexd calls into this from its
+    repair callbacks. Runs on the main thread — repair detection/execution
+    should happen on a worker thread and hand off via GLib.idle_add.
+    """
+
+    def __init__(self):
+        self.app = Gtk.Application(application_id="dev.wolftech.kortex.notifier")
+        self._toasts = {}
+        self.app.connect("startup", lambda a: _apply_css())
+
+    def run(self):
+        self.app.run(None)
+
+    # -- callbacks wired into RepairEngine --
+    def on_repair_started(self, ev):
+        GLib.idle_add(self._show_started, ev)
+
+    def on_repair_result(self, ev, success, detail, action, attempt, max_attempts):
+        GLib.idle_add(self._update_result, ev, success, detail, action, attempt, max_attempts)
+
+    def _show_started(self, ev):
+        toast = KortexToast(
+            self.app,
+            title="KibaOS noticed a device isn't functioning",
+            body="Automatic repair started",
+        )
+        toast.present()
+        self._toasts[ev.signature] = {"win": toast, "tried": []}
+        return False
+
+    def _update_result(self, ev, success, detail, action, attempt, max_attempts):
+        entry = self._toasts.get(ev.signature)
+        if not entry:
+            return False
+        entry["tried"].append(action)
+        win = entry["win"]
+        if success:
+            win.set_success(detail)
+        elif attempt < max_attempts and action != "noop_escalate":
+            win.set_retrying(action, attempt + 1, max_attempts)
+        else:
+            win.set_escalated(entry["tried"])
+        return False
+KORTEX_NOTIFIER_PY
+
+cat > /usr/lib/kortex/kortexd/core.py << 'KORTEX_CORE_PY'
+"""
+kortexd.core
+------------
+Entrypoint. Runs the repair watcher + usage/session trackers on a background
+thread, and the GTK notifier on the main thread (GTK requires the main
+thread on most platforms).
+
+Window-focus / move events are expected from the compositor via
+wlr-foreign-toplevel-management (Budgie/labwc on Wayland) — `on_window_focus`
+and `on_window_moved` are the two hooks a compositor-side shim should call.
+Kept as a stub interface here (`WindowEventSource`) so the daemon logic is
+testable without a live compositor.
+"""
+
+import threading
+import time
+import datetime
+import logging
+
+from .storage import Store
+from . import models
+from .repair import RepairEngine, watch_journal
+from .notifier import KortexNotifier
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s kortexd: %(message)s")
+log = logging.getLogger("kortexd")
+
+
+class WindowEventSource:
+    """Stub compositor bridge. Real implementation subscribes to
+    wlr-foreign-toplevel-management + xdg-shell move/resize events and
+    calls the callbacks below. Left abstract so it can be swapped per-DE.
+    """
+
+    def __init__(self, on_focus, on_move, on_click):
+        self.on_focus = on_focus
+        self.on_move = on_move
+        self.on_click = on_click
+
+    def start(self):
+        log.info("WindowEventSource stub started (wire to labwc/Budgie IPC here)")
+
+
+class KortexDaemon:
+    def __init__(self, db_path=None):
+        self.store = Store(db_path) if db_path else Store()
+        self.notifier = KortexNotifier()
+        self.repair_engine = RepairEngine(
+            self.store,
+            on_popup=self.notifier.on_repair_started,
+            on_result=self.notifier.on_repair_result,
+        )
+        self.active_sessions = {}          # app -> start_ts
+        self.last_click = {}               # app -> (x, y, ts)
+        self.rage_click_window = 1.2       # seconds
+        self.rage_click_radius = 20        # px
+        self.rage_click_count = {}         # app -> count in current burst
+        self.dead_click_timeout = 0.6      # seconds with no state change
+
+        self.window_source = WindowEventSource(
+            on_focus=self.on_window_focus,
+            on_move=self.on_window_moved,
+            on_click=self.on_click,
+        )
+
+    # ---- usage / focus tracking ----
+    def on_window_focus(self, app: str, ts=None):
+        ts = ts or time.time()
+        now = datetime.datetime.fromtimestamp(ts)
+        dow, hour = now.weekday(), now.hour
+
+        # close out previous session for this app if one was open elsewhere
+        prev_start = self.active_sessions.get(app)
+        if prev_start:
+            self.store.update_session_stats(app, ts - prev_start)
+
+        self.active_sessions[app] = ts
+        self.store.set_session_start(app, ts)
+        self.store.update_beta(app, dow, hour, hit=True, decay=models.LAMBDA_WEEKLY_FORGET)
+        self.store.add_kde_point("usage", [dow / 6.0, hour / 23.0], weight=1.0)
+
+    def on_window_close(self, app: str, ts=None):
+        ts = ts or time.time()
+        start = self.active_sessions.pop(app, None)
+        if start:
+            self.store.update_session_stats(app, ts - start)
+
+    # ---- placement ----
+    def on_window_moved(self, app, monitor, x, y, w, h):
+        self.store.update_placement(app, monitor, x, y, w, h)
+
+    # ---- click friction ----
+    def on_click(self, app, x, y, caused_state_change: bool, ts=None):
+        ts = ts or time.time()
+        last = self.last_click.get(app)
+        self.last_click[app] = (x, y, ts)
+
+        if not caused_state_change:
+            self.store.log_friction(app, "dead", x, y)
+            return
+
+        if last:
+            lx, ly, lts = last
+            dt = ts - lts
+            dist = ((x - lx) ** 2 + (y - ly) ** 2) ** 0.5
+            if dt <= self.rage_click_window and dist <= self.rage_click_radius:
+                n = self.rage_click_count.get(app, 0) + 1
+                self.rage_click_count[app] = n
+                if n >= 3:
+                    self.store.log_friction(app, "rage", x, y)
+                    self.rage_click_count[app] = 0
+            else:
+                self.rage_click_count[app] = 0
+
+    # ---- confidence scoring (public API other components call) ----
+    def score_app(self, app: str, ts=None) -> float:
+        ts = ts or time.time()
+        now = datetime.datetime.fromtimestamp(ts)
+        dow, hour = now.weekday(), now.hour
+
+        alpha, beta = self.store.get_beta(app, dow, hour)
+        mu = models.usage_belief(alpha, beta)
+
+        delta = models.kde_density(
+            point=[dow / 6.0, hour / 23.0],
+            anchors=self.store.get_kde_points("usage"),
+        )
+
+        eps = models.recency_decay(self.store.last_seen(app), now=ts)
+
+        sess = self.store.get_session_stats(app)
+        current_session = ts - sess["session_start"] if sess.get("session_start") else 0.0
+        variance = sess["m2"] / sess["count"] if sess["count"] > 1 else 0.0
+        beta_p = models.break_pressure(current_session, sess["mean"], variance)
+
+        pi = models.placement_consistency(
+            self.store.get_placement_confidence(app) * (models.PLACEMENT_KAPPA)  # back out weight
+        ) if False else self.store.get_placement_confidence(app)
+
+        phi = self.store.friction_score(app)
+
+        return models.confidence(mu, delta, eps, beta_p, pi, phi)
+
+    # ---- break reminders (polling loop) ----
+    def _break_reminder_loop(self, poll_seconds=30):
+        while True:
+            time.sleep(poll_seconds)
+            now = time.time()
+            for app, start in list(self.active_sessions.items()):
+                sess = self.store.get_session_stats(app)
+                if sess["count"] < 3:
+                    continue  # not enough history to know what's "too long"
+                variance = sess["m2"] / sess["count"]
+                pressure = models.break_pressure(now - start, sess["mean"], variance)
+                if pressure > 0.9:
+                    log.info(f"break pressure high for {app} ({pressure:.2f}) — nudge user")
+                    # UI hook: notifier could show a lightweight break toast here
+
+    def _repair_watch_loop(self):
+        while True:
+            try:
+                watch_journal(self.repair_engine)
+            except Exception as e:
+                log.warning(f"journal watcher crashed, restarting in 5s: {e}")
+                time.sleep(5)
+
+    def start_background(self):
+        threading.Thread(target=self._repair_watch_loop, daemon=True).start()
+        threading.Thread(target=self._break_reminder_loop, daemon=True).start()
+        self.window_source.start()
+
+    def run(self):
+        self.start_background()
+        log.info("kortexd running")
+        self.notifier.run()  # blocks on GTK main loop (main thread)
+
+
+def main():
+    daemon = KortexDaemon()
+    daemon.run()
+
+
+if __name__ == "__main__":
+    main()
+KORTEX_CORE_PY
+
+cat > /usr/lib/kortex/kortexd/__main__.py << 'KORTEX_MAIN_PY'
+from .core import main
+
+if __name__ == "__main__":
+    main()
+KORTEX_MAIN_PY
+
+cat > /usr/lib/kortex/kortexd/assets/kortex-icon.svg << 'KORTEX_ICON_SVG'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- adaptive/refresh glyph: two arcing arrows, same accent blue as the OOBE -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20 A12 12 0 0 1 34 13" stroke="#0099cc" stroke-width="3.4"/>
+    <path d="M34 13 l1 6 l-6 -1.5" fill="none" stroke="#0099cc" stroke-width="3.4"/>
+    <path d="M36 28 A12 12 0 0 1 14 35" stroke="#00aee3" stroke-width="3.4"/>
+    <path d="M14 35 l-1 -6 l6 1.5" fill="none" stroke="#00aee3" stroke-width="3.4"/>
+  </g>
+</svg>
+KORTEX_ICON_SVG
+
+mkdir -p /usr/lib/systemd/user
+cat > /usr/lib/systemd/user/kortexd.service << 'KORTEX_SERVICE_UNIT'
+[Unit]
+Description=Kortex — KibaOS adaptive daemon
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 -m kortexd
+Restart=on-failure
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=graphical-session.target
+KORTEX_SERVICE_UNIT
+
+echo "=== Compiling kortexd (Nuitka -> native x86_64 binary) ==="
+cd /usr/lib/kortex
+python -m nuitka \
+  --standalone \
+  --onefile \
+  --output-dir=build \
+  --output-filename=kortexd \
+  --include-package=kortexd \
+  --include-package-data=kortexd \
+  --python-flag=-m \
+  --assume-yes-for-downloads \
+  --lto=yes \
+  kortexd
+install -Dm755 build/kortexd /usr/bin/kortexd
+cd /
+rm -rf /usr/lib/kortex/build /usr/lib/kortex/kortexd.build /usr/lib/kortex/kortexd.dist /usr/lib/kortex/kortexd.onefile-build
+
+# Enabled per-user (graphical-session.target), same as other user services
+# in this image — actual activation happens on first login via systemd.
+mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
+ln -sf /usr/lib/systemd/user/kortexd.service \
+  /etc/skel/.config/systemd/user/graphical-session.target.wants/kortexd.service
+echo "=== Kortex installed ==="
+
+
 pacman-key --init
 pacman-key --populate archlinux
 pacman -Syy --noconfirm
