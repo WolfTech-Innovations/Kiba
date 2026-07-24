@@ -129,6 +129,7 @@ wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
+glm
 wayfire
 sddm
 budgie
