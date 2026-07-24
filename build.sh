@@ -5988,7 +5988,13 @@ echo "=== Building wayfire-plugins-extra (ipc, ipc-rules) ==="
 pacman -S --noconfirm --needed meson ninja cmake pkgconf git cairo glibmm wayland-protocols
 pacman -Scc --noconfirm
 
-git clone --depth=1 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
+# Pinned to v0.10.1, NOT master — master's meson.build now requires
+# wayfire >=0.11.0, but Arch's extra/wayfire package (installed above via
+# packages.x86_64) is 0.10.1. If Arch bumps wayfire past 0.11.0 in the
+# future, bump this tag to match — check `pacman -Si wayfire` for the
+# version actually being installed and pick the wayfire-plugins-extra tag
+# whose release notes list that same Wayfire version as a dependency.
+git clone --depth=1 --branch v0.10.1 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
 cd /tmp/wayfire-plugins-extra
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
