@@ -5994,7 +5994,7 @@ pacman -Scc --noconfirm
 # future, bump this tag to match — check `pacman -Si wayfire` for the
 # version actually being installed and pick the wayfire-plugins-extra tag
 # whose release notes list that same Wayfire version as a dependency.
-git clone --depth=1 --branch v0.10.1 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
+git clone --depth=1 --branch v0.10.0 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
 cd /tmp/wayfire-plugins-extra
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
