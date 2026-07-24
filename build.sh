@@ -406,6 +406,19 @@ sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 # non-interactive CI shell with no stdin, that stray prompt is what actually
 # hangs/fails the step, not a real space shortage.
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
+
+# ── Re-init the pacman keyring inside THIS chroot ───────────────────────────
+# "keyring is not writable" / "required key missing from keyring" happens
+# when /etc/pacman.d/gnupg's ownership/permissions don't match the UID
+# actually running pacman inside the container — common in CI where the
+# outer Docker layer and this arch-chroot session don't line up cleanly,
+# even though mkarchiso initialized a keyring earlier in the process. GnuPG
+# is strict about homedir perms (must be 0700, owned by the invoking user),
+# so rather than debug which UID owns what, wipe it and rebuild fresh under
+# the identity that's actually running this script right now.
+rm -rf /etc/pacman.d/gnupg
+pacman-key --init
+pacman-key --populate archlinux
 pacman -Syy --noconfirm
 
 # ── Reclaim disk before any further installs ────────────────────────────────
