@@ -71,7 +71,6 @@ cat > "${AIROOTFS}/etc/os-release" << 'OSRELEASE'
 NAME="KibaOS"
 PRETTY_NAME="KibaOS Rolling"
 ID=kibaos
-ID_LIKE=arch
 BUILD_ID=rolling
 VERSION_CODENAME="wolftech"
 ANSI_COLOR="1;36"
@@ -129,7 +128,6 @@ wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-glm
 wayfire
 sddm
 budgie
@@ -138,7 +136,6 @@ budgie-desktop-services
 swaybg
 grim
 slurp
-boost
 swayidle
 gtklock
 wlopm
@@ -159,30 +156,6 @@ evince
 papirus-icon-theme
 accountsservice
 sassc
-meson
-ninja
-vulkan-headers
-vulkan-icd-loader
-wayland
-wayland-protocols
-wlroots0.19
-cairo
-pango
-pixman
-libdrm
-libevdev
-libxml2
-freetype2
-libpng
-harfbuzz
-fribidi
-glib2
-sysprof
-libinput
-libjpeg-turbo
-libxkbcommon
-nlohmann-json
-yyjson
 network-manager-applet
 kvantum
 pipewire
@@ -195,7 +168,6 @@ chromium
 ntfs-3g
 exfatprogs
 polkit
-polkit-kde-agent
 udisks2
 upower
 scrot
@@ -1059,6 +1031,7 @@ import subprocess
 import time
 import re
 import math
+import json
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
@@ -1129,39 +1102,51 @@ def _run(cmd, timeout=15):
         return False, str(e)
 
 
+# ---------------------------------------------------------------------------
+# Privilege boundary: kortexd runs as an unprivileged per-user systemd
+# service (see graphical-session.target.wants), but every action below needs
+# root (modprobe, systemctl restart of a *system* unit, udevadm, sysfs
+# writes, kibaos-ota). Rather than granting kortexd itself any privilege, it
+# hands off to /usr/lib/kortex/kortex-helper via pkexec — a separate root
+# process that re-validates every parameter against the same whitelist
+# before touching anything. kortexd never runs privileged commands directly.
+# ---------------------------------------------------------------------------
+def _run_privileged(action: str, params: dict, timeout=15):
+    try:
+        r = subprocess.run(
+            ["pkexec", "/usr/lib/kortex/kortex-helper"],
+            input=json.dumps({"action": action, "params": params}),
+            capture_output=True, text=True, timeout=timeout,
+        )
+        if r.returncode != 0 and not r.stdout.strip():
+            return False, (r.stderr or "pkexec denied or failed").strip()[-500:]
+        resp = json.loads(r.stdout)
+        return bool(resp.get("ok")), str(resp.get("detail", ""))[-500:]
+    except Exception as e:
+        return False, str(e)
+
+
 def act_reload_module(ev: FailureEvent):
     mod = _extract_module(ev.detail)
     if not mod:
         return False, "no module name extracted"
-    _run(["modprobe", "-r", mod])
-    return _run(["modprobe", mod])
+    return _run_privileged("reload_module", {"mod": mod})
 
 
 def act_restart_service(ev: FailureEvent):
     svc = _extract_service(ev.detail) or ev.device
-    return _run(["systemctl", "restart", svc])
+    return _run_privileged("restart_service", {"svc": svc})
 
 
 def act_reset_udev_rule(ev: FailureEvent):
-    ok1, _ = _run(["udevadm", "control", "--reload-rules"])
-    ok2, out = _run(["udevadm", "trigger", "--action=change"])
-    return (ok1 and ok2), out
+    return _run_privileged("reset_udev_rule", {})
 
 
 def act_reset_usb_port(ev: FailureEvent):
     bus_port = _extract_usb_port(ev.detail)
     if not bus_port:
         return False, "no usb bus/port extracted"
-    path = f"/sys/bus/usb/devices/{bus_port}/authorized"
-    try:
-        with open(path, "w") as f:
-            f.write("0")
-        time.sleep(1)
-        with open(path, "w") as f:
-            f.write("1")
-        return True, f"cycled {bus_port}"
-    except Exception as e:
-        return False, str(e)
+    return _run_privileged("reset_usb_port", {"bus_port": bus_port})
 
 
 def act_fallback_driver(ev: FailureEvent):
@@ -1170,14 +1155,12 @@ def act_fallback_driver(ev: FailureEvent):
     if not alt:
         return False, "no fallback driver configured"
     mod = _extract_module(ev.detail)
-    if mod:
-        _run(["modprobe", "-r", mod])
-    return _run(["modprobe", alt])
+    return _run_privileged("fallback_driver", {"device": ev.device, "mod": mod or ""})
 
 
 def act_rollback_config(ev: FailureEvent):
     # Reuses KibaOS's existing OTA snapshot infra rather than reinventing it.
-    return _run(["kibaos-ota", "rollback", "--reason", f"kortex:{ev.signature}"])
+    return _run_privileged("rollback_config", {"reason": f"kortex:{ev.signature}"})
 
 
 def act_noop_escalate(ev: FailureEvent):
@@ -1240,6 +1223,7 @@ class RepairEngine:
         max_attempts = MAX_ATTEMPTS if density >= models.DENSITY_TAU else 1
 
         tried = []
+        any_succeeded = False
         for attempt in range(max_attempts):
             action = self._pick_action(ev, exclude=tried)
             if action is None or action == "noop_escalate":
@@ -1251,10 +1235,14 @@ class RepairEngine:
             if self.on_result:
                 self.on_result(ev, success, detail, action, attempt + 1, max_attempts)
             if success:
+                any_succeeded = True
                 return True
-        # exhausted attempts, or nothing to try
-        if self.on_result and (not tried or not any(tried)):
-            self.on_result(ev, False, "no viable action found", "noop_escalate", 0, max_attempts)
+        # exhausted attempts (all failed), or nothing was viable to try at all —
+        # either way, nothing fixed it, so surface a final escalation to the user
+        # distinct from the per-attempt failure notifications already sent above.
+        if self.on_result and not any_succeeded:
+            reason = "no viable action found" if not tried else f"all {len(tried)} attempt(s) failed"
+            self.on_result(ev, False, reason, "noop_escalate", len(tried), max_attempts)
         return False
 
     def _pick_action(self, ev: FailureEvent, exclude):
@@ -1308,6 +1296,202 @@ def watch_journal(engine: RepairEngine, poll_seconds=2):
     finally:
         proc.terminate()
 KORTEX_REPAIR_PY
+
+# ══════════════════════════════════════════════════════════════════════════
+# KORTEX-HELPER — root-side executor for the repair action table.
+#
+# kortexd (above) runs unprivileged as a per-user systemd service. It never
+# runs modprobe/systemctl/udevadm/sysfs-writes/kibaos-ota itself — it asks
+# this helper to, via pkexec. The helper re-validates every parameter
+# against the same whitelist independently: it does not trust kortexd's
+# extraction of the module/service/USB-port name, because that text
+# ultimately traces back to journald log lines, which a misbehaving device
+# could influence. Defense in depth across the privilege boundary.
+# ══════════════════════════════════════════════════════════════════════════
+echo "=== Installing kortex-helper (privileged repair executor) ==="
+install -d -m 755 /usr/lib/kortex
+cat > /usr/lib/kortex/kortex-helper << 'KORTEX_HELPER_PY'
+#!/usr/bin/env python3
+"""
+kortex-helper
+-------------
+Root-side executor for Kortex's fixed repair action table. Invoked via
+pkexec by the unprivileged kortexd user service. Reads one JSON request
+from stdin: {"action": "<name>", "params": {...}}, writes one JSON
+response to stdout: {"ok": bool, "detail": "..."}.
+
+Every parameter is re-validated here, independently of whatever checks
+kortexd already did — this process trusts nothing that crosses the
+privilege boundary. There is no arbitrary-command path: the action name
+must be an exact key in DISPATCH, and every function below only ever
+shells out to a fixed, named command.
+"""
+import sys
+import json
+import re
+import subprocess
+import time
+
+SAFE_NAME = re.compile(r"^[a-zA-Z0-9_\-]{1,64}$")
+SAFE_SERVICE = re.compile(r"^[a-zA-Z0-9_\-@.]{1,128}\.service$")
+SAFE_USB_PORT = re.compile(r"^\d+-[\d.]{1,16}$")
+SAFE_REASON = re.compile(r"^[a-zA-Z0-9_\-:. ]{1,128}$")
+
+# Keep in sync with kortexd/repair.py's KNOWN_FALLBACKS. Currently empty on
+# both sides — populate as real hardware fallback pairs get validated.
+KNOWN_FALLBACKS = {
+    # "wifi:rtl8822ce": "rtw88_8822ce",
+}
+
+
+def _run(cmd, timeout=15):
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode == 0, (r.stdout + r.stderr).strip()[-500:]
+    except Exception as e:
+        return False, str(e)
+
+
+def reload_module(params):
+    mod = params.get("mod", "")
+    if not SAFE_NAME.match(mod):
+        return False, "rejected: invalid module name"
+    _run(["modprobe", "-r", mod])
+    return _run(["modprobe", mod])
+
+
+def restart_service(params):
+    svc = params.get("svc", "")
+    if not SAFE_SERVICE.match(svc):
+        return False, "rejected: invalid service unit name"
+    return _run(["systemctl", "restart", svc])
+
+
+def reset_udev_rule(params):
+    ok1, _ = _run(["udevadm", "control", "--reload-rules"])
+    ok2, out = _run(["udevadm", "trigger", "--action=change"])
+    return (ok1 and ok2), out
+
+
+def reset_usb_port(params):
+    bus_port = params.get("bus_port", "")
+    if not SAFE_USB_PORT.match(bus_port):
+        return False, "rejected: invalid usb bus/port"
+    path = f"/sys/bus/usb/devices/{bus_port}/authorized"
+    try:
+        with open(path, "w") as f:
+            f.write("0")
+        time.sleep(1)
+        with open(path, "w") as f:
+            f.write("1")
+        return True, f"cycled {bus_port}"
+    except Exception as e:
+        return False, str(e)
+
+
+def fallback_driver(params):
+    device = params.get("device", "")
+    mod = params.get("mod", "")
+    alt = KNOWN_FALLBACKS.get(device)
+    if not alt:
+        return False, "no fallback driver configured"
+    if mod and not SAFE_NAME.match(mod):
+        return False, "rejected: invalid module name"
+    if mod:
+        _run(["modprobe", "-r", mod])
+    return _run(["modprobe", alt])
+
+
+def rollback_config(params):
+    reason = params.get("reason", "kortex:unknown")
+    if not SAFE_REASON.match(reason):
+        reason = "kortex:unspecified"
+    return _run(["kibaos-ota", "rollback", "--reason", reason])
+
+
+DISPATCH = {
+    "reload_module": reload_module,
+    "restart_service": restart_service,
+    "reset_udev_rule": reset_udev_rule,
+    "reset_usb_port": reset_usb_port,
+    "fallback_driver": fallback_driver,
+    "rollback_config": rollback_config,
+}
+
+
+def main():
+    try:
+        req = json.loads(sys.stdin.read())
+    except Exception:
+        print(json.dumps({"ok": False, "detail": "malformed request"}))
+        return 1
+
+    fn = DISPATCH.get(req.get("action", ""))
+    if fn is None:
+        print(json.dumps({"ok": False, "detail": f"unknown action: {req.get('action')!r}"}))
+        return 1
+
+    ok, detail = fn(req.get("params", {}) or {})
+    print(json.dumps({"ok": ok, "detail": detail}))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+KORTEX_HELPER_PY
+chown root:root /usr/lib/kortex/kortex-helper
+chmod 755 /usr/lib/kortex/kortex-helper
+
+# ── Polkit action + exec-path mapping ───────────────────────────────────────
+# The exec.path annotation is what lets `pkexec /usr/lib/kortex/kortex-helper`
+# resolve to this specific action id rather than falling back to the generic
+# org.freedesktop.policykit.exec action (which prompts for the admin password
+# every single time — unworkable for silent background repair).
+install -d -m 755 /usr/share/polkit-1/actions
+cat > /usr/share/polkit-1/actions/dev.wolftech.kortex.policy << 'KORTEX_POLKIT_POLICY'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>WolfTech Innovations</vendor>
+  <vendor_url>https://github.com/WolfTech-Innovations</vendor_url>
+  <action id="dev.wolftech.kortex.repair">
+    <description>Run a Kortex automatic repair action</description>
+    <message>Kortex wants to apply an automatic repair</message>
+    <icon_name>kortex</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/kortex/kortex-helper</annotate>
+  </action>
+</policyconfig>
+KORTEX_POLKIT_POLICY
+
+# ── Polkit rule: allow without a password prompt, active local session only ─
+# NOTE — deliberate tradeoff, not a default you should ship blind:
+# <defaults> above says auth_admin_keep (password once, cached). This rule
+# overrides that to YES with no password at all for the active local user,
+# because a repair popup that then demands a sudo password defeats the
+# point of "automatic" repair on a consumer OS. The blast radius is bounded
+# by kortex-helper's own fixed whitelist + re-validation above, but it does
+# mean any locally-running process as the active user can invoke these six
+# specific root actions without a prompt. If that tradeoff doesn't sit
+# right for you, delete this .rules file and keep only the auth_admin_keep
+# default above — Kortex will then prompt for a password on first repair
+# per session instead of acting silently.
+install -d -m 755 /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/49-kortex.rules << 'KORTEX_POLKIT_RULES'
+polkit.addRule(function(action, subject) {
+    if (action.id == "dev.wolftech.kortex.repair" &&
+        subject.active && subject.local) {
+        return polkit.Result.YES;
+    }
+});
+KORTEX_POLKIT_RULES
+chmod 644 /etc/polkit-1/rules.d/49-kortex.rules
+echo "=== kortex-helper installed ==="
 
 cat > /usr/lib/kortex/kortexd/notifier.py << 'KORTEX_NOTIFIER_PY'
 """
@@ -2009,6 +2193,470 @@ mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
 ln -sf /usr/lib/systemd/user/kortexd.service \
   /etc/skel/.config/systemd/user/graphical-session.target.wants/kortexd.service
 echo "=== Kortex installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# KORTEX-AUTHD — replaces polkit-kde-agent as the system's authentication
+# agent entirely (not just for Kortex's own repair actions above). The
+# stock "Authenticate to ___" polkit-kde-agent dialog is Qt/Kvantum on a
+# GTK4/libadwaita desktop — visibly the wrong toolkit, no relation to
+# KibaOS's Organic Motion Language design system. kortex-authd registers
+# as the real org.freedesktop.PolicyKit1.AuthenticationAgent for the
+# session (small C binary against libpolkit-agent-1, verified against the
+# real headers during development — see PolkitAgentListener docs) and
+# delegates only the visual prompt to a separate GTK4/libadwaita process,
+# kortex-auth-prompt, so the polkit-facing code stays a small, auditable
+# amount of glue rather than a UI-toolkit consumer itself.
+# ══════════════════════════════════════════════════════════════════════════
+echo "=== Building kortex-authd (PolicyKit authentication agent) ==="
+mkdir -p /usr/lib/kortex/src
+cat > /usr/lib/kortex/src/kortex-authd.c << 'KORTEX_AUTHD_C'
+/*
+ * kortex-authd — Kortex's replacement for the generic "Authenticate to ___"
+ * polkit dialog. Registers as the session's PolicyKit authentication agent;
+ * delegates the actual visual prompt to a separate GTK4/libadwaita process
+ * (kortex-auth-prompt) so this binary stays a small, auditable amount of
+ * glue against the real polkit-agent-1 API, not a UI toolkit consumer.
+ *
+ * Architecture follows the documented PolkitAgentListener vtable exactly:
+ * https://www.freedesktop.org/software/polkit/docs/latest/PolkitAgentListener.html
+ */
+
+#define POLKIT_AGENT_I_KNOW_API_IS_SUBJECT_TO_CHANGE
+#include <polkitagent/polkitagent.h>
+#include <gio/gio.h>
+#include <unistd.h>
+#include <string.h>
+
+#define KORTEX_TYPE_AGENT_LISTENER (kortex_agent_listener_get_type())
+G_DECLARE_FINAL_TYPE(KortexAgentListener, kortex_agent_listener, KORTEX, AGENT_LISTENER, PolkitAgentListener)
+
+struct _KortexAgentListener
+{
+  PolkitAgentListener parent_instance;
+};
+
+G_DEFINE_TYPE(KortexAgentListener, kortex_agent_listener, POLKIT_AGENT_TYPE_LISTENER)
+
+/* Per-authentication state threaded through the async chain. */
+typedef struct
+{
+  GTask *task;
+  PolkitAgentSession *session;
+  gchar *message;
+  gboolean gained_authorization;
+  gboolean is_retry;
+} KortexAuthState;
+
+static void
+state_free(KortexAuthState *state)
+{
+  if (state->session)
+    g_object_unref(state->session);
+  g_free(state->message);
+  g_free(state);
+}
+
+/* Spawns the branded prompt UI, feeds the polkit request message to it,
+ * reads the typed password back over stdout. A non-zero exit (user hit
+ * Cancel) means no password line is produced. */
+static void
+run_prompt_and_respond(KortexAuthState *state)
+{
+  GSubprocess *proc;
+  GError *error = NULL;
+  const gchar *argv[4];
+  gint argc = 0;
+
+  argv[argc++] = "/usr/lib/kortex/kortex-auth-prompt";
+  argv[argc++] = state->message ? state->message : "Authentication required";
+  if (state->is_retry)
+    argv[argc++] = "--retry";
+  argv[argc] = NULL;
+
+  proc = g_subprocess_newv(argv, G_SUBPROCESS_FLAGS_STDOUT_PIPE, &error);
+  if (!proc)
+    {
+      g_warning("kortex-authd: failed to spawn prompt: %s", error->message);
+      g_clear_error(&error);
+      polkit_agent_session_cancel(state->session);
+      return;
+    }
+
+  GBytes *stdout_buf = NULL;
+  if (!g_subprocess_communicate(proc, NULL, NULL, &stdout_buf, NULL, &error))
+    {
+      g_warning("kortex-authd: prompt communication failed: %s", error->message);
+      g_clear_error(&error);
+      g_object_unref(proc);
+      polkit_agent_session_cancel(state->session);
+      return;
+    }
+
+  if (!g_subprocess_get_successful(proc))
+    {
+      /* User cancelled in the UI. */
+      g_object_unref(proc);
+      if (stdout_buf)
+        g_bytes_unref(stdout_buf);
+      polkit_agent_session_cancel(state->session);
+      return;
+    }
+
+  gsize len = 0;
+  const gchar *data = stdout_buf ? g_bytes_get_data(stdout_buf, &len) : "";
+  gchar *password = g_strndup(data, len);
+  /* Strip the trailing newline the prompt writes after the password. */
+  g_strchomp(password);
+
+  polkit_agent_session_response(state->session, password);
+
+  /* Do not linger with the plaintext password in memory. */
+  memset(password, 0, strlen(password));
+  g_free(password);
+  if (stdout_buf)
+    g_bytes_unref(stdout_buf);
+  g_object_unref(proc);
+}
+
+static void
+on_session_request(PolkitAgentSession *session, const gchar *request,
+                    gboolean echo_on, gpointer user_data)
+{
+  KortexAuthState *state = user_data;
+  (void)session;
+  (void)request;
+  (void)echo_on;
+  run_prompt_and_respond(state);
+  state->is_retry = TRUE; /* any subsequent request in this session is a retry */
+}
+
+static void
+on_session_show_error(PolkitAgentSession *session, const gchar *text, gpointer user_data)
+{
+  (void)session;
+  (void)user_data;
+  g_message("kortex-authd: PAM error: %s", text);
+}
+
+static void
+on_session_show_info(PolkitAgentSession *session, const gchar *text, gpointer user_data)
+{
+  (void)session;
+  (void)user_data;
+  g_message("kortex-authd: PAM info: %s", text);
+}
+
+static void
+on_session_completed(PolkitAgentSession *session, gboolean gained_authorization,
+                      gpointer user_data)
+{
+  KortexAuthState *state = user_data;
+  (void)session;
+  state->gained_authorization = gained_authorization;
+  g_task_return_boolean(state->task, gained_authorization);
+  g_object_unref(state->task);
+  state_free(state);
+}
+
+static void
+kortex_agent_listener_initiate_authentication(PolkitAgentListener *listener,
+                                               const gchar *action_id,
+                                               const gchar *message,
+                                               const gchar *icon_name,
+                                               PolkitDetails *details,
+                                               const gchar *cookie,
+                                               GList *identities,
+                                               GCancellable *cancellable,
+                                               GAsyncReadyCallback callback,
+                                               gpointer user_data)
+{
+  (void)action_id;
+  (void)icon_name;
+  (void)details;
+
+  GTask *task = g_task_new(listener, cancellable, callback, user_data);
+
+  if (identities == NULL)
+    {
+      g_task_return_new_error(task, G_IO_ERROR, G_IO_ERROR_FAILED,
+                               "No identities to authenticate");
+      g_object_unref(task);
+      return;
+    }
+
+  /* Prefer authenticating as the identity matching our own uid when present
+   * (the common pkexec-as-self case); otherwise fall back to the first
+   * identity offered, same default most agents use. */
+  PolkitIdentity *chosen = g_list_nth_data(identities, 0);
+  uid_t my_uid = getuid();
+  for (GList *l = identities; l != NULL; l = l->next)
+    {
+      if (POLKIT_IS_UNIX_USER(l->data) &&
+          (uid_t)polkit_unix_user_get_uid(POLKIT_UNIX_USER(l->data)) == my_uid)
+        {
+          chosen = l->data;
+          break;
+        }
+    }
+
+  KortexAuthState *state = g_new0(KortexAuthState, 1);
+  state->task = task;
+  state->message = g_strdup(message);
+  state->session = polkit_agent_session_new(chosen, cookie);
+
+  g_signal_connect(state->session, "request", G_CALLBACK(on_session_request), state);
+  g_signal_connect(state->session, "show-error", G_CALLBACK(on_session_show_error), state);
+  g_signal_connect(state->session, "show-info", G_CALLBACK(on_session_show_info), state);
+  g_signal_connect(state->session, "completed", G_CALLBACK(on_session_completed), state);
+
+  polkit_agent_session_initiate(state->session);
+}
+
+static gboolean
+kortex_agent_listener_initiate_authentication_finish(PolkitAgentListener *listener,
+                                                      GAsyncResult *res,
+                                                      GError **error)
+{
+  (void)listener;
+  return g_task_propagate_boolean(G_TASK(res), error);
+}
+
+static void
+kortex_agent_listener_class_init(KortexAgentListenerClass *klass)
+{
+  PolkitAgentListenerClass *listener_class = POLKIT_AGENT_LISTENER_CLASS(klass);
+  listener_class->initiate_authentication = kortex_agent_listener_initiate_authentication;
+  listener_class->initiate_authentication_finish = kortex_agent_listener_initiate_authentication_finish;
+}
+
+static void
+kortex_agent_listener_init(KortexAgentListener *self)
+{
+  (void)self;
+}
+
+int
+main(void)
+{
+  GError *error = NULL;
+  PolkitSubject *subject = polkit_unix_session_new_for_process_sync(getpid(), NULL, &error);
+  if (!subject)
+    {
+      g_printerr("kortex-authd: could not get session subject: %s\n", error->message);
+      return 1;
+    }
+
+  KortexAgentListener *listener = g_object_new(KORTEX_TYPE_AGENT_LISTENER, NULL);
+  gpointer registration = polkit_agent_listener_register(
+      POLKIT_AGENT_LISTENER(listener),
+      POLKIT_AGENT_REGISTER_FLAGS_NONE,
+      subject,
+      NULL, /* default object path */
+      NULL, /* cancellable */
+      &error);
+
+  if (!registration)
+    {
+      g_printerr("kortex-authd: failed to register as authentication agent: %s\n",
+                 error->message);
+      return 1;
+    }
+
+  g_message("kortex-authd: registered, waiting for authentication requests");
+  GMainLoop *loop = g_main_loop_new(NULL, FALSE);
+  g_main_loop_run(loop);
+  return 0;
+}
+KORTEX_AUTHD_C
+
+cat > /usr/lib/kortex/src/kortex-auth-prompt.c << 'KORTEX_AUTH_PROMPT_C'
+/*
+ * kortex-auth-prompt — the actual visual card kortex-authd spawns for each
+ * password request. A plain, ordinary GTK4/libadwaita app: no polkit API
+ * surface here at all, on purpose — this process only ever prints the
+ * typed password to stdout on submit and exits 0, or exits non-zero on
+ * Cancel/close. kortex-authd is the only thing that talks to polkit.
+ *
+ * argv[1] = message to display (the polkit request/prompt text)
+ * argv[2] = optional "--retry" flag -> shows the shake + "try again" state
+ */
+
+#include <gtk/gtk.h>
+#include <adwaita.h>
+
+typedef struct
+{
+  GtkWidget *entry;
+  gboolean retry;
+} PromptData;
+
+static void
+on_submit(GtkWidget *widget, gpointer user_data)
+{
+  PromptData *data = user_data;
+  const gchar *text = gtk_editable_get_text(GTK_EDITABLE(data->entry));
+  g_print("%s\n", text);
+  fflush(stdout);
+  GtkWidget *window = gtk_widget_get_ancestor(widget, GTK_TYPE_WINDOW);
+  gtk_window_close(GTK_WINDOW(window));
+}
+
+static void
+on_cancel(GtkWidget *widget, gpointer user_data)
+{
+  (void)user_data;
+  GtkWidget *window = gtk_widget_get_ancestor(widget, GTK_TYPE_WINDOW);
+  gtk_window_close(GTK_WINDOW(window));
+  /* No password line was printed, so kortex-authd reads an empty
+   * subprocess output and treats it as a cancel. */
+  exit(1);
+}
+
+typedef struct
+{
+  const gchar *message;
+  gboolean retry;
+} ActivateData;
+
+static void
+activate(GtkApplication *app, gpointer user_data)
+{
+  ActivateData *adata = user_data;
+  const gchar *message = adata->message;
+
+  GtkWidget *window = adw_application_window_new(GTK_APPLICATION(app));
+  gtk_window_set_title(GTK_WINDOW(window), "Kortex");
+  gtk_window_set_decorated(GTK_WINDOW(window), FALSE);
+  gtk_widget_add_css_class(window, "kortex-auth-backdrop");
+
+  /* Outer layer fills the whole screen and centers the actual card in the
+   * middle of it, so this reads as a full dim overlay rather than a
+   * small dialog floating in a corner. */
+  GtkWidget *backdrop = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+  gtk_widget_set_halign(backdrop, GTK_ALIGN_FILL);
+  gtk_widget_set_valign(backdrop, GTK_ALIGN_FILL);
+  gtk_widget_set_hexpand(backdrop, TRUE);
+  gtk_widget_set_vexpand(backdrop, TRUE);
+
+  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
+  gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
+  gtk_widget_set_valign(box, GTK_ALIGN_CENTER);
+  gtk_widget_set_size_request(box, 380, -1);
+  gtk_widget_add_css_class(box, "kortex-auth-card");
+  gtk_widget_set_margin_top(box, 28);
+  gtk_widget_set_margin_bottom(box, 28);
+  gtk_widget_set_margin_start(box, 28);
+  gtk_widget_set_margin_end(box, 28);
+
+  GtkWidget *icon = gtk_image_new_from_icon_name("dialog-password-symbolic");
+  gtk_image_set_pixel_size(GTK_IMAGE(icon), 40);
+  gtk_widget_add_css_class(icon, "kortex-auth-icon");
+  gtk_box_append(GTK_BOX(box), icon);
+
+  GtkWidget *title = gtk_label_new("Kortex wants to apply a repair");
+  gtk_widget_add_css_class(title, "title-2");
+  gtk_box_append(GTK_BOX(box), title);
+
+  GtkWidget *subtitle = gtk_label_new(message);
+  gtk_label_set_wrap(GTK_LABEL(subtitle), TRUE);
+  gtk_widget_add_css_class(subtitle, "dim-label");
+  gtk_box_append(GTK_BOX(box), subtitle);
+
+  GtkWidget *entry = gtk_password_entry_new();
+  gtk_password_entry_set_show_peek_icon(GTK_PASSWORD_ENTRY(entry), TRUE);
+  gtk_widget_add_css_class(entry, "kortex-auth-entry");
+  gtk_box_append(GTK_BOX(box), entry);
+
+  PromptData *data = g_new0(PromptData, 1);
+  data->entry = entry;
+  data->retry = adata->retry;
+
+  if (data->retry)
+    {
+      GtkWidget *err = gtk_label_new("That password wasn't right — try again");
+      gtk_widget_add_css_class(err, "error");
+      gtk_box_append(GTK_BOX(box), err);
+      gtk_widget_add_css_class(entry, "kortex-shake");
+    }
+
+  GtkWidget *button_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+  gtk_widget_set_halign(button_row, GTK_ALIGN_END);
+
+  GtkWidget *cancel_btn = gtk_button_new_with_label("Cancel");
+  g_signal_connect(cancel_btn, "clicked", G_CALLBACK(on_cancel), data);
+  gtk_box_append(GTK_BOX(button_row), cancel_btn);
+
+  GtkWidget *ok_btn = gtk_button_new_with_label("Authenticate");
+  gtk_widget_add_css_class(ok_btn, "suggested-action");
+  g_signal_connect(ok_btn, "clicked", G_CALLBACK(on_submit), data);
+  gtk_box_append(GTK_BOX(button_row), ok_btn);
+
+  gtk_box_append(GTK_BOX(box), button_row);
+
+  /* Enter in the password field submits, same as clicking Authenticate. */
+  g_signal_connect(entry, "activate", G_CALLBACK(on_submit), data);
+
+  gtk_box_append(GTK_BOX(backdrop), box);
+  adw_application_window_set_content(ADW_APPLICATION_WINDOW(window), backdrop);
+  gtk_window_fullscreen(GTK_WINDOW(window));
+  gtk_window_present(GTK_WINDOW(window));
+  gtk_widget_grab_focus(entry);
+}
+
+int
+main(int argc, char **argv)
+{
+  ActivateData adata;
+  adata.message = argc > 1 ? argv[1] : "Authentication required";
+  adata.retry = (argc > 2 && g_strcmp0(argv[2], "--retry") == 0);
+
+  GtkApplication *app = gtk_application_new("dev.wolftech.kortex.authprompt",
+                                             G_APPLICATION_DEFAULT_FLAGS);
+  g_signal_connect(app, "activate", G_CALLBACK(activate), &adata);
+  int status = g_application_run(G_APPLICATION(app), 1, argv);
+  g_object_unref(app);
+  return status;
+}
+KORTEX_AUTH_PROMPT_C
+
+cd /usr/lib/kortex/src
+gcc -O2 -Wall $(pkg-config --cflags polkit-agent-1 polkit-gobject-1 glib-2.0 gio-2.0) \
+    kortex-authd.c -o /usr/lib/kortex/kortex-authd \
+    $(pkg-config --libs polkit-agent-1 polkit-gobject-1 glib-2.0 gio-2.0) \
+  || { echo "FATAL: kortex-authd compile/link failed" >&2; exit 1; }
+gcc -O2 -Wall $(pkg-config --cflags gtk4 libadwaita-1) \
+    kortex-auth-prompt.c -o /usr/lib/kortex/kortex-auth-prompt \
+    $(pkg-config --libs gtk4 libadwaita-1) \
+  || { echo "FATAL: kortex-auth-prompt compile/link failed" >&2; exit 1; }
+cd /
+rm -rf /usr/lib/kortex/src
+chown root:root /usr/lib/kortex/kortex-authd /usr/lib/kortex/kortex-auth-prompt
+chmod 755 /usr/lib/kortex/kortex-authd /usr/lib/kortex/kortex-auth-prompt
+
+# kortex-authd runs per-user, same as kortexd — it only needs to register
+# on the session bus, no elevated privilege of its own. It calls out to
+# pkexec/dev.wolftech.kortex.repair only indirectly (that flow is entirely
+# inside kortex-helper); this process just brokers the polkit conversation.
+cat > /usr/lib/systemd/user/kortex-authd.service << 'KORTEX_AUTHD_SERVICE'
+[Unit]
+Description=Kortex PolicyKit authentication agent
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/lib/kortex/kortex-authd
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target
+KORTEX_AUTHD_SERVICE
+
+mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
+ln -sf /usr/lib/systemd/user/kortex-authd.service \
+  /etc/skel/.config/systemd/user/graphical-session.target.wants/kortex-authd.service
+echo "=== kortex-authd installed ==="
 
 
 pacman-key --init
@@ -5449,10 +6097,10 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
  * motion. Verify visually.
  * ════════════════════════════════════════════════════════════════════════ */
 
-/* === KibaOS: Floating liquid glass pill panel === */
+/* === KibaOS: Floating liquid glass panel === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
-    border-radius: 999px;
+    border-radius: 22px;
     background-image: none;
     background-color: rgba(12, 20, 35, 0.55);
     border-top: 1px solid rgba(255, 255, 255, 0.18);
@@ -5468,7 +6116,7 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 }
 .budgie-panel .budgie-applet-button,
 .budgie-panel button.flat {
-    border-radius: 999px;
+    border-radius: 14px;
     background: transparent;
     transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0); /* fade out */
 }
@@ -6020,7 +6668,7 @@ pacman -Scc --noconfirm
 # future, bump this tag to match — check `pacman -Si wayfire` for the
 # version actually being installed and pick the wayfire-plugins-extra tag
 # whose release notes list that same Wayfire version as a dependency.
-git clone --depth=1 --branch v0.10.0 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
+git clone --depth=1 --branch v0.10.1 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
 cd /tmp/wayfire-plugins-extra
 meson setup build --prefix=/usr --buildtype=release
 ninja -C build
@@ -6776,13 +7424,58 @@ chmod 750 /home/liveuser
 # ══════════════════════════════════════════════════════════════════════════
 # DESKTOP SHORTCUTS
 # ══════════════════════════════════════════════════════════════════════════
-mkdir -p /usr/share/applications /etc/skel/Desktop
+mkdir -p /usr/share/applications /etc/skel/Desktop /etc/skel/Documents \
+         /etc/skel/Downloads /etc/skel/Pictures /etc/skel/Music /etc/skel/Videos
 cat > /etc/skel/.config/user-dirs.dirs << 'USERDIRS'
 XDG_DESKTOP_DIR="$HOME/Desktop"
 XDG_DOWNLOAD_DIR="$HOME/Downloads"
 XDG_DOCUMENTS_DIR="$HOME/Documents"
 XDG_PICTURES_DIR="$HOME/Pictures"
+XDG_MUSIC_DIR="$HOME/Music"
+XDG_VIDEOS_DIR="$HOME/Videos"
 USERDIRS
+
+# ── Nemo/GTK sidebar bookmarks: a clean "quick access" list ────────────────
+# Windows' C:\Users\<name> feels tidy because Explorer's nav pane only ever
+# shows Desktop/Documents/Downloads/Pictures/Music/Videos plus the user's
+# own Home — everything else (AppData-equivalent: our dotfiles in ~/.config,
+# ~/.local, ~/.cache) is already hidden by the leading dot, same as AppData
+# is hidden by its own attribute. This seeds the same short, fixed list in
+# Nemo's sidebar on first login, nothing more — no stray "Other Locations"/
+# raw filesystem browsing front and center.
+#
+# NOTE: this can't be a static /etc/skel file — GTK bookmark files are plain
+# file:// URIs with no variable expansion, and skel is copied byte-for-byte
+# at account creation before the real username exists. So instead this runs
+# once per new user via a first-login script gated on a marker file, using
+# a real $HOME at the time it actually runs.
+mkdir -p /etc/skel/.config/autostart
+cat > /usr/local/bin/kibaos-first-login-setup << 'FIRSTLOGIN'
+#!/bin/bash
+MARKER="$HOME/.config/.kibaos-first-login-done"
+[ -f "$MARKER" ] && exit 0
+mkdir -p "$HOME/.config/gtk-3.0"
+cat > "$HOME/.config/gtk-3.0/bookmarks" << BOOKMARKS
+file://$HOME/Desktop Desktop
+file://$HOME/Documents Documents
+file://$HOME/Downloads Downloads
+file://$HOME/Pictures Pictures
+file://$HOME/Music Music
+file://$HOME/Videos Videos
+BOOKMARKS
+mkdir -p "$HOME/.config"
+touch "$MARKER"
+FIRSTLOGIN
+chmod +x /usr/local/bin/kibaos-first-login-setup
+
+cat > /etc/skel/.config/autostart/kibaos-first-login-setup.desktop << 'FIRSTLOGINDESK'
+[Desktop Entry]
+Type=Application
+Name=KibaOS First Login Setup
+Exec=/usr/local/bin/kibaos-first-login-setup
+NoDisplay=true
+X-GNOME-Autostart-Phase=Initialization
+FIRSTLOGINDESK
 
 cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
@@ -7005,7 +7698,7 @@ if ls out/*.iso 1>/dev/null 2>&1; then
   mv out/*.iso "${ISO}.iso"
   sha256sum "${ISO}.iso" > "${ISO}.iso.sha256"
   echo "╔══════════════════════════════════════╗"
-  echo "║  KibaOS Budgie build complete!       ║"
+  echo "║  KibaOS build complete!       ║"
   echo "║  ${ISO}.iso            ║"
   echo "╚══════════════════════════════════════╝"
 else
