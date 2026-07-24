@@ -460,7 +460,12 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 # pattern the OOBE build below uses for its Vala sources.
 # ══════════════════════════════════════════════════════════════════════════
 echo "=== Installing Kortex build + runtime dependencies ==="
-pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject nuitka patchelf
+# NOTE: Nuitka's Arch package name is "nuitka", not "python-nuitka" — but
+# it's currently AUR-only (aur.archlinux.org/packages/nuitka), not in
+# core/extra, so plain `pacman -S nuitka` won't resolve on a stock mirror
+# without an AUR helper. Installing via pip avoids that dependency entirely.
+pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
+pip install --break-system-packages nuitka
 
 mkdir -p /usr/lib/kortex/kortexd/assets
 
@@ -534,7 +539,7 @@ CREATE TABLE IF NOT EXISTS placement (
 
 CREATE TABLE IF NOT EXISTS friction_events (
     app TEXT NOT NULL,
-    kind TEXT NOT NULL,             -- 'rage' | 'dead'
+    kind TEXT NOT NULL,             -- 'rage' | 'dead' | 'reverted'
     ts REAL NOT NULL,
     x REAL,
     y REAL
@@ -680,6 +685,20 @@ class Store:
                 (app, monitor, x, y, w, h, weight, time.time()),
             )
 
+    def get_placement(self, app, monitor):
+        """Returns (x, y, w, h, weight) for the learned placement, or None
+        if Kortex has never seen this app on this monitor.
+        """
+        with self.cursor() as c:
+            c.execute(
+                "SELECT x, y, w, h, weight FROM placement WHERE app=? AND monitor=?",
+                (app, monitor),
+            )
+            row = c.fetchone()
+            if not row:
+                return None
+            return (row["x"], row["y"], row["w"], row["h"], row["weight"])
+
     def get_placement_confidence(self, app, kappa=3.0):
         with self.cursor() as c:
             c.execute("SELECT SUM(weight) as tw FROM placement WHERE app=?", (app,))
@@ -688,6 +707,16 @@ class Store:
             return total / (total + kappa)
 
     # ---- friction ----
+    # 'reverted' (user manually undid an automatic Kortex action) is a much
+    # stronger, more specific signal than a rage/dead click — it's not "this
+    # UI is annoying," it's "Kortex was wrong about me, specifically." Weight
+    # it accordingly rather than logging it as a second 'rage' event.
+    FRICTION_KIND_WEIGHTS = {
+        "rage": 1.0,
+        "dead": 1.0,
+        "reverted": 3.0,
+    }
+
     def log_friction(self, app, kind, x=None, y=None):
         with self.cursor() as c:
             c.execute(
@@ -699,11 +728,15 @@ class Store:
         cutoff = time.time() - window_seconds
         with self.cursor() as c:
             c.execute(
-                "SELECT COUNT(*) as n FROM friction_events WHERE app=? AND ts>=?",
+                "SELECT kind, COUNT(*) as n FROM friction_events "
+                "WHERE app=? AND ts>=? GROUP BY kind",
                 (app, cutoff),
             )
-            n = c.fetchone()["n"]
-            return n / (n + rho)
+            weighted = sum(
+                self.FRICTION_KIND_WEIGHTS.get(row["kind"], 1.0) * row["n"]
+                for row in c.fetchall()
+            )
+            return weighted / (weighted + rho)
 
     # ---- repair beta ----
     def get_repair_beta(self, failure_sig, action):
@@ -1285,6 +1318,18 @@ CSS = b"""
     border-radius: 4px;
     background: #0099cc;
 }
+.kortex-undo-button {
+    background: rgba(0,153,204,0.10);
+    color: #0099cc;
+    font-weight: 600;
+    font-size: 12px;
+    border-radius: 10px;
+    padding: 4px 10px;
+    margin-top: 2px;
+}
+.kortex-undo-button:hover {
+    background: rgba(0,153,204,0.18);
+}
 """
 
 
@@ -1379,6 +1424,36 @@ class KortexToast(Gtk.Window):
             f"Trying fix {attempt}/{max_attempts}: {action.replace('_', ' ')}"
         )
 
+    def set_preference_shift(self, on_undo, auto_close_s=8):
+        """Deliberately vague/corporate, matching the repair toast's tone —
+        no app name, no coordinates, no admission of what actually moved.
+        """
+        self._stop_pulse()
+        self.progress.set_fraction(1.0)
+        self.title_label.set_label("KibaOS optimized your workspace")
+        self.body_label.set_label("Layout adjusted based on usage patterns")
+
+        undo_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
+        undo_row.set_halign(Gtk.Align.START)
+        undo_btn = Gtk.Button(label="Undo")
+        undo_btn.add_css_class("kortex-undo-button")
+        undo_btn.set_has_frame(False)
+
+        def _on_undo_clicked(_btn):
+            if on_undo:
+                on_undo()
+            self._close()
+
+        undo_btn.connect("clicked", _on_undo_clicked)
+        undo_row.append(undo_btn)
+
+        # Insert the undo row into the text column, right under the body
+        # label — same child structure as the rest of the toast.
+        text_col = self.body_label.get_parent()
+        text_col.append(undo_row)
+
+        self._schedule_close(auto_close_s)
+
     def set_escalated(self, tried_actions):
         self._stop_pulse()
         self.progress.set_fraction(1.0)
@@ -1424,6 +1499,24 @@ class KortexNotifier:
     def on_repair_result(self, ev, success, detail, action, attempt, max_attempts):
         GLib.idle_add(self._update_result, ev, success, detail, action, attempt, max_attempts)
 
+    # -- callback wired into KortexDaemon's preference-shift logic --
+    def on_preference_shift(self, on_undo):
+        """Fired once a placement/preference change has actually been
+        applied (not while confidence is merely accumulating) — see
+        core.py's confidence-threshold gate before this ever gets called.
+        """
+        GLib.idle_add(self._show_preference_shift, on_undo)
+
+    def _show_preference_shift(self, on_undo):
+        toast = KortexToast(
+            self.app,
+            title="KibaOS optimized your workspace",
+            body="Layout adjusted based on usage patterns",
+        )
+        toast.set_preference_shift(on_undo=on_undo)
+        toast.present()
+        return False
+
     def _show_started(self, ev):
         toast = KortexToast(
             self.app,
@@ -1457,17 +1550,19 @@ Entrypoint. Runs the repair watcher + usage/session trackers on a background
 thread, and the GTK notifier on the main thread (GTK requires the main
 thread on most platforms).
 
-Window-focus / move events are expected from the compositor via
-wlr-foreign-toplevel-management (Budgie/labwc on Wayland) — `on_window_focus`
-and `on_window_moved` are the two hooks a compositor-side shim should call.
-Kept as a stub interface here (`WindowEventSource`) so the daemon logic is
-testable without a live compositor.
+Window-focus/launch/move events come from Wayfire's IPC (the `ipc` +
+`ipc-rules` plugins from wayfire-plugins-extra, built from source in
+kibaos.sh's WAYFIRE IPC section since that package is AUR-only on Arch),
+consumed here via the `wfctl` CLI rather than the raw JSON-RPC socket
+protocol directly — see WindowEventSource below for why and its caveats.
 """
 
 import threading
 import time
 import datetime
 import logging
+import subprocess
+import json
 
 from .storage import Store
 from . import models
@@ -1478,19 +1573,136 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s kortexd: %(message)s
 log = logging.getLogger("kortexd")
 
 
+def _run(cmd, timeout=15):
+    """Same small subprocess helper as repair.py's — kept local rather than
+    imported since it's a one-liner and this module shouldn't reach into
+    repair.py's private helpers.
+    """
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        return r.returncode == 0, (r.stdout + r.stderr).strip()[-500:]
+    except Exception as e:
+        return False, str(e)
+
+
 class WindowEventSource:
-    """Stub compositor bridge. Real implementation subscribes to
-    wlr-foreign-toplevel-management + xdg-shell move/resize events and
-    calls the callbacks below. Left abstract so it can be swapped per-DE.
+    """Wayfire IPC bridge, via the `wfctl` CLI (pip: wfctl,
+    github.com/killown/wfctl) rather than hand-rolling the raw JSON-RPC
+    socket protocol that `ipc`/`ipc-rules` actually expose. `wfctl -m`
+    tails Wayfire's event stream and prints one JSON object per line — same
+    "tail a subprocess, parse lines" shape as repair.py's watch_journal(),
+    so this follows the pattern already established here instead of adding
+    a second I/O style.
+
+    CAVEAT — verify on first real boot: the event/field names below
+    (event, view.app-id, view.geometry, view-mapped/focused/geometry-changed)
+    are based on wfctl's documented command surface and Wayfire's IPC
+    changelog, not a field-by-field spec checked against a live socket.
+    Same "unverified until it boots, tune from there" situation as
+    wayfire.ini's [wobbly]/[blur] sections below — if `wfctl -m` emits
+    different keys, only _handle_event() needs to change.
+
+    CAVEAT — clicks are NOT covered: Wayfire's IPC has no raw pointer-button
+    event, by design — wlroots compositors deliberately don't let one client
+    see another client's input. `on_click` is therefore still never called
+    here; rage/dead-click detection needs either a custom Wayfire input-grab
+    plugin or a per-toolkit (GTK/Qt) hook, which is separate, larger work
+    than this IPC bridge covers.
     """
 
-    def __init__(self, on_focus, on_move, on_click):
+    def __init__(self, on_focus, on_move, on_click, on_launch=None):
         self.on_focus = on_focus
         self.on_move = on_move
         self.on_click = on_click
+        self.on_launch = on_launch
+        self._known_views = set()   # view ids already seen -> mapped vs re-mapped
+        self._view_apps = {}        # view id -> app-id, so move_window can resolve one
 
     def start(self):
-        log.info("WindowEventSource stub started (wire to labwc/Budgie IPC here)")
+        threading.Thread(target=self._watch_loop, daemon=True).start()
+        log.info("WindowEventSource started (wfctl -m watching Wayfire IPC)")
+
+    def _watch_loop(self):
+        while True:
+            try:
+                self._run_watch()
+            except Exception as e:
+                log.warning(f"wfctl watcher crashed, restarting in 5s: {e}")
+                time.sleep(5)
+
+    def _run_watch(self):
+        proc = subprocess.Popen(
+            ["wfctl", "-m"], stdout=subprocess.PIPE, text=True, bufsize=1,
+        )
+        try:
+            for line in proc.stdout:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except ValueError:
+                    continue  # non-JSON output line — ignore, don't crash the watcher
+                self._handle_event(event)
+        finally:
+            proc.terminate()
+
+    def _handle_event(self, event):
+        kind = event.get("event") or event.get("type")
+        view = event.get("view") or {}
+        app = view.get("app-id") or view.get("app_id") or event.get("app-id")
+        view_id = view.get("id", event.get("view-id"))
+        if not app or view_id is None:
+            return
+
+        if kind in ("view-mapped", "view-map"):
+            first_seen = view_id not in self._known_views
+            self._known_views.add(view_id)
+            self._view_apps[view_id] = app
+            if first_seen and self.on_launch:
+                geo = view.get("geometry", {})
+                monitor = view.get("output-id", view.get("output", 0))
+                xywh = (geo.get("x", 0), geo.get("y", 0),
+                         geo.get("width", 0), geo.get("height", 0))
+                self.on_launch(app, monitor, xywh)
+
+        elif kind in ("view-focused", "view-focus-changed"):
+            self._view_apps[view_id] = app
+            self.on_focus(app)
+
+        elif kind in ("view-geometry-changed", "view-moved", "view-resized"):
+            geo = view.get("geometry", {})
+            monitor = view.get("output-id", view.get("output", 0))
+            self.on_move(app, monitor, geo.get("x", 0), geo.get("y", 0),
+                         geo.get("width", 0), geo.get("height", 0))
+
+        elif kind in ("view-unmapped", "view-unmap"):
+            self._known_views.discard(view_id)
+            self._view_apps.pop(view_id, None)
+
+        # No pointer-button event exists in Wayfire's IPC — see class
+        # docstring. on_click is wired but nothing ever calls it yet.
+
+    def move_window(self, app, monitor, x, y, w, h):
+        """Applies a placement via wfctl (used both for Kortex-initiated
+        shifts and for reverting one via the Undo button). wfctl's
+        move/resize subcommands take a numeric view id, not an app name, so
+        resolve one from the most recent view we've seen for this app.
+        """
+        view_id = self._resolve_view_id(app)
+        if view_id is None:
+            log.warning(f"move_window: no live view found for {app!r}, skipping")
+            return
+        ok1, out1 = _run(["wfctl", "move", "view", str(view_id), str(int(x)), str(int(y))])
+        ok2, out2 = _run(["wfctl", "resize", "view", str(view_id), str(int(w)), str(int(h))])
+        if not (ok1 and ok2):
+            log.warning(f"move_window failed for {app!r} (view {view_id}): {out1} / {out2}")
+
+    def _resolve_view_id(self, app):
+        for vid, a in self._view_apps.items():
+            if a == app:
+                return vid
+        return None
 
 
 class KortexDaemon:
@@ -1513,6 +1725,7 @@ class KortexDaemon:
             on_focus=self.on_window_focus,
             on_move=self.on_window_moved,
             on_click=self.on_click,
+            on_launch=self.on_window_launch,
         )
 
     # ---- usage / focus tracking ----
@@ -1538,8 +1751,45 @@ class KortexDaemon:
             self.store.update_session_stats(app, ts - start)
 
     # ---- placement ----
+    # Threshold above which placement_consistency() is trusted enough to
+    # actually move a window, not just accumulate weight. Deliberately high
+    # — see the hysteresis discussion: an oscillating ~0.5 confidence should
+    # never win, it should keep sitting quietly in the store.
+    PLACEMENT_APPLY_THRESHOLD = 0.75
+
     def on_window_moved(self, app, monitor, x, y, w, h):
         self.store.update_placement(app, monitor, x, y, w, h)
+
+    def on_window_launch(self, app, monitor, current_xywh):
+        """Called at launch time — i.e. before the window has a position the
+        user cares about yet — rather than repositioning something live
+        under the user's cursor. This is the only place a learned placement
+        actually gets applied.
+        """
+        confidence = self.store.get_placement_confidence(app)
+        if confidence < self.PLACEMENT_APPLY_THRESHOLD:
+            return  # still just accumulating weight, not acted on yet
+
+        learned = self.store.get_placement(app, monitor)
+        if not learned or learned[:4] == current_xywh:
+            return  # nothing to change, or already there
+
+        old_xywh = current_xywh
+        new_xywh = learned[:4]
+        self.window_source.move_window(app, monitor, *new_xywh)
+        self.notifier.on_preference_shift(
+            on_undo=lambda: self._undo_shift(app, monitor, old_xywh)
+        )
+
+    def _undo_shift(self, app, monitor, old_xywh):
+        # Move it back...
+        self.window_source.move_window(app, monitor, *old_xywh)
+        # ...and log a 'reverted' friction event rather than reusing 'rage' —
+        # "user undid an automatic action" is a stronger, more specific
+        # signal than click-frustration, so it gets its own weighted kind
+        # (see storage.Store.FRICTION_KIND_WEIGHTS) instead of being faked
+        # as two rage clicks.
+        self.store.log_friction(app, "reverted")
 
     # ---- click friction ----
     def on_click(self, app, x, y, caused_state_change: bool, ts=None):
@@ -5630,7 +5880,9 @@ plugins = \
     wm-actions \
     command \
     shortcuts-inhibit \
-    blur
+    blur \
+    ipc \
+    ipc-rules
 
 # session-lock is intentionally NOT loaded above. This is a live/installer
 # session — nothing in this image wires up a lockscreen UI (gtklock is
@@ -5683,6 +5935,35 @@ kawase_offset = 2
 kawase_degrade = 3
 kawase_iterations = 2
 WAYFIREINI
+
+# ══════════════════════════════════════════════════════════════════════════
+# WAYFIRE IPC — Kortex's real compositor bridge
+# ══════════════════════════════════════════════════════════════════════════
+# `ipc`/`ipc-rules` (enabled above) ship in wayfire-plugins-extra, which is
+# AUR-only on Arch (no core/extra package — confirmed against archlinux.org
+# and the AUR page), so plain `pacman -S` can't resolve it. Built from
+# source here instead, same call as Kortex's own Nuitka compile: this whole
+# script already runs inside the arch-chroot (see customize_airootfs.sh),
+# so a source build lands directly in the target image, no AUR helper
+# needed. Once `ipc` is loaded, Wayfire exposes its IPC socket path via the
+# WAYFIRE_SOCKET env var automatically — no manual socket config required.
+echo "=== Building wayfire-plugins-extra (ipc, ipc-rules) ==="
+pacman -S --noconfirm --needed meson ninja cmake pkgconf git cairo glibmm wayland-protocols
+
+git clone --depth=1 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
+cd /tmp/wayfire-plugins-extra
+meson setup build --prefix=/usr --buildtype=release
+ninja -C build
+ninja -C build install
+cd /
+rm -rf /tmp/wayfire-plugins-extra
+
+# Kortex talks to the ipc/ipc-rules socket through `wfctl` (pip: wfctl,
+# github.com/killown/wfctl) rather than the raw JSON-RPC protocol directly —
+# see core.py's WindowEventSource for why and its documented caveats.
+echo "=== Installing wfctl (Wayfire IPC client used by Kortex) ==="
+pip install --break-system-packages wfctl
+
 # ══════════════════════════════════════════════════════════════════════════
 # OTA UPDATE SYSTEM
 # ══════════════════════════════════════════════════════════════════════════
