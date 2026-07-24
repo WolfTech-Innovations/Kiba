@@ -460,7 +460,7 @@ update-mime-database /usr/share/mime 2>/dev/null || true
 # pattern the OOBE build below uses for its Vala sources.
 # ══════════════════════════════════════════════════════════════════════════
 echo "=== Installing Kortex build + runtime dependencies ==="
-pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject python-nuitka patchelf
+pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject nuitka patchelf
 
 mkdir -p /usr/lib/kortex/kortexd/assets
 
