@@ -137,6 +137,7 @@ budgie-desktop-services
 swaybg
 grim
 slurp
+boost
 swayidle
 gtklock
 wlopm
