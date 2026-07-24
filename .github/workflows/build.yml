@@ -169,8 +169,16 @@ jobs:
           # rsync --files-from does one pass with internal parallelism for
           # directory creation + copy, instead of mkdir -p + cp per file.
           sed 's|^\./||' changed_files.txt > changed_files_rel.txt
-          rsync -a --files-from=changed_files_rel.txt \
+
+          # Run rsync as root so files owned by root in the extracted airootfs can be read.
+          # --ignore-missing-args prevents rsync exiting non-zero if a listed path is absent.
+          sudo rsync -a --files-from=changed_files_rel.txt --ignore-missing-args \
             /tmp/airootfs-extracted/ "${PATCH_DIR}/"
+
+          # Ensure files are readable by the runner for later steps.
+          # Make files readable and directories enterable, then chown to the current user so subsequent steps don't need sudo.
+          sudo chmod -R a+rX "${PATCH_DIR}"
+          sudo chown -R "$(id -u):$(id -g)" "${PATCH_DIR}" || true
 
           mkdir -p "${PATCH_DIR}/etc/kibaos"
           echo "${PATCH_NUM}" > "${PATCH_DIR}/etc/kibaos/patch-level"
