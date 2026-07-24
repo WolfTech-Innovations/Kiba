@@ -117,19 +117,13 @@ jobs:
       - name: Generate current build manifest
         run: |
           cd /tmp/airootfs-extracted
-          find . -type f -print0 \
-            | xargs -0 -P "$(nproc)" -n 64 sha256sum \
-            > "$GITHUB_WORKSPACE/current-build-manifest.txt"
+          sudo find . -type f -print0 \
+            | xargs -0 -P "$(nproc)" -n 64 sudo sha256sum 2>/dev/null \
+            | sed 's|sudo: ||' \
+            > "$GITHUB_WORKSPACE/current-build-manifest.txt" || true
           cd "$GITHUB_WORKSPACE"
-          # Normalize paths to the "./relative/path" form the rest of the
-          # pipeline expects (sha256sum already emits "./relative/path" when
-          # run from inside the dir, given the find . input above).
           echo "Manifest entries: $(wc -l < current-build-manifest.txt)"
 
-      # ── Diff: sort + comm instead of bash associative arrays ──────────────
-      # comm does the same "what changed" comparison in C, in one pass, with
-      # no per-line shell/awk overhead. Sorting first is required for comm
-      # but is itself fast (GNU sort is multi-threaded by default).
       - name: Compute changed files vs previous build
         id: diff
         run: |
