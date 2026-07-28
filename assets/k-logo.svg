@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+
+  <defs>
+    <linearGradient id="shine" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#6d8cff"/>
+      <stop offset="100%" stop-color="#263b9b"/>
+    </linearGradient>
+
+    <style>
+      .logo {
+        transform-origin: center;
+        transform-box: fill-box;
+        animation: spin 4s linear infinite;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: perspective(500px) rotateY(0deg);
+        }
+
+        100% {
+          transform: perspective(500px) rotateY(360deg);
+        }
+      }
+    </style>
+  </defs>
+
+  <g class="logo">
+    <text
+      x="150"
+      y="210"
+      text-anchor="middle"
+      font-size="180"
+      font-family="Arial Black, Arial"
+      font-weight="900"
+      fill="url(#shine)"
+      stroke="#10194d"
+      stroke-width="6">
+      K
+    </text>
+  </g>
+
+</svg>
