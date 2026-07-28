@@ -1,8 +1,14 @@
-<div align="center">
+<p align="center">
+  <img src="assets/k-logo.svg" width="250" alt="Animated K">
+</p>  
 
 > [!IMPORTANT]
+>
 > KibaOS only supports UEFI-based systems. Virtual machine installation is currently unsupported because KibaOS is designed to run on physical hardware.
 
+ 
+<div align="center">
+  
 # KibaOS
 ![OIN](https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/oin-member-2-0-horiz-1.png?raw=true)
 **A friendly, ready-to-use ~~Linux~~ general OS desktop, built for people switching to simple.**
