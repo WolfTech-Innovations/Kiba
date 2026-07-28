@@ -1,5 +1,7 @@
 <div align="center">
-<img width="200" alt="KibaOS installer icon" src="https://github.com/user-attachments/assets/60377ea4-3abe-489d-89dd-32a227782942" />
+
+> [!IMPORTANT]
+> KibaOS only supports UEFI-based systems. Virtual machine installation is currently unsupported because KibaOS is designed to run on physical hardware.
 
 # KibaOS
 ![OIN](https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/oin-member-2-0-horiz-1.png?raw=true)
