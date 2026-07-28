@@ -230,13 +230,13 @@ PACKAGES
 # to the live build and is never read by mkarchiso.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
-HOOKS=(base udev plymouth keyboard keymap modconf kms memdisk archiso block filesystems)
+HOOKS=(base udev kms plymouth keyboard keymap modconf memdisk archiso block filesystems)
 INITRAMFS
 
 # installed.conf — used by the INSTALLED system after the OOBE installer runs initcpio.
 # Must NOT include memdisk/archiso hooks (those are live-only).
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
-HOOKS=(base udev plymouth autodetect modconf kms block keyboard keymap filesystems fsck)
+HOOKS=(base udev kms plymouth autodetect modconf block keyboard keymap filesystems fsck)
 INSTALLED_HOOKS
 
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
@@ -2846,6 +2846,7 @@ public class KibaOOBE : Adw.Application {
     private Adw.ApplicationWindow window;
     private Adw.NavigationView    nav_view;
     private string selected_disk   = "";
+    private string install_mode    = "erase"; // "erase" or "alongside" (dual boot)
     private string selected_locale = "en_US.UTF-8";
     private string selected_keymap = "us";
     private string hostname_value  = "kibaos";
@@ -3398,6 +3399,23 @@ public class KibaOOBE : Adw.Application {
         return strip_partition_suffix (GLib.Path.get_basename (s.strip ()));
     }
 
+    // True if `devpath` already has a partition table with at least one
+    // partition on it — our signal that there might be another OS here,
+    // worth asking the user whether to erase it or install alongside it.
+    private bool disk_has_existing_data (string devpath) {
+        string raw = "";
+        try { GLib.Process.spawn_command_line_sync (
+                "lsblk -rno NAME %s".printf (devpath), out raw); }
+        catch (GLib.SpawnError e) { return false; }
+        int lines = 0;
+        foreach (var line in raw.split ("\n")) {
+            if (line.strip () != "") lines++;
+        }
+        // First line is the disk itself; anything beyond that means at
+        // least one partition already exists.
+        return lines > 1;
+    }
+
     private class StorageOption {
         public string devpath;
         public string label;
@@ -3435,9 +3453,21 @@ public class KibaOOBE : Adw.Application {
         var options = list_storage_options ();
         if (options.size <= 1) {
             selected_disk = options.size == 1 ? options[0].devpath : "";
-            nav_view.push (build_account_page ());
+            advance_past_install_mode_step ();
         } else {
             nav_view.push (build_storage_picker_page (options));
+        }
+    }
+
+    // After a disk is settled on: if it looks like it already has an OS
+    // on it, ask erase-vs-alongside; otherwise there's nothing to ask
+    // (a blank disk can only be erased/initialized) so skip straight on.
+    private void advance_past_install_mode_step () {
+        install_mode = "erase";
+        if (selected_disk != "" && disk_has_existing_data (selected_disk)) {
+            nav_view.push (build_install_mode_page ());
+        } else {
+            nav_view.push (build_account_page ());
         }
     }
 
@@ -3469,6 +3499,47 @@ public class KibaOOBE : Adw.Application {
         content.append (picker);
 
         return make_page ("Storage", content, "Next", () => {
+            advance_past_install_mode_step ();
+        }, false, 3, 6);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Page 4b: Install mode (erase vs. install alongside) — only shown
+    // when the chosen drive already has an existing OS/partition table
+    // ══════════════════════════════════════════════════════════════════
+    private Adw.NavigationPage build_install_mode_page () {
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
+        content.append (oobe_heading ("How should KibaOS be installed?",
+            "We found an existing operating system on this drive."));
+
+        var picker = new Gtk.ListBox ();
+        picker.add_css_class ("oobe-list");
+        picker.selection_mode = Gtk.SelectionMode.SINGLE;
+
+        var erase_row = new Adw.ActionRow () {
+            title    = "Erase disk",
+            subtitle = "Delete everything on this drive and install KibaOS by itself."
+        };
+        erase_row.add_prefix (new Gtk.Image.from_icon_name ("edit-delete-symbolic"));
+        erase_row.set_data ("mode", "erase");
+        picker.append (erase_row);
+
+        var alongside_row = new Adw.ActionRow () {
+            title    = "Install alongside",
+            subtitle = "Keep what's already here and set up KibaOS in the free space next to it (dual boot)."
+        };
+        alongside_row.add_prefix (new Gtk.Image.from_icon_name ("drive-multidisk-symbolic"));
+        alongside_row.set_data ("mode", "alongside");
+        picker.append (alongside_row);
+
+        picker.row_selected.connect ((row) => {
+            if (row != null) install_mode = row.get_data<string> ("mode");
+        });
+        install_mode = "erase";
+        picker.select_row (picker.get_row_at_index (0));
+        content.append (picker);
+
+        return make_page ("Install Mode", content, "Next", () => {
             nav_view.push (build_account_page ());
         }, false, 3, 6);
     }
@@ -3516,8 +3587,11 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_confirm_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading ("Ready to Set Up KibaOS",
-            "Everything on your computer will be replaced. " +
-            "Make sure anything important is backed up first."));
+            install_mode == "alongside"
+                ? "KibaOS will be installed next to your existing operating system, " +
+                  "using the free space on this drive. Nothing else will be touched."
+                : "Everything on your computer will be replaced. " +
+                  "Make sure anything important is backed up first."));
 
         // Summary card
         var summary = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
@@ -3525,6 +3599,7 @@ public class KibaOOBE : Adw.Application {
 
         OobeSummaryItem[] items = {
             { "drive-harddisk-symbolic",   "Storage",  selected_disk == "" ? "Auto-detected" : GLib.Path.get_basename (selected_disk) },
+            { "drive-multidisk-symbolic",  "Install mode", install_mode == "alongside" ? "Install alongside (dual boot)" : "Erase disk" },
             { "preferences-desktop-locale-symbolic", "Language", selected_locale },
             { "input-keyboard-symbolic",   "Keyboard", selected_keymap },
             { "system-users-symbolic",     "Account",  username_value == "" ? "(not set)" : username_value }
@@ -3617,7 +3692,7 @@ public class KibaOOBE : Adw.Application {
     private void start_install () {
         string[] argv = {
             "sudo", "/usr/local/bin/kibaos-oobe-backend",
-            selected_disk, selected_locale, selected_keymap,
+            selected_disk, install_mode, selected_locale, selected_keymap,
             hostname_value, username_value, password_value
         };
         launch_backend (argv);
@@ -4370,6 +4445,48 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
 int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
                            uint64_t *total_sectors);
 
+/* ── Dual-boot / "install alongside" support ─────────────────────────
+ * Everything above this point assumes we own the whole disk and are
+ * free to lay down a brand-new GPT (kiba_gpt_write() calls
+ * fdisk_create_disklabel(), which wipes whatever was there). The
+ * functions below are the non-destructive counterparts used when the
+ * disk already has an OS on it that the user wants to keep. */
+
+typedef struct {
+    int      esp_partno;      /* 1-indexed partno of an existing ESP found
+                                * on the disk, or 0 if none exists. */
+    uint64_t esp_first_lba;
+    uint64_t esp_last_lba;
+    uint64_t free_first_lba;  /* largest contiguous run of unallocated
+                                * sectors on the disk. Zero-length
+                                * (free_last_lba < free_first_lba) if the
+                                * disk has no usable free space. */
+    uint64_t free_last_lba;
+    uint64_t free_bytes;
+} kiba_gpt_scan_result_t;
+
+/* Reads the EXISTING partition table on `path` without modifying
+ * anything on disk (read-only fdisk_assign_device). Locates an existing
+ * EFI System Partition, if any, and the single largest gap of
+ * unallocated sectors, for dual-boot free-space installs. If the disk
+ * has no valid GPT label at all, *out is zeroed and this returns 0 —
+ * callers should treat that the same as "no free space / no ESP found"
+ * rather than as an error, since an unpartitioned disk simply isn't a
+ * dual-boot candidate. Returns -errno only if the device itself
+ * couldn't be opened/read. */
+int kiba_gpt_scan(const char *path, kiba_gpt_scan_result_t *out);
+
+/* Adds ONE new partition to an EXISTING GPT table on `path` — unlike
+ * kiba_gpt_write(), this does NOT call fdisk_create_disklabel() and
+ * does NOT touch any partition already on the disk. `part->first_lba`/
+ * `last_lba` should fall inside a free region (normally taken straight
+ * from a prior kiba_gpt_scan() call's free_first_lba/free_last_lba).
+ * On success, writes the new partition's 1-indexed partition number to
+ * *out_partno. Returns 0 on success, -errno / libfdisk error on
+ * failure. */
+int kiba_gpt_add_partition(const char *path, const kiba_gpt_partition_t *part,
+                            int *out_partno);
+
 #endif
 KIBA_SRC_END_GPTH
 
@@ -4401,6 +4518,7 @@ cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <strings.h>       /* strcasecmp */
 #include <sys/ioctl.h>
 #include <linux/fs.h>     /* BLKSSZGET, BLKGETSIZE64 */
 #include <libfdisk/libfdisk.h>
@@ -4566,6 +4684,181 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
          * another partition). The caller's udev settle loop will handle it. */
         rc = 0;
     }
+
+out:
+    fdisk_deassign_device(cxt, 0);
+    fdisk_unref_context(cxt);
+    return rc;
+}
+
+/* ── Dual-boot: scan an existing table for an ESP + the largest gap ─── */
+int kiba_gpt_scan(const char *path, kiba_gpt_scan_result_t *out) {
+    memset(out, 0, sizeof(*out));
+
+    struct fdisk_context *cxt = fdisk_new_context();
+    if (!cxt) return -ENOMEM;
+
+    int rc = fdisk_assign_device(cxt, path, 1 /* read-only */);
+    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
+
+    /* No label, or not GPT (e.g. blank disk, or legacy MBR) -- nothing
+     * to scan for dual-boot purposes. Not an error: the caller falls
+     * back to "erase disk" in that case. */
+    if (!fdisk_has_label(cxt) ||
+        !fdisk_is_labeltype(cxt, FDISK_DISKLABEL_GPT)) {
+        fdisk_deassign_device(cxt, 1);
+        fdisk_unref_context(cxt);
+        return 0;
+    }
+
+    struct fdisk_table *tb = NULL;
+    rc = fdisk_get_partitions(cxt, &tb);
+    if (rc != 0 || !tb) {
+        fdisk_deassign_device(cxt, 1);
+        fdisk_unref_context(cxt);
+        return rc;
+    }
+
+    /* Collect [start,end] spans for every in-use partition so we can
+     * walk the gaps between them in order. 128 is GPT's own hard cap
+     * on partition entries, so this never overflows. */
+    uint64_t starts[128], ends[128];
+    size_t n = 0;
+
+    struct fdisk_partition *pa = NULL;
+    struct fdisk_iter *itr = fdisk_new_iter(FDISK_ITER_FORWARD);
+    while (n < 128 && fdisk_table_next_partition(tb, itr, &pa) == 0) {
+        starts[n] = fdisk_partition_get_start(pa);
+        ends[n]   = fdisk_partition_get_end(pa);
+
+        if (out->esp_partno == 0) {
+            struct fdisk_parttype *pt = fdisk_partition_get_type(pa);
+            const char *gs = pt ? fdisk_parttype_get_string(pt) : NULL;
+            if (gs && strcasecmp(gs, KIBA_GUID_ESP_STR) == 0) {
+                out->esp_partno    = (int)fdisk_partition_get_partno(pa) + 1;
+                out->esp_first_lba = starts[n];
+                out->esp_last_lba  = ends[n];
+            }
+        }
+        n++;
+    }
+    fdisk_free_iter(itr);
+
+    /* Simple insertion sort by start LBA -- n is at most 128, and in
+     * practice almost always under 10, so O(n^2) is irrelevant here. */
+    for (size_t i = 1; i < n; i++) {
+        uint64_t s = starts[i], e = ends[i];
+        size_t j = i;
+        while (j > 0 && starts[j - 1] > s) {
+            starts[j] = starts[j - 1];
+            ends[j]   = ends[j - 1];
+            j--;
+        }
+        starts[j] = s;
+        ends[j]   = e;
+    }
+
+    uint64_t first_usable = fdisk_get_first_lba(cxt);
+    uint64_t last_usable  = fdisk_get_last_lba(cxt);
+    uint32_t ssz = fdisk_get_sector_size(cxt);
+
+    uint64_t best_first = 0, best_last = 0, best_len = 0;
+    uint64_t cursor = first_usable;
+
+    for (size_t i = 0; i <= n; i++) {
+        uint64_t gap_start = cursor;
+        uint64_t gap_end   = (i < n) ? (starts[i] > 0 ? starts[i] - 1 : 0)
+                                      : last_usable;
+        if (gap_end >= gap_start) {
+            uint64_t len = gap_end - gap_start + 1;
+            if (len > best_len) {
+                best_len = len; best_first = gap_start; best_last = gap_end;
+            }
+        }
+        if (i < n) cursor = ends[i] + 1;
+    }
+
+    if (best_len > 0) {
+        out->free_first_lba = best_first;
+        out->free_last_lba  = best_last;
+        out->free_bytes     = best_len * (uint64_t)(ssz ? ssz : 512);
+    } else {
+        /* No free space: make free_last_lba < free_first_lba so callers
+         * can check "free_last_lba >= free_first_lba" as the has-room test. */
+        out->free_first_lba = 1;
+        out->free_last_lba  = 0;
+    }
+
+    fdisk_unref_table(tb);
+    fdisk_deassign_device(cxt, 1);
+    fdisk_unref_context(cxt);
+    return 0;
+}
+
+/* ── Dual-boot: append one partition to an existing table ───────────── */
+int kiba_gpt_add_partition(const char *path, const kiba_gpt_partition_t *part,
+                            int *out_partno) {
+    struct fdisk_context *cxt = fdisk_new_context();
+    if (!cxt) return -ENOMEM;
+
+    int rc = fdisk_assign_device(cxt, path, 0 /* read-write */);
+    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
+
+    if (!fdisk_has_label(cxt) || !fdisk_is_labeltype(cxt, FDISK_DISKLABEL_GPT)) {
+        /* Caller is responsible for having already confirmed (via
+         * kiba_gpt_scan()) that a GPT label exists. Refuse to proceed
+         * rather than silently creating one -- that's what
+         * kiba_gpt_write() is for, and doing it here would surprise
+         * dual-boot callers with a wipe they explicitly wanted to avoid. */
+        rc = -EINVAL;
+        goto out;
+    }
+
+    struct fdisk_partition *pa = fdisk_new_partition();
+    if (!pa) { rc = -ENOMEM; goto out; }
+
+    /* Let libfdisk pick the next free partition-number slot rather than
+     * us guessing one, since we don't know which slots are occupied by
+     * whatever's already on this disk. */
+    fdisk_partition_partno_follow_default(pa, 1);
+    fdisk_partition_set_start(pa, part->first_lba);
+    if (part->last_lba == KIBA_GPT_LAST_LBA_REST) {
+        fdisk_partition_end_follow_default(pa, 1);
+    } else {
+        fdisk_partition_set_size(pa, part->last_lba - part->first_lba + 1);
+    }
+
+    struct fdisk_parttype *ptype = NULL;
+    if (memcmp(part->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
+        ptype = fdisk_label_parse_parttype(fdisk_get_label(cxt, NULL), KIBA_GUID_ESP_STR);
+    else
+        ptype = fdisk_label_parse_parttype(fdisk_get_label(cxt, NULL), KIBA_GUID_LINUX_FS_STR);
+    if (ptype) {
+        fdisk_partition_set_type(pa, ptype);
+        fdisk_unref_parttype(ptype);
+    }
+
+    if (part->name[0])
+        fdisk_partition_set_name(pa, part->name);
+
+    if (!guid_is_zero(&part->unique_guid)) {
+        char uguid_str[37];
+        guid_to_str(&part->unique_guid, uguid_str);
+        fdisk_partition_set_uuid(pa, uguid_str);
+    }
+
+    size_t partno = 0;
+    rc = fdisk_add_partition(cxt, pa, &partno);
+    fdisk_unref_partition(pa);
+    if (rc != 0) goto out;
+
+    rc = fdisk_write_disklabel(cxt);
+    if (rc != 0) goto out;
+
+    rc = fdisk_reread_partition_table(cxt);
+    if (rc != 0) rc = 0; /* non-fatal, same rationale as kiba_gpt_write() */
+
+    if (out_partno) *out_partno = (int)partno + 1;
 
 out:
     fdisk_deassign_device(cxt, 0);
@@ -4984,8 +5277,24 @@ int kiba_install_create_user(const char *target_root, const char *username,
  * posix_spawnp arch-chroot bootctl, patches the loader entry with the
  * real PARTUUID (read via kiba_read_partuuid_direct, no blkid call),
  * enables services, rebuilds the initramfs. */
+/* root_partno is the 1-indexed GPT partition number of `root_part` on
+ * `disk_path`, used to read back its PARTUUID directly off the GPT
+ * entry array. On a fresh whole-disk install this is always 2 (ESP=1,
+ * root=2); on a dual-boot "install alongside" install it can be
+ * anything, since the root partition was appended after whatever
+ * already existed on the disk. */
+/* dualboot: when true, the ESP being installed to is shared with an
+ * existing OS. We leave that OS's own boot files on the ESP completely
+ * untouched (bootctl install only ever adds KibaOS's own files under
+ * /EFI/systemd, /loader/entries/kibaos.conf, and an NVRAM entry -- it
+ * never removes anyone else's), but we also configure the systemd-boot
+ * menu to actually show a menu (rather than the whole-disk install's
+ * silent auto-boot) and to auto-discover the other OS's own loader
+ * entries, so the user gets a real choice at boot instead of KibaOS
+ * silently taking over. */
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, kiba_progress_cb cb, void *user_data);
+                           const char *root_part, int root_partno, bool dualboot,
+                           kiba_progress_cb cb, void *user_data);
 
 /* Human-readable description of the last failure from any kiba_install_*
  * function in this module. */
@@ -5442,8 +5751,8 @@ int kiba_install_create_user(const char *target_root, const char *username,
 }
 
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, kiba_progress_cb cb, void *user_data) {
-    (void)disk_path;
+                           const char *root_part, int root_partno, bool dualboot,
+                           kiba_progress_cb cb, void *user_data) {
     char path[1024];
 
     if (cb) cb(80, "Removing live-only tools...", user_data);
@@ -5503,17 +5812,31 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     unlink(path);
 
     snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
-    write_file(path,
-               "default kibaos.conf\n"
-               "timeout 0\n"
-               "console-mode max\n"
-               "editor no\n"
-               "auto-entries no\n");
+    if (dualboot) {
+        /* Show a real menu (nonzero timeout) and let systemd-boot
+         * auto-discover the other OS's boot entries already on this
+         * ESP (Windows Boot Manager, another distro's loader.conf
+         * entries, etc.) instead of hiding everything but KibaOS. */
+        write_file(path,
+                   "default kibaos.conf\n"
+                   "timeout 5\n"
+                   "console-mode max\n"
+                   "editor no\n"
+                   "auto-entries yes\n"
+                   "auto-firmware yes\n");
+    } else {
+        write_file(path,
+                   "default kibaos.conf\n"
+                   "timeout 0\n"
+                   "console-mode max\n"
+                   "editor no\n"
+                   "auto-entries no\n");
+    }
 
     /* Patch the loader entry with the real PARTUUID, read directly from
      * the GPT bytes we wrote ourselves -- no blkid subprocess. */
     char partuuid[64];
-    if (!kiba_read_partuuid_direct(disk_path, /* partno */ 2, partuuid, sizeof(partuuid))) {
+    if (!kiba_read_partuuid_direct(disk_path, root_partno, partuuid, sizeof(partuuid))) {
         snprintf(g_finish_err, sizeof(g_finish_err), "could not read root PARTUUID");
         return -1;
     }
@@ -5558,7 +5881,11 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         free(buf);
     }
 
-    {
+    if (!dualboot) {
+        /* Whole-disk installs: KibaOS is the only OS, so skip straight
+         * to it -- these clear any firmware-level timeout/default that
+         * would otherwise force a menu. On a dualboot install we want
+         * the opposite (see loader.conf above), so this is skipped. */
         char *argv1[] = { (char *)"bootctl", (char *)"set-timeout", (char *)"", NULL };
         chroot_run(target_root, argv1);
         char *argv2[] = { (char *)"bootctl", (char *)"set-default", (char *)"", NULL };
@@ -5621,8 +5948,11 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 /* kibaos_oobe_backend_main.c — the privileged install orchestrator.
  *
  * Invoked via sudo (no D-Bus/polkit dependency): `sudo /usr/local/bin/kibaos-oobe-backend
- * <disk> <locale> <keymap> <hostname> <username> <password>` — argv,
+ * <disk> <mode> <locale> <keymap> <hostname> <username> <password>` — argv,
  * no shell, per the injection fix already applied on the Vala side.
+ * <mode> is "erase" (wipe the whole disk, original behavior) or
+ * "alongside" (dual-boot: keep whatever's already on the disk, reuse its
+ * existing ESP, and install KibaOS into the largest free-space gap).
  *
  * Internally this no longer touches archinstall, parted, blkid, or
  * partprobe as subprocesses: all of that is libkibadisk (kiba_gpt.c /
@@ -5687,18 +6017,43 @@ static void fail(const char *msg) {
     exit(1);
 }
 
+/* Builds the device path for partition number `n` of `disk` into `buf`.
+ * Real rule (confirmed against ArchWiki's device-naming page): if the
+ * disk's device name ends in a digit, partitions get a 'p' separator
+ * (/dev/loop0p1, /dev/nvme0n1p1); otherwise they don't (/dev/vda1,
+ * /dev/sda1). This is NOT about which driver/bus is involved (virtio vs
+ * nvme vs scsi) -- it's purely about whether the trailing character of
+ * the disk name is already a digit, which would otherwise make "loop01"
+ * ambiguous (loop-1 vs loop0-partition-1). Checking for "nvme"/"mmcblk"
+ * by substring was the previous (wrong) approach -- it happened to work
+ * for /dev/vda by accident, but failed for /dev/loop0. */
+static void partition_path(const char *disk, int n, char *buf, size_t buf_len) {
+    size_t disk_len = strlen(disk);
+    bool ends_in_digit = disk_len > 0 && disk[disk_len - 1] >= '0' && disk[disk_len - 1] <= '9';
+    if (ends_in_digit) snprintf(buf, buf_len, "%sp%d", disk, n);
+    else                snprintf(buf, buf_len, "%s%d", disk, n);
+}
+
 int main(int argc, char **argv) {
     log_init();
-    if (argc != 7) {
-        fprintf(stderr, "usage: %s <disk> <locale> <keymap> <hostname> <username> <password>\n", argv[0]);
+    if (argc != 8) {
+        fprintf(stderr,
+            "usage: %s <disk> <mode: erase|alongside> <locale> <keymap> <hostname> <username> <password>\n",
+            argv[0]);
         return 2;
     }
     const char *disk     = argv[1];
-    const char *locale   = argv[2];
-    const char *keymap   = argv[3];
-    const char *hostname = argv[4];
-    const char *username = argv[5];
-    const char *password = argv[6];
+    const char *mode     = argv[2];
+    const char *locale   = argv[3];
+    const char *keymap   = argv[4];
+    const char *hostname = argv[5];
+    const char *username = argv[6];
+    const char *password = argv[7];
+
+    bool dualboot = (strcmp(mode, "alongside") == 0);
+    if (!dualboot && strcmp(mode, "erase") != 0) {
+        fail("Unknown install mode (expected 'erase' or 'alongside').");
+    }
 
     const char *target_root = "/mnt/kibaos-install";
 
@@ -5710,74 +6065,101 @@ int main(int argc, char **argv) {
         fail("Could not read disk information.");
     }
 
-    progress(6, "Partitioning disk...");
-    int disk_fd = open(disk, O_RDWR);
-    if (disk_fd < 0) fail("Could not open disk for writing.");
-
-    /* Layout: 512MiB ESP (FAT32) + remainder as Linux root (ext4),
-     * matching the layout the old archinstall-based backend used. */
-    uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
-    uint64_t entry_array_sectors = (128 * 128 + ssz - 1) / ssz;
-    uint64_t first_usable = 2 + entry_array_sectors;
-    uint64_t esp_first  = first_usable;
-    uint64_t esp_last   = esp_first + esp_sectors - 1;
-    uint64_t root_first = esp_last + 1;
-    /* Root partition consumes the rest of the disk. We deliberately do NOT
-     * hand-compute the last usable LBA here -- that previously tried to
-     * dead-reckon where the backup GPT header + entry array sit at the end
-     * of the disk, and a one-sector mismatch against libfdisk's own
-     * calculation made fdisk_add_partition() reject it with EINVAL ("The
-     * last usable GPT sector is X, but Y is requested"). Passing the
-     * KIBA_GPT_LAST_LBA_REST sentinel defers to libfdisk's own
-     * last_usable_lba, which fdisk_create_disklabel() already derived
-     * correctly for this exact disk/sector size. */
-    uint64_t root_last  = KIBA_GPT_LAST_LBA_REST;
-
-    if (root_first >= total_sectors) {
-        close(disk_fd);
-        fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
-    }
-
-    kiba_gpt_disk_t gdisk = {
-        .fd = disk_fd,
-        .logical_sector_size = ssz,
-        .total_sectors = total_sectors,
-        .disk_guid = {{0}},
-    };
-    kiba_gpt_partition_t parts[2] = {
-        { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
-          .first_lba = esp_first,  .last_lba = esp_last,  .attributes = 0 },
-        { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
-          .first_lba = root_first, .last_lba = root_last, .attributes = 0 },
-    };
-    int rc = kiba_gpt_write(&gdisk, parts, 2);
-    close(disk_fd);
-    if (rc != 0) {
-        char errbuf[256];
-        snprintf(errbuf, sizeof(errbuf), "Partitioning failed: %s", strerror(-rc));
-        fail(errbuf);
-    }
-
-    /* Determine the resulting partition device paths.
-     * Real rule (confirmed against ArchWiki's device-naming page): if
-     * the disk's device name ends in a digit, partitions get a 'p'
-     * separator (/dev/loop0p1, /dev/nvme0n1p1); otherwise they don't
-     * (/dev/vda1, /dev/sda1). This is NOT about which driver/bus is
-     * involved (virtio vs nvme vs scsi) -- it's purely about whether
-     * the trailing character of the disk name is already a digit,
-     * which would otherwise make "loop01" ambiguous (loop-1 vs
-     * loop0-partition-1). Checking for "nvme"/"mmcblk" by substring
-     * was the previous (wrong) approach -- it happened to work for
-     * /dev/vda by accident, but failed for /dev/loop0. */
     char esp_part[300], root_part[300];
-    size_t disk_len = strlen(disk);
-    bool disk_ends_in_digit = disk_len > 0 && disk[disk_len - 1] >= '0' && disk[disk_len - 1] <= '9';
-    if (disk_ends_in_digit) {
-        snprintf(esp_part,  sizeof(esp_part),  "%sp1", disk);
-        snprintf(root_part, sizeof(root_part), "%sp2", disk);
+    int esp_partno = 0, root_partno = 0;
+
+    if (!dualboot) {
+        /* ── Whole-disk install: wipe and lay down a fresh GPT ───────── */
+        progress(6, "Partitioning disk...");
+        int disk_fd = open(disk, O_RDWR);
+        if (disk_fd < 0) fail("Could not open disk for writing.");
+
+        /* Layout: 512MiB ESP (FAT32) + remainder as Linux root (ext4),
+         * matching the layout the old archinstall-based backend used. */
+        uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
+        uint64_t entry_array_sectors = (128 * 128 + ssz - 1) / ssz;
+        uint64_t first_usable = 2 + entry_array_sectors;
+        uint64_t esp_first  = first_usable;
+        uint64_t esp_last   = esp_first + esp_sectors - 1;
+        uint64_t root_first = esp_last + 1;
+        /* Root partition consumes the rest of the disk. We deliberately do NOT
+         * hand-compute the last usable LBA here -- that previously tried to
+         * dead-reckon where the backup GPT header + entry array sit at the end
+         * of the disk, and a one-sector mismatch against libfdisk's own
+         * calculation made fdisk_add_partition() reject it with EINVAL ("The
+         * last usable GPT sector is X, but Y is requested"). Passing the
+         * KIBA_GPT_LAST_LBA_REST sentinel defers to libfdisk's own
+         * last_usable_lba, which fdisk_create_disklabel() already derived
+         * correctly for this exact disk/sector size. */
+        uint64_t root_last  = KIBA_GPT_LAST_LBA_REST;
+
+        if (root_first >= total_sectors) {
+            close(disk_fd);
+            fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
+        }
+
+        kiba_gpt_disk_t gdisk = {
+            .fd = disk_fd,
+            .logical_sector_size = ssz,
+            .total_sectors = total_sectors,
+            .disk_guid = {{0}},
+        };
+        kiba_gpt_partition_t parts[2] = {
+            { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
+              .first_lba = esp_first,  .last_lba = esp_last,  .attributes = 0 },
+            { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
+              .first_lba = root_first, .last_lba = root_last, .attributes = 0 },
+        };
+        int rc = kiba_gpt_write(&gdisk, parts, 2);
+        close(disk_fd);
+        if (rc != 0) {
+            char errbuf[256];
+            snprintf(errbuf, sizeof(errbuf), "Partitioning failed: %s", strerror(-rc));
+            fail(errbuf);
+        }
+        esp_partno = 1;
+        root_partno = 2;
+        partition_path(disk, esp_partno,  esp_part,  sizeof(esp_part));
+        partition_path(disk, root_partno, root_part, sizeof(root_part));
     } else {
-        snprintf(esp_part,  sizeof(esp_part),  "%s1", disk);
-        snprintf(root_part, sizeof(root_part), "%s2", disk);
+        /* ── Dual-boot: reuse the existing ESP, use free space only ──── */
+        progress(4, "Looking for an existing EFI partition and free space...");
+        kiba_gpt_scan_result_t scan;
+        if (kiba_gpt_scan(disk, &scan) != 0) {
+            fail("Could not read the existing partition table.");
+        }
+        if (scan.esp_partno == 0) {
+            fail("No existing EFI System Partition was found on this disk -- "
+                 "install alongside needs one already present from the "
+                 "other operating system.");
+        }
+        if (scan.free_last_lba < scan.free_first_lba) {
+            fail("No usable free space was found on this disk to install "
+                 "KibaOS alongside the existing operating system.");
+        }
+        const uint64_t min_root_bytes = 12ull * 1024 * 1024 * 1024; /* 12 GiB floor */
+        if (scan.free_bytes < min_root_bytes) {
+            fail("Not enough free space on this disk to install KibaOS "
+                 "alongside the existing operating system (need at least ~12GB free).");
+        }
+
+        esp_partno = scan.esp_partno;
+        partition_path(disk, esp_partno, esp_part, sizeof(esp_part));
+
+        progress(6, "Creating KibaOS partition in free space...");
+        kiba_gpt_partition_t root = {
+            .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
+            .first_lba = scan.free_first_lba, .last_lba = scan.free_last_lba, .attributes = 0
+        };
+        int new_partno = 0;
+        int rc = kiba_gpt_add_partition(disk, &root, &new_partno);
+        if (rc != 0) {
+            char errbuf[256];
+            snprintf(errbuf, sizeof(errbuf), "Partitioning failed: %s", strerror(-rc));
+            fail(errbuf);
+        }
+        root_partno = new_partno;
+        partition_path(disk, root_partno, root_part, sizeof(root_part));
     }
 
     /* Wait for the kernel/udev to settle before touching the new
@@ -5788,9 +6170,16 @@ int main(int argc, char **argv) {
 
     /* ── 3. Format ─────────────────────────────────────────────────── */
     progress(10, "Formatting partitions...");
-    if (kiba_fs_format(esp_part, KIBA_FS_FAT32, "KIBAOS-ESP") != 0) {
-        fail(kiba_fs_strerror());
+    if (!dualboot) {
+        if (kiba_fs_format(esp_part, KIBA_FS_FAT32, "KIBAOS-ESP") != 0) {
+            fail(kiba_fs_strerror());
+        }
     }
+    /* Dual-boot: the ESP already belongs to the other OS and already has
+     * a filesystem on it, plus that OS's own boot files -- formatting it
+     * would destroy them. bootctl install (further down) only ever adds
+     * KibaOS's own files there, so we deliberately never touch the ESP's
+     * filesystem in this mode. */
     if (kiba_fs_format(root_part, KIBA_FS_EXT4, "KIBAOS-ROOT") != 0) {
         fail(kiba_fs_strerror());
     }
@@ -5856,7 +6245,8 @@ int main(int argc, char **argv) {
     }
 
     /* ── 10. Bootloader, services, initramfs ─────────────────────────── */
-    if (kiba_install_finalize(target_root, disk, root_part, progress_cb, NULL) != 0) {
+    if (kiba_install_finalize(target_root, disk, root_part, root_partno, dualboot,
+                               progress_cb, NULL) != 0) {
         fail(kiba_install_strerror());
     }
 
