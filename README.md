@@ -1,14 +1,14 @@
 <p align="center">
   <img src="assets/k-logo.svg" width="250" alt="Animated K">
-</p>  
+</p>
 
 > [!IMPORTANT]
 >
 > KibaOS only supports UEFI-based systems. Virtual machine installation is currently unsupported because KibaOS is designed to run on physical hardware.
 
- 
+
 <div align="center">
-  
+
 # KibaOS
 ![OIN](https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/oin-member-2-0-horiz-1.png?raw=true)
 **A friendly, ready-to-use ~~Linux~~ general OS desktop, built for people switching to simple.**
@@ -17,6 +17,15 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-3DDC97?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](#license)
 [![Arch Linux](https://img.shields.io/badge/Base-Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
 [![Budgie Desktop](https://img.shields.io/badge/Desktop-Budgie-2C001E?style=for-the-badge&logo=linux&logoColor=white)](https://buddiesofbudgie.org)
+
+<sub>
+<img src="https://img.shields.io/badge/Icons-Numix_Circle-6b5ce7?style=flat-square" alt="Numix Circle Icons">
+<img src="https://img.shields.io/badge/Boot_Splash-Numix_Plymouth-6b5ce7?style=flat-square" alt="Numix Plymouth">
+<img src="https://img.shields.io/badge/Package_Manager-kibapkg-00b0d8?style=flat-square" alt="kibapkg">
+<img src="https://img.shields.io/badge/Installer-archinstall_%2B_squashfs-00b0d8?style=flat-square" alt="archinstall + squashfs installer">
+</sub>
+
+<br>
 
 <sub>
 <img src="https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style=flat-square&color=blue" alt="Repo Size">
@@ -33,9 +42,12 @@
 </div>
 
 <img width="1000" alt="Desktop screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_000000008ac881f5beb3622a8ec72855.png?raw=true" />
+
 ---
 
 KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Budgie** desktop environment and is designed so that anyone switching to simple can sit down and use it immediately, without having to configure anything first.
+
+Every piece of it — the installer, the app icons, the terminal, even the boot screen — is chosen or built with one rule in mind: **nothing should look or feel like it's still showing you the plumbing.**
 
 KibaOS is built and maintained by **Kiba Labs**.
 
@@ -51,6 +63,7 @@ We're happy to recommend **[CurrentBuild](https://www.currentbuild.com)**, a bui
 ## Table of Contents
 
 - [What KibaOS Includes](#what-kibaos-includes)
+- [Design & Theming](#design--theming)
 - [Recommended Hardware: CurrentBuild](#want-kibaos-on-real-hardware)
 - [Getting Started](#getting-started)
   - [Step 1: Download the ISO](#step-1-download-the-iso)
@@ -59,6 +72,7 @@ We're happy to recommend **[CurrentBuild](https://www.currentbuild.com)**, a bui
   - [Step 4: Install KibaOS](#step-4-install-kibaos)
 - [System Requirements](#system-requirements)
 - [Everyday Use](#everyday-use)
+  - [Managing Apps with kibapkg](#managing-apps-with-kibapkg)
   - [Running Windows Programs](#running-windows-programs)
   - [Automatic Updates](#automatic-updates)
 - [Building KibaOS Yourself](#building-kibaos-yourself)
@@ -77,13 +91,30 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 | --- | --- |
 | **A solid foundation** | Built on Arch Linux, a well-respected base known for staying current and supporting the newest hardware. |
 | **A clean, familiar desktop** | The Budgie desktop environment provides a taskbar, a centered dock, and a clock applet, laid out so everything is easy to find. |
-| **Everyday apps, already installed** | A file manager (Nemo), a web browser (Firefox), a calculator, a calendar, email (Geary), notes, music, and a to-do list app. |
+| **Everyday apps, already installed** | A file manager (Nemo), a web browser, a calculator, a calendar, email (Geary), notes, music, and a to-do list app — all picked or relabeled so they read as plain, simple tools instead of a pile of separately-branded software. |
+| **A simple terminal, when you need it** | The built-in terminal is deliberately minimal — one window, no tabs, no menus — for the rare moments you need it, without it ever feeling like the "real" way to use the computer. |
+| **`kiba`, a friendly app manager** | Install, remove, and update software with plain-language commands instead of memorizing package-manager flags. See [Managing Apps with kibapkg](#managing-apps-with-kibapkg). |
 | **A guided setup experience** | KibaOS's own built-in installer (the OOBE app, short for "Out-Of-Box Experience") asks you one simple question at a time. |
+| **A calm, uncluttered live session** | The trial/install session never dims, locks, or falls asleep on you mid-setup, and stays free of raw system dialogs, developer tools, and other things you'd never need to see. |
 | **Windows program support** | Many simple Windows programs can be double-clicked and run directly — no extra setup needed. |
 | **Automatic background updates** | Small fixes download and apply on their own, without interrupting what you're doing. |
 
 > [!TIP]
 > If a word here is unfamiliar — like "desktop environment" or "ISO" — don't worry. We explain each one the first time it comes up.
+
+---
+
+## Design & Theming
+
+KibaOS's look isn't an afterthought bolted onto stock Arch + Budgie — every visual layer is deliberately chosen so the system feels like one coherent product, not a collection of default Linux app icons and system dialogs.
+
+| Layer | What's used | Why |
+| --- | --- | --- |
+| **Boot splash** | [Numix Plymouth](https://github.com/numixproject/numix-plymouth-theme) | Replaces the default distro boot screen with a clean, animated splash — the first thing you see sets the tone. |
+| **App icons** | [Numix Circle](https://github.com/numixproject/numix-icon-theme-circle) | A consistent, modern, single-style icon set across every app, instead of each app showing its own designer's take on an icon. |
+| **Window & UI theme** | Adwaita-dark, with a KibaOS rounded-rectangle panel override | A calm dark base that avoids the visual noise of a stock desktop while staying easy on the eyes. |
+| **Motion** | KibaOS's own "Organic Motion Language" | A shared set of named, natural-feeling animation curves used consistently across the desktop and installer, so things like window opens and panel transitions feel like part of the same system rather than a grab-bag of default GTK animations. |
+| **App branding** | De-branded where it matters | A handful of apps that would otherwise show a separate company's name or logo (the browser, the software store, the settings app) are relabeled to plain, generic names — "Browser," "App Store," "Settings" — so the desktop reads as one product. |
 
 ---
 
@@ -135,7 +166,7 @@ From the live desktop, open the **"Install KibaOS"** icon. This launches KibaOS'
 4. Your username and password
 5. A short confirmation screen before anything is written to disk
 
-After you confirm, the installer copies KibaOS onto your computer's disk, sets up the bootloader (the part that lets your computer find and start KibaOS when it turns on), and finishes by creating your personal user account.
+After you confirm, the installer prepares your disk, copies KibaOS onto it, sets up the bootloader (the part that lets your computer find and start KibaOS when it turns on), and finishes by creating your personal user account. Behind the scenes it uses the well-tested, community-maintained [archinstall](https://github.com/archlinux/archinstall) project to handle disk partitioning, then copies over the exact same system image you tried in the live session — so what you installed is what you tested.
 
 > [!CAUTION]
 > Installing KibaOS will erase the disk you choose in step 3 above. Make sure you've backed up anything important, and double check you're installing to the correct disk if your computer has more than one.
@@ -156,6 +187,22 @@ Once installation finishes, restart your computer, remove the USB drive, and Kib
 ---
 
 ## Everyday Use
+
+### Managing Apps with kibapkg
+
+KibaOS includes its own app manager, **kibapkg**, used from the terminal as the short command `kiba`. It talks directly to the same underlying package system Arch itself uses, but skips the jargon — no flags to memorize, no wall of resolver output.
+
+```bash
+kiba install <app name>   # install an app
+kiba remove  <app name>   # remove an app
+kiba update                # update everything
+kiba search  <term>        # search for an app
+kiba list                  # see what's installed
+kiba info    <app name>    # details about an app
+```
+
+> [!TIP]
+> Most people won't need `kiba` day-to-day — the App Store handles installing and updating apps visually. `kiba` is there for when you'd rather type a command.
 
 ### Running Windows Programs
 
@@ -188,7 +235,7 @@ docker run --rm --privileged \
 ```
 
 > [!NOTE]
-> The `build.sh` script does the real work: it installs Arch Linux's `archiso` tool, configures the Budgie desktop, builds KibaOS's custom graphical installer, sets up automatic updates, and finally packages everything into a bootable ISO file. The official KibaOS releases on SourceForge are built automatically using this exact same script, run by GitHub Actions (a service that builds and tests projects automatically) every time changes are pushed to the project or on a regular weekly schedule.
+> The `build.sh` script does the real work: it installs Arch Linux's `archiso` tool, configures the Budgie desktop, applies the Numix boot splash and icon theme, builds KibaOS's custom graphical installer and `kibapkg`, sets up automatic updates, and finally packages everything into a bootable ISO file. The official KibaOS releases on SourceForge are built automatically using this exact same script, run by GitHub Actions (a service that builds and tests projects automatically) every time changes are pushed to the project or on a regular weekly schedule.
 
 ---
 
@@ -215,7 +262,7 @@ Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://
 
 ## License
 
-KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Budgie, Wine, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
+KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Budgie, Wine, Numix, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
