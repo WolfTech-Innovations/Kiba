@@ -128,7 +128,7 @@ debugedit
 base-devel
 archinstall
 python
-python-pyalpm
+pyalpm
 wine
 wine-mono
 lib32-mesa
