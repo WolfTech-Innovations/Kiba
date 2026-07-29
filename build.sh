@@ -128,7 +128,7 @@ debugedit
 base-devel
 archinstall
 python
-python-pyalpm
+pyalpm
 wine
 wine-mono
 lib32-mesa
@@ -5987,8 +5987,26 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
     write_file(path, "[Daemon]\nTheme=numix\nShowDelay=0\nDeviceTimeout=8\n");
     {
-        char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"numix", NULL };
-        chroot_run(target_root, argv);
+        /* Sanity-check the theme actually landed in target_root before we
+         * try to switch to it -- if the airootfs->target copy ever misses
+         * it, this turns a silent "boot shows the stock theme" bug into a
+         * clear, logged failure instead. */
+        char theme_check[1024];
+        snprintf(theme_check, sizeof(theme_check), "%s/usr/share/plymouth/themes/numix/numix.plymouth", target_root);
+        struct stat st;
+        if (stat(theme_check, &st) != 0) {
+            if (cb) cb(93, "Warning: numix Plymouth theme missing from target, boot splash will use the default theme", user_data);
+        } else {
+            char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"numix", NULL };
+            if (chroot_run(target_root, argv) != 0) {
+                /* Non-fatal: a missing splash theme shouldn't abort the
+                 * whole install, but MUST be visible, or the initramfs
+                 * rebuild below will silently bake in whatever theme was
+                 * already active (the stock default) instead of numix --
+                 * this was previously discarded with no error or log line. */
+                if (cb) cb(93, "Warning: plymouth-set-default-theme failed, boot splash will use the default theme", user_data);
+            }
+        }
     }
 
     if (cb) cb(94, "Rebuilding initramfs...", user_data);
