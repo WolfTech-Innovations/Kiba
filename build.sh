@@ -152,6 +152,7 @@ gnome-disk-utility
 gnome-backgrounds
 gnome-keyring
 gnome-settings-daemon
+gnome-control-center
 gvfs
 gvfs-mtp
 gvfs-smb
@@ -4461,15 +4462,40 @@ if [ $? -ne 0 ]; then
   tail -n 1 "$LOG" | sed 's/^/FATAL: /'
   exit 1
 fi
+# only_hd is disk-work only by design (see comment block above this script) --
+# it deliberately never runs the package-install phase, so archinstall's own
+# config-completion summary reports "base" (and other install-phase keys) as
+# not-yet-done on exit. That line is expected here and is NOT what the exit
+# code above is guarding -- base gets installed later via the squashfs
+# extraction in kibaos-oobe-backend, not via archinstall. Left in the log
+# only so it isn't mistaken for a real failure when triaging.
+echo "NOTE: the 'required steps ... base' line above from archinstall is expected -- base is installed via squashfs extraction, not by only_hd." >> "$LOG"
 
-# only_hd leaves everything mounted under /mnt/archinstall. Resolve which
-# device nodes it actually used, then unmount -- kibaos-oobe-backend does
-# its own mount at /mnt/kibaos-install so the rest of the pipeline (which
-# hardcodes that path) needs zero changes.
-root_part=$(findmnt -n -o SOURCE --target /mnt/archinstall)
-esp_part=$(findmnt -n -o SOURCE --target /mnt/archinstall/boot)
+# only_hd leaves everything mounted under /mnt/archinstall, but the new
+# partition device nodes/mount info can lag by a beat after wipe+create
+# (udev hasn't settled yet), which is what was causing the "unable to
+# determine what partitions archinstall made" failure. Settle udev and
+# retry findmnt a few times before giving up, and log full lsblk/findmnt
+# state on failure so a real failure is diagnosable instead of opaque.
+udevadm settle --timeout=10 2>/dev/null || true
+
+root_part=""
+esp_part=""
+for _try in 1 2 3 4 5; do
+  root_part=$(findmnt -n -o SOURCE --target /mnt/archinstall 2>/dev/null)
+  esp_part=$(findmnt -n -o SOURCE --target /mnt/archinstall/boot 2>/dev/null)
+  [ -n "$root_part" ] && [ -n "$esp_part" ] && break
+  sleep 1
+  udevadm settle --timeout=5 2>/dev/null || true
+done
+
 if [ -z "$root_part" ] || [ -z "$esp_part" ]; then
-  echo "FATAL: Couldn't determine which partitions archinstall created."
+  echo "FATAL: Couldn't determine which partitions archinstall created." >> "$LOG"
+  echo "-- findmnt /mnt/archinstall state --" >> "$LOG"
+  findmnt -R /mnt/archinstall >> "$LOG" 2>&1 || true
+  echo "-- lsblk ${disk} state --" >> "$LOG"
+  lsblk "${disk}" >> "$LOG" 2>&1 || true
+  tail -n 1 "$LOG" | sed 's/^/FATAL: /'
   exit 1
 fi
 umount -R /mnt/archinstall
@@ -6603,6 +6629,48 @@ gtk-update-icon-cache -f /usr/share/icons/Numix-Circle-Light 2>/dev/null || true
 rm -rf "${NUMIX_ICONS_BUILD}"
 echo "=== Icon theme: Numix Circle installed ==="
 
+# ══════════════════════════════════════════════════════════════════════════
+# TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
+# ══════════════════════════════════════════════════════════════════════════
+# The Budgie Menu applet's default icon name is "start-here-symbolic"
+# (solus-project/budgie-desktop#457). Numix-Circle is an APP icon theme only
+# (see note above) and doesn't cover the "places" category that icon lives
+# in, so the lookup falls through to adwaita-icon-theme — which means the
+# taskbar launcher button would otherwise show Adwaita's literal "GNOME
+# foot" logo, a well-known rough edge (bbs.archlinux.org/viewtopic.php?
+# id=209293) that has no place on a consumer OS. Generate a plain
+# black-circle / white-inner-ring launcher icon with ImageMagick and drop it
+# in everywhere Adwaita ships start-here-symbolic, at every size Adwaita
+# provides it, so the swap is picked up regardless of which size the panel
+# actually requests.
+ADWAITA_ICONS="/usr/share/icons/Adwaita"
+LAUNCHER_MASTER="/tmp/kibaos-launcher-icon.png"
+# Master render at high res: filled black disc, then an unfilled white ring
+# stroked well inside the outer edge — a black circle with a bright white
+# inner rim, not touching the outline.
+magick -size 512x512 xc:none \
+  -fill black -draw "circle 256,256 256,16" \
+  -stroke white -strokewidth 20 -fill none -draw "circle 256,256 256,60" \
+  "${LAUNCHER_MASTER}"
+
+if [ -d "${ADWAITA_ICONS}" ]; then
+  find "${ADWAITA_ICONS}" -path '*/places/start-here-symbolic.svg' -print0 2>/dev/null \
+    | while IFS= read -r -d '' _svg; do
+        _dir=$(dirname "${_svg}")
+        _size=$(basename "$(dirname "${_dir}")")   # e.g. "48x48", or "scalable"
+        _px="${_size%%x*}"
+        case "${_px}" in
+          ''|*[!0-9]*) _px=256 ;;   # "scalable" or anything unparsable -> high-res master
+        esac
+        magick "${LAUNCHER_MASTER}" -resize "${_px}x${_px}" \
+          "${_dir}/start-here-symbolic.png"
+        rm -f "${_svg}"
+      done
+  gtk-update-icon-cache -f "${ADWAITA_ICONS}" 2>/dev/null || true
+fi
+rm -f "${LAUNCHER_MASTER}"
+echo "=== Taskbar launcher icon: custom black-circle/white-ring icon installed ==="
+
 
 # ══════════════════════════════════════════════════════════════════════════
 # GTK THEME — system-wide Adwaita-dark base + KibaOS rounded-rectangle panel override
@@ -8296,16 +8364,50 @@ if [ -f "/usr/share/applications/org.gnome.Terminal.desktop" ]; then
     || echo 'NoDisplay=true' >> "/usr/share/applications/org.gnome.Terminal.desktop"
 fi
 
-# ── Rename budgie-control-center to "Settings" ─────────────────────────────
-# The upstream desktop file calls it "Budgie Control Center"; rebrand to the
-# simpler, consumer-friendly label "Settings".
+# ── Hide budgie-control-center from the app launcher ───────────────────────
+# Pulled in transitively as a dependency of the budgie package group; can't
+# be removed without risking breaking budgie itself, but it's superseded as
+# the visible Settings app below, so just keep it out of the menu.
 for _bcc_desk in budgie-control-center.desktop \
                  org.buddiesofbudgie.BudgieControlCenter.desktop; do
   if [ -f "/usr/share/applications/${_bcc_desk}" ]; then
-    sed -i 's/^Name=.*/Name=Settings/' \
-        "/usr/share/applications/${_bcc_desk}" || true
-    # Strip any localised Name[xx]=… lines so they don't override our label
-    sed -i '/^Name\[/d' "/usr/share/applications/${_bcc_desk}" || true
+    sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/${_bcc_desk}" || true
+    grep -q '^NoDisplay=' "/usr/share/applications/${_bcc_desk}" \
+      || echo 'NoDisplay=true' >> "/usr/share/applications/${_bcc_desk}"
+  fi
+done
+
+# ── Rename gnome-control-center to "Settings" ───────────────────────────────
+# Plain upstream GNOME Settings, not the Budgie fork -- current libadwaita
+# builds use the sidebar+search layout, closer to macOS System Settings than
+# budgie-control-center's older layout. Upstream desktop file calls it
+# "Settings" already in most locales, but strip localised Name[xx]= lines so
+# a non-English locale can't override our label, matching the other rebrands
+# in this block.
+for _gcc_desk in gnome-control-center.desktop \
+                 org.gnome.Settings.desktop; do
+  if [ -f "/usr/share/applications/${_gcc_desk}" ]; then
+    sed -i 's/^Name=.*/Name=Settings/' "/usr/share/applications/${_gcc_desk}" || true
+    sed -i '/^Name\[/d' "/usr/share/applications/${_gcc_desk}" || true
+  fi
+done
+
+# gnome-control-center registers each panel as its own (usually NoDisplay)
+# .desktop file purely for search indexing (e.g. "gnome-wifi-panel.desktop"
+# launches `gnome-control-center wifi`). A few of those panels are
+# GNOME-Shell-specific and meaningless under Wayfire/Budgie, so drop them
+# from search too. This list is a best-effort starting point based on
+# current upstream panel naming -- check `ls /usr/share/applications/
+# gnome-*-panel.desktop` on a built image and extend/trim as needed, since
+# exact panel-desktop-id naming does shift between GNOME releases.
+for _panel_desk in gnome-multitasking-panel.desktop \
+                    gnome-search-panel.desktop \
+                    gnome-wwan-panel.desktop \
+                    gnome-online-accounts-panel.desktop; do
+  if [ -f "/usr/share/applications/${_panel_desk}" ]; then
+    sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/${_panel_desk}" || true
+    grep -q '^NoDisplay=' "/usr/share/applications/${_panel_desk}" \
+      || echo 'NoDisplay=true' >> "/usr/share/applications/${_panel_desk}"
   fi
 done
 
@@ -8325,6 +8427,17 @@ if [ -f "/usr/share/applications/nm-connection-editor.desktop" ]; then
   sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/nm-connection-editor.desktop" || true
   grep -q '^NoDisplay=' "/usr/share/applications/nm-connection-editor.desktop" \
     || echo 'NoDisplay=true' >> "/usr/share/applications/nm-connection-editor.desktop"
+fi
+
+# ── Hide cmake-gui from the app launcher ───────────────────────────────────
+# cmake is a build dependency pulled in above only to compile
+# wayfire-plugins-extra from source; Arch's cmake package ships a
+# cmake-gui.desktop entry alongside it, which has no business showing up
+# in a consumer app menu.
+if [ -f "/usr/share/applications/cmake-gui.desktop" ]; then
+  sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/cmake-gui.desktop" || true
+  grep -q '^NoDisplay=' "/usr/share/applications/cmake-gui.desktop" \
+    || echo 'NoDisplay=true' >> "/usr/share/applications/cmake-gui.desktop"
 fi
 
 # ── Disable Magic SysRq — a raw kernel-debugging keyboard backdoor that has
@@ -8444,11 +8557,6 @@ cat > /etc/NetworkManager/conf.d/dns.conf << 'NMDNS'
 dns=none
 NMDNS
 
-cat > /etc/resolv.conf << 'RESOLVCONF'
-nameserver 1.1.1.1
-nameserver 1.0.0.1
-RESOLVCONF
-
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
@@ -8483,6 +8591,17 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
   dconf write /org/gnome/Console/audible-bell false
   dconf write /org/gnome/Console/custom-font-enabled false
 '
+
+# ── DNS: hardcode Cloudflare (1.1.1.1 / 1.0.0.1) ─────────────────────────
+# Written as the LAST thing this script does, right before mkarchiso packs
+# the airootfs into the squashfs -- NetworkManager (or anything else touched
+# above) won't get a chance to reset /etc/resolv.conf after this point, so
+# what ships in the live ISO is guaranteed to still be this file.
+cat > /etc/resolv.conf << 'RESOLVCONF'
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+RESOLVCONF
+
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
