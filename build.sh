@@ -126,9 +126,9 @@ budgie-session
 gcc
 debugedit
 base-devel
-archinstall<3.0.13
 python
 pyalpm
+parted
 wine
 wine-mono
 lib32-mesa
@@ -4283,6 +4283,39 @@ meson setup build --prefix=/usr || { echo "FATAL: meson setup failed for kibaos-
 ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check the Vala compile errors above." >&2; exit 1; }
 ninja -C build install
 cd /
+
+# ══════════════════════════════════════════════════════════════════════════
+# ARCHINSTALL — built from source, pinned to 3.0.12
+# ══════════════════════════════════════════════════════════════════════════
+# 3.0.13 (archlinux/archinstall#3879) replaced the plain wifi handling with
+# a textual-based wifi connection menu. That menu expects an interactive
+# TTY and breaks the non-interactive `only_hd --config ... --silent` flow
+# kibaos-archinstall-backend relies on below, so pacman's plain `archinstall`
+# package (always latest) is no longer installed via packages.x86_64 —
+# we build the last pre-3.0.13 release from source instead, straight into
+# this chroot, same approach as the wayfire-plugins-extra/wfctl build
+# further down.
+#
+# pyparted needs libparted's headers/lib to compile its C extension against
+# (see `parted` in packages.x86_64) and a compiler (gcc/base-devel, already
+# installed above). pydantic and cryptography are pulled in automatically
+# by pip from archinstall's own pyproject.toml — no extra pacman packages
+# needed for those.
+echo "=== Building archinstall 3.0.12 from source (pinned below 3.0.13's wifi TUI) ==="
+pacman -S --noconfirm --needed parted python-pip git
+git clone --depth=1 --branch 3.0.12 https://github.com/archlinux/archinstall /tmp/archinstall
+cd /tmp/archinstall
+pip install --break-system-packages --no-cache-dir .
+cd /
+rm -rf /tmp/archinstall
+installed_ver="$(archinstall --version 2>/dev/null || true)"
+echo "=== archinstall installed: ${installed_ver:-<version check failed>} ==="
+case "$installed_ver" in
+  *3.0.13*|*3.0.14*|*3.0.15*|*4.*)
+    echo "FATAL: archinstall resolved to $installed_ver, not the pinned 3.0.12 build — aborting." >&2
+    exit 1
+    ;;
+esac
 
 # ── Privileged backend script ─────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════
