@@ -126,6 +126,9 @@ budgie-session
 gcc
 debugedit
 base-devel
+archinstall
+python
+python-pyalpm
 wine
 wine-mono
 lib32-mesa
@@ -144,7 +147,7 @@ gtklock
 wlopm
 nemo
 nemo-fileroller
-gnome-terminal
+gnome-console
 gnome-disk-utility
 gnome-backgrounds
 gnome-keyring
@@ -153,8 +156,8 @@ gvfs
 gvfs-mtp
 gvfs-smb
 file-roller
-gedit
-eog
+gnome-text-editor
+loupe
 evince
 papirus-icon-theme
 accountsservice
@@ -2659,6 +2662,15 @@ sed -i 's/#IdleAction=ignore/IdleAction=ignore/'               /etc/systemd/logi
 # nothing should put the machine to sleep mid-install.
 grep -q 'IdleActionSec'  /etc/systemd/logind.conf || echo 'IdleActionSec=0'  >> /etc/systemd/logind.conf
 grep -q 'HandleHibernateKey' /etc/systemd/logind.conf || echo 'HandleHibernateKey=ignore' >> /etc/systemd/logind.conf
+grep -q 'HandleLidSwitchDocked' /etc/systemd/logind.conf || echo 'HandleLidSwitchDocked=ignore' >> /etc/systemd/logind.conf
+grep -q 'HandleLidSwitchExternalPower' /etc/systemd/logind.conf || echo 'HandleLidSwitchExternalPower=ignore' >> /etc/systemd/logind.conf
+grep -q 'HandlePowerKey' /etc/systemd/logind.conf && \
+  sed -i 's/^HandlePowerKey=.*/HandlePowerKey=poweroff/' /etc/systemd/logind.conf
+
+# Belt-and-suspenders: mask the sleep targets themselves so nothing on the
+# live/install image — a stray udev rule, a misbehaving app, a battery
+# driver's default — can put the machine to sleep mid-session or mid-install.
+systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target suspend-then-hibernate.target
 
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
@@ -3825,8 +3837,12 @@ public class KibaOOBE : Adw.Application {
     }
 
     private void start_install () {
+        // Delegates disk partitioning/formatting, base pacstrap, and
+        // bootloader install to archinstall instead of libkibadisk's
+        // hand-rolled ioctl code. Same argv shape and PROGRESS/FATAL
+        // stdout protocol as before, so nothing else in this file changes.
         string[] argv = {
-            "sudo", "/usr/local/bin/kibaos-oobe-backend",
+            "sudo", "/usr/local/bin/kibaos-archinstall-backend",
             selected_disk, install_mode, selected_locale, selected_keymap,
             hostname_value, username_value, password_value
         };
@@ -4269,6 +4285,116 @@ ninja -C build install
 cd /
 
 # ── Privileged backend script ─────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════
+# ARCHINSTALL FOR PARTITIONING ONLY — squashfs extraction stays.
+# ══════════════════════════════════════════════════════════════════════════
+# Uses archinstall's `only_hd` script, which — unlike the guided/default
+# script — ONLY partitions, formats, and mounts a disk; it does no pacstrap,
+# no bootloader, no package install. That's exactly the piece worth
+# delegating (archinstall's partitioning is far more battle-tested than
+# libkibadisk's hand-rolled libfdisk code), while everything downstream —
+# squashfs extraction onto the mounted target, configs, user creation,
+# bootloader — stays exactly as kiba_install_extract_image()/
+# kiba_install_write_configs()/kiba_install_finalize() already do it below.
+# kibaos-oobe-backend gets a new `prepartitioned` mode (see main() below)
+# that skips straight to "mount + extract" using the device nodes
+# archinstall just formatted, via KIBA_ROOT_PART/KIBA_ESP_PART env vars.
+#
+# Scope: only_hd's "default_layout" wipes the whole disk, so this only
+# covers `mode=erase`. `mode=alongside` (dual-boot into existing free
+# space + an existing ESP) keeps using the original kiba_gpt_scan()/
+# kiba_gpt_add_partition() path further down — archinstall's manual
+# partitioning mode has a long history of bugs around exactly this
+# "reuse an existing table, only touch the free space" case (see e.g.
+# archlinux/archinstall issues around silent partition failures), so
+# it isn't worth the risk for the less-common dual-boot path.
+#
+# Config field names below match the archinstall 3.x JSON schema as
+# documented, but that schema does shift between releases — run
+# `archinstall --script only_hd --dry-run` against the version pinned in
+# this ISO before shipping to confirm they still match.
+cat > /usr/local/bin/kibaos-archinstall-backend << 'ARCHBACKEND'
+#!/bin/bash
+# Thin shim between the OOBE and the C backend: run archinstall's only_hd
+# script to partition/format/mount the disk, then hand off to
+# kibaos-oobe-backend in "prepartitioned" mode for the squashfs extraction,
+# configs, user account, and bootloader (unchanged from before).
+set -o pipefail
+LOG=/var/log/kibaos-oobe.log
+disk="$1"; mode="$2"; locale="$3"; keymap="$4"
+hostname="$5"; username="$6"; password="$7"
+echo "=== kibaos-archinstall-backend started $(date) ===" >> "$LOG"
+
+if [ "$mode" = "alongside" ]; then
+  # archinstall's manual partitioning isn't reliable enough for "append
+  # into existing free space" yet -- fall straight through to the
+  # original hand-rolled dual-boot path, untouched.
+  exec /usr/local/bin/kibaos-oobe-backend "$disk" "$mode" "$locale" "$keymap" \
+       "$hostname" "$username" "$password"
+fi
+
+echo "PROGRESS 1 Preparing disk layout…"
+# Unquoted heredoc on purpose -- $disk etc. interpolate directly into the
+# JSON, no separate config-generation script needed.
+cat > /tmp/kiba_disk_config.json << DISKCFG
+{
+  "disk_config": {
+    "config_type": "default_layout",
+    "device_modifications": [
+      {
+        "device": "${disk}",
+        "wipe": true,
+        "partitions": [
+          {
+            "type": "primary",
+            "start": "1MiB",
+            "size": "512MiB",
+            "mountpoint": "/boot",
+            "fs_type": "fat32",
+            "flags": ["boot", "esp"]
+          },
+          {
+            "type": "primary",
+            "start": "513MiB",
+            "size": "100%",
+            "mountpoint": "/",
+            "fs_type": "ext4",
+            "flags": []
+          }
+        ]
+      }
+    ]
+  }
+}
+DISKCFG
+
+echo "PROGRESS 4 Partitioning and formatting…"
+archinstall --script only_hd --config /tmp/kiba_disk_config.json --silent \
+  >> "$LOG" 2>&1
+if [ $? -ne 0 ]; then
+  tail -n 1 "$LOG" | sed 's/^/FATAL: /'
+  exit 1
+fi
+
+# only_hd leaves everything mounted under /mnt/archinstall. Resolve which
+# device nodes it actually used, then unmount -- kibaos-oobe-backend does
+# its own mount at /mnt/kibaos-install so the rest of the pipeline (which
+# hardcodes that path) needs zero changes.
+root_part=$(findmnt -n -o SOURCE --target /mnt/archinstall)
+esp_part=$(findmnt -n -o SOURCE --target /mnt/archinstall/boot)
+if [ -z "$root_part" ] || [ -z "$esp_part" ]; then
+  echo "FATAL: Couldn't determine which partitions archinstall created."
+  exit 1
+fi
+umount -R /mnt/archinstall
+
+echo "PROGRESS 8 Handing off to KibaOS installer…"
+KIBA_ROOT_PART="$root_part" KIBA_ESP_PART="$esp_part" \
+  exec /usr/local/bin/kibaos-oobe-backend "$disk" "$mode" "$locale" "$keymap" \
+       "$hostname" "$username" "$password" prepartitioned
+ARCHBACKEND
+chmod +x /usr/local/bin/kibaos-archinstall-backend
+
 # ── Privileged backend: libkibadisk + kibaos-oobe-backend ─────────────────
 # Replaces the old Python/archinstall-based backend entirely. No archinstall,
 # no parted, no blkid/partprobe subprocesses for the disk-critical path --
@@ -5806,9 +5932,9 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     snprintf(path, sizeof(path), "%s/etc/plymouth", target_root);
     mkdir(path, 0755);
     snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
-    write_file(path, "[Daemon]\nTheme=kibaos\nShowDelay=0\nDeviceTimeout=8\n");
+    write_file(path, "[Daemon]\nTheme=numix\nShowDelay=0\nDeviceTimeout=8\n");
     {
-        char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"kibaos", NULL };
+        char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"numix", NULL };
         chroot_run(target_root, argv);
     }
 
@@ -5865,6 +5991,7 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -5943,12 +6070,18 @@ int main(int argc, char **argv) {
              "(virtual disk handling isn't reliable enough yet). "
              "Please install on real hardware.");
     }
-    if (argc != 8) {
+    if (argc != 8 && argc != 9) {
         fprintf(stderr,
-            "usage: %s <disk> <mode: erase|alongside> <locale> <keymap> <hostname> <username> <password>\n",
+            "usage: %s <disk> <mode: erase|alongside> <locale> <keymap> <hostname> <username> <password> [prepartitioned]\n",
             argv[0]);
         return 2;
     }
+    /* "prepartitioned": archinstall's only_hd script already partitioned,
+     * formatted, and mounted the disk (see kibaos-archinstall-backend).
+     * KIBA_ROOT_PART / KIBA_ESP_PART point at the device nodes it used.
+     * Everything from here on (squashfs extraction, configs, user,
+     * bootloader) is unchanged either way. */
+    bool prepartitioned = (argc == 9 && strcmp(argv[8], "prepartitioned") == 0);
     const char *disk     = argv[1];
     const char *mode     = argv[2];
     const char *locale   = argv[3];
@@ -5963,19 +6096,35 @@ int main(int argc, char **argv) {
     }
 
     const char *target_root = "/mnt/kibaos-install";
-
-    /* ── 1-2. Probe + partition (replaces archinstall entirely) ─────── */
-    progress(2, "Reading disk information...");
-    uint32_t ssz = 0;
-    uint64_t total_sectors = 0;
-    if (kiba_gpt_probe_device(disk, &ssz, &total_sectors) != 0) {
-        fail("Could not read disk information.");
-    }
-
     char esp_part[300], root_part[300];
     int esp_partno = 0, root_partno = 0;
 
-    if (!dualboot) {
+    if (prepartitioned) {
+        const char *env_root = getenv("KIBA_ROOT_PART");
+        const char *env_esp  = getenv("KIBA_ESP_PART");
+        if (!env_root || !env_esp) {
+            fail("prepartitioned mode requires KIBA_ROOT_PART/KIBA_ESP_PART to be set.");
+        }
+        snprintf(root_part, sizeof(root_part), "%s", env_root);
+        snprintf(esp_part,  sizeof(esp_part),  "%s", env_esp);
+        /* Trailing digits of the device path are the partition number
+         * (e.g. /dev/sda2 -> 2, /dev/nvme0n1p2 -> 2) -- only used later
+         * to pass through to kiba_install_finalize(). */
+        size_t rl = strlen(root_part);
+        size_t digit_start = rl;
+        while (digit_start > 0 && isdigit((unsigned char)root_part[digit_start - 1])) digit_start--;
+        root_partno = digit_start < rl ? atoi(root_part + digit_start) : 0;
+        progress(2, "Using archinstall's disk layout...");
+    } else {
+        /* ── 1-2. Probe + partition (hand-rolled GPT via libfdisk) ────── */
+        progress(2, "Reading disk information...");
+        uint32_t ssz = 0;
+        uint64_t total_sectors = 0;
+        if (kiba_gpt_probe_device(disk, &ssz, &total_sectors) != 0) {
+            fail("Could not read disk information.");
+        }
+
+        if (!dualboot) {
         /* ── Whole-disk install: wipe and lay down a fresh GPT ───────── */
         progress(6, "Partitioning disk...");
         int disk_fd = open(disk, O_RDWR);
@@ -6067,6 +6216,7 @@ int main(int argc, char **argv) {
         }
         root_partno = new_partno;
         partition_path(disk, root_partno, root_part, sizeof(root_part));
+        }
     }
 
     /* Wait for the kernel/udev to settle before touching the new
@@ -6076,6 +6226,9 @@ int main(int argc, char **argv) {
     }
 
     /* ── 3. Format ─────────────────────────────────────────────────── */
+    /* Skipped entirely in prepartitioned mode -- archinstall's only_hd
+     * script already formatted both partitions per its disk_config. */
+    if (!prepartitioned) {
     progress(10, "Formatting partitions...");
     if (!dualboot) {
         if (kiba_fs_format(esp_part, KIBA_FS_FAT32, "KIBAOS-ESP") != 0) {
@@ -6089,6 +6242,7 @@ int main(int argc, char **argv) {
      * filesystem in this mode. */
     if (kiba_fs_format(root_part, KIBA_FS_EXT4, "KIBAOS-ROOT") != 0) {
         fail(kiba_fs_strerror());
+    }
     }
 
     /* ── 4. Mount ──────────────────────────────────────────────────── */
@@ -6288,63 +6442,22 @@ cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 # ══════════════════════════════════════════════════════════════════════════
-# BOOT SPLASH — Plymouth "kibaos" theme with baked-in logo
+# BOOT SPLASH — Numix Plymouth theme (github.com/numixproject/numix-plymouth-theme)
 # ══════════════════════════════════════════════════════════════════════════
-THEME_DIR="/usr/share/plymouth/themes/kibaos"
-mkdir -p "${THEME_DIR}"
-
-# Reuse the logo already fetched earlier in this script (LOGO_URL →
-# LOGO_256) instead of embedding a second copy as a base64 blob.
-cp "${LOGO_256}" "${THEME_DIR}/logo.png"
-
-# Plymouth theme descriptor
-cat > "${THEME_DIR}/kibaos.plymouth" << 'PLYMOUTHCONF'
-[Plymouth Theme]
-Name=KibaOS
-Description=KibaOS boot splash — liquid glass K on black
-ModuleName=script
-
-[script]
-ImageDir=/usr/share/plymouth/themes/kibaos
-ScriptFile=/usr/share/plymouth/themes/kibaos/kibaos.script
-PLYMOUTHCONF
-
-# Plymouth script — centres the logo and pulses it gently
-cat > "${THEME_DIR}/kibaos.script" << 'PLYSCRIPT'
-logo_image = Image("logo.png");
-logo_width  = logo_image.GetWidth();
-logo_height = logo_image.GetHeight();
-
-screen_width  = Window.GetWidth();
-screen_height = Window.GetHeight();
-
-scale = Math.Min((screen_width  * 0.35) / logo_width,
-                 (screen_height * 0.35) / logo_height);
-
-logo_scaled = logo_image.Scale(logo_width * scale, logo_height * scale);
-
-logo_sprite = Sprite(logo_scaled);
-logo_sprite.SetX((screen_width  - logo_width  * scale) / 2);
-logo_sprite.SetY((screen_height - logo_height * scale) / 2);
-logo_sprite.SetOpacity(1);
-
-counter = 0;
-
-fun refresh_callback() {
-    counter += 1;
-    t = counter / 60.0;
-    opacity = 0.75 + 0.25 * Math.Sin(t * 3.14159 * 0.8);
-    logo_sprite.SetOpacity(opacity);
-}
-
-Plymouth.SetRefreshFunction(refresh_callback);
-PLYSCRIPT
+# Upstream's own install instructions use `update-alternatives`, which is
+# Debian/Ubuntu-only and doesn't exist on Arch — swapped for Arch's own
+# `plymouth-set-default-theme` below. Everything else (clone + `make
+# install`) is upstream's documented process, unchanged.
+NUMIX_BUILD="/tmp/numix-plymouth-theme"
+rm -rf "${NUMIX_BUILD}"
+git clone --depth 1 https://github.com/numixproject/numix-plymouth-theme.git "${NUMIX_BUILD}"
+make -C "${NUMIX_BUILD}" install
 
 # Plymouth daemon config — must be written before mkinitcpio bakes it in
 mkdir -p /etc/plymouth
 cat > /etc/plymouth/plymouthd.conf << 'PLYMOUTHD'
 [Daemon]
-Theme=kibaos
+Theme=numix
 ShowDelay=0
 DeviceTimeout=8
 PLYMOUTHD
@@ -6357,8 +6470,35 @@ PLYMOUTHD
 # rebuild in here just gets overwritten — and running it against the wrong
 # config (installed.conf, which is for the INSTALLED system, not this live
 # ISO) was actively wrong on top of being redundant.
-plymouth-set-default-theme kibaos 2>/dev/null || true
-echo "=== Boot splash: Plymouth kibaos theme installed ==="
+plymouth-set-default-theme numix 2>/dev/null || true
+rm -rf "${NUMIX_BUILD}"
+echo "=== Boot splash: Numix Plymouth theme installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# ICON THEME — Numix Circle (github.com/numixproject/numix-icon-theme-circle)
+# ══════════════════════════════════════════════════════════════════════════
+# Unlike the Plymouth theme, this repo ships no Makefile/install script —
+# just the two theme directories themselves (Numix-Circle and its lighter
+# variant) — so installing it is a straight copy into /usr/share/icons.
+# There's no official Arch package either (only an AUR git package that
+# builds from this same repo); cloning directly is simpler and keeps this
+# script free of AUR/makepkg dependency resolution.
+#
+# Note: Numix Circle is an APP icon theme only — its index.theme Inherits=
+# chain falls back to the base Numix theme (and then Adwaita/hicolor) for
+# places/devices/mimetypes/actions. We're not installing the base numix-
+# icon-theme here since it wasn't asked for, so non-app icons will fall
+# back to whatever adwaita-icon-theme/hicolor already provides. Say the
+# word if you want the base theme installed too for full coverage.
+NUMIX_ICONS_BUILD="/tmp/numix-icon-theme-circle"
+rm -rf "${NUMIX_ICONS_BUILD}"
+git clone --depth 1 https://github.com/numixproject/numix-icon-theme-circle.git "${NUMIX_ICONS_BUILD}"
+cp -r "${NUMIX_ICONS_BUILD}/Numix-Circle" "${NUMIX_ICONS_BUILD}/Numix-Circle-Light" /usr/share/icons/
+gtk-update-icon-cache -f /usr/share/icons/Numix-Circle 2>/dev/null || true
+gtk-update-icon-cache -f /usr/share/icons/Numix-Circle-Light 2>/dev/null || true
+rm -rf "${NUMIX_ICONS_BUILD}"
+echo "=== Icon theme: Numix Circle installed ==="
+
 
 # ══════════════════════════════════════════════════════════════════════════
 # GTK THEME — system-wide Adwaita-dark base + KibaOS rounded-rectangle panel override
@@ -6366,7 +6506,7 @@ echo "=== Boot splash: Plymouth kibaos theme installed ==="
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
 gtk-theme-name = "Adwaita-dark"
-gtk-icon-theme-name = "Papirus-Dark"
+gtk-icon-theme-name = "Numix-Circle"
 gtk-font-name = "Noto Sans 11"
 gtk-cursor-theme-size = 24
 gtk-toolbar-style = GTK_TOOLBAR_ICONS
@@ -6382,7 +6522,7 @@ mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
 gtk-theme-name=Adwaita-dark
-gtk-icon-theme-name=Papirus-Dark
+gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
@@ -7424,7 +7564,7 @@ NEMODESKTOP
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
 gtk-theme-name=Adwaita-dark
-gtk-icon-theme-name=Papirus-Dark
+gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
 gtk-xft-antialias=1
@@ -7441,7 +7581,7 @@ cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
 gtk-theme-name="Adwaita-dark"
-gtk-icon-theme-name="Papirus-Dark"
+gtk-icon-theme-name="Numix-Circle"
 gtk-font-name="Noto Sans 11"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
@@ -7469,7 +7609,7 @@ STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
 gsettings set org.gnome.desktop.interface gtk-theme               'Adwaita-dark'
-gsettings set org.gnome.desktop.interface icon-theme              'Papirus-Dark'
+gsettings set org.gnome.desktop.interface icon-theme              'Numix-Circle'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
 gsettings set org.gnome.desktop.interface font-name               'Noto Sans 11'
@@ -7804,6 +7944,209 @@ NoDisplay=true
 X-GNOME-Autostart-Phase=Initialization
 FIRSTLOGINDESK
 
+# ══════════════════════════════════════════════════════════════════════════
+# KIBAPKG — friendly libalpm-backed package manager, invoked as `kiba`
+# ══════════════════════════════════════════════════════════════════════════
+# Talks to libalpm directly via pyalpm (no shelling out to pacman), and
+# translates its transaction/event callbacks into plain-language status
+# lines instead of pacman's raw resolver/conflict/signature jargon. Reads
+# repo names + mirror servers straight from pacman.conf/mirrorlist so it
+# stays in sync with whatever the system is actually configured to use.
+mkdir -p /usr/share/kibapkg
+cat > /usr/share/kibapkg/kibapkg.py << 'KIBAPKG'
+#!/usr/bin/env python3
+"""kibapkg — a friendly front-end to libalpm (via pyalpm) for KibaOS.
+Invoked as `kiba`. Talks to libalpm directly; never shells out to pacman."""
+import os
+import re
+import sys
+import pyalpm
+
+ROOT = "/"
+DBPATH = "/var/lib/pacman"
+PACMAN_CONF = "/etc/pacman.conf"
+MIRRORLIST = "/etc/pacman.d/mirrorlist"
+
+
+def die(msg):
+    print(f"kiba: {msg}")
+    sys.exit(1)
+
+
+def need_root():
+    if os.geteuid() != 0:
+        os.execvp("sudo", ["sudo", sys.executable, __file__] + sys.argv[1:])
+
+
+def active_mirrors(limit=5):
+    mirrors = []
+    if os.path.exists(MIRRORLIST):
+        with open(MIRRORLIST) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("Server"):
+                    url = line.split("=", 1)[1].strip()
+                    mirrors.append(url)
+                    if len(mirrors) >= limit:
+                        break
+    return mirrors
+
+
+def repo_names():
+    repos = []
+    if os.path.exists(PACMAN_CONF):
+        with open(PACMAN_CONF) as f:
+            for line in f:
+                m = re.match(r"^\[(\w+)\]$", line.strip())
+                if m and m.group(1) != "options":
+                    repos.append(m.group(1))
+    return repos or ["core", "extra", "multilib"]
+
+
+def make_handle():
+    h = pyalpm.Handle(ROOT, DBPATH)
+    mirrors = active_mirrors()
+    for repo in repo_names():
+        db = h.register_syncdb(repo, pyalpm.SIG_DATABASE_OPTIONAL)
+        db.servers = [m.replace("$repo", repo).replace("$arch", "x86_64") for m in mirrors]
+    return h
+
+
+def cb_event(*_):
+    pass  # kept silent on purpose — kiba prints its own plain-language status
+
+
+def run_transaction(h, build_trans, verb):
+    h.dlcb = lambda name, xfered, total: None
+    h.eventcb = cb_event
+    t = h.init_transaction()
+    try:
+        build_trans(h, t)
+        t.prepare()
+        if not t.to_add and not t.to_remove:
+            print(f"kiba: nothing to {verb}.")
+            t.release()
+            return
+        for pkg in t.to_add:
+            print(f"  + {pkg.name} {pkg.version}")
+        for pkg in t.to_remove:
+            print(f"  - {pkg.name} {pkg.version}")
+        t.commit()
+        print(f"kiba: {verb} complete.")
+    except pyalpm.error as e:
+        print(f"kiba: couldn't {verb} that — {e}")
+        sys.exit(1)
+    finally:
+        try:
+            t.release()
+        except Exception:
+            pass
+
+
+def cmd_search(h, terms):
+    seen = set()
+    for db in h.get_syncdbs():
+        for pkg in db.search(terms):
+            if pkg.name not in seen:
+                seen.add(pkg.name)
+                print(f"{pkg.name:<28} {pkg.version:<16} {pkg.desc}")
+
+
+def cmd_list(h):
+    for pkg in h.get_localdb().pkgcache:
+        print(f"{pkg.name:<28} {pkg.version}")
+
+
+def cmd_info(h, name):
+    pkg = h.get_localdb().get_pkg(name)
+    source = "installed"
+    if pkg is None:
+        for db in h.get_syncdbs():
+            pkg = db.get_pkg(name)
+            if pkg:
+                source = f"available in {db.name}"
+                break
+    if pkg is None:
+        die(f"no package named '{name}'")
+    print(f"{pkg.name}  {pkg.version}  ({source})")
+    print(pkg.desc)
+
+
+def cmd_install(h, names):
+    def build(h, t):
+        for name in names:
+            pkg = None
+            for db in h.get_syncdbs():
+                pkg = db.get_pkg(name)
+                if pkg:
+                    break
+            if pkg is None:
+                die(f"no package named '{name}'")
+            t.add_pkg(pkg)
+    run_transaction(h, build, "install")
+
+
+def cmd_remove(h, names):
+    def build(h, t):
+        for name in names:
+            pkg = h.get_localdb().get_pkg(name)
+            if pkg is None:
+                die(f"'{name}' isn't installed")
+            t.remove_pkg(pkg)
+    run_transaction(h, build, "remove")
+
+
+def cmd_update(h):
+    def build(h, t):
+        for db in h.get_syncdbs():
+            db.update(force=False)
+        h.sysupgrade(downgrade=False)
+    run_transaction(h, build, "update")
+
+
+HELP = """kiba — the KibaOS package manager
+
+  kiba install <name...>   install one or more apps
+  kiba remove  <name...>   remove one or more apps
+  kiba update              update everything
+  kiba search  <term>      search for an app
+  kiba list                list installed apps
+  kiba info    <name>      show details about an app
+"""
+
+
+def main():
+    args = sys.argv[1:]
+    if not args or args[0] in ("-h", "--help", "help"):
+        print(HELP)
+        return
+    cmd, rest = args[0], args[1:]
+    if cmd in ("install", "remove", "update"):
+        need_root()
+    h = make_handle()
+    if cmd == "install" and rest:
+        cmd_install(h, rest)
+    elif cmd == "remove" and rest:
+        cmd_remove(h, rest)
+    elif cmd == "update":
+        cmd_update(h)
+    elif cmd == "search" and rest:
+        cmd_search(h, rest)
+    elif cmd == "list":
+        cmd_list(h)
+    elif cmd == "info" and rest:
+        cmd_info(h, rest[0])
+    else:
+        print(HELP)
+
+
+if __name__ == "__main__":
+    main()
+KIBAPKG
+chmod +x /usr/share/kibapkg/kibapkg.py
+ln -sf /usr/share/kibapkg/kibapkg.py /usr/local/bin/kiba
+ln -sf /usr/share/kibapkg/kibapkg.py /usr/local/bin/kibapkg
+
 cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
 Name=Install KibaOS
@@ -7859,6 +8202,51 @@ for _bcc_desk in budgie-control-center.desktop \
         "/usr/share/applications/${_bcc_desk}" || true
     # Strip any localised Name[xx]=… lines so they don't override our label
     sed -i '/^Name\[/d' "/usr/share/applications/${_bcc_desk}" || true
+  fi
+done
+
+# ── Rename GNOME Software so it doesn't expose the "gnome-software"/Flathub
+# plumbing in its name; consumers should just see "App Store".
+for _sw_desk in org.gnome.Software.desktop; do
+  if [ -f "/usr/share/applications/${_sw_desk}" ]; then
+    sed -i 's/^Name=.*/Name=App Store/' "/usr/share/applications/${_sw_desk}" || true
+    sed -i '/^Name\[/d' "/usr/share/applications/${_sw_desk}" || true
+  fi
+done
+
+# ── Hide the raw NetworkManager connection editor (nm-connection-editor) —
+# advanced tabs (802.1x, bonding, IPv6 routing metrics) are pure plumbing
+# for a consumer OS; Wi-Fi/wired toggling stays exposed via the panel applet.
+if [ -f "/usr/share/applications/nm-connection-editor.desktop" ]; then
+  sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/nm-connection-editor.desktop" || true
+  grep -q '^NoDisplay=' "/usr/share/applications/nm-connection-editor.desktop" \
+    || echo 'NoDisplay=true' >> "/usr/share/applications/nm-connection-editor.desktop"
+fi
+
+# ── Disable Magic SysRq — a raw kernel-debugging keyboard backdoor that has
+# no business being reachable from a consumer desktop.
+echo 'kernel.sysrq = 0' > /etc/sysctl.d/50-kibaos-disable-sysrq.conf
+
+# ── Restrict virtual-terminal switching: Ctrl+Alt+F2 etc. are handled by the
+# kernel's VT layer, not the compositor, so this can't be blocked from
+# Wayfire config. Instead, remove what's waiting on the other VTs — cap
+# logind to one auto-spawned VT and mask the extra getty units so
+# Ctrl+Alt+F2-F6 land on an empty console with no login prompt to reach.
+grep -q '^NAutoVTs' /etc/systemd/logind.conf \
+  && sed -i 's/^NAutoVTs=.*/NAutoVTs=1/' /etc/systemd/logind.conf \
+  || echo 'NAutoVTs=1' >> /etc/systemd/logind.conf
+systemctl mask getty@tty2.service getty@tty3.service getty@tty4.service \
+                getty@tty5.service getty@tty6.service
+
+# ── De-brand Chromium: keep the engine (site/extension/DRM compatibility),
+# strip the corporate name/icon so it doesn't read as "Google Chromium" in
+# the app grid. Icon is swapped for a flat single-color glyph consistent
+# with the rest of the KibaOS icon set.
+for _chromium_desk in chromium.desktop; do
+  if [ -f "/usr/share/applications/${_chromium_desk}" ]; then
+    sed -i 's/^Name=.*/Name=Browser/' "/usr/share/applications/${_chromium_desk}" || true
+    sed -i '/^Name\[/d' "/usr/share/applications/${_chromium_desk}" || true
+    sed -i 's/^Icon=.*/Icon=kibaos-browser/' "/usr/share/applications/${_chromium_desk}" || true
   fi
 done
 
@@ -7985,6 +8373,11 @@ chown -R 1000:1000 /home/liveuser
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 runuser -u liveuser -- dbus-run-session -- bash -c '
   dconf write /com/solus-project/budgie-panel/panels "@as []"
+  # GNOME Console (kgx) is already the simplest terminal available — single
+  # window, no tabs UI, no menu bar by design. Just quiet the bell and use
+  # its own clean default font instead of inheriting a monospace override.
+  dconf write /org/gnome/Console/audible-bell false
+  dconf write /org/gnome/Console/custom-font-enabled false
 '
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
