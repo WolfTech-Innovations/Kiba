@@ -128,7 +128,7 @@ debugedit
 base-devel
 archinstall
 python
-pyalpm
+python-pyalpm
 wine
 wine-mono
 lib32-mesa
@@ -4338,8 +4338,28 @@ echo "PROGRESS 1 Preparing disk layout…"
 # objects (not "512MiB"-style strings) and wants a per-partition obj_id
 # UUID -- matched against actual archinstall 3.x --silent configs, not the
 # simplified examples in the docs.
+#
+# NOTE: current archinstall's Unit enum has NO "Percent" member -- that was
+# removed at some point after the docs/examples were written. Size.parse_args
+# does Unit[size_arg['unit']], a literal enum-name lookup, so "Percent"
+# raises KeyError: 'Percent'. There is no "fill the rest of the disk" token
+# anymore -- we have to compute the actual end size ourselves. archinstall's
+# own bounds check requires the last partition's end to be <= (total_size -
+# 1 MiB) on GPT disks (Size.gpt_end()), so gpt_safety_mib below only needs
+# to clear 1 MiB -- kept at 2 for integer-division/rounding slack.
 boot_obj_id=$(cat /proc/sys/kernel/random/uuid)
 root_obj_id=$(cat /proc/sys/kernel/random/uuid)
+
+disk_bytes=$(lsblk -b -dn -o SIZE "${disk}")
+disk_mib=$(( disk_bytes / 1048576 ))
+root_start_mib=513
+gpt_safety_mib=2
+root_size_mib=$(( disk_mib - root_start_mib - gpt_safety_mib ))
+
+if [ "$root_size_mib" -lt 1024 ]; then
+  echo "ERROR: computed root partition size (${root_size_mib}MiB) is too small -- disk ${disk} may be smaller than expected (${disk_mib}MiB total)" >> "$LOG"
+  exit 1
+fi
 
 # Unquoted heredoc on purpose -- $disk etc. interpolate directly into the
 # JSON, no separate config-generation script needed.
@@ -4384,8 +4404,8 @@ cat > /tmp/kiba_disk_config.json << DISKCFG
             },
             "size": {
               "sector_size": {"unit": "B", "value": 512},
-              "unit": "Percent",
-              "value": 100
+              "unit": "MiB",
+              "value": ${root_size_mib}
             },
             "mountpoint": "/",
             "fs_type": "ext4",
