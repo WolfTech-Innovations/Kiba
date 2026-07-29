@@ -126,7 +126,7 @@ budgie-session
 gcc
 debugedit
 base-devel
-archinstall
+archinstall<3.0.13
 python
 pyalpm
 wine
