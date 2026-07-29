@@ -128,7 +128,7 @@ debugedit
 base-devel
 archinstall
 python
-pyalpm
+python-pyalpm
 wine
 wine-mono
 lib32-mesa
@@ -4334,6 +4334,13 @@ if [ "$mode" = "alongside" ]; then
 fi
 
 echo "PROGRESS 1 Preparing disk layout…"
+# archinstall's real config schema nests sizes as {sector_size,unit,value}
+# objects (not "512MiB"-style strings) and wants a per-partition obj_id
+# UUID -- matched against actual archinstall 3.x --silent configs, not the
+# simplified examples in the docs.
+boot_obj_id=$(cat /proc/sys/kernel/random/uuid)
+root_obj_id=$(cat /proc/sys/kernel/random/uuid)
+
 # Unquoted heredoc on purpose -- $disk etc. interpolate directly into the
 # JSON, no separate config-generation script needed.
 cat > /tmp/kiba_disk_config.json << DISKCFG
@@ -4346,20 +4353,46 @@ cat > /tmp/kiba_disk_config.json << DISKCFG
         "wipe": true,
         "partitions": [
           {
+            "obj_id": "${boot_obj_id}",
+            "status": "create",
             "type": "primary",
-            "start": "1MiB",
-            "size": "512MiB",
+            "start": {
+              "sector_size": {"unit": "B", "value": 512},
+              "unit": "MiB",
+              "value": 1
+            },
+            "size": {
+              "sector_size": {"unit": "B", "value": 512},
+              "unit": "MiB",
+              "value": 512
+            },
             "mountpoint": "/boot",
             "fs_type": "fat32",
-            "flags": ["boot", "esp"]
+            "mount_options": [],
+            "flags": ["boot", "esp"],
+            "btrfs": [],
+            "dev_path": null
           },
           {
+            "obj_id": "${root_obj_id}",
+            "status": "create",
             "type": "primary",
-            "start": "513MiB",
-            "size": "100%",
+            "start": {
+              "sector_size": {"unit": "B", "value": 512},
+              "unit": "MiB",
+              "value": 513
+            },
+            "size": {
+              "sector_size": {"unit": "B", "value": 512},
+              "unit": "Percent",
+              "value": 100
+            },
             "mountpoint": "/",
             "fs_type": "ext4",
-            "flags": []
+            "mount_options": [],
+            "flags": [],
+            "btrfs": [],
+            "dev_path": null
           }
         ]
       }
