@@ -149,6 +149,7 @@ libnotify
 swayidle
 gtklock
 wlopm
+intltool
 nemo
 nemo-fileroller
 gnome-console
