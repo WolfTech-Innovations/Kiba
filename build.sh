@@ -149,6 +149,7 @@ libnotify
 swayidle
 gtklock
 wlopm
+wlr-randr
 nemo
 nemo-fileroller
 gnome-console
@@ -3888,12 +3889,11 @@ public class KibaOOBE : Adw.Application {
     }
 
     private void start_install () {
-        // Delegates disk partitioning/formatting, base pacstrap, and
-        // bootloader install to archinstall instead of libkibadisk's
-        // hand-rolled ioctl code. Same argv shape and PROGRESS/FATAL
-        // stdout protocol as before, so nothing else in this file changes.
+        // Disk partitioning/formatting, base extraction, and bootloader
+        // install all go through libkibadisk (libfdisk-backed GPT writer)
+        // in kibaos-oobe-backend directly -- no archinstall detour.
         string[] argv = {
-            "sudo", "/usr/local/bin/kibaos-archinstall-backend",
+            "sudo", "/usr/local/bin/kibaos-oobe-backend",
             selected_disk, install_mode, selected_locale, selected_keymap,
             hostname_value, username_value, password_value
         };
@@ -4337,228 +4337,6 @@ meson setup build --prefix=/usr || { echo "FATAL: meson setup failed for kibaos-
 ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check the Vala compile errors above." >&2; exit 1; }
 ninja -C build install
 cd /
-
-# ══════════════════════════════════════════════════════════════════════════
-# ARCHINSTALL — built from source, pinned to 3.0.12
-# ══════════════════════════════════════════════════════════════════════════
-# 3.0.13 (archlinux/archinstall#3879) replaced the plain wifi handling with
-# a textual-based wifi connection menu. That menu expects an interactive
-# TTY and breaks the non-interactive `only_hd --config ... --silent` flow
-# kibaos-archinstall-backend relies on below, so pacman's plain `archinstall`
-# package (always latest) is no longer installed via packages.x86_64 —
-# we build the last pre-3.0.13 release from source instead, straight into
-# this chroot, same approach as the wayfire-plugins-extra/wfctl build
-# further down.
-#
-# pyparted needs libparted's headers/lib to compile its C extension against
-# (see `parted` in packages.x86_64) and a compiler (gcc/base-devel, already
-# installed above). pydantic and cryptography are pulled in automatically
-# by pip from archinstall's own pyproject.toml — no extra pacman packages
-# needed for those.
-echo "=== Building archinstall 3.0.12 from source (pinned below 3.0.13's wifi TUI) ==="
-pacman -S --noconfirm --needed parted python-pip git
-git clone --depth=1 --branch 3.0.12 https://github.com/archlinux/archinstall /tmp/archinstall
-cd /tmp/archinstall
-pip install --break-system-packages --no-cache-dir .
-cd /
-rm -rf /tmp/archinstall
-installed_ver="$(archinstall --version 2>/dev/null || true)"
-echo "=== archinstall installed: ${installed_ver:-<version check failed>} ==="
-case "$installed_ver" in
-  *3.0.13*|*3.0.14*|*3.0.15*|*4.*)
-    echo "FATAL: archinstall resolved to $installed_ver, not the pinned 3.0.12 build — aborting." >&2
-    exit 1
-    ;;
-esac
-
-# ── Privileged backend script ─────────────────────────────────────────────
-# ══════════════════════════════════════════════════════════════════════════
-# ARCHINSTALL FOR PARTITIONING ONLY — squashfs extraction stays.
-# ══════════════════════════════════════════════════════════════════════════
-# Uses archinstall's `only_hd` script, which — unlike the guided/default
-# script — ONLY partitions, formats, and mounts a disk; it does no pacstrap,
-# no bootloader, no package install. That's exactly the piece worth
-# delegating (archinstall's partitioning is far more battle-tested than
-# libkibadisk's hand-rolled libfdisk code), while everything downstream —
-# squashfs extraction onto the mounted target, configs, user creation,
-# bootloader — stays exactly as kiba_install_extract_image()/
-# kiba_install_write_configs()/kiba_install_finalize() already do it below.
-# kibaos-oobe-backend gets a new `prepartitioned` mode (see main() below)
-# that skips straight to "mount + extract" using the device nodes
-# archinstall just formatted, via KIBA_ROOT_PART/KIBA_ESP_PART env vars.
-#
-# Scope: only_hd's "default_layout" wipes the whole disk, so this only
-# covers `mode=erase`. `mode=alongside` (dual-boot into existing free
-# space + an existing ESP) keeps using the original kiba_gpt_scan()/
-# kiba_gpt_add_partition() path further down — archinstall's manual
-# partitioning mode has a long history of bugs around exactly this
-# "reuse an existing table, only touch the free space" case (see e.g.
-# archlinux/archinstall issues around silent partition failures), so
-# it isn't worth the risk for the less-common dual-boot path.
-#
-# Config field names below match the archinstall 3.x JSON schema as
-# documented, but that schema does shift between releases — run
-# `archinstall --script only_hd --dry-run` against the version pinned in
-# this ISO before shipping to confirm they still match.
-cat > /usr/local/bin/kibaos-archinstall-backend << 'ARCHBACKEND'
-#!/bin/bash
-# Thin shim between the OOBE and the C backend: run archinstall's only_hd
-# script to partition/format/mount the disk, then hand off to
-# kibaos-oobe-backend in "prepartitioned" mode for the squashfs extraction,
-# configs, user account, and bootloader (unchanged from before).
-set -o pipefail
-LOG=/var/log/kibaos-oobe.log
-disk="$1"; mode="$2"; locale="$3"; keymap="$4"
-hostname="$5"; username="$6"; password="$7"
-echo "=== kibaos-archinstall-backend started $(date) ===" >> "$LOG"
-
-if [ "$mode" = "alongside" ]; then
-  # archinstall's manual partitioning isn't reliable enough for "append
-  # into existing free space" yet -- fall straight through to the
-  # original hand-rolled dual-boot path, untouched.
-  exec /usr/local/bin/kibaos-oobe-backend "$disk" "$mode" "$locale" "$keymap" \
-       "$hostname" "$username" "$password"
-fi
-
-echo "PROGRESS 1 Preparing disk layout…"
-# archinstall's real config schema nests sizes as {sector_size,unit,value}
-# objects (not "512MiB"-style strings) and wants a per-partition obj_id
-# UUID -- matched against actual archinstall 3.x --silent configs, not the
-# simplified examples in the docs.
-#
-# NOTE: current archinstall's Unit enum has NO "Percent" member -- that was
-# removed at some point after the docs/examples were written. Size.parse_args
-# does Unit[size_arg['unit']], a literal enum-name lookup, so "Percent"
-# raises KeyError: 'Percent'. There is no "fill the rest of the disk" token
-# anymore -- we have to compute the actual end size ourselves. archinstall's
-# own bounds check requires the last partition's end to be <= (total_size -
-# 1 MiB) on GPT disks (Size.gpt_end()), so gpt_safety_mib below only needs
-# to clear 1 MiB -- kept at 2 for integer-division/rounding slack.
-boot_obj_id=$(cat /proc/sys/kernel/random/uuid)
-root_obj_id=$(cat /proc/sys/kernel/random/uuid)
-
-disk_bytes=$(lsblk -b -dn -o SIZE "${disk}")
-disk_mib=$(( disk_bytes / 1048576 ))
-root_start_mib=513
-gpt_safety_mib=2
-root_size_mib=$(( disk_mib - root_start_mib - gpt_safety_mib ))
-
-if [ "$root_size_mib" -lt 1024 ]; then
-  echo "ERROR: computed root partition size (${root_size_mib}MiB) is too small -- disk ${disk} may be smaller than expected (${disk_mib}MiB total)" >> "$LOG"
-  exit 1
-fi
-
-# Unquoted heredoc on purpose -- $disk etc. interpolate directly into the
-# JSON, no separate config-generation script needed.
-cat > /tmp/kiba_disk_config.json << DISKCFG
-{
-  "disk_config": {
-    "config_type": "default_layout",
-    "device_modifications": [
-      {
-        "device": "${disk}",
-        "wipe": true,
-        "partitions": [
-          {
-            "obj_id": "${boot_obj_id}",
-            "status": "create",
-            "type": "primary",
-            "start": {
-              "sector_size": {"unit": "B", "value": 512},
-              "unit": "MiB",
-              "value": 1
-            },
-            "size": {
-              "sector_size": {"unit": "B", "value": 512},
-              "unit": "MiB",
-              "value": 512
-            },
-            "mountpoint": "/boot",
-            "fs_type": "fat32",
-            "mount_options": [],
-            "flags": ["boot", "esp"],
-            "btrfs": [],
-            "dev_path": null
-          },
-          {
-            "obj_id": "${root_obj_id}",
-            "status": "create",
-            "type": "primary",
-            "start": {
-              "sector_size": {"unit": "B", "value": 512},
-              "unit": "MiB",
-              "value": 513
-            },
-            "size": {
-              "sector_size": {"unit": "B", "value": 512},
-              "unit": "MiB",
-              "value": ${root_size_mib}
-            },
-            "mountpoint": "/",
-            "fs_type": "ext4",
-            "mount_options": [],
-            "flags": [],
-            "btrfs": [],
-            "dev_path": null
-          }
-        ]
-      }
-    ]
-  }
-}
-DISKCFG
-
-echo "PROGRESS 4 Partitioning and formatting…"
-archinstall --script only_hd --config /tmp/kiba_disk_config.json --silent \
-  >> "$LOG" 2>&1
-if [ $? -ne 0 ]; then
-  tail -n 1 "$LOG" | sed 's/^/FATAL: /'
-  exit 1
-fi
-# only_hd is disk-work only by design (see comment block above this script) --
-# it deliberately never runs the package-install phase, so archinstall's own
-# config-completion summary reports "base" (and other install-phase keys) as
-# not-yet-done on exit. That line is expected here and is NOT what the exit
-# code above is guarding -- base gets installed later via the squashfs
-# extraction in kibaos-oobe-backend, not via archinstall. Left in the log
-# only so it isn't mistaken for a real failure when triaging.
-echo "NOTE: the 'required steps ... base' line above from archinstall is expected -- base is installed via squashfs extraction, not by only_hd." >> "$LOG"
-
-# only_hd leaves everything mounted under plain /mnt (confirmed from a real
-# run's lsblk output: root -> /mnt, ESP -> /mnt/boot -- NOT /mnt/archinstall,
-# which was a wrong assumption from an older archinstall version/config).
-# Keep a short udev-settle retry as cheap insurance against the new
-# partition device nodes lagging a beat after wipe+create, but check the
-# real mountpoints.
-udevadm settle --timeout=10 2>/dev/null || true
-
-root_part=""
-esp_part=""
-for _try in 1 2 3 4 5; do
-  root_part=$(findmnt -n -o SOURCE --target /mnt 2>/dev/null)
-  esp_part=$(findmnt -n -o SOURCE --target /mnt/boot 2>/dev/null)
-  [ -n "$root_part" ] && [ -n "$esp_part" ] && break
-  sleep 1
-  udevadm settle --timeout=5 2>/dev/null || true
-done
-
-if [ -z "$root_part" ] || [ -z "$esp_part" ]; then
-  echo "FATAL: Couldn't determine which partitions archinstall created." >> "$LOG"
-  echo "-- findmnt /mnt state --" >> "$LOG"
-  findmnt -R /mnt >> "$LOG" 2>&1 || true
-  echo "-- lsblk ${disk} state --" >> "$LOG"
-  lsblk "${disk}" >> "$LOG" 2>&1 || true
-  tail -n 1 "$LOG" | sed 's/^/FATAL: /'
-  exit 1
-fi
-umount -R /mnt
-
-echo "PROGRESS 8 Handing off to KibaOS installer…"
-KIBA_ROOT_PART="$root_part" KIBA_ESP_PART="$esp_part" \
-  exec /usr/local/bin/kibaos-oobe-backend "$disk" "$mode" "$locale" "$keymap" \
-       "$hostname" "$username" "$password" prepartitioned
-ARCHBACKEND
-chmod +x /usr/local/bin/kibaos-archinstall-backend
 
 # ── Privileged backend: libkibadisk + kibaos-oobe-backend ─────────────────
 # Replaces the old Python/archinstall-based backend entirely. No archinstall,
@@ -6260,18 +6038,12 @@ int main(int argc, char **argv) {
              "(virtual disk handling isn't reliable enough yet). "
              "Please install on real hardware.");
     }
-    if (argc != 8 && argc != 9) {
+    if (argc != 8) {
         fprintf(stderr,
-            "usage: %s <disk> <mode: erase|alongside> <locale> <keymap> <hostname> <username> <password> [prepartitioned]\n",
+            "usage: %s <disk> <mode: erase|alongside> <locale> <keymap> <hostname> <username> <password>\n",
             argv[0]);
         return 2;
     }
-    /* "prepartitioned": archinstall's only_hd script already partitioned,
-     * formatted, and mounted the disk (see kibaos-archinstall-backend).
-     * KIBA_ROOT_PART / KIBA_ESP_PART point at the device nodes it used.
-     * Everything from here on (squashfs extraction, configs, user,
-     * bootloader) is unchanged either way. */
-    bool prepartitioned = (argc == 9 && strcmp(argv[8], "prepartitioned") == 0);
     const char *disk     = argv[1];
     const char *mode     = argv[2];
     const char *locale   = argv[3];
@@ -6289,32 +6061,15 @@ int main(int argc, char **argv) {
     char esp_part[300], root_part[300];
     int esp_partno = 0, root_partno = 0;
 
-    if (prepartitioned) {
-        const char *env_root = getenv("KIBA_ROOT_PART");
-        const char *env_esp  = getenv("KIBA_ESP_PART");
-        if (!env_root || !env_esp) {
-            fail("prepartitioned mode requires KIBA_ROOT_PART/KIBA_ESP_PART to be set.");
-        }
-        snprintf(root_part, sizeof(root_part), "%s", env_root);
-        snprintf(esp_part,  sizeof(esp_part),  "%s", env_esp);
-        /* Trailing digits of the device path are the partition number
-         * (e.g. /dev/sda2 -> 2, /dev/nvme0n1p2 -> 2) -- only used later
-         * to pass through to kiba_install_finalize(). */
-        size_t rl = strlen(root_part);
-        size_t digit_start = rl;
-        while (digit_start > 0 && isdigit((unsigned char)root_part[digit_start - 1])) digit_start--;
-        root_partno = digit_start < rl ? atoi(root_part + digit_start) : 0;
-        progress(2, "Using archinstall's disk layout...");
-    } else {
-        /* ── 1-2. Probe + partition (hand-rolled GPT via libfdisk) ────── */
-        progress(2, "Reading disk information...");
-        uint32_t ssz = 0;
-        uint64_t total_sectors = 0;
-        if (kiba_gpt_probe_device(disk, &ssz, &total_sectors) != 0) {
-            fail("Could not read disk information.");
-        }
+    /* ── 1-2. Probe + partition (GPT via libfdisk) ───────────────────── */
+    progress(2, "Reading disk information...");
+    uint32_t ssz = 0;
+    uint64_t total_sectors = 0;
+    if (kiba_gpt_probe_device(disk, &ssz, &total_sectors) != 0) {
+        fail("Could not read disk information.");
+    }
 
-        if (!dualboot) {
+    if (!dualboot) {
         /* ── Whole-disk install: wipe and lay down a fresh GPT ───────── */
         progress(6, "Partitioning disk...");
         int disk_fd = open(disk, O_RDWR);
@@ -6406,7 +6161,6 @@ int main(int argc, char **argv) {
         }
         root_partno = new_partno;
         partition_path(disk, root_partno, root_part, sizeof(root_part));
-        }
     }
 
     /* Wait for the kernel/udev to settle before touching the new
@@ -6416,9 +6170,6 @@ int main(int argc, char **argv) {
     }
 
     /* ── 3. Format ─────────────────────────────────────────────────── */
-    /* Skipped entirely in prepartitioned mode -- archinstall's only_hd
-     * script already formatted both partitions per its disk_config. */
-    if (!prepartitioned) {
     progress(10, "Formatting partitions...");
     if (!dualboot) {
         if (kiba_fs_format(esp_part, KIBA_FS_FAT32, "KIBAOS-ESP") != 0) {
@@ -6432,7 +6183,6 @@ int main(int argc, char **argv) {
      * filesystem in this mode. */
     if (kiba_fs_format(root_part, KIBA_FS_EXT4, "KIBAOS-ROOT") != 0) {
         fail(kiba_fs_strerror());
-    }
     }
 
     /* ── 4. Mount ──────────────────────────────────────────────────── */
@@ -8869,7 +8619,6 @@ DESKTOP_SESSION=budgie-desktop
 XDG_CURRENT_DESKTOP=Budgie:GNOME
 XDG_SESSION_DESKTOP=budgie-desktop
 XDG_SESSION_TYPE=wayland
-QT_AUTO_SCREEN_SCALE_FACTOR=1
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
 GTK_THEME=Adwaita-dark
