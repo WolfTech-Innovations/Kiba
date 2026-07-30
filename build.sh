@@ -148,6 +148,14 @@ tesseract-data-eng
 libnotify
 swayidle
 gtklock
+gtk2
+gtk-doc
+pkgconf
+intltool
+autoconf
+automake
+libtool
+base-devel
 wlopm
 intltool
 nemo
