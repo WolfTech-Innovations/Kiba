@@ -148,15 +148,7 @@ tesseract-data-eng
 libnotify
 swayidle
 gtklock
--doc
-pkgconf
-intltool
-autoconf
-automake
-libtool
-base-devel
 wlopm
-intltool
 nemo
 nemo-fileroller
 gnome-console
@@ -241,9 +233,8 @@ sbctl
 apparmor
 firejail
 
-# ── Numix GTK theme build deps (numix-gtk-theme is AUR-only; built from
-# source below the same way the Plymouth/icon themes already are) ───────
-gdk-pixbuf2
+# ── System tuning/maintenance ────────────────────────────────────────────
+tuned
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -508,16 +499,7 @@ echo "=== Installing Kortex build + runtime dependencies ==="
 # without an AUR helper. Installing via pip avoids that dependency entirely.
 pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
 pip install --break-system-packages --no-cache-dir nuitka
-git clone https://aur.archlinux.org/gtk2.git /tmp/gtk2 && \
-cd /tmp/gtk2 && \
-makepkg --nodeps --noconfirm && \
-pacman -U --noconfirm ./*.pkg.tar.* && \
-cd /tmp && \
-rm -rf /tmp/gtk2 && \
-git clone https://aur.archlinux.org/gtk-engine-murrine.git /tmp/gtk-engine-murrine && \
-cd /tmp/gtk-engine-murrine && \
-makepkg --nodeps --noconfirm && \
-pacman -U --noconfirm ./*.pkg.tar.*
+
 mkdir -p /usr/lib/kortex/kortexd/assets
 
 cat > /usr/lib/kortex/kortexd/__init__.py << 'KORTEX_INIT_PY'
@@ -6708,24 +6690,6 @@ rm -rf "${NUMIX_ICONS_BUILD}"
 echo "=== Icon theme: Numix Circle installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# WINDOW THEME — Numix GTK theme (github.com/numixproject/numix-gtk-theme)
-# ══════════════════════════════════════════════════════════════════════════
-# This is the actual window/widget theme (titlebars, buttons, controls) --
-# separate from Numix-Circle above, which is icons only. AUR-only on Arch
-# (no core/extra package), so it's built straight from upstream source,
-# same as the Plymouth theme and Numix-Circle above. Upstream's own
-# Makefile already targets `sassc` (not the deprecated ruby-sass gem some
-# older AUR PKGBUILDs still fight with), and sassc/gdk-pixbuf2/glib2 are
-# all already installed, so no extra Sass/Ruby toolchain is needed.
-NUMIX_GTK_BUILD="/tmp/numix-gtk-theme"
-rm -rf "${NUMIX_GTK_BUILD}"
-git clone --depth 1 https://github.com/numixproject/numix-gtk-theme.git "${NUMIX_GTK_BUILD}"
-make -C "${NUMIX_GTK_BUILD}" -j"$(nproc)"
-make -C "${NUMIX_GTK_BUILD}" install
-rm -rf "${NUMIX_GTK_BUILD}"
-echo "=== Window theme: Numix GTK theme installed ==="
-
-# ══════════════════════════════════════════════════════════════════════════
 # TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
 # ══════════════════════════════════════════════════════════════════════════
 # The Budgie Menu applet's default icon name is "start-here-symbolic"
@@ -6769,28 +6733,12 @@ echo "=== Taskbar launcher icon: custom black-circle/white-ring icon installed =
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME — system-wide Numix (dark variant) base + KibaOS rounded-rectangle panel override
+# GTK THEME — system-wide Adwaita-dark base + KibaOS rounded-rectangle panel override
 # ══════════════════════════════════════════════════════════════════════════
-mkdir -p /usr/share/gtk-2.0
-cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
-gtk-theme-name = "Numix"
-gtk-icon-theme-name = "Numix-Circle"
-gtk-font-name = "Noto Sans 11"
-gtk-cursor-theme-size = 24
-gtk-toolbar-style = GTK_TOOLBAR_ICONS
-gtk-button-images = 1
-gtk-menu-images = 1
-gtk-xft-antialias = 1
-gtk-xft-hinting = 1
-gtk-xft-hintstyle = "hintslight"
-gtk-xft-rgba = "rgb"
-GTK2RC
-
 mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
-gtk-theme-name=Numix
-gtk-application-prefer-dark-theme=true
+gtk-theme-name=Adwaita-dark
 gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -6821,6 +6769,25 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
  *           positional overshoot reads as a twig springing back rather
  *           than a robotic snap. Used nowhere else — overusing overshoot
  *           reads as cartoonish rather than organic.
+ *   grow    cubic-bezier(0.16, 1, 0.3, 1)       — easeOutExpo. Reserved
+ *           for STRUCTURAL reveals (Raven and the Budgie Menu appearing/
+ *           dismissing), never for small in-place state changes. A leaf
+ *           unfurling and a light switching on are different kinds of
+ *           motion even though both are "something turning on" — settle
+ *           is the latter (a value flips, fast and certain), grow is the
+ *           former (a whole shape is arriving, slightly unhurried at the
+ *           start before resolving quickly). Kept distinct from settle
+ *           so the two don't blur into a single generic "ease-ish" feel.
+ *
+ * Organic radius scale — every corner-radius below is a mild asymmetric
+ * quad (top-left top-right bottom-right bottom-left) instead of one flat
+ * number on all four corners. The spread is deliberately small (2-6px on
+ * surfaces in the 16-28px range) so it reads as machined-but-grown at a
+ * glance — closer to a river stone or a leaf edge than a die-cut card —
+ * without tipping into the blobby/cartoonish territory a bigger spread
+ * would. Applied only to the handful of surfaces that carry the brand
+ * (panel, Raven, Budgie Menu, OSD, tooltips, context menus), not to every
+ * button and row — restraint matters more than coverage here.
  *
  * Caveat: this governs GTK widget-state transitions only — separate from
  * Wayfire's wobbly plugin, which now provides real compositor-level window
@@ -6833,11 +6800,16 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 /* === KibaOS: Floating rounded-rectangle panel === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
-    /* 42px panel height (see PANEL_PATH size below) — 16px keeps corners
-     * clearly rounded without hitting the ~21px half-height point where
-     * the ends fully round off into a pill/stadium shape. */
-    border-radius: 16px;
-    background-image: none;
+    /* 42px panel height (see PANEL_PATH size below) — asymmetric quad
+     * keeps every corner clearly rounded without hitting the ~21px
+     * half-height point where the ends fully round off into a pill. */
+    border-radius: 14px 20px 18px 22px;
+    /* Faint radial bloom in a muted moss green (#7fae86, ~5% opacity),
+     * layered under the existing navy glass — the one deliberate "nature"
+     * accent color in the whole sheet, used nowhere else as a flat fill,
+     * only ever as this kind of soft grown-from-behind glow. */
+    background-image: radial-gradient(ellipse at 30% -40%,
+        rgba(127, 174, 134, 0.05), transparent 65%);
     background-color: rgba(12, 20, 35, 0.55);
     border-top: 1px solid rgba(255, 255, 255, 0.18);
     border-left: 1px solid rgba(255, 255, 255, 0.10);
@@ -6877,14 +6849,16 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 frame.raven-frame,
 .raven-background {
     margin: 8px 8px 8px 0;
-    border-radius: 22px;
+    border-radius: 20px 26px 24px 28px;
+    background-image: radial-gradient(ellipse at 80% -20%,
+        rgba(127, 174, 134, 0.05), transparent 60%);
     background-color: rgba(16, 24, 40, 0.72);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow:
         0 12px 48px rgba(0, 0, 0, 0.50),
         inset 0 1px 0 rgba(255, 255, 255, 0.10);
     opacity: 1;
-    transition: opacity 280ms cubic-bezier(0.22, 1, 0.36, 1); /* best-effort, see note above */
+    transition: opacity 280ms cubic-bezier(0.16, 1, 0.3, 1); /* grow — structural reveal, best-effort, see note above */
 }
 frame.raven-frame > border { border-style: none; box-shadow: none; }
 .raven-header,
@@ -6945,11 +6919,13 @@ frame.raven-frame > border { border-style: none; box-shadow: none; }
 /* === KibaOS: Budgie Menu (app launcher popover) as a floating glass card === */
 popover.budgie-menu,
 .budgie-menu-window {
-    border-radius: 22px;
+    border-radius: 22px 28px 20px 26px;
+    background-image: radial-gradient(ellipse at 20% -30%,
+        rgba(127, 174, 134, 0.05), transparent 60%);
     background-color: rgba(16, 24, 40, 0.80);
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.50);
-    transition: opacity 260ms cubic-bezier(0.22, 1, 0.36, 1); /* best-effort, see note above */
+    transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1); /* grow — structural reveal, best-effort, see note above */
 }
 .budgie-menu-window entry,
 popover.budgie-menu entry {
@@ -7025,7 +7001,7 @@ tooltip {
     background-color: rgba(20, 26, 40, 0.92);
     color: #e8eef5;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
+    border-radius: 8px 12px 9px 11px;
     padding: 6px 10px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
@@ -7095,7 +7071,7 @@ menu,
 popover.menu > contents {
     background-color: rgba(20, 26, 40, 0.92);
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 12px;
+    border-radius: 10px 14px 11px 13px;
     box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
     padding: 4px;
 }
@@ -7116,7 +7092,7 @@ modelbutton:hover {
 .osd {
     background-color: rgba(16, 24, 40, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 20px;
+    border-radius: 18px 24px 20px 22px;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.50);
 }
 
@@ -7157,12 +7133,12 @@ cat > /etc/gtk-4.0/gtk.css << 'GTK4CSS'
 @define-color headerbar_bg_color #1a2030;
 @define-color headerbar_fg_color #dde5ef;
 
-window, .window-frame          { border-radius: 16px; }
-headerbar                      { border-radius: 16px 16px 0 0; }
-.card, frame, .frame           { border-radius: 14px; }
+window, .window-frame          { border-radius: 16px 20px 18px 22px; }
+headerbar                      { border-radius: 18px 22px 0 0; }
+.card, frame, .frame           { border-radius: 13px 16px 14px 17px; }
 button                         { border-radius: 10px; }
 entry                          { border-radius: 10px; }
-popover > contents             { border-radius: 14px; }
+popover > contents             { border-radius: 14px 18px 13px 17px; }
 .sidebar-row                   { border-radius: 8px; }
 listview                       { border-radius: 12px; }
 notebook > header              { border-radius: 12px 12px 0 0; }
@@ -7171,9 +7147,17 @@ button { box-shadow: none; -gtk-icon-shadow: none; }
 .suggested-action:hover { background: shade(@accent_bg_color, 0.88); }
 headerbar { padding: 8px 12px; min-height: 44px; }
 row        { padding: 4px 8px; }
+/* Same faint moss-green (#7fae86) bloom as the GTK3 panel — the one
+ * deliberate nature accent, kept identical across GTK3/GTK4 so a mixed
+ * Budgie+libadwaita desktop still reads as one coherent surface. */
+window {
+    background-image: radial-gradient(ellipse at 30% -30%,
+        rgba(127, 174, 134, 0.04), transparent 65%);
+}
 
-/* KibaOS organic motion — same settle/fade pair as GTK3 (see gtk-3.0/gtk.css
- * for the full naming/rationale); GTK4 apps get the same asymmetric feel. */
+/* KibaOS organic motion — same settle/fade/grow set as GTK3 (see
+ * gtk-3.0/gtk.css for the full naming/rationale); GTK4 apps get the same
+ * asymmetric feel. */
 button, row, .sidebar-row, switch slider {
     transition: background-color 220ms cubic-bezier(0.5, 0, 0.75, 0),
                 border-color    220ms cubic-bezier(0.5, 0, 0.75, 0);
@@ -7183,6 +7167,9 @@ button:hover, row:hover, .sidebar-row:hover {
                 border-color    140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 switch slider { transition: margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+popover > contents {
+    transition: opacity 260ms cubic-bezier(0.16, 1, 0.3, 1); /* grow — structural reveal */
+}
 
 /* Same extra polish pass as gtk-3.0/gtk.css (see that file for the full
  * rationale on each rule) — GTK4/libadwaita apps get the same treatment
@@ -7196,7 +7183,7 @@ tooltip {
     background-color: rgba(20, 26, 40, 0.92);
     color: #e8eef5;
     border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 10px;
+    border-radius: 8px 12px 9px 11px;
     padding: 6px 10px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
 }
@@ -7232,7 +7219,7 @@ radiobutton radio:checked {
 .osd {
     background-color: rgba(16, 24, 40, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 20px;
+    border-radius: 18px 24px 20px 22px;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.50);
 }
 window:backdrop {
@@ -7565,7 +7552,7 @@ cat > /usr/local/bin/kibaos-screenshot-ocr << 'SCREENSHOTOCR'
 # and put the text (not the image) on the clipboard.
 set -euo pipefail
 GEOM=$(slurp) || exit 0
-TMP=$(mktemp --suffix=.png)
+TMP=$(mktemp --suffix=.png -t kibaos-ocr.XXXXXX)
 trap 'rm -f "$TMP"' EXIT
 grim -g "$GEOM" "$TMP"
 
@@ -8137,8 +8124,7 @@ NEMODESKTOP
 
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
-gtk-theme-name=Numix
-gtk-application-prefer-dark-theme=true
+gtk-theme-name=Adwaita-dark
 gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -8153,20 +8139,6 @@ GTK3SKEL
 
 cp /etc/gtk-3.0/gtk.css "${SKEL}/.config/gtk-3.0/gtk.css"
 cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
-
-cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
-gtk-theme-name="Numix"
-gtk-icon-theme-name="Numix-Circle"
-gtk-font-name="Noto Sans 11"
-gtk-cursor-theme-size=24
-gtk-toolbar-style=GTK_TOOLBAR_ICONS
-gtk-button-images=1
-gtk-menu-images=1
-gtk-xft-antialias=1
-gtk-xft-hinting=1
-gtk-xft-hintstyle="hintslight"
-gtk-xft-rgba="rgb"
-GTK2SKEL
 
 dbus-run-session -- dconf write /com/solus-project/budgie-panel/panels "@as []" || true
 cat > /usr/share/glib-2.0/schemas/99-kibaos-budgie.gschema.override << 'EOF'
@@ -8183,7 +8155,7 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
-gsettings set org.gnome.desktop.interface gtk-theme               'Numix'
+gsettings set org.gnome.desktop.interface gtk-theme               'Adwaita-dark'
 gsettings set org.gnome.desktop.interface icon-theme              'Numix-Circle'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
@@ -8889,7 +8861,7 @@ XDG_SESSION_TYPE=wayland
 QT_AUTO_SCREEN_SCALE_FACTOR=1
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-GTK_THEME=Numix:dark
+GTK_THEME=Adwaita-dark
 QT_STYLE_OVERRIDE=kvantum
 XCURSOR_THEME=Adwaita
 XCURSOR_SIZE=24
@@ -8966,8 +8938,88 @@ cat > /etc/NetworkManager/conf.d/dns.conf << 'NMDNS'
 dns=none
 NMDNS
 
+# ── Boot-time DNS pin ─────────────────────────────────────────────────────
+# Runs every boot, live or installed, and forces /etc/resolv.conf back to
+# a single "nameserver 1.1.1.1" line before anything else comes up.
+cat > /usr/local/bin/kibaos-boot-dns << 'BOOTDNS'
+#!/bin/bash
+echo "nameserver 1.1.1.1" > /etc/resolv.conf
+BOOTDNS
+chmod +x /usr/local/bin/kibaos-boot-dns
+
+cat > /etc/systemd/system/kibaos-boot-dns.service << 'BOOTDNSSVC'
+[Unit]
+Description=Pin /etc/resolv.conf to nameserver 1.1.1.1
+DefaultDependencies=no
+Before=sysinit.target network-pre.target NetworkManager.service
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kibaos-boot-dns
+RemainAfterExit=yes
+
+[Install]
+WantedBy=sysinit.target
+BOOTDNSSVC
+systemctl enable kibaos-boot-dns.service
+
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
+
+# ══════════════════════════════════════════════════════════════════════════
+# SYSTEM SERVICES — irqbalance, tuned, systemd-sysext, fstrim, tmpfiles
+# ══════════════════════════════════════════════════════════════════════════
+# irqbalance: was already in packages.x86_64 but never actually enabled --
+# distributes IRQ load across cores instead of pinning everything to CPU0,
+# which matters more on the low-core-count H616 SBC target than on a
+# desktop x86_64 box, but costs nothing either way.
+systemctl enable irqbalance
+
+# tuned: ships a "balanced" profile out of the box that's a reasonable
+# default for a consumer desktop (dynamic between throughput and power
+# saving) without needing power-profiles-daemon and tuned fighting over
+# the same knobs -- power-profiles-daemon is already installed for the
+# GNOME-side battery/performance toggle in Budgie's quick settings, so
+# tuned is set to a profile that doesn't try to override CPU governor
+# decisions PPD already owns. tuned-adm needs a running D-Bus session to
+# select a profile the normal way, which doesn't exist in this chroot, so
+# the active_profile file (what tuned-adm actually writes under the hood)
+# is dropped directly instead.
+mkdir -p /etc/tuned
+echo "balanced" > /etc/tuned/active_profile
+systemctl enable tuned
+
+# systemd-sysext: ships inside systemd itself, no separate package. Not
+# populated with any extension images at build time -- this just enables
+# the mechanism and creates the directories it reads from, so a .raw/
+# squashfs extension image (e.g. a driver bundle or dev toolchain for the
+# H616 SBC work) can be dropped into /var/lib/extensions and merged into
+# /usr at boot with `systemctl restart systemd-sysext`, with no rebuild
+# of the base image required. Empty directories are a no-op until
+# something's actually placed in them.
+mkdir -p /var/lib/extensions /etc/extensions
+systemctl enable systemd-sysext
+
+# fstrim.timer: ships inside systemd itself. Weekly TRIM for SSD/NVMe --
+# continuous online discard (mount option) is deliberately NOT used
+# instead, since batched weekly TRIM avoids the write-amplification and
+# latency spikes continuous discard is known for.
+systemctl enable fstrim.timer
+
+# systemd-tmpfiles-clean.timer: periodic sweep of tmpfiles.d Age= rules.
+# Add one real rule on top of the stock ones: kibaos-screenshot-ocr (see
+# WAYFIRE CONFIG above) drops its OCR scratch PNG in /tmp via mktemp
+# (now with a "kibaos-ocr." prefix specifically so this rule can target
+# just those files) and already cleans it up on exit, but a killed/
+# crashed OCR run would leak it -- age those out after a day as a
+# backstop. Scoped to the specific prefix rather than touching /tmp's
+# own age (already handled by systemd's stock tmpfiles.d/tmp.conf) so
+# this doesn't shadow or conflict with that default.
+cat > /etc/tmpfiles.d/kibaos.conf << 'TMPFILES'
+e /tmp/kibaos-ocr.* - - - 1d
+TMPFILES
+systemctl enable systemd-tmpfiles-clean.timer
 
 # ══════════════════════════════════════════════════════════════════════════
 # SECURITY — AppArmor, Firejail, Secure Boot (sbctl)
