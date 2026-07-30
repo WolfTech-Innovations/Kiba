@@ -142,6 +142,10 @@ budgie-desktop-services
 swaybg
 grim
 slurp
+wl-clipboard
+tesseract
+tesseract-data-eng
+libnotify
 swayidle
 gtklock
 wlopm
@@ -223,6 +227,16 @@ gnome-music
 gnome-todo
 plymouth
 squashfs-tools
+
+# ── Security ────────────────────────────────────────────────────────────
+sbctl
+apparmor
+firejail
+
+# ── Numix GTK theme build deps (numix-gtk-theme is AUR-only; built from
+# source below the same way the Plymouth/icon themes already are) ───────
+gdk-pixbuf2
+gtk-engine-murrine
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -417,7 +431,22 @@ exec wine "$@" 2>/dev/null
 WINEWRAPPER
 chmod +x /usr/local/bin/wine-silent
 
-systemctl enable earlyoom
+# earlyoom (global free-memory/swap threshold polling) and systemd-oomd
+# (cgroup-aware, PSI-based) are both OOM killers with overlapping jobs --
+# running both means they can race to kill different processes for the
+# same pressure event. systemd-oomd ships inside the systemd package
+# itself (no extra package needed) and is the more modern, desktop-
+# integrated choice (it already understands user.slice/session cgroups),
+# so it's what's actually enabled. earlyoom stays installed but disabled
+# as a simple fallback if oomd is ever ripped out.
+systemctl disable earlyoom 2>/dev/null || true
+mkdir -p /etc/systemd/oomd.conf.d
+cat > /etc/systemd/oomd.conf.d/kibaos.conf << 'OOMDCONF'
+[OOM]
+SwapUsedLimit=90%
+DefaultMemoryPressureDurationSec=20s
+OOMDCONF
+systemctl enable systemd-oomd
 
 cat > /etc/sysctl.d/99-kibaos.conf << 'SYSCTL'
 vm.swappiness=10
@@ -2818,8 +2847,8 @@ public class KibaOOBE : Adw.Application {
     // Tiny inline translator: t("English", "Türkçe") at each call site
     // instead of a separate lookup table, so a string and its
     // translation always sit next to each other in the source.
-    private string t (string en, string tr) {
-        return ui_lang == "tr" ? tr : en;
+    private string t (string en, string tr, string pl) {
+        return ui_lang == "tr" ? tr : ui_lang == "pl" ? pl : en;
     }
 
     // ── Dark mode ─────────────────────────────────────────────────────
@@ -2916,16 +2945,18 @@ public class KibaOOBE : Adw.Application {
 
         content.append (oobe_heading (
             t ("Installation isn't available in a virtual machine",
-               "Sanal makinede kurulum kullanılamaz"),
+               "Sanal makinede kurulum kullanılamaz",
+               "Instalacja nie jest dostępna w maszynie wirtualnej"),
             t ("KibaOS can't be installed onto a virtual disk yet — VDI/VMDK/qcow2 " +
                "support isn't reliable enough to ship. You're welcome to explore the " +
                "live desktop, or boot this image on real hardware to install.",
                "KibaOS henüz sanal bir diske kurulamıyor — VDI/VMDK/qcow2 desteği " +
                "yayınlanacak kadar güvenilir değil. Canlı masaüstünü keşfedebilir " +
-               "ya da kurulum için bu imajı gerçek bir donanımda başlatabilirsiniz.")));
+               "ya da kurulum için bu imajı gerçek bir donanımda başlatabilirsiniz.",
+               "KibaOS nie można jeszcze zainstalować na dysku wirtualnym — obsługa VDI/VMDK/qcow2 nie jest wystarczająco niezawodna, by ją udostępnić. Możesz swobodnie poznać system na żywo albo uruchomić ten obraz na prawdziwym sprzęcie, aby przeprowadzić instalację.")));
 
-        return make_page (t ("Virtual Machine Detected", "Sanal Makine Algılandı"),
-            content, t ("Explore Live Desktop", "Canlı Masaüstünü Keşfet"), () => {
+        return make_page (t ("Virtual Machine Detected", "Sanal Makine Algılandı", "Wykryto maszynę wirtualną"),
+            content, t ("Explore Live Desktop", "Canlı Masaüstünü Keşfet", "Poznaj system na żywo"), () => {
                 this.quit ();
             }, true);
     }
@@ -2992,7 +3023,7 @@ public class KibaOOBE : Adw.Application {
         nav_row.append (spacer);
 
         if (!hide_back && nav_view.get_navigation_stack ().get_n_items () > 1) {
-            var back_btn = new Gtk.Button.with_label (t ("Back", "Geri"));
+            var back_btn = new Gtk.Button.with_label (t ("Back", "Geri", "Wstecz"));
             back_btn.add_css_class ("oobe-secondary-button");
             back_btn.clicked.connect (() => nav_view.pop ());
             nav_row.append (back_btn);
@@ -3030,11 +3061,17 @@ public class KibaOOBE : Adw.Application {
             margin_top   = 24
         };
 
-        var lang_btn = new Gtk.Button.with_label (ui_lang == "tr" ? "EN" : "TR");
+        var lang_btn = new Gtk.Button.with_label (
+            ui_lang == "en" ? "TR" : ui_lang == "tr" ? "PL" : "EN");
         lang_btn.add_css_class ("oobe-corner-button");
-        lang_btn.tooltip_text = t ("Switch to Turkish", "İngilizceye geç");
+        // Tooltip is always phrased in the CURRENT language, naming the NEXT
+        // one in the cycle (en -> tr -> pl -> en) -- matches the original
+        // en/tr behaviour, just extended to a third stop.
+        lang_btn.tooltip_text = ui_lang == "en" ? "Switch to Turkish"
+                               : ui_lang == "tr" ? "Lehçeye geç"
+                               : "Przełącz na angielski";
         lang_btn.clicked.connect (() => {
-            ui_lang = ui_lang == "tr" ? "en" : "tr";
+            ui_lang = ui_lang == "en" ? "tr" : ui_lang == "tr" ? "pl" : "en";
             refresh_current_page ();
         });
         corner.append (lang_btn);
@@ -3043,8 +3080,8 @@ public class KibaOOBE : Adw.Application {
             is_dark ? "weather-clear-symbolic" : "weather-clear-night-symbolic");
         dark_btn.add_css_class ("oobe-corner-button");
         dark_btn.tooltip_text = is_dark
-            ? t ("Switch to light mode", "Açık moda geç")
-            : t ("Switch to dark mode", "Koyu moda geç");
+            ? t ("Switch to light mode", "Açık moda geç", "Przełącz na jasny motyw")
+            : t ("Switch to dark mode", "Koyu moda geç", "Przełącz na ciemny motyw");
         dark_btn.clicked.connect (() => {
             is_dark = !is_dark;
             apply_dark_mode ();
@@ -3118,23 +3155,25 @@ public class KibaOOBE : Adw.Application {
         content.append (logo);
 
         content.append (oobe_heading (
-            t ("Welcome to KibaOS", "KibaOS'a Hoş Geldiniz"),
+            t ("Welcome to KibaOS", "KibaOS'a Hoş Geldiniz", "Witamy w KibaOS"),
             t ("Let's get your system set up. This should only take a few minutes.",
-               "Sisteminizi kuralım. Bu işlem yalnızca birkaç dakika sürecek.")));
+               "Sisteminizi kuralım. Bu işlem yalnızca birkaç dakika sürecek.",
+               "Skonfigurujmy Twój system. To zajmie tylko kilka minut.")));
 
         var nav_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
             halign = Gtk.Align.START,
             margin_top = 20
         };
-        var try_btn = new Gtk.Button.with_label (t ("Try KibaOS", "KibaOS'u Dene"));
+        var try_btn = new Gtk.Button.with_label (t ("Try KibaOS", "KibaOS'u Dene", "Wypróbuj KibaOS"));
         try_btn.add_css_class ("oobe-secondary-button");
         try_btn.tooltip_text = t ("Explore the live desktop without installing anything yet.",
-            "Henüz hiçbir şey kurmadan canlı masaüstünü keşfedin.");
+            "Henüz hiçbir şey kurmadan canlı masaüstünü keşfedin.",
+            "Poznaj system na żywo, nie instalując jeszcze niczego.");
         try_btn.clicked.connect (() => { this.quit (); });
         nav_row.append (try_btn);
         content.append (nav_row);
 
-        return make_page ("Welcome", content, t ("Get Started", "Başla"), () => {
+        return make_page ("Welcome", content, t ("Get Started", "Başla", "Rozpocznij"), () => {
             nav_view.push (build_wifi_page ());
         }, true, 0, 0);
     }
@@ -3212,9 +3251,10 @@ public class KibaOOBE : Adw.Application {
 
         content.append (canvas);
         content.append (oobe_heading (
-            t ("Connect to Wi-Fi", "Wi-Fi'ye Bağlan"),
+            t ("Connect to Wi-Fi", "Wi-Fi'ye Bağlan", "Połącz z Wi-Fi"),
             t ("Choose a network to continue. You can also skip this step.",
-               "Devam etmek için bir ağ seçin. Bu adımı atlayabilirsiniz de.")));
+               "Devam etmek için bir ağ seçin. Bu adımı atlayabilirsiniz de.",
+               "Wybierz sieć, aby kontynuować. Możesz też pominąć ten krok.")));
 
         // Status label shown below the list ("Connecting…", "Connected ✓", errors)
         var status_label = new Gtk.Label ("") {
@@ -3305,7 +3345,7 @@ public class KibaOOBE : Adw.Application {
         }
         if (!any) {
             var row = new Adw.ActionRow () {
-                title = t ("No networks found nearby", "Yakında ağ bulunamadı")
+                title = t ("No networks found nearby", "Yakında ağ bulunamadı", "Nie znaleziono pobliskich sieci")
             };
             row.add_prefix (new Gtk.Image.from_icon_name ("network-offline-symbolic"));
             list_box.append (row);
@@ -3326,19 +3366,20 @@ public class KibaOOBE : Adw.Application {
             if (secured) {
                 // ── Password dialog ───────────────────────────────────────
                 var dialog = new Adw.MessageDialog (window,
-                    t ("Enter Wi-Fi Password", "Wi-Fi Şifresini Girin"),
+                    t ("Enter Wi-Fi Password", "Wi-Fi Şifresini Girin", "Wprowadź hasło Wi-Fi"),
                     t ("""Enter the password for "%s".""",
-                       """"%s" ağının şifresini girin.""").printf (ssid));
+                       """"%s" ağının şifresini girin.""",
+                       "Wprowadź hasło dla „%s”.").printf (ssid));
 
                 var pw_entry = new Gtk.PasswordEntry () {
                     show_peek_icon = true,
-                    placeholder_text = t ("Password", "Şifre")
+                    placeholder_text = t ("Password", "Şifre", "Hasło")
                 };
                 pw_entry.add_css_class ("oobe-entry");
                 dialog.set_extra_child (pw_entry);
 
-                dialog.add_response ("cancel", t ("Cancel", "İptal"));
-                dialog.add_response ("connect", t ("Connect", "Bağlan"));
+                dialog.add_response ("cancel", t ("Cancel", "İptal", "Anuluj"));
+                dialog.add_response ("connect", t ("Connect", "Bağlan", "Połącz"));
                 dialog.set_response_appearance ("connect", Adw.ResponseAppearance.SUGGESTED);
                 dialog.set_default_response ("connect");
                 dialog.set_close_response ("cancel");
@@ -3357,13 +3398,14 @@ public class KibaOOBE : Adw.Application {
                         status_label.remove_css_class ("oobe-subtitle");
                         status_label.add_css_class ("oobe-error");
                         status_label.label = t ("Password cannot be empty.",
-                                                 "Şifre boş olamaz.");
+                                                 "Şifre boş olamaz.",
+                                                 "Hasło nie może być puste.");
                         return;
                     }
 
                     status_label.remove_css_class ("oobe-error");
                     status_label.add_css_class ("oobe-subtitle");
-                    status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…").printf (ssid);
+                    status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…", "Łączenie z %s…").printf (ssid);
                     do_connect_async (dev_box[0], ssid, password, status_label);
                 });
 
@@ -3371,12 +3413,12 @@ public class KibaOOBE : Adw.Application {
 
             } else {
                 // ── Open network — connect directly ───────────────────────
-                status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…").printf (ssid);
+                status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…", "Łączenie z %s…").printf (ssid);
                 do_connect_async (dev_box[0], ssid, null, status_label);
             }
         });
 
-        return make_page ("Wi-Fi", content, t ("Next", "İleri"), () => {
+        return make_page ("Wi-Fi", content, t ("Next", "İleri", "Dalej"), () => {
             nav_view.push (build_locale_page ());
         }, false, 1, 6);
     }
@@ -3430,13 +3472,13 @@ public class KibaOOBE : Adw.Application {
                 if (!ok_f) {
                     lbl.remove_css_class ("oobe-subtitle");
                     lbl.add_css_class ("oobe-error");
-                    lbl.label = t ("Could not connect: %s", "Bağlanılamadı: %s").printf (err_f);
+                    lbl.label = t ("Could not connect: %s", "Bağlanılamadı: %s", "Nie udało się połączyć: %s").printf (err_f);
                     return GLib.Source.REMOVE;
                 }
                 // Start polling for association on the main thread
                 lbl.remove_css_class ("oobe-error");
                 lbl.add_css_class ("oobe-subtitle");
-                lbl.label = t ("Verifying connection…", "Bağlantı doğrulanıyor…");
+                lbl.label = t ("Verifying connection…", "Bağlantı doğrulanıyor…", "Weryfikowanie połączenia…");
                 int[] attempts = { 0 };
                 GLib.Timeout.add (500, () => {
                     attempts[0]++;
@@ -3450,14 +3492,15 @@ public class KibaOOBE : Adw.Application {
                     } catch (GLib.SpawnError e) {}
 
                     if (associated) {
-                        lbl.label = t ("Connected to %s ✓", "%s ağına bağlanıldı ✓").printf (ssid_copy);
+                        lbl.label = t ("Connected to %s ✓", "%s ağına bağlanıldı ✓", "Połączono z %s ✓").printf (ssid_copy);
                         return GLib.Source.REMOVE;
                     }
                     if (attempts[0] >= 30) {   // 30 × 500 ms = 15 s
                         lbl.remove_css_class ("oobe-subtitle");
                         lbl.add_css_class ("oobe-error");
                         lbl.label = t ("Timed out — check the password and try again.",
-                                        "Zaman aşımı — şifreyi kontrol edip tekrar deneyin.");
+                                        "Zaman aşımı — şifreyi kontrol edip tekrar deneyin.",
+                                        "Przekroczono czas oczekiwania — sprawdź hasło i spróbuj ponownie.");
                         return GLib.Source.REMOVE;
                     }
                     return GLib.Source.CONTINUE;
@@ -3473,22 +3516,23 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_locale_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading (
-            t ("Language & Keyboard", "Dil ve Klavye"),
+            t ("Language & Keyboard", "Dil ve Klavye", "Język i klawiatura"),
             t ("Choose how KibaOS should communicate with you.",
-               "KibaOS'un sizinle nasıl iletişim kuracağını seçin.")));
+               "KibaOS'un sizinle nasıl iletişim kuracağını seçin.",
+               "Wybierz, w jaki sposób KibaOS ma się z Tobą komunikować.")));
 
-        var locale_row = new Adw.ComboRow () { title = t ("Language", "Dil") };
+        var locale_row = new Adw.ComboRow () { title = t ("Language", "Dil", "Język") };
         var locale_model = new Gtk.StringList (null);
         // Display names shown in the picker; `locales` holds the actual
         // locale strings the installed system will use, in the same order.
         string[] locale_labels = {
             "English (US)", "English (UK)", "Deutsch", "Français",
-            "Español", "日本語", "中文（简体）", "Türkçe"
+            "Español", "日本語", "中文（简体）", "Türkçe", "Polski"
         };
         string[] locales = {
             "en_US.UTF-8", "en_GB.UTF-8", "de_DE.UTF-8",
             "fr_FR.UTF-8", "es_ES.UTF-8", "ja_JP.UTF-8", "zh_CN.UTF-8",
-            "tr_TR.UTF-8"
+            "tr_TR.UTF-8", "pl_PL.UTF-8"
         };
         foreach (var l in locale_labels) locale_model.append (l);
         locale_row.set_model (locale_model);
@@ -3497,13 +3541,13 @@ public class KibaOOBE : Adw.Application {
         });
         content.append (locale_row);
 
-        var keymap_row = new Adw.ComboRow () { title = t ("Keyboard layout", "Klavye düzeni") };
+        var keymap_row = new Adw.ComboRow () { title = t ("Keyboard layout", "Klavye düzeni", "Układ klawiatury") };
         var keymap_model = new Gtk.StringList (null);
         string[] keymap_labels = {
             "English (US)", "English (UK)", "Deutsch", "Français",
-            "Español", "日本語", "Dvorak", "Türkçe (Q)"
+            "Español", "日本語", "Dvorak", "Türkçe (Q)", "Polski"
         };
-        string[] keymaps = { "us", "uk", "de", "fr", "es", "jp106", "dvorak", "trq" };
+        string[] keymaps = { "us", "uk", "de", "fr", "es", "jp106", "dvorak", "trq", "pl" };
         foreach (var k in keymap_labels) keymap_model.append (k);
         keymap_row.set_model (keymap_model);
         keymap_row.notify["selected"].connect (() => {
@@ -3511,7 +3555,7 @@ public class KibaOOBE : Adw.Application {
         });
         content.append (keymap_row);
 
-        return make_page ("Language", content, t ("Next", "İleri"), () => {
+        return make_page ("Language", content, t ("Next", "İleri", "Dalej"), () => {
             if (is_oem_mode) nav_view.push (build_account_page ());
             else advance_past_storage_step ();
         }, false, 2, 6);
@@ -3571,8 +3615,8 @@ public class KibaOOBE : Adw.Application {
             catch (GLib.RegexError e) {}
             var opt  = new StorageOption ();
             opt.devpath = devpath;
-            opt.label   = t ("Your computer's storage (%s)", "Bilgisayarınızın deposu (%s)").printf (
-                label == "" ? t ("internal drive", "dahili disk") : label);
+            opt.label   = t ("Your computer's storage (%s)", "Bilgisayarınızın deposu (%s)", "Pamięć Twojego komputera (%s)").printf (
+                label == "" ? t ("internal drive", "dahili disk", "dysk wewnętrzny") : label);
             options.add (opt);
         }
         return options;
@@ -3606,9 +3650,10 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_storage_picker_page (Gee.ArrayList<StorageOption> options) {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading (
-            t ("Where should KibaOS go?", "KibaOS nereye kurulsun?"),
+            t ("Where should KibaOS go?", "KibaOS nereye kurulsun?", "Gdzie zainstalować KibaOS?"),
             t ("Your computer has more than one drive. Pick the one to set up.",
-               "Bilgisayarınızda birden fazla disk var. Kurulacak olanı seçin.")));
+               "Bilgisayarınızda birden fazla disk var. Kurulacak olanı seçin.",
+               "Twój komputer ma więcej niż jeden dysk. Wybierz ten, na którym chcesz zainstalować system.")));
 
         var picker = new Gtk.ListBox ();
         picker.add_css_class ("oobe-list");
@@ -3629,7 +3674,7 @@ public class KibaOOBE : Adw.Application {
         }
         content.append (picker);
 
-        return make_page ("Storage", content, t ("Next", "İleri"), () => {
+        return make_page ("Storage", content, t ("Next", "İleri", "Dalej"), () => {
             advance_past_install_mode_step ();
         }, false, 3, 6);
     }
@@ -3641,27 +3686,30 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_install_mode_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading (
-            t ("How should KibaOS be installed?", "KibaOS nasıl kurulsun?"),
+            t ("How should KibaOS be installed?", "KibaOS nasıl kurulsun?", "Jak zainstalować KibaOS?"),
             t ("We found an existing operating system on this drive.",
-               "Bu diskte mevcut bir işletim sistemi bulduk.")));
+               "Bu diskte mevcut bir işletim sistemi bulduk.",
+               "Znaleźliśmy na tym dysku istniejący system operacyjny.")));
 
         var picker = new Gtk.ListBox ();
         picker.add_css_class ("oobe-list");
         picker.selection_mode = Gtk.SelectionMode.SINGLE;
 
         var erase_row = new Adw.ActionRow () {
-            title    = t ("Erase disk", "Diski sil"),
+            title    = t ("Erase disk", "Diski sil", "Wyczyść dysk"),
             subtitle = t ("Delete everything on this drive and install KibaOS by itself.",
-                           "Bu diskteki her şeyi silip yalnızca KibaOS'u kurun.")
+                           "Bu diskteki her şeyi silip yalnızca KibaOS'u kurun.",
+                           "Usuń wszystko z tego dysku i zainstaluj wyłącznie KibaOS.")
         };
         erase_row.add_prefix (new Gtk.Image.from_icon_name ("edit-delete-symbolic"));
         erase_row.set_data ("mode", "erase");
         picker.append (erase_row);
 
         var alongside_row = new Adw.ActionRow () {
-            title    = t ("Install alongside", "Yanına kur"),
+            title    = t ("Install alongside", "Yanına kur", "Zainstaluj obok"),
             subtitle = t ("Keep what's already here and set up KibaOS in the free space next to it (dual boot).",
-                           "Mevcut sistemi koru, KibaOS'u yanındaki boş alana kur (çift önyükleme).")
+                           "Mevcut sistemi koru, KibaOS'u yanındaki boş alana kur (çift önyükleme).",
+                           "Zachowaj to, co już tu jest, i zainstaluj KibaOS w wolnym miejscu obok (dual boot).")
         };
         alongside_row.add_prefix (new Gtk.Image.from_icon_name ("drive-multidisk-symbolic"));
         alongside_row.set_data ("mode", "alongside");
@@ -3674,7 +3722,7 @@ public class KibaOOBE : Adw.Application {
         picker.select_row (picker.get_row_at_index (0));
         content.append (picker);
 
-        return make_page ("Install Mode", content, t ("Next", "İleri"), () => {
+        return make_page ("Install Mode", content, t ("Next", "İleri", "Dalej"), () => {
             nav_view.push (build_account_page ());
         }, false, 3, 6);
     }
@@ -3685,30 +3733,31 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_account_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 16);
         content.append (oobe_heading (
-            t ("Create Your Account", "Hesabınızı Oluşturun"),
+            t ("Create Your Account", "Hesabınızı Oluşturun", "Utwórz swoje konto"),
             t ("This is the account you'll use every day.",
-               "Bu, her gün kullanacağınız hesap.")));
+               "Bu, her gün kullanacağınız hesap.",
+               "To konto, którego będziesz używać na co dzień.")));
 
         var group = new Adw.PreferencesGroup ();
         group.add_css_class ("oobe-prefs-group");
 
-        var hostname_entry = new Adw.EntryRow () { title = t ("Computer name", "Bilgisayar adı") };
+        var hostname_entry = new Adw.EntryRow () { title = t ("Computer name", "Bilgisayar adı", "Nazwa komputera") };
         hostname_entry.text = "kibaos";
         hostname_entry.changed.connect (() => { hostname_value = hostname_entry.text; });
         group.add (hostname_entry);
 
-        var user_entry = new Adw.EntryRow () { title = t ("Username", "Kullanıcı adı") };
+        var user_entry = new Adw.EntryRow () { title = t ("Username", "Kullanıcı adı", "Nazwa użytkownika") };
         user_entry.changed.connect (() => { username_value = user_entry.text; });
         group.add (user_entry);
 
-        var pass_entry = new Adw.PasswordEntryRow () { title = t ("Password", "Şifre") };
+        var pass_entry = new Adw.PasswordEntryRow () { title = t ("Password", "Şifre", "Hasło") };
         pass_entry.changed.connect (() => { password_value = pass_entry.text; });
         group.add (pass_entry);
 
         content.append (group);
 
         return make_page ("Account", content,
-            is_oem_mode ? t ("Finish Setup", "Kurulumu Bitir") : t ("Next", "İleri"), () => {
+            is_oem_mode ? t ("Finish Setup", "Kurulumu Bitir", "Zakończ konfigurację") : t ("Next", "İleri", "Dalej"), () => {
                 if (is_oem_mode) {
                     nav_view.push (build_installing_page ());
                     start_oem_finish ();
@@ -3724,30 +3773,32 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_confirm_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading (
-            t ("Ready to Set Up KibaOS", "KibaOS Kurulumuna Hazır"),
+            t ("Ready to Set Up KibaOS", "KibaOS Kurulumuna Hazır", "Gotowy do instalacji KibaOS"),
             install_mode == "alongside"
                 ? t ("KibaOS will be installed next to your existing operating system, " +
                      "using the free space on this drive. Nothing else will be touched.",
                      "KibaOS, mevcut işletim sisteminizin yanına, bu diskteki boş alan " +
-                     "kullanılarak kurulacak. Başka hiçbir şeye dokunulmayacak.")
+                     "kullanılarak kurulacak. Başka hiçbir şeye dokunulmayacak.",
+                     "KibaOS zostanie zainstalowany obok Twojego obecnego systemu operacyjnego, wykorzystując wolne miejsce na tym dysku. Nic innego nie zostanie zmienione.")
                 : t ("Everything on your computer will be replaced. " +
                      "Make sure anything important is backed up first.",
                      "Bilgisayarınızdaki her şeyin yerine yenisi kurulacak. " +
-                     "Önemli olan her şeyi önceden yedeklediğinizden emin olun.")));
+                     "Önemli olan her şeyi önceden yedeklediğinizden emin olun.",
+                     "Wszystko na Twoim komputerze zostanie zastąpione. Upewnij się wcześniej, że wszystkie ważne dane masz zapisane w kopii zapasowej.")));
 
         // Summary card
         var summary = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
         summary.add_css_class ("oobe-summary-box");
 
         OobeSummaryItem[] items = {
-            { "drive-harddisk-symbolic",   t ("Storage", "Depolama"),
-              selected_disk == "" ? t ("Auto-detected", "Otomatik algılandı") : GLib.Path.get_basename (selected_disk) },
-            { "drive-multidisk-symbolic",  t ("Install mode", "Kurulum modu"),
-              install_mode == "alongside" ? t ("Install alongside (dual boot)", "Yanına kur (çift önyükleme)") : t ("Erase disk", "Diski sil") },
-            { "preferences-desktop-locale-symbolic", t ("Language", "Dil"), selected_locale },
-            { "input-keyboard-symbolic",   t ("Keyboard", "Klavye"), selected_keymap },
-            { "system-users-symbolic",     t ("Account", "Hesap"),
-              username_value == "" ? t ("(not set)", "(ayarlanmadı)") : username_value }
+            { "drive-harddisk-symbolic",   t ("Storage", "Depolama", "Pamięć"),
+              selected_disk == "" ? t ("Auto-detected", "Otomatik algılandı", "Wykryto automatycznie") : GLib.Path.get_basename (selected_disk) },
+            { "drive-multidisk-symbolic",  t ("Install mode", "Kurulum modu", "Tryb instalacji"),
+              install_mode == "alongside" ? t ("Install alongside (dual boot)", "Yanına kur (çift önyükleme)", "Zainstaluj obok (dual boot)") : t ("Erase disk", "Diski sil", "Wyczyść dysk") },
+            { "preferences-desktop-locale-symbolic", t ("Language", "Dil", "Język"), selected_locale },
+            { "input-keyboard-symbolic",   t ("Keyboard", "Klavye", "Klawiatura"), selected_keymap },
+            { "system-users-symbolic",     t ("Account", "Hesap", "Konto"),
+              username_value == "" ? t ("(not set)", "(ayarlanmadı)", "(nie ustawiono)") : username_value }
         };
         bool first = true;
         foreach (var item in items) {
@@ -3772,7 +3823,7 @@ public class KibaOOBE : Adw.Application {
         }
         content.append (summary);
 
-        return make_page ("Confirm", content, t ("Install KibaOS", "KibaOS'u Kur"), () => {
+        return make_page ("Confirm", content, t ("Install KibaOS", "KibaOS'u Kur", "Zainstaluj KibaOS"), () => {
             nav_view.push (build_installing_page ());
             start_install ();
         }, false, 5, 6);
@@ -3787,14 +3838,14 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_installing_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
         content.append (oobe_heading (
-            t ("Installing KibaOS", "KibaOS Kuruluyor"),
-            t ("Sit tight — this won't take long.", "Biraz bekleyin — çok sürmeyecek.")));
+            t ("Installing KibaOS", "KibaOS Kuruluyor", "Instalowanie KibaOS"),
+            t ("Sit tight — this won't take long.", "Biraz bekleyin — çok sürmeyecek.", "Chwila cierpliwości — to nie potrwa długo.")));
 
         progress_bar = new Gtk.ProgressBar () { show_text = false };
         progress_bar.add_css_class ("oobe-progress");
         content.append (progress_bar);
 
-        progress_label = new Gtk.Label (t ("Preparing…", "Hazırlanıyor…"));
+        progress_label = new Gtk.Label (t ("Preparing…", "Hazırlanıyor…", "Przygotowywanie…"));
         progress_label.add_css_class ("oobe-subtitle");
         content.append (progress_label);
 
@@ -3815,11 +3866,12 @@ public class KibaOOBE : Adw.Application {
         content.append (check);
 
         content.append (oobe_heading (
-            t ("You're all set.", "Her şey hazır."),
+            t ("You're all set.", "Her şey hazır.", "Wszystko gotowe."),
             t ("KibaOS is installed and ready. Restart your computer to get started.",
-               "KibaOS kuruldu ve hazır. Başlamak için bilgisayarınızı yeniden başlatın.")));
+               "KibaOS kuruldu ve hazır. Başlamak için bilgisayarınızı yeniden başlatın.",
+               "KibaOS został zainstalowany i jest gotowy. Uruchom ponownie komputer, aby rozpocząć.")));
 
-        return make_page ("Done", content, t ("Restart Now", "Şimdi Yeniden Başlat"), () => {
+        return make_page ("Done", content, t ("Restart Now", "Şimdi Yeniden Başlat", "Uruchom ponownie teraz"), () => {
             try { GLib.Process.spawn_command_line_async ("systemctl reboot"); }
             catch (GLib.SpawnError e) { warning ("Reboot failed: %s", e.message); }
         }, true);
@@ -3867,7 +3919,7 @@ public class KibaOOBE : Adw.Application {
             read_backend_output.begin (
                 new GLib.DataInputStream (proc.get_stdout_pipe ()), proc);
         } catch (GLib.Error e) {
-            progress_label.label = t ("Failed to start: %s", "Başlatılamadı: %s").printf (e.message);
+            progress_label.label = t ("Failed to start: %s", "Başlatılamadı: %s", "Nie udało się uruchomić: %s").printf (e.message);
         }
     }
 
@@ -3894,15 +3946,18 @@ public class KibaOOBE : Adw.Application {
             } else if (last_fatal_message != "") {
                 progress_label.label = last_fatal_message +
                     t ("\n(Full log: /var/log/kibaos-oobe.log)",
-                       "\n(Tam günlük: /var/log/kibaos-oobe.log)");
+                       "\n(Tam günlük: /var/log/kibaos-oobe.log)",
+                       "\\n(Pełny dziennik: /var/log/kibaos-oobe.log)");
             } else {
                 progress_label.label = t (
                     "Something went wrong. Check /var/log/kibaos-oobe.log for details.",
-                    "Bir şeyler ters gitti. Ayrıntılar için /var/log/kibaos-oobe.log dosyasına bakın.");
+                    "Bir şeyler ters gitti. Ayrıntılar için /var/log/kibaos-oobe.log dosyasına bakın.",
+                    "Coś poszło nie tak. Szczegóły znajdziesz w /var/log/kibaos-oobe.log.");
             }
         } catch (GLib.Error e) {
             progress_label.label = t ("Lost connection to installer: %s",
-                                       "Kurulum programıyla bağlantı kesildi: %s").printf (e.message);
+                                       "Kurulum programıyla bağlantı kesildi: %s",
+                                       "Utracono połączenie z instalatorem: %s").printf (e.message);
         }
     }
 
@@ -4471,19 +4526,19 @@ fi
 # only so it isn't mistaken for a real failure when triaging.
 echo "NOTE: the 'required steps ... base' line above from archinstall is expected -- base is installed via squashfs extraction, not by only_hd." >> "$LOG"
 
-# only_hd leaves everything mounted under /mnt/archinstall, but the new
-# partition device nodes/mount info can lag by a beat after wipe+create
-# (udev hasn't settled yet), which is what was causing the "unable to
-# determine what partitions archinstall made" failure. Settle udev and
-# retry findmnt a few times before giving up, and log full lsblk/findmnt
-# state on failure so a real failure is diagnosable instead of opaque.
+# only_hd leaves everything mounted under plain /mnt (confirmed from a real
+# run's lsblk output: root -> /mnt, ESP -> /mnt/boot -- NOT /mnt/archinstall,
+# which was a wrong assumption from an older archinstall version/config).
+# Keep a short udev-settle retry as cheap insurance against the new
+# partition device nodes lagging a beat after wipe+create, but check the
+# real mountpoints.
 udevadm settle --timeout=10 2>/dev/null || true
 
 root_part=""
 esp_part=""
 for _try in 1 2 3 4 5; do
-  root_part=$(findmnt -n -o SOURCE --target /mnt/archinstall 2>/dev/null)
-  esp_part=$(findmnt -n -o SOURCE --target /mnt/archinstall/boot 2>/dev/null)
+  root_part=$(findmnt -n -o SOURCE --target /mnt 2>/dev/null)
+  esp_part=$(findmnt -n -o SOURCE --target /mnt/boot 2>/dev/null)
   [ -n "$root_part" ] && [ -n "$esp_part" ] && break
   sleep 1
   udevadm settle --timeout=5 2>/dev/null || true
@@ -4491,14 +4546,14 @@ done
 
 if [ -z "$root_part" ] || [ -z "$esp_part" ]; then
   echo "FATAL: Couldn't determine which partitions archinstall created." >> "$LOG"
-  echo "-- findmnt /mnt/archinstall state --" >> "$LOG"
-  findmnt -R /mnt/archinstall >> "$LOG" 2>&1 || true
+  echo "-- findmnt /mnt state --" >> "$LOG"
+  findmnt -R /mnt >> "$LOG" 2>&1 || true
   echo "-- lsblk ${disk} state --" >> "$LOG"
   lsblk "${disk}" >> "$LOG" 2>&1 || true
   tail -n 1 "$LOG" | sed 's/^/FATAL: /'
   exit 1
 fi
-umount -R /mnt/archinstall
+umount -R /mnt
 
 echo "PROGRESS 8 Handing off to KibaOS installer…"
 KIBA_ROOT_PART="$root_part" KIBA_ESP_PART="$esp_part" \
@@ -5978,6 +6033,11 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
      * (on dual-boot installs) os-prober so GRUB picks up the other OS's
      * entries automatically instead of hiding everything but KibaOS. */
     snprintf(path, sizeof(path), "%s/etc/default/grub", target_root);
+    /* lsm= sets the LSM init order/stack; apparmor must be present in it
+     * for the apparmor.service enabled below to actually enforce anything
+     * (the old apparmor=1/security=apparmor params are deprecated and get
+     * ignored -- confirmed against the current kernel AppArmor docs).
+     * capability is omitted since the kernel always includes it anyway. */
     if (dualboot) {
         write_file(path,
                    "GRUB_DISTRIBUTOR=\"KibaOS\"\n"
@@ -5986,7 +6046,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
                    "GRUB_TIMEOUT_STYLE=menu\n"
                    "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
                    "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                   "plymouth.use-simpledrm=1\"\n"
+                   "plymouth.use-simpledrm=1 "
+                   "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n"
                    "GRUB_CMDLINE_LINUX=\"\"\n"
                    "GRUB_DISABLE_OS_PROBER=false\n");
     } else {
@@ -5997,7 +6058,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
                    "GRUB_TIMEOUT_STYLE=hidden\n"
                    "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
                    "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                   "plymouth.use-simpledrm=1\"\n"
+                   "plymouth.use-simpledrm=1 "
+                   "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n"
                    "GRUB_CMDLINE_LINUX=\"\"\n"
                    "GRUB_DISABLE_OS_PROBER=true\n");
     }
@@ -6544,7 +6606,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=budgie-desktop
+Session=budgie-wayfire
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -6630,6 +6692,24 @@ rm -rf "${NUMIX_ICONS_BUILD}"
 echo "=== Icon theme: Numix Circle installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
+# WINDOW THEME — Numix GTK theme (github.com/numixproject/numix-gtk-theme)
+# ══════════════════════════════════════════════════════════════════════════
+# This is the actual window/widget theme (titlebars, buttons, controls) --
+# separate from Numix-Circle above, which is icons only. AUR-only on Arch
+# (no core/extra package), so it's built straight from upstream source,
+# same as the Plymouth theme and Numix-Circle above. Upstream's own
+# Makefile already targets `sassc` (not the deprecated ruby-sass gem some
+# older AUR PKGBUILDs still fight with), and sassc/gdk-pixbuf2/glib2 are
+# all already installed, so no extra Sass/Ruby toolchain is needed.
+NUMIX_GTK_BUILD="/tmp/numix-gtk-theme"
+rm -rf "${NUMIX_GTK_BUILD}"
+git clone --depth 1 https://github.com/numixproject/numix-gtk-theme.git "${NUMIX_GTK_BUILD}"
+make -C "${NUMIX_GTK_BUILD}" -j"$(nproc)"
+make -C "${NUMIX_GTK_BUILD}" install
+rm -rf "${NUMIX_GTK_BUILD}"
+echo "=== Window theme: Numix GTK theme installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
 # TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
 # ══════════════════════════════════════════════════════════════════════════
 # The Budgie Menu applet's default icon name is "start-here-symbolic"
@@ -6673,11 +6753,11 @@ echo "=== Taskbar launcher icon: custom black-circle/white-ring icon installed =
 
 
 # ══════════════════════════════════════════════════════════════════════════
-# GTK THEME — system-wide Adwaita-dark base + KibaOS rounded-rectangle panel override
+# GTK THEME — system-wide Numix (dark variant) base + KibaOS rounded-rectangle panel override
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/gtk-2.0
 cat > /usr/share/gtk-2.0/gtkrc << 'GTK2RC'
-gtk-theme-name = "Adwaita-dark"
+gtk-theme-name = "Numix"
 gtk-icon-theme-name = "Numix-Circle"
 gtk-font-name = "Noto Sans 11"
 gtk-cursor-theme-size = 24
@@ -6693,7 +6773,8 @@ GTK2RC
 mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
-gtk-theme-name=Adwaita-dark
+gtk-theme-name=Numix
+gtk-application-prefer-dark-theme=true
 gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -6909,6 +6990,138 @@ switch:checked {
 switch {
     transition: background-color 240ms cubic-bezier(0.5, 0, 0.75, 0);
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * KibaOS extra polish pass — the small stuff that adds up
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* Crisp, on-brand focus rings instead of GTK's default dotted/heavy outline —
+ * keyboard navigation should always be obvious, never ugly. */
+*:focus-visible {
+    outline: 2px solid rgba(0, 153, 204, 0.75);
+    outline-offset: 1px;
+    transition: outline-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Tooltips as small glass cards, matching Raven/the menu popover language
+ * instead of GTK's flat dark rectangle. */
+tooltip {
+    background-color: rgba(20, 26, 40, 0.92);
+    color: #e8eef5;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 6px 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+tooltip decoration { background: transparent; box-shadow: none; }
+
+/* Thin, rounded, low-profile scrollbars — always present but never loud. */
+scrollbar {
+    background-color: transparent;
+}
+scrollbar slider {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    min-width: 6px;
+    min-height: 6px;
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+scrollbar slider:hover {
+    background-color: rgba(255, 255, 255, 0.32);
+    transition: background-color 130ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+scrollbar slider:active {
+    background-color: rgba(0, 153, 204, 0.65);
+}
+
+/* Selected text uses the accent colour, not GTK's default blue. */
+selection, *:selected {
+    background-color: rgba(0, 153, 204, 0.55);
+    color: #ffffff;
+}
+
+/* Checkboxes/radios: rounded box, accent fill when checked, same settle/fade
+ * pair as everything else — these were the one obviously-untouched stock
+ * GTK widget left standing next to switches/sliders that already got it. */
+checkbutton check,
+radiobutton radio {
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background-color: rgba(255, 255, 255, 0.06);
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0),
+                border-color    200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+radiobutton radio { border-radius: 999px; }
+checkbutton check:checked,
+radiobutton radio:checked {
+    background-color: #0099cc;
+    border-color: #0099cc;
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1),
+                border-color    150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Progress bars: rounded pill track matching the volume/brightness sliders
+ * in Raven, instead of GTK's square-edged default. */
+progressbar trough {
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.10);
+    min-height: 6px;
+}
+progressbar progress {
+    border-radius: 999px;
+    background-color: #0099cc;
+    transition: background-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Right-click / app context menus as the same floating glass card as
+ * Raven and the Budgie Menu, instead of a flat GTK menu rectangle. */
+menu,
+popover.menu > contents {
+    background-color: rgba(20, 26, 40, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+    padding: 4px;
+}
+menuitem,
+modelbutton {
+    border-radius: 8px;
+    padding: 6px 10px;
+    transition: background-color 180ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+menuitem:hover,
+modelbutton:hover {
+    background-color: rgba(255, 255, 255, 0.10);
+    transition: background-color 120ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The volume/brightness/etc. on-screen bezel (.osd) as a small floating
+ * glass pill, matching everything else instead of GTK's plain dark box. */
+.osd {
+    background-color: rgba(16, 24, 40, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 20px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.50);
+}
+
+/* Unfocused windows recede slightly — a small depth cue that makes the
+ * focused window unambiguous at a glance, especially with several floating
+ * glass panels/popovers on screen at once. */
+window:backdrop {
+    opacity: 0.96;
+    transition: opacity 300ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+window:not(:backdrop) {
+    transition: opacity 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Linked button groups (segmented controls) read as one pill-shaped
+ * control instead of GTK's default row of square-joined buttons. */
+.linked > button {
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+.linked > button:first-child { border-radius: 10px 0 0 10px; }
+.linked > button:last-child  { border-radius: 0 10px 10px 0; }
 GTK3PANEL
 
 # ── GTK4 CSS OVERRIDE ─────────────────────────────────────────────────────
@@ -6954,6 +7167,76 @@ button:hover, row:hover, .sidebar-row:hover {
                 border-color    140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 switch slider { transition: margin 260ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+
+/* Same extra polish pass as gtk-3.0/gtk.css (see that file for the full
+ * rationale on each rule) — GTK4/libadwaita apps get the same treatment
+ * as Budgie's own chrome instead of looking like a different OS. */
+*:focus-visible {
+    outline: 2px solid rgba(0, 153, 204, 0.75);
+    outline-offset: 1px;
+    transition: outline-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+tooltip {
+    background-color: rgba(20, 26, 40, 0.92);
+    color: #e8eef5;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 6px 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+scrollbar slider {
+    background-color: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    min-width: 6px;
+    min-height: 6px;
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+scrollbar slider:hover {
+    background-color: rgba(255, 255, 255, 0.32);
+    transition: background-color 130ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+selection, *:selected {
+    background-color: rgba(0, 153, 204, 0.55);
+    color: #ffffff;
+}
+checkbutton check,
+radiobutton radio {
+    border-radius: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    background-color: rgba(255, 255, 255, 0.06);
+    transition: background-color 200ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+radiobutton radio { border-radius: 999px; }
+checkbutton check:checked,
+radiobutton radio:checked {
+    background-color: #0099cc;
+    border-color: #0099cc;
+    transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.osd {
+    background-color: rgba(16, 24, 40, 0.85);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 20px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.50);
+}
+window:backdrop {
+    opacity: 0.96;
+    transition: opacity 300ms cubic-bezier(0.5, 0, 0.75, 0);
+}
+
+/* libadwaita toasts (AdwToast — the little "Undo" bar that slides up from
+ * the bottom) as the same floating glass pill as everything else. */
+.toast {
+    background-color: rgba(20, 26, 40, 0.92);
+    color: #e8eef5;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+    padding: 4px 6px;
+}
+.toast button {
+    border-radius: 999px;
+}
 GTK4CSS
 
 # ── Disable Budgie's "built-in theme" so the KibaOS GTK CSS above actually ──
@@ -7169,6 +7452,33 @@ Rectangle {
 }
 SDDMQML
 
+# ── Wayland session — custom Budgie-on-Wayfire .desktop ────────────────
+# Budgie 10.10's own package ships /usr/share/wayland-sessions/
+# budgie-desktop.desktop, whose Exec= launches labwc (Budgie's official
+# recommended/default Wayland compositor as of 10.10 -- see
+# buddiesofbudgie.org/blog/budgie-10-10-released). SDDM's [Wayland]
+# CompositorCommand only controls what the GREETER itself runs on, not
+# the session the user logs into -- that comes entirely from whichever
+# wayland-sessions/*.desktop the Session= key names. So even with
+# CompositorCommand=wayfire set below, `Session=budgie-desktop` was
+# silently handing the actual session to labwc, which has no wobbly
+# plugin at all (its whole design philosophy excludes compositor-level
+# animation) -- hence wobbly windows never worked no matter what
+# wayfire.ini said.
+#
+# Fix: delete the stock labwc-launching session entry so it can't be
+# picked by accident, and drop in our own that runs wayfire directly.
+rm -f /usr/share/wayland-sessions/budgie-desktop.desktop
+mkdir -p /usr/share/wayland-sessions
+cat > /usr/share/wayland-sessions/budgie-wayfire.desktop << 'BUDGIEWAYFIRE'
+[Desktop Entry]
+Name=Budgie
+Comment=Budgie Desktop on the Wayfire compositor
+Exec=wayfire
+Type=Application
+DesktopNames=Budgie:GNOME
+BUDGIEWAYFIRE
+
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [General]
@@ -7182,7 +7492,7 @@ Current=kibaos
 
 [Autologin]
 User=liveuser
-Session=budgie-desktop
+Session=budgie-wayfire
 SDDMCONF
 
 mkdir -p /var/lib/sddm
@@ -7207,6 +7517,54 @@ chmod 750 /var/lib/sddm
 # it only reads $XDG_CONFIG_HOME/wayfire.ini (effectively ~/.config/wayfire.ini).
 # So the default lives in /etc/skel and gets copied into every new user's
 # home directory (liveuser, and any user the OOBE installer creates) instead.
+# ── Screenshot + screenshot-OCR ──────────────────────────────────────────
+# Bound to Print/Shift+Print/Super+Shift+Print in wayfire.ini's [command]
+# section below. All three copy to the clipboard via wl-copy (so paste-
+# anywhere works immediately) as well as writing a file, and confirm with
+# a toast so a keypress that silently did something isn't left ambiguous.
+cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
+#!/bin/bash
+# kibaos-screenshot [region] — grabs the full screen by default, or a
+# user-selected region if "region" is passed as the first argument.
+set -euo pipefail
+OUT_DIR="$HOME/Pictures/Screenshots"
+mkdir -p "$OUT_DIR"
+FILE="$OUT_DIR/Screenshot from $(date '+%Y-%m-%d %H-%M-%S').png"
+
+if [ "${1:-}" = "region" ]; then
+  GEOM=$(slurp) || exit 0   # empty selection (Esc) -> exit quietly
+  grim -g "$GEOM" "$FILE"
+else
+  grim "$FILE"
+fi
+
+wl-copy < "$FILE"
+notify-send -i "$FILE" "Screenshot saved" "Copied to clipboard · $(basename "$FILE")"
+SCREENSHOT
+chmod +x /usr/local/bin/kibaos-screenshot
+
+cat > /usr/local/bin/kibaos-screenshot-ocr << 'SCREENSHOTOCR'
+#!/bin/bash
+# kibaos-screenshot-ocr — select a region, extract its text with Tesseract,
+# and put the text (not the image) on the clipboard.
+set -euo pipefail
+GEOM=$(slurp) || exit 0
+TMP=$(mktemp --suffix=.png)
+trap 'rm -f "$TMP"' EXIT
+grim -g "$GEOM" "$TMP"
+
+TEXT=$(tesseract "$TMP" - 2>/dev/null | sed -e '$ { /^$/d }')
+if [ -z "$TEXT" ]; then
+  notify-send "Screenshot OCR" "No text found in that selection."
+  exit 0
+fi
+
+printf '%s' "$TEXT" | wl-copy
+PREVIEW=$(printf '%s' "$TEXT" | head -c 120)
+notify-send "Text copied to clipboard" "${PREVIEW}$([ ${#TEXT} -gt 120 ] && echo …)"
+SCREENSHOTOCR
+chmod +x /usr/local/bin/kibaos-screenshot-ocr
+
 mkdir -p "${SKEL}/.config"
 cat > "${SKEL}/.config/wayfire.ini" << 'WAYFIREINI'
 [core]
@@ -7218,6 +7576,7 @@ plugins = \
     move \
     resize \
     wobbly \
+    animate \
     grid \
     place \
     expo \
@@ -7271,6 +7630,22 @@ friction = 4.5
 spring_k = 8.0
 grid_resolution = 6
 
+# Handles open/close/minimize transitions -- distinct from [wobbly] above,
+# which only affects live move/resize. Zoom on open/close reads as "grow
+# from/shrink to origin", closer to what people expect from a modern DE;
+# fade is reserved for overlay-type surfaces (menus/popovers) where a zoom
+# would look wrong. Key names/values confirmed against animate.cpp and
+# community wayfire.ini examples.
+[animate]
+open_animation = zoom
+close_animation = zoom
+minimize_animation = zoom
+duration = 300
+zoom_duration = 300
+fade_duration = 200
+enabled_for = (type equals "toplevel" | (type equals "x-or" & focusable equals true))
+fade_enabled_for = type equals "overlay"
+
 # Blur is a real Wayfire plugin (unlike labwc, which has none at all), but
 # a known upstream limitation (WayfireWM/wayfire#1399) means it historically
 # does NOT apply behind semi-transparent layer-shell surfaces like Budgie's
@@ -7284,6 +7659,17 @@ mode = normal
 kawase_offset = 2
 kawase_degrade = 3
 kawase_iterations = 2
+
+# Print = full-screen screenshot, Shift+Print = region screenshot, both to
+# clipboard + ~/Pictures/Screenshots. Super+Shift+Print = region -> OCR ->
+# text on the clipboard (see the two scripts written just above).
+[command]
+binding_screenshot_full   = KEY_PRINT
+command_screenshot_full   = kibaos-screenshot
+binding_screenshot_region = <shift> KEY_PRINT
+command_screenshot_region = kibaos-screenshot region
+binding_screenshot_ocr    = <super> <shift> KEY_PRINT
+command_screenshot_ocr    = kibaos-screenshot-ocr
 WAYFIREINI
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -7735,7 +8121,8 @@ NEMODESKTOP
 
 cat > "${SKEL}/.config/gtk-3.0/settings.ini" << 'GTK3SKEL'
 [Settings]
-gtk-theme-name=Adwaita-dark
+gtk-theme-name=Numix
+gtk-application-prefer-dark-theme=true
 gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -7752,7 +8139,7 @@ cp /etc/gtk-3.0/gtk.css "${SKEL}/.config/gtk-3.0/gtk.css"
 cp /etc/gtk-4.0/gtk.css "${SKEL}/.config/gtk-4.0/gtk.css"
 
 cat > "${SKEL}/.gtkrc-2.0" << 'GTK2SKEL'
-gtk-theme-name="Adwaita-dark"
+gtk-theme-name="Numix"
 gtk-icon-theme-name="Numix-Circle"
 gtk-font-name="Noto Sans 11"
 gtk-cursor-theme-size=24
@@ -7780,7 +8167,7 @@ cat > /usr/local/bin/kibaos-first-login << 'FIRSTLOGIN'
 STAMP="${HOME}/.config/.kibaos-configured"
 [ -f "${STAMP}" ] && exit 0
 
-gsettings set org.gnome.desktop.interface gtk-theme               'Adwaita-dark'
+gsettings set org.gnome.desktop.interface gtk-theme               'Numix'
 gsettings set org.gnome.desktop.interface icon-theme              'Numix-Circle'
 gsettings set org.gnome.desktop.interface cursor-theme            'Adwaita'
 gsettings set org.gnome.desktop.interface cursor-size             24
@@ -8486,7 +8873,7 @@ XDG_SESSION_TYPE=wayland
 QT_AUTO_SCREEN_SCALE_FACTOR=1
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-GTK_THEME=Adwaita-dark
+GTK_THEME=Numix:dark
 QT_STYLE_OVERRIDE=kvantum
 XCURSOR_THEME=Adwaita
 XCURSOR_SIZE=24
@@ -8534,7 +8921,13 @@ TIMESYNCD
 # Force RTC to UTC (matches hwclock.conf) and enable sync
 timedatectl set-local-rtc 0 2>/dev/null || true
 systemctl enable systemd-timesyncd
-systemctl enable systemd-time-wait-sync
+# NOT systemd-time-wait-sync: that unit exists to BLOCK boot until the
+# first NTP sync completes -- built for servers that need a guaranteed
+# clock before continuing, not a consumer desktop. timesyncd above already
+# syncs the clock in the background with zero boot-time cost; wait-sync
+# would instead add a real (sometimes multi-second, sometimes a full
+# timeout on a flaky/offline network) delay to every single boot for no
+# benefit a desktop actually needs.
 
 systemctl enable sddm
 
@@ -8559,6 +8952,60 @@ NMDNS
 
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
+
+# ══════════════════════════════════════════════════════════════════════════
+# SECURITY — AppArmor, Firejail, Secure Boot (sbctl)
+# ══════════════════════════════════════════════════════════════════════════
+# AppArmor: the LSM itself is only live if apparmor is in the kernel's
+# lsm= boot param (set above in /etc/default/grub for installed systems;
+# see kiba_gpt.c's GRUB_CMDLINE_LINUX_DEFAULT). Enabling the service here
+# just makes it load whatever profiles ship in /etc/apparmor.d/ at boot
+# once that param is active -- profile enforcement (aa-enforce/aa-complain
+# for individual apps) is left to Remi/the end user, since KibaOS doesn't
+# curate its own profile set.
+systemctl enable apparmor
+
+# Firejail: firecfg symlinks /usr/local/bin/<app> -> /usr/bin/firejail for
+# every desktop app it recognizes a sandbox profile for (found by scanning
+# /usr/share/applications), so e.g. the browser launches sandboxed by
+# default without anyone having to type `firejail chromium` by hand.
+# NOTE: firejail's own namespace/seccomp sandboxing and AppArmor's
+# path-based enforcement have been reported to step on each other for
+# some apps (an app both jailed AND under a restrictive profile can get
+# denied in confusing ways) -- if something sandboxed misbehaves, check
+# `aa-status`/`journalctl` for AppArmor DENIED lines before assuming it's
+# just a firejail bug.
+firecfg 2>/dev/null || true
+
+# Secure Boot (sbctl): key generation/enrollment is inherently a per-
+# machine, post-install action -- it needs the target's own firmware in
+# Setup Mode, and on a handful of boards (some ASUS/Lenovo models per the
+# Arch wiki) it can interact badly with OEM-signed Option ROMs if done
+# carelessly. None of that is safe or meaningful to run against this
+# build chroot, so this just installs sbctl (which also drops its own
+# pacman hook to auto-resign the kernel/bootloader on future updates once
+# keys exist) and a helper script the end user runs themselves.
+cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
+#!/usr/bin/env bash
+# Run this AFTER installing KibaOS, on the real target machine, with
+# Secure Boot's Setup Mode enabled in firmware settings. It creates and
+# enrolls your own Secure Boot keys, then signs the kernel and GRUB.
+set -e
+echo "This will create and enroll new Secure Boot keys on THIS machine"
+echo "and is not easily reversible. Only continue if you understand what"
+echo "Secure Boot key enrollment does. See: wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot"
+read -rp "Continue? [y/N] " _confirm
+[ "${_confirm}" = "y" ] || [ "${_confirm}" = "Y" ] || exit 0
+
+sudo sbctl status
+sudo sbctl create-keys
+sudo sbctl enroll-keys -m
+sudo sbctl sign -s /boot/vmlinuz-linux
+sudo sbctl sign -s /boot/EFI/KibaOS/grubx64.efi
+sudo sbctl verify
+echo "Done. Reboot and re-enable Secure Boot in firmware settings."
+SBCTLSETUP
+chmod +x /usr/local/bin/kibaos-secureboot-setup
 
 # ── Size reduction ─────────────────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*
