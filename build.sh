@@ -414,15 +414,7 @@ pacman -Syy --noconfirm
 # not any one install being oversized on its own. `-Scc` (double-c) drops
 # cached packages of every version, not just superseded ones.
 pacman -Scc --noconfirm
-# Build and install gtk-engine-murrine from the AUR
-useradd -m builder
-su - builder -c '
-git clone https://aur.archlinux.org/gtk-engine-murrine.git
-cd gtk-engine-murrine
-makepkg -s
-'
-pacman -U --noconfirm /home/builder/gtk-engine-murrine/*.pkg.tar.*
-userdel -r builder
+
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
 #!/usr/bin/env bash
@@ -508,7 +500,15 @@ echo "=== Installing Kortex build + runtime dependencies ==="
 # without an AUR helper. Installing via pip avoids that dependency entirely.
 pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
 pip install --break-system-packages --no-cache-dir nuitka
+useradd -m builder || true
 
+su - builder -c '
+git clone https://aur.archlinux.org/gtk-engine-murrine.git
+cd gtk-engine-murrine
+makepkg --nodeps --noconfirm
+'
+
+pacman -U --noconfirm /home/builder/gtk-engine-murrine/*.pkg.tar.*
 mkdir -p /usr/lib/kortex/kortexd/assets
 
 cat > /usr/lib/kortex/kortexd/__init__.py << 'KORTEX_INIT_PY'
