@@ -7568,6 +7568,17 @@ notify-send "Text copied to clipboard" "${PREVIEW}$([ ${#TEXT} -gt 120 ] && echo
 SCREENSHOTOCR
 chmod +x /usr/local/bin/kibaos-screenshot-ocr
 
+# SKEL is defined here (rather than only at the "SKELETON" section later in
+# this script) because this is its first use: wayfire.ini gets written to
+# /etc/skel so it's copied into every new user's home (liveuser, and any
+# user the OOBE installer creates). Previously SKEL wasn't set until much
+# later in the script, so with `set -ex` (no -u) it silently expanded to
+# an empty string here, writing wayfire.ini to /.config instead of
+# /etc/skel/.config — meaning no user ever actually got it, Wayfire had no
+# [autostart] entry, and budgie-desktop never launched (gray screen, giant
+# cursor, bare compositor). The later "SKELETON" section still re-assigns
+# SKEL="/etc/skel" — that's redundant now but harmless, so it's left as-is.
+SKEL="/etc/skel"
 mkdir -p "${SKEL}/.config"
 cat > "${SKEL}/.config/wayfire.ini" << 'WAYFIREINI'
 [core]
