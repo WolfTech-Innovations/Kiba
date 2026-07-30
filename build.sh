@@ -148,8 +148,7 @@ tesseract-data-eng
 libnotify
 swayidle
 gtklock
-gtk2
-gtk-doc
+-doc
 pkgconf
 intltool
 autoconf
@@ -509,15 +508,16 @@ echo "=== Installing Kortex build + runtime dependencies ==="
 # without an AUR helper. Installing via pip avoids that dependency entirely.
 pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
 pip install --break-system-packages --no-cache-dir nuitka
-useradd -m builder || true
-
-su - builder -c '
-git clone https://aur.archlinux.org/gtk-engine-murrine.git
-cd gtk-engine-murrine
-makepkg --nodeps --noconfirm
-'
-
-pacman -U --noconfirm /home/builder/gtk-engine-murrine/*.pkg.tar.*
+git clone https://aur.archlinux.org/gtk2.git /tmp/gtk2 && \
+cd /tmp/gtk2 && \
+makepkg --nodeps --noconfirm && \
+pacman -U --noconfirm ./*.pkg.tar.* && \
+cd /tmp && \
+rm -rf /tmp/gtk2 && \
+git clone https://aur.archlinux.org/gtk-engine-murrine.git /tmp/gtk-engine-murrine && \
+cd /tmp/gtk-engine-murrine && \
+makepkg --nodeps --noconfirm && \
+pacman -U --noconfirm ./*.pkg.tar.*
 mkdir -p /usr/lib/kortex/kortexd/assets
 
 cat > /usr/lib/kortex/kortexd/__init__.py << 'KORTEX_INIT_PY'
