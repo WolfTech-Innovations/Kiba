@@ -414,8 +414,15 @@ pacman -Syy --noconfirm
 # not any one install being oversized on its own. `-Scc` (double-c) drops
 # cached packages of every version, not just superseded ones.
 pacman -Scc --noconfirm
-pacman -S --needed git base-devel && git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm && cd - && rm -rf /tmp/yay
-yay -S gtk-engine-murrine
+# Build and install gtk-engine-murrine from the AUR
+useradd -m builder
+su - builder -c '
+git clone https://aur.archlinux.org/gtk-engine-murrine.git
+cd gtk-engine-murrine
+makepkg -s
+'
+pacman -U --noconfirm /home/builder/gtk-engine-murrine/*.pkg.tar.*
+userdel -r builder
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
 #!/usr/bin/env bash
