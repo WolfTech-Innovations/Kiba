@@ -236,7 +236,6 @@ firejail
 # ── Numix GTK theme build deps (numix-gtk-theme is AUR-only; built from
 # source below the same way the Plymouth/icon themes already are) ───────
 gdk-pixbuf2
-gtk-engine-murrine
 PACKAGES
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -415,7 +414,8 @@ pacman -Syy --noconfirm
 # not any one install being oversized on its own. `-Scc` (double-c) drops
 # cached packages of every version, not just superseded ones.
 pacman -Scc --noconfirm
-
+pacman -S --needed git base-devel && git clone https://aur.archlinux.org/yay.git /tmp/yay && cd /tmp/yay && makepkg -si --noconfirm && cd - && rm -rf /tmp/yay
+yay -S gtk-engine-murrine
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
 #!/usr/bin/env bash
