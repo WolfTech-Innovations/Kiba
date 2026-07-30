@@ -4399,7 +4399,17 @@ typedef struct {
     char        name[37];      /* NUL-terminated, displayed only; truncated to 36 UTF-16 chars on disk */
     kiba_guid_t type_guid;
     kiba_guid_t unique_guid;   /* if all-zero, libfdisk generates one */
-    uint64_t    first_lba;
+    uint64_t    first_lba;     /* Pass KIBA_GPT_FIRST_LBA_DEFAULT to let libfdisk
+                                 * pick the first usable LBA itself (only valid
+                                 * for the first partition in the array) or
+                                 * KIBA_GPT_FIRST_LBA_CONTIGUOUS to start right
+                                 * after the previous partition's *actual*
+                                 * on-disk placement. Either way, when first_lba
+                                 * isn't a concrete number, last_lba below is
+                                 * reinterpreted as a sector COUNT rather than
+                                 * an absolute LBA, since the real start (and
+                                 * therefore the real end) isn't known until
+                                 * libfdisk places the partition. */
     uint64_t    last_lba;      /* inclusive. Pass KIBA_GPT_LAST_LBA_REST to
                                  * consume all remaining space on the disk --
                                  * this defers to libfdisk's own last-usable-LBA
@@ -4409,9 +4419,18 @@ typedef struct {
     uint64_t    attributes;
 } kiba_gpt_partition_t;
 
-/* Sentinel for last_lba: "use all remaining space on the disk." Never a
- * legitimate LBA value, so safe to reuse as a flag. */
-#define KIBA_GPT_LAST_LBA_REST UINT64_MAX
+/* Sentinels for first_lba/last_lba: never legitimate LBA values (or sector
+ * counts, for KIBA_GPT_FIRST_LBA_DEFAULT's reinterpretation of last_lba), so
+ * safe to reuse as flags. Hand-computing "first usable LBA after the GPT
+ * header + entry array" and "last usable LBA before the backup header" both
+ * turned out to drift by a sector or two from what libfdisk actually derives
+ * for a given disk (entry array size, alignment, sector size all factor in) --
+ * that mismatch is exactly what made fdisk_add_partition() reject requests
+ * with EINVAL. Deferring to libfdisk for both ends of the layout avoids
+ * needing to replicate its internal math. */
+#define KIBA_GPT_LAST_LBA_REST        UINT64_MAX
+#define KIBA_GPT_FIRST_LBA_DEFAULT    UINT64_MAX
+#define KIBA_GPT_FIRST_LBA_CONTIGUOUS (UINT64_MAX - 1)
 
 typedef struct {
     int      fd;                 /* open O_RDWR on the whole-disk block device */
@@ -4431,13 +4450,21 @@ kiba_guid_t kiba_guid_random(void);
  * automatically (libfdisk calls BLKPG/BLKRRPART internally as needed) —
  * caller does not need to call partprobe.
  *
+ * out_last_lba: optional (may be NULL). If non-NULL, must point to an
+ * array of n_parts uint64_t -- filled in with each partition's *actual*
+ * on-disk last LBA once libfdisk has placed it. Needed whenever a later
+ * partition uses KIBA_GPT_FIRST_LBA_CONTIGUOUS, since libfdisk (not this
+ * function) is the source of truth for where the previous partition
+ * actually landed.
+ *
  * NOTE: disk->fd is used only to derive the device path for libfdisk
  * (via /proc/self/fd) — libfdisk opens the device itself through
  * fdisk_assign_device(). The fd passed in must stay open for the
  * duration of the call.
  */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
-                    const kiba_gpt_partition_t *parts, size_t n_parts);
+                    const kiba_gpt_partition_t *parts, size_t n_parts,
+                    uint64_t *out_last_lba);
 
 /* Reads back sector size + total size for `path` (e.g. "/dev/vda") via
  * ioctl (BLKSSZGET, BLKGETSIZE64) — no `blockdev`/`lsblk` subprocess.
@@ -4594,7 +4621,8 @@ int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
 
 /* ── kiba_gpt_write — the libfdisk implementation ───────────────────── */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
-                    const kiba_gpt_partition_t *parts, size_t n_parts) {
+                    const kiba_gpt_partition_t *parts, size_t n_parts,
+                    uint64_t *out_last_lba) {
     if (n_parts == 0 || n_parts > 128) return -EINVAL;
     if (disk->logical_sector_size == 0) return -EINVAL;
 
@@ -4626,20 +4654,42 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     }
 
     /* ── Add each partition ──────────────────────────────────────── */
+    uint64_t prev_end = 0;
     for (size_t i = 0; i < n_parts; i++) {
         const kiba_gpt_partition_t *p = &parts[i];
 
         struct fdisk_partition *pa = fdisk_new_partition();
         if (!pa) { rc = -ENOMEM; goto out; }
 
-        fdisk_partition_set_start(pa, p->first_lba);
+        /* Resolve first_lba sentinels against what libfdisk/the previous
+         * partition actually did, rather than hand-computed guesses --
+         * see the KIBA_GPT_*_LBA_* comment above kiba_gpt_partition_t. */
+        uint64_t resolved_first = p->first_lba;
+        bool start_is_default = false;
+        if (p->first_lba == KIBA_GPT_FIRST_LBA_CONTIGUOUS) {
+            if (i == 0) { rc = -EINVAL; fdisk_unref_partition(pa); goto out; }
+            resolved_first = prev_end + 1;
+        } else if (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT) {
+            start_is_default = true;
+        }
+
+        if (start_is_default) {
+            fdisk_partition_start_follow_default(pa, 1);
+        } else {
+            fdisk_partition_set_start(pa, resolved_first);
+        }
+
         if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
             /* Let libfdisk pick the end -- it already knows the real
              * last usable LBA for this disk (accounts for the backup
              * GPT header + entry array), so we don't have to guess. */
             fdisk_partition_end_follow_default(pa, 1);
+        } else if (start_is_default) {
+            /* Start isn't known yet, so last_lba can't be an absolute
+             * LBA here -- it's the partition's size in sectors instead. */
+            fdisk_partition_set_size(pa, p->last_lba);
         } else {
-            fdisk_partition_set_size(pa, p->last_lba - p->first_lba + 1);
+            fdisk_partition_set_size(pa, p->last_lba - resolved_first + 1);
         }
 
         /* Partition type GUID */
@@ -4671,6 +4721,19 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
         rc = fdisk_add_partition(cxt, pa, &partno);
         fdisk_unref_partition(pa);
         if (rc != 0) goto out;
+
+        /* Find out where libfdisk actually put it -- needed for the next
+         * iteration's KIBA_GPT_FIRST_LBA_CONTIGUOUS, and to report back
+         * to the caller, since a default/follow-default placement can
+         * land anywhere libfdisk's own alignment rules decide. */
+        uint64_t actual_end = p->last_lba;
+        struct fdisk_partition *placed = NULL;
+        if (fdisk_get_partition(cxt, partno, &placed) == 0 && placed) {
+            actual_end = fdisk_partition_get_end(placed);
+            fdisk_unref_partition(placed);
+        }
+        prev_end = actual_end;
+        if (out_last_lba) out_last_lba[i] = actual_end;
     }
 
     /* ── Write GPT to disk ───────────────────────────────────────── */
@@ -6076,25 +6139,25 @@ int main(int argc, char **argv) {
         if (disk_fd < 0) fail("Could not open disk for writing.");
 
         /* Layout: 512MiB ESP (FAT32) + remainder as Linux root (ext4),
-         * matching the layout the old archinstall-based backend used. */
+         * matching the layout the old archinstall-based backend used.
+         *
+         * Deliberately NOT hand-computing first/last usable LBAs here.
+         * That used to dead-reckon where the GPT header + entry array
+         * sit (both at the start, for the ESP, and at the end, for
+         * root), and a sector or two of drift against what libfdisk
+         * actually derives for this disk/sector size made
+         * fdisk_add_partition() reject the request with EINVAL ("Invalid
+         * argument"). KIBA_GPT_FIRST_LBA_DEFAULT / _CONTIGUOUS /
+         * KIBA_GPT_LAST_LBA_REST all defer to libfdisk's own placement
+         * instead -- see kiba_gpt_write()'s handling of these sentinels
+         * and the doc comment on kiba_gpt_partition_t. */
         uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
-        uint64_t entry_array_sectors = (128 * 128 + ssz - 1) / ssz;
-        uint64_t first_usable = 2 + entry_array_sectors;
-        uint64_t esp_first  = first_usable;
-        uint64_t esp_last   = esp_first + esp_sectors - 1;
-        uint64_t root_first = esp_last + 1;
-        /* Root partition consumes the rest of the disk. We deliberately do NOT
-         * hand-compute the last usable LBA here -- that previously tried to
-         * dead-reckon where the backup GPT header + entry array sit at the end
-         * of the disk, and a one-sector mismatch against libfdisk's own
-         * calculation made fdisk_add_partition() reject it with EINVAL ("The
-         * last usable GPT sector is X, but Y is requested"). Passing the
-         * KIBA_GPT_LAST_LBA_REST sentinel defers to libfdisk's own
-         * last_usable_lba, which fdisk_create_disklabel() already derived
-         * correctly for this exact disk/sector size. */
-        uint64_t root_last  = KIBA_GPT_LAST_LBA_REST;
 
-        if (root_first >= total_sectors) {
+        /* Rough pre-flight sanity check only (not used for the actual
+         * partition layout below) -- catches "disk is way too small"
+         * early with a friendly message instead of a raw libfdisk error. */
+        uint64_t rough_overhead = (128 * 128 + ssz - 1) / ssz + 34;
+        if (esp_sectors + rough_overhead >= total_sectors) {
             close(disk_fd);
             fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
         }
@@ -6107,11 +6170,12 @@ int main(int argc, char **argv) {
         };
         kiba_gpt_partition_t parts[2] = {
             { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
-              .first_lba = esp_first,  .last_lba = esp_last,  .attributes = 0 },
+              .first_lba = KIBA_GPT_FIRST_LBA_DEFAULT, .last_lba = esp_sectors, .attributes = 0 },
             { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
-              .first_lba = root_first, .last_lba = root_last, .attributes = 0 },
+              .first_lba = KIBA_GPT_FIRST_LBA_CONTIGUOUS, .last_lba = KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
         };
-        int rc = kiba_gpt_write(&gdisk, parts, 2);
+        uint64_t placed_ends[2] = {0};
+        int rc = kiba_gpt_write(&gdisk, parts, 2, placed_ends);
         close(disk_fd);
         if (rc != 0) {
             char errbuf[256];
@@ -7318,6 +7382,73 @@ notify-send "Text copied to clipboard" "${PREVIEW}$([ ${#TEXT} -gt 120 ] && echo
 SCREENSHOTOCR
 chmod +x /usr/local/bin/kibaos-screenshot-ocr
 
+# ── Output scale: real per-monitor DPI via wlr-randr ──────────────────────
+# Wayfire has no built-in auto-DPI logic -- outputs default to scale 1
+# unless something explicitly sets them. This runs on every session start
+# (wired into wayfire.ini's [autostart] below) so it also re-applies
+# correctly on dock/undock and monitor hotplug, not just at first login.
+# Scale is derived from actual DPI (px / physical size in inches) when the
+# monitor reports its physical dimensions over EDID, falling back to a
+# resolution-only heuristic when it doesn't (common on some external
+# monitors and most VMs).
+cat > /usr/local/bin/kibaos-apply-output-scale << 'OUTPUTSCALE'
+#!/bin/bash
+# Give the compositor a moment to enumerate outputs on cold start.
+for _ in 1 2 3 4 5; do
+    wlr-randr >/tmp/.kiba-outputs 2>/dev/null && [ -s /tmp/.kiba-outputs ] && break
+    sleep 1
+done
+[ -s /tmp/.kiba-outputs ] || exit 0
+
+current_name=""
+current_w=""
+current_h=""
+current_mm_w=""
+current_mm_h=""
+
+apply_scale() {
+    [ -n "$current_name" ] || return
+    scale=1
+    if [ -n "$current_mm_w" ] && [ "$current_mm_w" -gt 0 ] 2>/dev/null; then
+        # DPI = px / (mm / 25.4); compare against a 168dpi HiDPI threshold.
+        dpi=$(( current_w * 254 / (current_mm_w * 10) ))
+        if [ "$dpi" -ge 168 ]; then
+            scale=2
+        fi
+    elif [ -n "$current_w" ] && [ "$current_w" -ge 3000 ] 2>/dev/null; then
+        # No physical size reported (VM, some externals) -- fall back to a
+        # plain resolution heuristic. 4K+ panels are HiDPI in practice.
+        scale=2
+    fi
+    wlr-randr --output "$current_name" --scale "$scale" >/dev/null 2>&1
+}
+
+while IFS= read -r line; do
+    case "$line" in
+        [A-Za-z]*)
+            apply_scale
+            current_name=$(printf '%s' "$line" | awk '{print $1}')
+            current_w=""; current_h=""; current_mm_w=""; current_mm_h=""
+            ;;
+        *"Physical size:"*)
+            # e.g. "  Physical size: 344x194 mm"
+            dims=$(printf '%s' "$line" | grep -oE '[0-9]+x[0-9]+')
+            current_mm_w=${dims%x*}
+            current_mm_h=${dims#*x}
+            ;;
+        *"current"*)
+            # e.g. "  1920x1080 px, 60.000000 Hz (current)"
+            dims=$(printf '%s' "$line" | grep -oE '^[[:space:]]*[0-9]+x[0-9]+' | tr -d ' ')
+            current_w=${dims%x*}
+            current_h=${dims#*x}
+            ;;
+    esac
+done < /tmp/.kiba-outputs
+apply_scale
+rm -f /tmp/.kiba-outputs
+OUTPUTSCALE
+chmod +x /usr/local/bin/kibaos-apply-output-scale
+
 # SKEL is defined here (rather than only at the "SKELETON" section later in
 # this script) because this is its first use: wayfire.ini gets written to
 # /etc/skel so it's copied into every new user's home (liveuser, and any
@@ -7375,6 +7506,7 @@ screensaver_timeout = -1
 # No labwc-style bridge exists for Wayfire — this is what actually starts
 # the Budgie shell. Without it, Wayfire boots to an empty compositor.
 [autostart]
+autostart_scale = kibaos-apply-output-scale
 autostart_budgie = budgie-desktop
 
 # RGBA as four floats from 0.0-1.0 — Wayfire's decoration plugin does NOT
