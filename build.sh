@@ -6011,34 +6011,56 @@ int kiba_install_locale_gen(const char *target_root) {
 
 int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password) {
-    /* Strip the live-session [Autologin] block out of the REAL sddm config.
-     * The old code here unlinked /etc/sddm.conf.d/kibaos-live.conf and
-     * /etc/sddm.conf.d/autologin.conf -- neither of those paths is ever
-     * written anywhere in this build script. The actual autologin config
-     * lives inside /etc/sddm.conf.d/kibaos.conf (baked into every image,
-     * live and installed, at airootfs build time) as:
-     *   [Autologin]
-     *   User=liveuser
-     *   Session=budgie-desktop
-     * That block survived on the installed target untouched, and since
-     * liveuser gets userdel'd a few lines below, SDDM was left trying to
-     * autologin a user that no longer exists -- which is what was actually
-     * causing the installed system to come up with no desktop at all
-     * (labwc/Budgie were never the problem; SDDM never got that far).
-     * Fix: rewrite kibaos.conf on the target without the [Autologin]
-     * section, so it falls through to a normal greeter with Session=
-     * still defaulting to budgie-desktop. */
+    /* The build-time kibaos.conf (customize_airootfs.sh) ships an
+     * [Autologin] block pointing at "liveuser". That block survived on
+     * the installed target untouched, and since liveuser gets userdel'd
+     * a few lines below, SDDM was left trying to autologin a user that
+     * no longer exists -- which is what was actually causing the
+     * installed system to come up with no desktop at all (labwc/Budgie
+     * were never the problem; SDDM never got that far).
+     * Fix: swap just the "User=liveuser" value to the real account name,
+     * in place, rather than re-writing the whole file from a hardcoded
+     * copy of the template -- that copy drifts the moment kibaos.conf
+     * picks up a new key at build time and this function doesn't. Net
+     * effect: the installed system autologins straight to the account
+     * just created here, same as the live session did; the user can flip
+     * that off in Settings afterward if they want a login prompt. */
     char path[1024];
     snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos.conf", target_root);
-    write_file(path,
-               "[General]\n"
-               "DisplayServer=wayland\n"
-               "\n"
-               "[Wayland]\n"
-               "CompositorCommand=labwc\n"
-               "\n"
-               "[Theme]\n"
-               "Current=kibaos\n");
+    {
+        FILE *f = fopen(path, "r");
+        if (f) {
+            fseek(f, 0, SEEK_END);
+            long sz = ftell(f);
+            fseek(f, 0, SEEK_SET);
+            char *buf = malloc((size_t)sz + 1);
+            if (buf) {
+                size_t got = fread(buf, 1, (size_t)sz, f);
+                buf[got] = 0;
+                fclose(f);
+
+                const char *needle = "User=liveuser";
+                char *pos = strstr(buf, needle);
+                if (pos) {
+                    size_t prefix_len = (size_t)(pos - buf) + strlen("User=");
+                    const char *suffix = pos + strlen(needle);
+                    char *out = malloc(prefix_len + strlen(username) + strlen(suffix) + 1);
+                    if (out) {
+                        memcpy(out, buf, prefix_len);
+                        strcpy(out + prefix_len, username);
+                        strcat(out, suffix);
+
+                        FILE *fw = fopen(path, "w");
+                        if (fw) { fwrite(out, 1, strlen(out), fw); fclose(fw); }
+                        free(out);
+                    }
+                }
+                free(buf);
+            } else {
+                fclose(f);
+            }
+        }
+    }
 
     /* Remove the live user -- best effort, ignore failure if absent. */
     {
