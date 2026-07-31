@@ -129,6 +129,7 @@ base-devel
 python
 pyalpm
 parted
+gptfdisk
 wine
 wine-mono
 lib32-mesa
@@ -2792,14 +2793,17 @@ echo "=== AUR packages installed ==="
 #     palette (matching gtk-3.0/gtk.css's colors elsewhere in this script).
 #   - Backend: a privileged C binary (kibaos-oobe-backend), called via
 #     sudo with a plain argv array (no shell string, no quoting/
-#     injection surface, no D-Bus/polkit dependency). Disk partitioning (GPT) and the udev-settle
-#     wait are hand-implemented in libkibadisk against raw ioctls --
-#     no archinstall, no parted/sgdisk, no blkid/partprobe subprocess
-#     for the disk-critical path. The handful of remaining external
-#     tools (unsquashfs, mkfs.fat/mkfs.ext4, arch-chroot, grub-install,
-#     mkinitcpio, useradd/chpasswd, locale-gen, pacman) have no sane
-#     from-scratch replacement and are invoked via posix_spawn argv
-#     arrays, never a shell. See /usr/share/kibaos-oobe/src/disk/ for
+#     injection surface, no D-Bus/polkit dependency). The udev-settle
+#     wait is hand-implemented in libkibadisk against raw ioctls; GPT
+#     partitioning is done by shelling out to sgdisk (argv array via
+#     execvp, never a shell -- see kiba_gpt.c) instead of a hand-rolled
+#     writer or a libfdisk link dependency. No archinstall, no parted,
+#     no blkid/partprobe subprocess anywhere in the disk-critical path.
+#     The handful of remaining external tools (sgdisk, unsquashfs,
+#     mkfs.fat/mkfs.ext4, arch-chroot, grub-install, mkinitcpio,
+#     useradd/chpasswd, locale-gen, pacman) have no sane from-scratch
+#     replacement and are invoked via argv arrays, never a shell.
+#     See /usr/share/kibaos-oobe/src/disk/ for
 #     the library source (kiba_gpt.c, kiba_fs.c, kiba_udev.c,
 #     kiba_install_*.c) and kibaos_oobe_backend_main.c for the
 #     orchestrator that ties it together.
@@ -3890,8 +3894,8 @@ public class KibaOOBE : Adw.Application {
 
     private void start_install () {
         // Disk partitioning/formatting, base extraction, and bootloader
-        // install all go through libkibadisk (libfdisk-backed GPT writer)
-        // in kibaos-oobe-backend directly -- no archinstall detour.
+        // install all go through libkibadisk (sgdisk-subprocess-backed GPT
+        // writer) in kibaos-oobe-backend directly -- no archinstall detour.
         string[] argv = {
             "sudo", "/usr/local/bin/kibaos-oobe-backend",
             selected_disk, install_mode, selected_locale, selected_keymap,
@@ -4353,29 +4357,39 @@ mkdir -p /usr/share/kibaos-oobe/src/disk
 cd /usr/share/kibaos-oobe/src/disk
 
 cat > kiba_gpt.h << 'KIBA_SRC_END_GPTH'
-/* kiba_gpt.h — GPT partition table writer, backed by libfdisk.
+/* kiba_gpt.h — GPT partition table writer, backed by sgdisk.
  *
  * Previously this was a from-scratch, hand-rolled implementation of
  * UEFI Spec 2.10 chapter 5 (protective MBR + primary/backup GPT header +
  * entry array) written directly via pwrite(), with BLKPG ioctls standing
- * in for partprobe. That hand-rolled GPT writer is now replaced with
- * libfdisk (util-linux's own partitioning library — the same code that
- * backs `fdisk`/`cfdisk` and is maintained by the kernel/util-linux
- * project). Reasoning: GPT is a CRC32'd, dual-copy, byte-exact-spec
- * format — exactly the kind of thing where a small bug (off-by-one
- * sector, wrong CRC scope, endianness slip) silently corrupts a real
- * disk. libfdisk gets this right because it's the reference
- * implementation other tools defer to, not because hand-rolled C can't
- * — it's a real, maintained dependency trade made deliberately, the
- * same way kiba_fs.h already defers to mkfs.ext4/mkfs.fat for the same
- * reason.
+ * in for partprobe. That was later swapped for libfdisk's C API, which
+ * pulled in a link-time dependency (-lfdisk) and a fair amount of
+ * fdisk_context/fdisk_partition object plumbing for what's fundamentally
+ * a handful of "add this partition" calls. This revision replaces that
+ * API dependency with `sgdisk` (from the gptfdisk package) invoked as a
+ * plain subprocess — same underlying correctness guarantee (sgdisk is
+ * the same kind of reference GPT implementation libfdisk is, and is
+ * what most distro installers already shell out to), but the call
+ * surface is now just "build an argv array, exec it, check the exit
+ * code" instead of a C library binding. Every invocation goes through
+ * execvp() with a real argv array — never a shell — so partition names
+ * or GUIDs containing spaces or shell metacharacters are passed through
+ * literally with no quoting/injection surface, same guarantee the rest
+ * of this backend already holds itself to.
+ *
+ * The layout math (where each partition starts/ends, accounting for the
+ * GPT header + entry array at both ends of the disk) is still computed
+ * by this code rather than left to sgdisk's own "-n 0:0:0" defaults, so
+ * placement stays fully deterministic and doesn't require parsing
+ * sgdisk's output back out to find out where it actually put things.
  *
  * The public API below is UNCHANGED from the previous version, so
  * kibaos_oobe_backend_main.c and every other caller needs zero changes.
  *
- * Build requirement: link with `-lfdisk` (libfdisk-dev /
- * util-linux-libs, already present on any Arch base — part of
- * util-linux). See the gcc invocation building kibaos-oobe-backend.
+ * Build requirement: none beyond the `sgdisk` binary being on PATH at
+ * runtime (package: gptfdisk, already in packages.x86_64). No extra
+ * -l flag needed at link time — see the gcc invocation building
+ * kibaos-oobe-backend.
  */
 #ifndef KIBA_GPT_H
 #define KIBA_GPT_H
@@ -4386,7 +4400,8 @@ cat > kiba_gpt.h << 'KIBA_SRC_END_GPTH'
 
 /* 16-byte little/mixed-endian GUID, stored exactly as UEFI expects on disk.
  * Kept for ABI compatibility with existing callers — internally this is
- * now converted to/from libfdisk's string-GUID representation. */
+ * now converted to/from the canonical string-GUID format sgdisk's -u/-U
+ * flags expect. */
 typedef struct {
     uint8_t b[16];
 } kiba_guid_t;
@@ -4398,36 +4413,37 @@ extern const kiba_guid_t KIBA_GUID_LINUX_FS;     /* 0FC63DAF-8483-4772-8E79-3D69
 typedef struct {
     char        name[37];      /* NUL-terminated, displayed only; truncated to 36 UTF-16 chars on disk */
     kiba_guid_t type_guid;
-    kiba_guid_t unique_guid;   /* if all-zero, libfdisk generates one */
-    uint64_t    first_lba;     /* Pass KIBA_GPT_FIRST_LBA_DEFAULT to let libfdisk
-                                 * pick the first usable LBA itself (only valid
-                                 * for the first partition in the array) or
-                                 * KIBA_GPT_FIRST_LBA_CONTIGUOUS to start right
-                                 * after the previous partition's *actual*
-                                 * on-disk placement. Either way, when first_lba
-                                 * isn't a concrete number, last_lba below is
-                                 * reinterpreted as a sector COUNT rather than
-                                 * an absolute LBA, since the real start (and
-                                 * therefore the real end) isn't known until
-                                 * libfdisk places the partition. */
+    kiba_guid_t unique_guid;   /* if all-zero, sgdisk generates one */
+    uint64_t    first_lba;     /* Pass KIBA_GPT_FIRST_LBA_DEFAULT to let this
+                                 * code compute the first usable LBA itself
+                                 * (only valid for the first partition in the
+                                 * array) or KIBA_GPT_FIRST_LBA_CONTIGUOUS to
+                                 * start right after the previous partition's
+                                 * resolved on-disk placement. Either way, when
+                                 * first_lba isn't a concrete number, last_lba
+                                 * below is reinterpreted as a sector COUNT
+                                 * rather than an absolute LBA, since the real
+                                 * start (and therefore the real end) isn't
+                                 * resolved until write time. */
     uint64_t    last_lba;      /* inclusive. Pass KIBA_GPT_LAST_LBA_REST to
                                  * consume all remaining space on the disk --
-                                 * this defers to libfdisk's own last-usable-LBA
-                                 * (which already accounts for the backup GPT
-                                 * header + entry array at the end of the disk)
-                                 * instead of recomputing it by hand. */
+                                 * this uses this code's own computed
+                                 * last-usable-LBA (which already accounts for
+                                 * the backup GPT header + entry array at the
+                                 * end of the disk) instead of recomputing it
+                                 * by hand at every call site. */
     uint64_t    attributes;
 } kiba_gpt_partition_t;
 
 /* Sentinels for first_lba/last_lba: never legitimate LBA values (or sector
  * counts, for KIBA_GPT_FIRST_LBA_DEFAULT's reinterpretation of last_lba), so
- * safe to reuse as flags. Hand-computing "first usable LBA after the GPT
- * header + entry array" and "last usable LBA before the backup header" both
- * turned out to drift by a sector or two from what libfdisk actually derives
- * for a given disk (entry array size, alignment, sector size all factor in) --
- * that mismatch is exactly what made fdisk_add_partition() reject requests
- * with EINVAL. Deferring to libfdisk for both ends of the layout avoids
- * needing to replicate its internal math. */
+ * safe to reuse as flags. The first/last usable LBA math (GPT header +
+ * 128-entry array on each end of the disk, sized off the real logical
+ * sector size) is centralized once in kiba_gpt_write() instead of being
+ * duplicated by hand at every call site -- see the entry_array_sectors
+ * calculation there. This is the same math sgdisk and libfdisk both use
+ * internally for a standard 128-entry GPT, so callers land on exactly
+ * the same first/last usable LBAs those tools would pick by default. */
 #define KIBA_GPT_LAST_LBA_REST        UINT64_MAX
 #define KIBA_GPT_FIRST_LBA_DEFAULT    UINT64_MAX
 #define KIBA_GPT_FIRST_LBA_CONTIGUOUS (UINT64_MAX - 1)
@@ -4436,31 +4452,33 @@ typedef struct {
     int      fd;                 /* open O_RDWR on the whole-disk block device */
     uint32_t logical_sector_size;
     uint64_t total_sectors;
-    kiba_guid_t disk_guid;       /* if all-zero, libfdisk generates one */
+    kiba_guid_t disk_guid;       /* if all-zero, sgdisk generates one */
 } kiba_gpt_disk_t;
 
 /* Generates a random RFC-4122 v4 GUID using /dev/urandom — no external tool. */
 kiba_guid_t kiba_guid_random(void);
 
 /* Creates a fresh GPT label and writes the given partitions (in order) to
- * disk->fd via libfdisk. Returns 0 on success, -errno (or a libfdisk
- * negative error code) on failure.
+ * disk->fd by invoking sgdisk as a subprocess (single call, all -n/-t/-c/-u
+ * options for every partition passed in one argv array). Returns 0 on
+ * success, -errno on failure (sgdisk's own error is collapsed to -EIO,
+ * since it reports failures via stderr text rather than a stable numeric
+ * code — the message is left on stderr for anyone debugging a failed run).
  *
  * On success, the kernel partition table is updated for each partition
- * automatically (libfdisk calls BLKPG/BLKRRPART internally as needed) —
+ * automatically (sgdisk issues the BLKPG/BLKRRPART reread itself) —
  * caller does not need to call partprobe.
  *
  * out_last_lba: optional (may be NULL). If non-NULL, must point to an
- * array of n_parts uint64_t -- filled in with each partition's *actual*
- * on-disk last LBA once libfdisk has placed it. Needed whenever a later
- * partition uses KIBA_GPT_FIRST_LBA_CONTIGUOUS, since libfdisk (not this
- * function) is the source of truth for where the previous partition
- * actually landed.
+ * array of n_parts uint64_t -- filled in with each partition's resolved
+ * on-disk last LBA, computed by this function before it ever calls
+ * sgdisk. Needed whenever a later partition uses
+ * KIBA_GPT_FIRST_LBA_CONTIGUOUS, so the next iteration knows where the
+ * previous partition actually landed.
  *
- * NOTE: disk->fd is used only to derive the device path for libfdisk
- * (via /proc/self/fd) — libfdisk opens the device itself through
- * fdisk_assign_device(). The fd passed in must stay open for the
- * duration of the call.
+ * NOTE: disk->fd is used only to derive the device path (via
+ * /proc/self/fd) to pass to sgdisk on argv — sgdisk opens the device
+ * itself. The fd passed in must stay open for the duration of the call.
  */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
                     const kiba_gpt_partition_t *parts, size_t n_parts,
@@ -4474,10 +4492,10 @@ int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
 
 /* ── Dual-boot / "install alongside" support ─────────────────────────
  * Everything above this point assumes we own the whole disk and are
- * free to lay down a brand-new GPT (kiba_gpt_write() calls
- * fdisk_create_disklabel(), which wipes whatever was there). The
- * functions below are the non-destructive counterparts used when the
- * disk already has an OS on it that the user wants to keep. */
+ * free to lay down a brand-new GPT (kiba_gpt_write() runs `sgdisk -Z`
+ * first, which wipes whatever was there). The functions below are the
+ * non-destructive counterparts used when the disk already has an OS on
+ * it that the user wants to keep. */
 
 typedef struct {
     int      esp_partno;      /* 1-indexed partno of an existing ESP found
@@ -4493,7 +4511,7 @@ typedef struct {
 } kiba_gpt_scan_result_t;
 
 /* Reads the EXISTING partition table on `path` without modifying
- * anything on disk (read-only fdisk_assign_device). Locates an existing
+ * anything on disk (runs `sgdisk -p`, read-only). Locates an existing
  * EFI System Partition, if any, and the single largest gap of
  * unallocated sectors, for dual-boot free-space installs. If the disk
  * has no valid GPT label at all, *out is zeroed and this returns 0 —
@@ -4504,13 +4522,12 @@ typedef struct {
 int kiba_gpt_scan(const char *path, kiba_gpt_scan_result_t *out);
 
 /* Adds ONE new partition to an EXISTING GPT table on `path` — unlike
- * kiba_gpt_write(), this does NOT call fdisk_create_disklabel() and
- * does NOT touch any partition already on the disk. `part->first_lba`/
- * `last_lba` should fall inside a free region (normally taken straight
- * from a prior kiba_gpt_scan() call's free_first_lba/free_last_lba).
+ * kiba_gpt_write(), this does NOT run `sgdisk -Z`/-o and does NOT touch
+ * any partition already on the disk. `part->first_lba`/`last_lba`
+ * should fall inside a free region (normally taken straight from a
+ * prior kiba_gpt_scan() call's free_first_lba/free_last_lba).
  * On success, writes the new partition's 1-indexed partition number to
- * *out_partno. Returns 0 on success, -errno / libfdisk error on
- * failure. */
+ * *out_partno. Returns 0 on success, -EIO/-errno on failure. */
 int kiba_gpt_add_partition(const char *path, const kiba_gpt_partition_t *part,
                             int *out_partno);
 
@@ -4518,23 +4535,34 @@ int kiba_gpt_add_partition(const char *path, const kiba_gpt_partition_t *part,
 KIBA_SRC_END_GPTH
 
 cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
-/* kiba_gpt.c — GPT writer backed by libfdisk (util-linux).
+/* kiba_gpt.c — GPT writer backed by sgdisk (gptfdisk), run as a subprocess.
  *
- * The previous revision of this file was a hand-rolled GPT writer
- * (pwrite, CRC32, etc). It has been replaced with libfdisk, which is
- * the reference implementation that backs fdisk/cfdisk and is maintained
- * by the util-linux / kernel project. The public API (kiba_gpt.h) is
- * unchanged — all callers continue to work without modification.
+ * The previous revision of this file called into libfdisk's C API
+ * (fdisk_new_context / fdisk_add_partition / etc). This revision drops
+ * that library dependency entirely and instead builds a plain argv
+ * array and hands it to sgdisk via fork()+execvp() -- never a shell, so
+ * nothing here (partition names, GUIDs, device paths) needs escaping
+ * regardless of its contents. The public API (kiba_gpt.h) is unchanged
+ * -- all callers continue to work without modification.
  *
- * libfdisk handles:
+ * sgdisk still handles the parts that are genuinely easy to get subtly
+ * wrong by hand:
  *   - Protective MBR
- *   - Primary + backup GPT headers (including CRCs)
+ *   - Primary + backup GPT headers (including CRC32)
  *   - Partition entry array
- *   - BLKPG / BLKRRPART kernel notification (via fdisk_reread_partition_table)
+ *   - BLKPG / BLKRRPART kernel notification (sgdisk does this itself
+ *     after a successful write, same as partprobe would)
+ *
+ * What THIS file now owns instead of deferring to the library: the
+ * actual sector-placement math (first/last usable LBA, where each
+ * partition starts/ends). Computing that ourselves means every call to
+ * sgdisk is a single, fully-formed command with concrete numbers --
+ * no "-n 0:0:0 let sgdisk pick" placeholders whose result would then
+ * need to be read back out of sgdisk's text output just to know where
+ * things landed.
  *
  * We retain our own kiba_gpt_probe_device() (raw ioctls, unchanged) and
- * kiba_guid_random() since those have nothing to do with GPT writing and
- * we do not want to pull in extra libfdisk API for such simple helpers.
+ * kiba_guid_random() since neither has anything to do with sgdisk.
  */
 #define _GNU_SOURCE
 #include "kiba_gpt.h"
@@ -4546,16 +4574,22 @@ cat > kiba_gpt.c << 'KIBA_SRC_END_GPTC'
 #include <string.h>
 #include <unistd.h>
 #include <strings.h>       /* strcasecmp */
+#include <limits.h>        /* PATH_MAX */
 #include <sys/ioctl.h>
+#include <sys/wait.h>
 #include <linux/fs.h>     /* BLKSSZGET, BLKGETSIZE64 */
-#include <libfdisk/libfdisk.h>
 
-/* ── Well-known type GUIDs (string form for libfdisk) ───────────────── */
-/* libfdisk accepts GUIDs as canonical strings: 8-4-4-4-12 uppercase hex.
- * These correspond to the byte arrays in the old hand-rolled version;
- * kept as string constants so they're human-readable and verifiable. */
+/* ── Well-known type GUIDs (string form for sgdisk's -u/-U flags) ───── */
+/* sgdisk accepts full GUIDs as canonical strings: 8-4-4-4-12 hex. For
+ * partition *type* it also accepts short 4-hex-digit codes (ef00 = EFI
+ * System, 8300 = Linux filesystem) which is what we pass to -t below --
+ * these full-GUID #defines are only used for the type comparison against
+ * caller-supplied kiba_guid_t values and for kiba_gpt_scan()'s output
+ * parsing. */
 #define KIBA_GUID_ESP_STR      "C12A7328-F81F-11D2-BA4B-00A0C93EC93B"
 #define KIBA_GUID_LINUX_FS_STR "0FC63DAF-8483-4772-8E79-3D69D8477DE4"
+#define KIBA_TYPE_CODE_ESP       "ef00"
+#define KIBA_TYPE_CODE_LINUX_FS  "8300"
 
 /* Public kiba_guid_t constants — kept for API compatibility with callers
  * that compare against them. Byte layout: u32 LE, u16 LE, u16 LE, u8[8]. */
@@ -4588,7 +4622,7 @@ kiba_guid_t kiba_guid_random(void) {
 }
 
 /* Convert our kiba_guid_t (mixed-endian on-disk bytes) to the canonical
- * 8-4-4-4-12 string that libfdisk expects.
+ * 8-4-4-4-12 string that sgdisk's -u/-U flags expect.
  * GPT GUID wire format: first three groups are LE, last two are BE/raw. */
 static void guid_to_str(const kiba_guid_t *g, char out[37]) {
     const uint8_t *b = g->b;
@@ -4619,15 +4653,83 @@ int kiba_gpt_probe_device(const char *path, uint32_t *sector_size,
     return 0;
 }
 
-/* ── kiba_gpt_write — the libfdisk implementation ───────────────────── */
+/* ── Run sgdisk as a subprocess via a real argv array — never a shell.
+ * Discards sgdisk's (very chatty) stdout; leaves stderr connected so a
+ * real failure still shows up in the caller's logs. Returns 0 on a
+ * clean exit, -ENOENT if the sgdisk binary itself couldn't be found,
+ * -EIO if sgdisk ran but reported failure, or -errno if fork/wait
+ * itself failed. */
+static int run_sgdisk(char *const argv[]) {
+    pid_t pid = fork();
+    if (pid < 0) return -errno;
+
+    if (pid == 0) {
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) { dup2(devnull, STDOUT_FILENO); close(devnull); }
+        execvp("sgdisk", argv);
+        _exit(127); /* only reached if execvp() itself failed */
+    }
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) return -errno;
+    if (!WIFEXITED(status)) return -EIO;
+    int code = WEXITSTATUS(status);
+    if (code == 127) return -ENOENT;
+    return code == 0 ? 0 : -EIO;
+}
+
+/* Same as run_sgdisk(), but captures stdout into `out` (NUL-terminated,
+ * truncated to out_sz - 1 bytes) instead of discarding it -- used by
+ * kiba_gpt_scan(), which actually needs to read sgdisk's `-p` table
+ * back out. Stderr is silenced here since sgdisk prints routine
+ * "Creating new GPT entries in memory" notices there even on success. */
+static int run_sgdisk_capture(char *const argv[], char *out, size_t out_sz) {
+    int pipefd[2];
+    if (pipe(pipefd) != 0) return -errno;
+
+    pid_t pid = fork();
+    if (pid < 0) { close(pipefd[0]); close(pipefd[1]); return -errno; }
+
+    if (pid == 0) {
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+        int devnull = open("/dev/null", O_WRONLY);
+        if (devnull >= 0) { dup2(devnull, STDERR_FILENO); close(devnull); }
+        execvp("sgdisk", argv);
+        _exit(127);
+    }
+    close(pipefd[1]);
+
+    size_t used = 0;
+    ssize_t n;
+    while (used < out_sz - 1 &&
+           (n = read(pipefd[0], out + used, out_sz - 1 - used)) > 0) {
+        used += (size_t)n;
+    }
+    out[used] = '\0';
+    /* Drain any remainder so the child never blocks writing to a full pipe. */
+    char scratch[256];
+    while (read(pipefd[0], scratch, sizeof(scratch)) > 0) {}
+    close(pipefd[0]);
+
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) return -errno;
+    if (!WIFEXITED(status)) return -EIO;
+    int code = WEXITSTATUS(status);
+    if (code == 127) return -ENOENT;
+    return code == 0 ? 0 : -EIO;
+}
+
+/* ── kiba_gpt_write — the sgdisk-subprocess implementation ──────────── */
 int kiba_gpt_write(kiba_gpt_disk_t *disk,
                     const kiba_gpt_partition_t *parts, size_t n_parts,
                     uint64_t *out_last_lba) {
     if (n_parts == 0 || n_parts > 128) return -EINVAL;
     if (disk->logical_sector_size == 0) return -EINVAL;
 
-    /* Resolve the block device path from our open fd via /proc/self/fd.
-     * libfdisk needs a path string, not an fd. */
+    /* Resolve the block device path from our open fd via /proc/self/fd --
+     * sgdisk needs a path string on argv, not an fd. */
     char fd_link[64];
     char dev_path[PATH_MAX];
     snprintf(fd_link, sizeof(fd_link), "/proc/self/fd/%d", disk->fd);
@@ -4635,122 +4737,101 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     if (len < 0) return -errno;
     dev_path[len] = '\0';
 
-    /* ── Initialise libfdisk context ─────────────────────────────── */
-    struct fdisk_context *cxt = fdisk_new_context();
-    if (!cxt) return -ENOMEM;
+    /* GPT layout constants -- the same math a standard 128-entry table
+     * uses under sgdisk/libfdisk: entry array is 128 * 128 bytes,
+     * rounded up to whole sectors, with one header sector at each end
+     * of the disk (LBA 0 is the protective MBR; LBA 1 is the primary
+     * header; the very last LBA is the backup header). Computed once
+     * here instead of asking sgdisk where it put things afterward. */
+    uint32_t ssz = disk->logical_sector_size;
+    uint64_t entry_array_sectors = (16384 + ssz - 1) / ssz;
+    uint64_t first_usable = 2 + entry_array_sectors;
+    uint64_t last_usable  = disk->total_sectors - 2 - entry_array_sectors;
 
-    int rc = fdisk_assign_device(cxt, dev_path, 0 /* read-write */);
-    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
+    /* Per-partition argv string storage -- heap-allocated since n_parts
+     * isn't a compile-time constant. Every string here becomes a literal
+     * argv element (no shell in between), so partition names containing
+     * spaces or odd characters need no escaping at all. */
+    struct { char n[48], t[24], c[80], u[56]; } *buf = calloc(n_parts, sizeof(*buf));
+    if (!buf) return -ENOMEM;
 
-    /* Create a fresh GPT label (wipes any existing table) */
-    rc = fdisk_create_disklabel(cxt, "gpt");
-    if (rc != 0) goto out;
+    bool have_disk_guid = !guid_is_zero(&disk->disk_guid);
+    char disk_guid_str[37];
+    if (have_disk_guid) guid_to_str(&disk->disk_guid, disk_guid_str);
 
-    /* Optionally set the disk GUID */
-    if (!guid_is_zero(&disk->disk_guid)) {
-        char disk_guid_str[37];
-        guid_to_str(&disk->disk_guid, disk_guid_str);
-        fdisk_set_disklabel_id_from_string(cxt, disk_guid_str);
-    }
+    /* Upper bound: sgdisk, -Z, -a 1, [-U guid], (per part: -n v -t v [-c v] [-u v]), path, NULL */
+    char *argv[6 + n_parts * 8 + 2];
+    size_t ai = 0;
+    argv[ai++] = "sgdisk";
+    argv[ai++] = "-Z";                       /* wipe any existing MBR/GPT, start clean */
+    /* sgdisk snaps partition starts to its own alignment grid (2048
+     * sectors / 1MiB by default) even when given an explicit numeric
+     * start -- "-a 1" disables that snapping so the LBAs we computed
+     * above are the LBAs actually written, matching what out_last_lba
+     * reports back to the caller. Verified against a loopback device:
+     * without this flag sgdisk silently moved a partition requested at
+     * LBA 34 to LBA 2048. */
+    argv[ai++] = "-a"; argv[ai++] = "1";
+    if (have_disk_guid) { argv[ai++] = "-U"; argv[ai++] = disk_guid_str; }
 
-    /* ── Add each partition ──────────────────────────────────────── */
     uint64_t prev_end = 0;
     for (size_t i = 0; i < n_parts; i++) {
         const kiba_gpt_partition_t *p = &parts[i];
 
-        struct fdisk_partition *pa = fdisk_new_partition();
-        if (!pa) { rc = -ENOMEM; goto out; }
-
-        /* Resolve first_lba sentinels against what libfdisk/the previous
-         * partition actually did, rather than hand-computed guesses --
-         * see the KIBA_GPT_*_LBA_* comment above kiba_gpt_partition_t. */
-        uint64_t resolved_first = p->first_lba;
-        bool start_is_default = false;
+        bool start_is_default = (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT);
+        uint64_t resolved_first;
         if (p->first_lba == KIBA_GPT_FIRST_LBA_CONTIGUOUS) {
-            if (i == 0) { rc = -EINVAL; fdisk_unref_partition(pa); goto out; }
+            if (i == 0) { free(buf); return -EINVAL; }
             resolved_first = prev_end + 1;
-        } else if (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT) {
-            start_is_default = true;
-        }
-
-        if (start_is_default) {
-            fdisk_partition_start_follow_default(pa, 1);
-        } else {
-            fdisk_partition_set_start(pa, resolved_first);
-        }
-
-        if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
-            /* Let libfdisk pick the end -- it already knows the real
-             * last usable LBA for this disk (accounts for the backup
-             * GPT header + entry array), so we don't have to guess. */
-            fdisk_partition_end_follow_default(pa, 1);
         } else if (start_is_default) {
-            /* Start isn't known yet, so last_lba can't be an absolute
-             * LBA here -- it's the partition's size in sectors instead. */
-            fdisk_partition_set_size(pa, p->last_lba);
+            resolved_first = first_usable;
         } else {
-            fdisk_partition_set_size(pa, p->last_lba - resolved_first + 1);
+            resolved_first = p->first_lba;
         }
 
-        /* Partition type GUID */
-        struct fdisk_parttype *ptype = NULL;
-        if (memcmp(p->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
-            ptype = fdisk_label_parse_parttype(
-                        fdisk_get_label(cxt, NULL), KIBA_GUID_ESP_STR);
-        else
-            ptype = fdisk_label_parse_parttype(
-                        fdisk_get_label(cxt, NULL), KIBA_GUID_LINUX_FS_STR);
-        if (ptype) {
-            fdisk_partition_set_type(pa, ptype);
-            fdisk_unref_parttype(ptype);
+        uint64_t resolved_last;
+        if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
+            resolved_last = last_usable;
+        } else if (start_is_default) {
+            /* last_lba is a sector COUNT here, not an absolute LBA --
+             * see the kiba_gpt_partition_t doc comment in kiba_gpt.h. */
+            resolved_last = resolved_first + p->last_lba - 1;
+        } else {
+            resolved_last = p->last_lba;
         }
 
-        /* Partition name */
-        if (p->name[0])
-            fdisk_partition_set_name(pa, p->name);
+        snprintf(buf[i].n, sizeof(buf[i].n), "%zu:%llu:%llu", i + 1,
+                  (unsigned long long)resolved_first, (unsigned long long)resolved_last);
+        argv[ai++] = "-n"; argv[ai++] = buf[i].n;
 
-        /* Unique partition GUID (if caller provided one) */
+        const char *type_code = (memcmp(p->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
+                                     ? KIBA_TYPE_CODE_ESP : KIBA_TYPE_CODE_LINUX_FS;
+        snprintf(buf[i].t, sizeof(buf[i].t), "%zu:%s", i + 1, type_code);
+        argv[ai++] = "-t"; argv[ai++] = buf[i].t;
+
+        if (p->name[0]) {
+            snprintf(buf[i].c, sizeof(buf[i].c), "%zu:%s", i + 1, p->name);
+            argv[ai++] = "-c"; argv[ai++] = buf[i].c;
+        }
         if (!guid_is_zero(&p->unique_guid)) {
-            char uguid_str[37];
-            guid_to_str(&p->unique_guid, uguid_str);
-            fdisk_partition_set_uuid(pa, uguid_str);
+            char g[37];
+            guid_to_str(&p->unique_guid, g);
+            snprintf(buf[i].u, sizeof(buf[i].u), "%zu:%s", i + 1, g);
+            argv[ai++] = "-u"; argv[ai++] = buf[i].u;
         }
 
-        /* Use fdisk_add_partition so libfdisk tracks the slot number */
-        size_t partno = i; /* 0-based slot */
-        rc = fdisk_add_partition(cxt, pa, &partno);
-        fdisk_unref_partition(pa);
-        if (rc != 0) goto out;
-
-        /* Find out where libfdisk actually put it -- needed for the next
-         * iteration's KIBA_GPT_FIRST_LBA_CONTIGUOUS, and to report back
-         * to the caller, since a default/follow-default placement can
-         * land anywhere libfdisk's own alignment rules decide. */
-        uint64_t actual_end = p->last_lba;
-        struct fdisk_partition *placed = NULL;
-        if (fdisk_get_partition(cxt, partno, &placed) == 0 && placed) {
-            actual_end = fdisk_partition_get_end(placed);
-            fdisk_unref_partition(placed);
-        }
-        prev_end = actual_end;
-        if (out_last_lba) out_last_lba[i] = actual_end;
+        if (out_last_lba) out_last_lba[i] = resolved_last;
+        prev_end = resolved_last;
     }
 
-    /* ── Write GPT to disk ───────────────────────────────────────── */
-    rc = fdisk_write_disklabel(cxt);
-    if (rc != 0) goto out;
+    argv[ai++] = dev_path;
+    argv[ai]   = NULL;
 
-    /* Tell the kernel about the new partition table (replaces partprobe) */
-    rc = fdisk_reread_partition_table(cxt);
-    if (rc != 0) {
-        /* Non-fatal on some setups (e.g. disk is mounted read-only for
-         * another partition). The caller's udev settle loop will handle it. */
-        rc = 0;
-    }
-
-out:
-    fdisk_deassign_device(cxt, 0);
-    fdisk_unref_context(cxt);
+    /* One sgdisk invocation writes the whole table (zap + optional disk
+     * GUID + every partition) in a single pass, including the kernel
+     * reread on success -- no separate partprobe step needed. */
+    int rc = run_sgdisk(argv);
+    free(buf);
     return rc;
 }
 
@@ -4758,54 +4839,75 @@ out:
 int kiba_gpt_scan(const char *path, kiba_gpt_scan_result_t *out) {
     memset(out, 0, sizeof(*out));
 
-    struct fdisk_context *cxt = fdisk_new_context();
-    if (!cxt) return -ENOMEM;
-
-    int rc = fdisk_assign_device(cxt, path, 1 /* read-only */);
-    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
-
-    /* No label, or not GPT (e.g. blank disk, or legacy MBR) -- nothing
-     * to scan for dual-boot purposes. Not an error: the caller falls
-     * back to "erase disk" in that case. */
-    if (!fdisk_has_label(cxt) ||
-        !fdisk_is_labeltype(cxt, FDISK_DISKLABEL_GPT)) {
-        fdisk_deassign_device(cxt, 1);
-        fdisk_unref_context(cxt);
-        return 0;
+    uint32_t ssz = 0;
+    uint64_t total_sectors = 0;
+    if (kiba_gpt_probe_device(path, &ssz, &total_sectors) != 0) {
+        /* Device couldn't even be opened/probed -- that's the one case
+         * this function treats as a real error, per kiba_gpt.h. */
+        return -errno;
     }
 
-    struct fdisk_table *tb = NULL;
-    rc = fdisk_get_partitions(cxt, &tb);
-    if (rc != 0 || !tb) {
-        fdisk_deassign_device(cxt, 1);
-        fdisk_unref_context(cxt);
-        return rc;
-    }
+    char outbuf[16384];
+    char *argv[] = { "sgdisk", "-p", (char *)path, NULL };
+    int rc = run_sgdisk_capture(argv, outbuf, sizeof(outbuf));
+    if (rc == -ENOENT) return rc; /* sgdisk itself missing -- real error */
+    /* Any other non-zero exit (including "no valid partition table")
+     * is treated as "nothing to scan" per kiba_gpt.h -- out stays
+     * zeroed and this returns success, same as the old libfdisk version
+     * did for a blank/non-GPT disk. */
+    if (rc != 0) return 0;
 
-    /* Collect [start,end] spans for every in-use partition so we can
-     * walk the gaps between them in order. 128 is GPT's own hard cap
-     * on partition entries, so this never overflows. */
-    uint64_t starts[128], ends[128];
-    size_t n = 0;
-
-    struct fdisk_partition *pa = NULL;
-    struct fdisk_iter *itr = fdisk_new_iter(FDISK_ITER_FORWARD);
-    while (n < 128 && fdisk_table_next_partition(tb, itr, &pa) == 0) {
-        starts[n] = fdisk_partition_get_start(pa);
-        ends[n]   = fdisk_partition_get_end(pa);
-
-        if (out->esp_partno == 0) {
-            struct fdisk_parttype *pt = fdisk_partition_get_type(pa);
-            const char *gs = pt ? fdisk_parttype_get_string(pt) : NULL;
-            if (gs && strcasecmp(gs, KIBA_GUID_ESP_STR) == 0) {
-                out->esp_partno    = (int)fdisk_partition_get_partno(pa) + 1;
-                out->esp_first_lba = starts[n];
-                out->esp_last_lba  = ends[n];
+    /* ── Parse "First usable sector is X, last usable sector is Y" ──── */
+    uint64_t first_usable = 0, last_usable = 0;
+    bool have_usable = false;
+    {
+        const char *m = strstr(outbuf, "First usable sector is ");
+        if (m) {
+            unsigned long long fu = 0, lu = 0;
+            if (sscanf(m, "First usable sector is %llu, last usable sector is %llu",
+                        &fu, &lu) == 2) {
+                first_usable = fu; last_usable = lu; have_usable = true;
             }
         }
-        n++;
     }
-    fdisk_free_iter(itr);
+    if (!have_usable) return 0; /* no valid GPT label found -- treat as empty */
+
+    /* ── Parse the partition table lines: "  N   start   end   size  unit  code  name" ── */
+    uint64_t starts[128], ends[128];
+    size_t n = 0;
+    char type_codes[128][8];
+
+    char *line = outbuf;
+    while (line && *line) {
+        char *nl = strchr(line, '\n');
+        if (nl) *nl = '\0';
+
+        unsigned partno = 0;
+        unsigned long long s = 0, e = 0;
+        char code[8] = {0};
+        /* First three whitespace-separated tokens are partno/start/end;
+         * skip the "size" + "unit" tokens, then grab the 4-hex-digit
+         * type code. Any line that doesn't match this shape (headers,
+         * blank lines, warnings) is simply not a partition row. */
+        double size_val;
+        char unit[8] = {0}, junk_size[16] = {0};
+        int matched = sscanf(line, " %u %llu %llu %15s %7s %7s",
+                              &partno, &s, &e, junk_size, unit, code);
+        (void)size_val;
+        if (matched == 6 && partno >= 1 && partno <= 128 && n < 128) {
+            starts[n] = s;
+            ends[n]   = e;
+            snprintf(type_codes[n], sizeof(type_codes[n]), "%s", code);
+            if (out->esp_partno == 0 && strcasecmp(code, KIBA_TYPE_CODE_ESP) == 0) {
+                out->esp_partno    = (int)partno;
+                out->esp_first_lba = s;
+                out->esp_last_lba  = e;
+            }
+            n++;
+        }
+
+        line = nl ? nl + 1 : NULL;
+    }
 
     /* Simple insertion sort by start LBA -- n is at most 128, and in
      * practice almost always under 10, so O(n^2) is irrelevant here. */
@@ -4821,22 +4923,15 @@ int kiba_gpt_scan(const char *path, kiba_gpt_scan_result_t *out) {
         ends[j]   = e;
     }
 
-    uint64_t first_usable = fdisk_get_first_lba(cxt);
-    uint64_t last_usable  = fdisk_get_last_lba(cxt);
-    uint32_t ssz = fdisk_get_sector_size(cxt);
-
     uint64_t best_first = 0, best_last = 0, best_len = 0;
     uint64_t cursor = first_usable;
-
     for (size_t i = 0; i <= n; i++) {
         uint64_t gap_start = cursor;
         uint64_t gap_end   = (i < n) ? (starts[i] > 0 ? starts[i] - 1 : 0)
                                       : last_usable;
         if (gap_end >= gap_start) {
-            uint64_t len = gap_end - gap_start + 1;
-            if (len > best_len) {
-                best_len = len; best_first = gap_start; best_last = gap_end;
-            }
+            uint64_t glen = gap_end - gap_start + 1;
+            if (glen > best_len) { best_len = glen; best_first = gap_start; best_last = gap_end; }
         }
         if (i < n) cursor = ends[i] + 1;
     }
@@ -4851,82 +4946,88 @@ int kiba_gpt_scan(const char *path, kiba_gpt_scan_result_t *out) {
         out->free_first_lba = 1;
         out->free_last_lba  = 0;
     }
-
-    fdisk_unref_table(tb);
-    fdisk_deassign_device(cxt, 1);
-    fdisk_unref_context(cxt);
     return 0;
 }
 
 /* ── Dual-boot: append one partition to an existing table ───────────── */
 int kiba_gpt_add_partition(const char *path, const kiba_gpt_partition_t *part,
                             int *out_partno) {
-    struct fdisk_context *cxt = fdisk_new_context();
-    if (!cxt) return -ENOMEM;
+    /* Caller is responsible for having already confirmed (via
+     * kiba_gpt_scan()) that a GPT label exists. sgdisk itself refuses
+     * to add a sane partition to a disk with no label rather than
+     * silently creating one -- that's what kiba_gpt_write() is for. */
 
-    int rc = fdisk_assign_device(cxt, path, 0 /* read-write */);
-    if (rc != 0) { fdisk_unref_context(cxt); return rc; }
-
-    if (!fdisk_has_label(cxt) || !fdisk_is_labeltype(cxt, FDISK_DISKLABEL_GPT)) {
-        /* Caller is responsible for having already confirmed (via
-         * kiba_gpt_scan()) that a GPT label exists. Refuse to proceed
-         * rather than silently creating one -- that's what
-         * kiba_gpt_write() is for, and doing it here would surprise
-         * dual-boot callers with a wipe they explicitly wanted to avoid. */
-        rc = -EINVAL;
-        goto out;
-    }
-
-    struct fdisk_partition *pa = fdisk_new_partition();
-    if (!pa) { rc = -ENOMEM; goto out; }
-
-    /* Let libfdisk pick the next free partition-number slot rather than
-     * us guessing one, since we don't know which slots are occupied by
-     * whatever's already on this disk. */
-    fdisk_partition_partno_follow_default(pa, 1);
-    fdisk_partition_set_start(pa, part->first_lba);
+    uint64_t resolved_last = part->last_lba;
     if (part->last_lba == KIBA_GPT_LAST_LBA_REST) {
-        fdisk_partition_end_follow_default(pa, 1);
-    } else {
-        fdisk_partition_set_size(pa, part->last_lba - part->first_lba + 1);
+        uint32_t ssz = 0;
+        uint64_t total_sectors = 0;
+        if (kiba_gpt_probe_device(path, &ssz, &total_sectors) != 0) return -errno;
+        uint64_t entry_array_sectors = (16384 + ssz - 1) / ssz;
+        resolved_last = total_sectors - 2 - entry_array_sectors;
     }
 
-    struct fdisk_parttype *ptype = NULL;
-    if (memcmp(part->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
-        ptype = fdisk_label_parse_parttype(fdisk_get_label(cxt, NULL), KIBA_GUID_ESP_STR);
-    else
-        ptype = fdisk_label_parse_parttype(fdisk_get_label(cxt, NULL), KIBA_GUID_LINUX_FS_STR);
-    if (ptype) {
-        fdisk_partition_set_type(pa, ptype);
-        fdisk_unref_parttype(ptype);
-    }
+    /* "0" as the partition number tells sgdisk to use the next free
+     * slot itself -- we don't need to know which slots are occupied. */
+    char n_arg[48];
+    snprintf(n_arg, sizeof(n_arg), "0:%llu:%llu",
+              (unsigned long long)part->first_lba, (unsigned long long)resolved_last);
 
-    if (part->name[0])
-        fdisk_partition_set_name(pa, part->name);
+    const char *type_code = (memcmp(part->type_guid.b, KIBA_GUID_ESP.b, 16) == 0)
+                                 ? KIBA_TYPE_CODE_ESP : KIBA_TYPE_CODE_LINUX_FS;
+    char t_arg[24];
+    snprintf(t_arg, sizeof(t_arg), "0:%s", type_code);
 
+    char c_arg[80] = {0};
+    if (part->name[0]) snprintf(c_arg, sizeof(c_arg), "0:%s", part->name);
+
+    char u_arg[56] = {0};
     if (!guid_is_zero(&part->unique_guid)) {
-        char uguid_str[37];
-        guid_to_str(&part->unique_guid, uguid_str);
-        fdisk_partition_set_uuid(pa, uguid_str);
+        char g[37];
+        guid_to_str(&part->unique_guid, g);
+        snprintf(u_arg, sizeof(u_arg), "0:%s", g);
     }
 
-    size_t partno = 0;
-    rc = fdisk_add_partition(cxt, pa, &partno);
-    fdisk_unref_partition(pa);
-    if (rc != 0) goto out;
+    char *argv[14];
+    size_t ai = 0;
+    argv[ai++] = "sgdisk";
+    argv[ai++] = "-a"; argv[ai++] = "1"; /* see kiba_gpt_write() -- keep our LBAs exact */
+    argv[ai++] = "-n"; argv[ai++] = n_arg;
+    argv[ai++] = "-t"; argv[ai++] = t_arg;
+    if (c_arg[0]) { argv[ai++] = "-c"; argv[ai++] = c_arg; }
+    if (u_arg[0]) { argv[ai++] = "-u"; argv[ai++] = u_arg; }
+    argv[ai++] = (char *)path;
+    argv[ai]   = NULL;
 
-    rc = fdisk_write_disklabel(cxt);
-    if (rc != 0) goto out;
+    int rc = run_sgdisk(argv);
+    if (rc != 0) return rc;
 
-    rc = fdisk_reread_partition_table(cxt);
-    if (rc != 0) rc = 0; /* non-fatal, same rationale as kiba_gpt_write() */
-
-    if (out_partno) *out_partno = (int)partno + 1;
-
-out:
-    fdisk_deassign_device(cxt, 0);
-    fdisk_unref_context(cxt);
-    return rc;
+    /* Find the partition number sgdisk actually assigned by re-scanning
+     * the table and matching on the start LBA we just requested. */
+    if (out_partno) {
+        kiba_gpt_scan_result_t scan;
+        if (kiba_gpt_scan(path, &scan) == 0) {
+            char outbuf[16384];
+            char *pargv[] = { "sgdisk", "-p", (char *)path, NULL };
+            if (run_sgdisk_capture(pargv, outbuf, sizeof(outbuf)) == 0) {
+                unsigned partno = 0;
+                unsigned long long s = 0;
+                char *line = outbuf;
+                while (line && *line) {
+                    char *nl = strchr(line, '\n');
+                    if (nl) *nl = '\0';
+                    unsigned long long e; char junk[16], unit[8], code[8];
+                    if (sscanf(line, " %u %llu %llu %15s %7s %7s",
+                                &partno, &s, &e, junk, unit, code) == 6 &&
+                        s == part->first_lba) {
+                        *out_partno = (int)partno;
+                        break;
+                    }
+                    line = nl ? nl + 1 : NULL;
+                }
+            }
+        }
+    }
+    return 0;
 }
 KIBA_SRC_END_GPTC
 
@@ -6003,8 +6104,9 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
  * Internally this no longer touches archinstall, parted, blkid, or
  * partprobe as subprocesses: all of that is libkibadisk (kiba_gpt.c /
  * kiba_fs.c / kiba_udev.c). The only external tools left are the ones
- * with no sane from-scratch replacement: unsquashfs, useradd/chpasswd,
- * grub-install, grub-mkconfig, mkinitcpio, locale-gen, pacman -- all invoked via argv
+ * with no sane from-scratch replacement: sgdisk (GPT writer, see
+ * kiba_gpt.c), unsquashfs, useradd/chpasswd, grub-install,
+ * grub-mkconfig, mkinitcpio, locale-gen, pacman -- all invoked via argv
  * arrays inside libkibadisk, never through a shell.
  *
  * Output protocol is unchanged on purpose: "PROGRESS <pct> <msg>" on
@@ -6124,7 +6226,7 @@ int main(int argc, char **argv) {
     char esp_part[300], root_part[300];
     int esp_partno = 0, root_partno = 0;
 
-    /* ── 1-2. Probe + partition (GPT via libfdisk) ───────────────────── */
+    /* ── 1-2. Probe + partition (GPT via sgdisk) ───────────────────── */
     progress(2, "Reading disk information...");
     uint32_t ssz = 0;
     uint64_t total_sectors = 0;
@@ -6141,21 +6243,21 @@ int main(int argc, char **argv) {
         /* Layout: 512MiB ESP (FAT32) + remainder as Linux root (ext4),
          * matching the layout the old archinstall-based backend used.
          *
-         * Deliberately NOT hand-computing first/last usable LBAs here.
-         * That used to dead-reckon where the GPT header + entry array
-         * sit (both at the start, for the ESP, and at the end, for
-         * root), and a sector or two of drift against what libfdisk
-         * actually derives for this disk/sector size made
-         * fdisk_add_partition() reject the request with EINVAL ("Invalid
-         * argument"). KIBA_GPT_FIRST_LBA_DEFAULT / _CONTIGUOUS /
-         * KIBA_GPT_LAST_LBA_REST all defer to libfdisk's own placement
-         * instead -- see kiba_gpt_write()'s handling of these sentinels
-         * and the doc comment on kiba_gpt_partition_t. */
+         * Deliberately NOT re-deriving first/last usable LBAs here by
+         * hand a second time. kiba_gpt_write() already computes them
+         * once, internally, from the real sector size/total sectors and
+         * the standard 128-entry GPT layout -- duplicating that math at
+         * every call site is exactly how the old hand-rolled version
+         * used to drift by a sector or two and get rejected. Just use
+         * the sentinels below and let kiba_gpt_write() own the layout:
+         * KIBA_GPT_FIRST_LBA_DEFAULT / _CONTIGUOUS / KIBA_GPT_LAST_LBA_REST
+         * -- see kiba_gpt_write()'s handling of these sentinels and the
+         * doc comment on kiba_gpt_partition_t. */
         uint64_t esp_sectors = (512ull * 1024 * 1024) / ssz;
 
         /* Rough pre-flight sanity check only (not used for the actual
          * partition layout below) -- catches "disk is way too small"
-         * early with a friendly message instead of a raw libfdisk error. */
+         * early with a friendly message instead of a raw sgdisk error. */
         uint64_t rough_overhead = (128 * 128 + ssz - 1) / ssz + 34;
         if (esp_sectors + rough_overhead >= total_sectors) {
             close(disk_fd);
@@ -6334,7 +6436,7 @@ ar rcs libkibadisk.a kiba_gpt.o kiba_fs.o kiba_udev.o kiba_install_extract.o kib
 
 echo "=== Building kibaos-oobe-backend (privileged install orchestrator) ==="
 gcc -O2 -Wall -o /usr/local/bin/kibaos-oobe-backend kibaos_oobe_backend_main.c \
-    -L. -lkibadisk -lfdisk \
+    -L. -lkibadisk \
     || { echo "FATAL: kibaos-oobe-backend failed to compile/link" >&2; exit 1; }
 chmod +x /usr/local/bin/kibaos-oobe-backend
 cd /
