@@ -1,10 +1,11 @@
 #!/bin/bash
 set -ex
 
-# ── Performance: Enable parallel downloads for host pacman ─────────────────
+# ── speed hack: crank up parallel downloads so pacman isn't crawling ───────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
-# ── Pre-create alpm user in airootfs so pacman works inside chroot ─────────
+# ── gotta pre-make the alpm user inside airootfs or pacman throws a fit
+#    when it tries to run inside the chroot later ──────────────────────────
 grep -q '^alpm:' "${AIROOTFS}/etc/passwd" 2>/dev/null || \
   echo 'alpm:x:951:951::/var/cache/pacman/pkg:/usr/bin/nologin' >> "${AIROOTFS}/etc/passwd"
 grep -q '^alpm:' "${AIROOTFS}/etc/group" 2>/dev/null || \
@@ -14,7 +15,7 @@ grep -q '^alpm:' "${AIROOTFS}/etc/shadow" 2>/dev/null || \
 mkdir -p "${AIROOTFS}/var/cache/pacman/pkg"
 chmod 755 "${AIROOTFS}/var/cache/pacman" "${AIROOTFS}/var/cache/pacman/pkg"
 
-# ── Container deps ────────────────────────────────────────────────────────
+# ── stuff the build container itself needs before we can do anything ──────
 pacman-key --init
 pacman-key --populate archlinux
 pacman -Syy --noconfirm
@@ -136,7 +137,7 @@ wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-wayfire
+labwc
 sddm
 budgie
 budgie-desktop-view
@@ -243,20 +244,20 @@ PACKAGES
 # ══════════════════════════════════════════════════════════════════════════
 # mkinitcpio
 # ══════════════════════════════════════════════════════════════════════════
-# archiso.conf — used only by the LIVE environment (memdisk/archiso hooks).
-# "plymouth" is included so the live boot can show our splash theme, and
-# "kms" so the framebuffer is set up early enough (before "archiso") for
-# plymouth to actually have a surface to draw on. Both must be added here —
-# mkarchiso only ever bakes THIS file's hooks into the live ISO's initramfs
-# (per linux.preset's archiso_config= below); installed.conf is irrelevant
-# to the live build and is never read by mkarchiso.
+# archiso.conf is ONLY for the live environment (memdisk/archiso hooks).
+# plymouth's in there so live boot can actually show our splash, and kms
+# has to come before archiso so the framebuffer exists in time for
+# plymouth to have something to draw on. gotta add both here since
+# mkarchiso only bakes this file's hooks into the live ISO initramfs
+# (see linux.preset's archiso_config= below) — installed.conf is a
+# completely separate thing and mkarchiso never even looks at it.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
 HOOKS=(base udev kms plymouth keyboard keymap modconf memdisk archiso block filesystems)
 INITRAMFS
 
-# installed.conf — used by the INSTALLED system after the OOBE installer runs initcpio.
-# Must NOT include memdisk/archiso hooks (those are live-only).
+# installed.conf is what the INSTALLED system uses once the OOBE installer
+# runs initcpio. no memdisk/archiso hooks allowed here, those are live-only
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
 HOOKS=(base udev kms plymouth autodetect modconf block keyboard keymap filesystems fsck)
 INSTALLED_HOOKS
@@ -272,18 +273,19 @@ PRESET
 # ══════════════════════════════════════════════════════════════════════════
 # Boot menu — GRUB, UEFI only
 # ══════════════════════════════════════════════════════════════════════════
-# releng ships syslinux/ (BIOS) and efiboot/ (systemd-boot) by default;
-# neither is used now that bootmodes above is GRUB/UEFI-only, so drop them
-# rather than leave dead config lying around in the profile.
+# releng ships both syslinux/ (BIOS) and efiboot/ (systemd-boot) by
+# default, but neither one matters now that bootmodes up top is
+# GRUB/UEFI-only, so out they go — no point leaving dead config sitting
+# around in the profile.
 rm -rf "${PROFILE}/syslinux" "${PROFILE}/efiboot"
 mkdir -p "${PROFILE}/grub"
 
-# grub/grub.cfg is a template: mkarchiso substitutes %ARCHISO_LABEL%,
-# %INSTALL_DIR%, %ARCH% and %ARCHISO_SEARCH_FILENAME% for us at build time
-# (see mkarchiso's _build_grub_config). GRUB draws its background/theme
-# immediately regardless of timeout — unlike systemd-boot, there's no
-# timeout>=1 requirement to get a splash on screen, so `timeout=0` here
-# auto-boots straight in without the systemd-boot splash bug we hit before.
+# grub.cfg is a template — mkarchiso fills in %ARCHISO_LABEL%,
+# %INSTALL_DIR%, %ARCH%, %ARCHISO_SEARCH_FILENAME% for us at build time
+# (see _build_grub_config in mkarchiso). GRUB just draws its splash right
+# away no matter what the timeout is — unlike systemd-boot, which needs
+# timeout>=1 to even show one — so timeout=0 here means we boot straight
+# in without hitting that systemd-boot splash bug from before.
 cat > "${PROFILE}/grub/grub.cfg" << 'GRUBCFG'
 set default=0
 set timeout=0
@@ -356,20 +358,20 @@ set -e
 rm -f /etc/machine-id
 touch /etc/machine-id
 
-# ── create system users/groups declared via sysusers.d (polkitd, etc.) ─────
-# pacman normally triggers this via a post-install hook on a running system,
-# but that hook doesn't fire reliably when packages are unpacked straight
-# into an airootfs, so users like polkitd never get created and polkitd
-# fails to start (-> "Could not activate remote peer 'org.freedesktop.
-# PolicyKit1': startup job failed"). Run it explicitly here.
+# ── spin up the sysusers.d users (polkitd etc) by hand ─────────────────────
+# normally pacman fires this off as a post-install hook on a live system,
+# but that hook just doesn't reliably trigger when packages get unpacked
+# straight into an airootfs, so stuff like polkitd never gets a user and
+# then polkitd faceplants on boot ("Could not activate remote peer
+# 'org.freedesktop.PolicyKit1': startup job failed"). so just run it
+# ourselves here instead of hoping pacman does it.
 systemd-sysusers || true
 systemd-tmpfiles --create 2>/dev/null || true
 
-# ── polkitd fallback ────────────────────────────────────────────────────────
-# Belt-and-suspenders: if systemd-sysusers above didn't run/succeed in this
-# chroot context, this guarantees the polkitd user still exists so polkitd
-# can actually start (otherwise: "Could not activate remote peer
-# 'org.freedesktop.PolicyKit1': startup job failed").
+# ── polkitd fallback, just in case ──────────────────────────────────────────
+# belt and suspenders: if systemd-sysusers above whiffed in this chroot for
+# whatever reason, this makes sure the polkitd user exists anyway so
+# polkitd can actually start (same failure mode as above otherwise)
 id polkitd &>/dev/null || useradd -r -U -M -d /run/polkit -s /usr/bin/nologin polkitd
 
 # ── alpm user ──────────────────────────────────────────────────────────────
@@ -379,42 +381,42 @@ chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
 
-# CheckSpace is disabled for the airootfs pacstrap over in kibaos.sh's
-# PROFILE/pacman.conf, but that doesn't guarantee this chroot's own live
-# /etc/pacman.conf inherited the same edit — belt-and-suspenders it here too.
-# CheckSpace is a known false-positive source under overlay filesystems (its
-# statvfs() call misreports free space on overlay2, which is what most CI
-# runners use for Docker), and — critically — its "not enough free disk
-# space... Proceed with installation? [Y/n]" prompt does NOT reliably honor
-# --noconfirm the way the normal transaction-confirmation prompt does. In a
-# non-interactive CI shell with no stdin, that stray prompt is what actually
-# hangs/fails the step, not a real space shortage.
+# CheckSpace already got disabled for the airootfs pacstrap up in
+# kibaos.sh's PROFILE/pacman.conf, but that edit isn't guaranteed to have
+# carried over into THIS chroot's own live /etc/pacman.conf, so — belt and
+# suspenders again — do it here too. CheckSpace is notorious for false-
+# positiving on overlay filesystems (its statvfs() call just lies about
+# free space on overlay2, which is what basically every Docker CI runner
+# uses), and worse, its "not enough free disk space... Proceed? [Y/n]"
+# prompt doesn't respect --noconfirm like the normal prompts do. in a
+# non-interactive CI shell with no stdin that's the actual thing hanging
+# the build, not a real space problem.
 sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 
-# ── Re-init the pacman keyring inside THIS chroot ───────────────────────────
-# "keyring is not writable" / "required key missing from keyring" happens
-# when /etc/pacman.d/gnupg's ownership/permissions don't match the UID
-# actually running pacman inside the container — common in CI where the
-# outer Docker layer and this arch-chroot session don't line up cleanly,
-# even though mkarchiso initialized a keyring earlier in the process. GnuPG
-# is strict about homedir perms (must be 0700, owned by the invoking user),
-# so rather than debug which UID owns what, wipe it and rebuild fresh under
-# the identity that's actually running this script right now.
+# ── nuke and rebuild the pacman keyring inside THIS chroot ─────────────────
+# "keyring is not writable" / "required key missing from keyring" shows up
+# whenever /etc/pacman.d/gnupg's ownership/perms don't line up with
+# whatever UID is actually running pacman in here — happens a lot in CI
+# where the outer Docker layer and this arch-chroot session don't quite
+# match, even though mkarchiso already set up a keyring earlier. GnuPG's
+# picky about homedir perms (has to be 0700, owned by whoever's calling
+# it), so instead of chasing down which UID owns what, just blow it away
+# and rebuild clean under whatever's actually running this script.
 rm -rf /etc/pacman.d/gnupg
 pacman-key --init
 pacman-key --populate archlinux
 pacman -Syy --noconfirm
 
-# ── Reclaim disk before any further installs ────────────────────────────────
-# By this point mkarchiso has already pacstrapped the full ~195-package
-# packages.x86_64 list (chromium, wine, mesa, etc.) into this airootfs, and
-# every one of those .pkg.tar.zst downloads is still sitting in the cache —
-# previously nothing cleared it until the very end of the script. Later
-# steps in here (Kortex's own pacman installs, the Nuitka onefile compile,
-# building wayfire-plugins-extra from source) all need real scratch disk on
-# top of that, which is what was actually running the image out of space,
-# not any one install being oversized on its own. `-Scc` (double-c) drops
-# cached packages of every version, not just superseded ones.
+# ── clear out disk before we install anything else ──────────────────────────
+# by now mkarchiso's already pacstrapped the whole ~195-package
+# packages.x86_64 list (chromium, wine, mesa, all of it) into this
+# airootfs, and every single .pkg.tar.zst is still sitting in the cache —
+# nothing cleared it until the very end of the script before. everything
+# coming up next (Kortex's own installs, the Nuitka onefile compile,
+# building whatever compositor plugins from source) needs real scratch
+# disk on top of that, and THAT'S what was actually running the image out
+# of space, not any one install being huge. -Scc (double-c) nukes cached
+# packages of every version, not just the outdated ones.
 pacman -Scc --noconfirm
 
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
@@ -432,14 +434,15 @@ exec wine "$@" 2>/dev/null
 WINEWRAPPER
 chmod +x /usr/local/bin/wine-silent
 
-# earlyoom (global free-memory/swap threshold polling) and systemd-oomd
-# (cgroup-aware, PSI-based) are both OOM killers with overlapping jobs --
-# running both means they can race to kill different processes for the
-# same pressure event. systemd-oomd ships inside the systemd package
-# itself (no extra package needed) and is the more modern, desktop-
-# integrated choice (it already understands user.slice/session cgroups),
-# so it's what's actually enabled. earlyoom stays installed but disabled
-# as a simple fallback if oomd is ever ripped out.
+# earlyoom (just polls free mem/swap thresholds) and systemd-oomd
+# (cgroup-aware, uses PSI) both do the same job of OOM-killing stuff, so
+# running both at once just means they can race and kill different
+# processes for the same pressure event. systemd-oomd already ships
+# inside systemd itself (no extra package) and is the more modern,
+# desktop-integrated pick since it already understands user.slice/session
+# cgroups, so that's the one that's actually enabled. earlyoom stays
+# installed but off, just sitting there as a fallback if oomd ever gets
+# ripped out.
 systemctl disable earlyoom 2>/dev/null || true
 mkdir -p /etc/systemd/oomd.conf.d
 cat > /etc/systemd/oomd.conf.d/kibaos.conf << 'OOMDCONF'
@@ -1444,10 +1447,11 @@ chown root:root /usr/lib/kortex/kortex-helper
 chmod 755 /usr/lib/kortex/kortex-helper
 
 # ── Polkit action + exec-path mapping ───────────────────────────────────────
-# The exec.path annotation is what lets `pkexec /usr/lib/kortex/kortex-helper`
-# resolve to this specific action id rather than falling back to the generic
-# org.freedesktop.policykit.exec action (which prompts for the admin password
-# every single time — unworkable for silent background repair).
+# that exec.path annotation is the whole trick — it's what lets
+# `pkexec /usr/lib/kortex/kortex-helper` resolve to THIS specific action id
+# instead of falling back to the generic org.freedesktop.policykit.exec
+# action, which asks for the admin password every single time. that's a
+# dealbreaker for silent background repair.
 install -d -m 755 /usr/share/polkit-1/actions
 cat > /usr/share/polkit-1/actions/dev.wolftech.kortex.policy << 'KORTEX_POLKIT_POLICY'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -1470,18 +1474,19 @@ cat > /usr/share/polkit-1/actions/dev.wolftech.kortex.policy << 'KORTEX_POLKIT_P
 </policyconfig>
 KORTEX_POLKIT_POLICY
 
-# ── Polkit rule: allow without a password prompt, active local session only ─
-# NOTE — deliberate tradeoff, not a default you should ship blind:
-# <defaults> above says auth_admin_keep (password once, cached). This rule
-# overrides that to YES with no password at all for the active local user,
-# because a repair popup that then demands a sudo password defeats the
-# point of "automatic" repair on a consumer OS. The blast radius is bounded
-# by kortex-helper's own fixed whitelist + re-validation above, but it does
-# mean any locally-running process as the active user can invoke these six
-# specific root actions without a prompt. If that tradeoff doesn't sit
-# right for you, delete this .rules file and keep only the auth_admin_keep
-# default above — Kortex will then prompt for a password on first repair
-# per session instead of acting silently.
+# ── Polkit rule: no password prompt, but only for the active local session ─
+# heads up — this is a deliberate tradeoff, not something to ship blind:
+# <defaults> up above says auth_admin_keep (password once, then cached).
+# this rule straight up overrides that to YES with zero password for the
+# active local user, because a "repair" popup that then makes you type a
+# sudo password kind of defeats the whole point of automatic repair on a
+# consumer OS. the blast radius is capped by kortex-helper's own fixed
+# whitelist + re-validation above, but yeah — it does mean any process
+# running locally as the active user can fire these six specific root
+# actions with no prompt at all. if that doesn't sit right with you, just
+# delete this .rules file and keep the auth_admin_keep default — Kortex
+# will fall back to asking for a password on the first repair each
+# session instead of doing it silently.
 install -d -m 755 /etc/polkit-1/rules.d
 cat > /etc/polkit-1/rules.d/49-kortex.rules << 'KORTEX_POLKIT_RULES'
 polkit.addRule(function(action, subject) {
@@ -1798,11 +1803,17 @@ Entrypoint. Runs the repair watcher + usage/session trackers on a background
 thread, and the GTK notifier on the main thread (GTK requires the main
 thread on most platforms).
 
-Window-focus/launch/move events come from Wayfire's IPC (the `ipc` +
-`ipc-rules` plugins from wayfire-plugins-extra, built from source in
-kibaos.sh's WAYFIRE IPC section since that package is AUR-only on Arch),
-consumed here via the `wfctl` CLI rather than the raw JSON-RPC socket
-protocol directly — see WindowEventSource below for why and its caveats.
+Window-focus/launch/move events used to come from Wayfire's IPC (the
+`ipc`/`ipc-rules` plugins from wayfire-plugins-extra, built from source
+since that package was AUR-only on Arch), read here via the `wfctl` CLI.
+Now that the build's back on labwc, that whole compositor IPC layer
+doesn't exist anymore — labwc has no plugin system and nothing like it.
+WindowEventSource below still exists and still gets wired up the same
+way, it just detects there's no `wfctl` binary to talk to, logs that
+once, and turns itself into a no-op instead of ever starting a watcher
+thread. Everything else in Kortex — usage prediction, break reminders,
+repair — has zero dependency on this and runs completely normally either
+way. See WindowEventSource for the actual degrade-gracefully logic.
 """
 
 import threading
@@ -1811,6 +1822,7 @@ import datetime
 import logging
 import subprocess
 import json
+import shutil
 
 from .storage import Store
 from . import models
@@ -1834,28 +1846,41 @@ def _run(cmd, timeout=15):
 
 
 class WindowEventSource:
-    """Wayfire IPC bridge, via the `wfctl` CLI (pip: wfctl,
-    github.com/killown/wfctl) rather than hand-rolling the raw JSON-RPC
-    socket protocol that `ipc`/`ipc-rules` actually expose. `wfctl -m`
-    tails Wayfire's event stream and prints one JSON object per line — same
-    "tail a subprocess, parse lines" shape as repair.py's watch_journal(),
-    so this follows the pattern already established here instead of adding
-    a second I/O style.
+    """Was a Wayfire IPC bridge via the `wfctl` CLI (pip: wfctl,
+    github.com/killown/wfctl), tailing `wfctl -m`'s event stream and
+    parsing one JSON object per line — same "tail a subprocess, parse
+    lines" shape as repair.py's watch_journal(), so it followed the
+    pattern already established here instead of adding a second I/O style.
 
-    CAVEAT — verify on first real boot: the event/field names below
-    (event, view.app-id, view.geometry, view-mapped/focused/geometry-changed)
-    are based on wfctl's documented command surface and Wayfire's IPC
-    changelog, not a field-by-field spec checked against a live socket.
-    Same "unverified until it boots, tune from there" situation as
-    wayfire.ini's [wobbly]/[blur] sections below — if `wfctl -m` emits
-    different keys, only _handle_event() needs to change.
+    labwc has nothing resembling this — no IPC socket, no plugin system
+    to bolt one onto. Rather than rip the class out (Kortex's other code
+    still constructs and wires it up the same way, and I'd rather that
+    keep working untouched than thread None-checks through every call
+    site), start() below just checks whether `wfctl` even exists on
+    $PATH first. If it doesn't, this logs once and quietly never spins up
+    the watcher thread — every method is still callable, on_focus/
+    on_move/on_launch just never fire, and move_window()'s _run() calls
+    fail closed (logged, not raised) since there's no view to resolve.
+    Nothing in here crashes, retries forever, or hangs waiting on a
+    socket that's never coming.
 
-    CAVEAT — clicks are NOT covered: Wayfire's IPC has no raw pointer-button
-    event, by design — wlroots compositors deliberately don't let one client
-    see another client's input. `on_click` is therefore still never called
-    here; rage/dead-click detection needs either a custom Wayfire input-grab
-    plugin or a per-toolkit (GTK/Qt) hook, which is separate, larger work
-    than this IPC bridge covers.
+    Kept in case a labwc IPC/plugin story ever materializes upstream —
+    at that point this class is still exactly where the bridge would
+    plug back in.
+
+    CAVEAT (left over from the Wayfire days, still accurate if wfctl ever
+    comes back): the event/field names below (event, view.app-id,
+    view.geometry, view-mapped/focused/geometry-changed) were based on
+    wfctl's documented command surface and Wayfire's IPC changelog, never
+    checked field-by-field against a live socket — if they ever turn out
+    wrong, only _handle_event() needs to change.
+
+    CAVEAT: clicks were never covered either way — Wayfire's IPC had no
+    raw pointer-button event by design (wlroots compositors deliberately
+    don't let one client see another client's input), so `on_click` was
+    already dead code before labwc entered the picture. Rage/dead-click
+    detection would need a per-toolkit (GTK/Qt) hook instead, separate
+    work from anything an IPC bridge could ever cover.
     """
 
     def __init__(self, on_focus, on_move, on_click, on_launch=None):
@@ -1867,8 +1892,15 @@ class WindowEventSource:
         self._view_apps = {}        # view id -> app-id, so move_window can resolve one
 
     def start(self):
+        if shutil.which("wfctl") is None:
+            log.info(
+                "WindowEventSource: no wfctl on PATH (expected under labwc — "
+                "no compositor IPC exists). Window-event tracking is disabled; "
+                "everything else in Kortex is unaffected."
+            )
+            return
         threading.Thread(target=self._watch_loop, daemon=True).start()
-        log.info("WindowEventSource started (wfctl -m watching Wayfire IPC)")
+        log.info("WindowEventSource started (wfctl -m watching compositor IPC)")
 
     def _watch_loop(self):
         while True:
@@ -2749,7 +2781,7 @@ cp "${LOGO_48}"  /usr/share/icons/hicolor/48x48/apps/kibaos.png
 cp "${LOGO_32}"  /usr/share/icons/hicolor/32x32/apps/kibaos.png
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 
-# ── OOBE installer logo — separate art from the generic distro logo above ──
+# ── OOBE installer logo, keeping this art separate from the generic distro logo above ──
 curl -fL --retry 5 --retry-delay 3 -o "${INSTALLER_LOGO}.raw" "${INSTALLER_LOGO_URL}" || true
 if [ -f "${INSTALLER_LOGO}.raw" ] && file "${INSTALLER_LOGO}.raw" | grep -qi 'image'; then
   magick "${INSTALLER_LOGO}.raw" -filter Lanczos -resize 256x256 "${INSTALLER_LOGO}"
@@ -2780,34 +2812,35 @@ echo "=== AUR packages installed ==="
 # ══════════════════════════════════════════════════════════════════════════
 # KIBAOS OOBE INSTALLER — fullscreen, one-step-per-screen Vala/GTK4 app.
 #
-# Earlier attempts ported elementary/installer + distinst to Arch/pacman.
-# That path is abandoned: distinst's apt/dpkg assumptions required a Rust
-# source patch (done), which then required building GNU parted from source
-# to get complete libparted headers for bindgen (done), which then hit an
-# unrelated upstream parted CLI compile bug. Rather than keep patching a
-# dependency chain built for Ubuntu/apt, this section replaces it entirely
-# with a small from-scratch Vala/GTK4/libadwaita app:
-#   - UI: a NavigationView stack, one page per step (welcome, locale, disk,
-#     account, confirm, installing, done) — no sidebar, no visible step
-#     list, matching the Windows-OOBE single-question-per-screen pattern
-#     the person actually asked for, themed in KibaOS's own navy/glass
-#     palette (matching gtk-3.0/gtk.css's colors elsewhere in this script).
+# backstory: I originally tried porting elementary/installer + distinst
+# over to Arch/pacman. gave up on that road entirely — distinst's
+# apt/dpkg assumptions needed a Rust source patch (did that), which then
+# needed GNU parted built from source just to get full libparted headers
+# for bindgen (did that too), which then ran face-first into an unrelated
+# upstream parted CLI compile bug. at that point I was just patching a
+# dependency chain that was never built for Arch in the first place, so
+# screw it, this whole section is a small from-scratch Vala/GTK4/
+# libadwaita app instead:
+#   - UI: a NavigationView stack, one page per step (welcome, locale,
+#     disk, account, confirm, installing, done). no sidebar, no visible
+#     step list — matches the Windows-OOBE single-question-per-screen
+#     vibe I actually wanted, themed in KibaOS's own navy/glass palette
+#     (same colors as gtk-3.0/gtk.css elsewhere in this script).
 #   - Backend: a privileged C binary (kibaos-oobe-backend), called via
-#     sudo with a plain argv array (no shell string, no quoting/
-#     injection surface, no D-Bus/polkit dependency). The udev-settle
-#     wait is hand-implemented in libkibadisk against raw ioctls; GPT
-#     partitioning is done by shelling out to sgdisk (argv array via
-#     execvp, never a shell -- see kiba_gpt.c) instead of a hand-rolled
-#     writer or a libfdisk link dependency. No archinstall, no parted,
-#     no blkid/partprobe subprocess anywhere in the disk-critical path.
-#     The handful of remaining external tools (sgdisk, unsquashfs,
-#     mkfs.fat/mkfs.ext4, arch-chroot, refind-install, mkinitcpio,
-#     useradd/chpasswd, locale-gen, pacman) have no sane from-scratch
-#     replacement and are invoked via argv arrays, never a shell.
-#     See /usr/share/kibaos-oobe/src/disk/ for
-#     the library source (kiba_gpt.c, kiba_fs.c, kiba_udev.c,
-#     kiba_install_*.c) and kibaos_oobe_backend_main.c for the
-#     orchestrator that ties it together.
+#     sudo with a plain argv array — no shell string, no quoting/
+#     injection surface, no D-Bus/polkit dependency to worry about. the
+#     udev-settle wait is hand-rolled in libkibadisk against raw ioctls,
+#     and GPT partitioning shells out to sgdisk (argv array via execvp,
+#     never a shell — see kiba_gpt.c) instead of writing my own or
+#     dragging in a libfdisk link dependency. no archinstall, no parted,
+#     no blkid/partprobe subprocess anywhere near the disk-critical path.
+#     whatever external tools are left (sgdisk, unsquashfs, mkfs.fat/
+#     mkfs.ext4, arch-chroot, refind-install, mkinitcpio, useradd/
+#     chpasswd, locale-gen, pacman) just don't have a sane from-scratch
+#     replacement, so those get invoked via argv arrays too, never a
+#     shell. the library source lives in /usr/share/kibaos-oobe/src/disk/
+#     (kiba_gpt.c, kiba_fs.c, kiba_udev.c, kiba_install_*.c) and
+#     kibaos_oobe_backend_main.c is the orchestrator tying it together.
 # ══════════════════════════════════════════════════════════════════════════
 
 mkdir -p /usr/share/kibaos-oobe/src
@@ -2848,9 +2881,10 @@ public class KibaOOBE : Adw.Application {
     // installed system will use).
     private string ui_lang = "en";
 
-    // Tiny inline translator: t("English", "Türkçe") at each call site
-    // instead of a separate lookup table, so a string and its
-    // translation always sit next to each other in the source.
+    // tiny inline translator — t("English", "Türkçe") right at each call
+    // site instead of a separate lookup table, so a string and its
+    // translation stay glued together in the source instead of drifting
+    // apart in two different files.
     private string t (string en, string tr, string pl) {
         return ui_lang == "tr" ? tr : ui_lang == "pl" ? pl : en;
     }
@@ -2864,11 +2898,11 @@ public class KibaOOBE : Adw.Application {
     }
 
     // ── VM guard ──────────────────────────────────────────────────────
-    // Installing onto virtual disks (VDI/VMDK/qcow2) was never made
-    // reliable enough to ship — GPT/ESP handling on those virtual disk
-    // formats kept breaking in ways real hardware never hit. Rather than
-    // let someone click through the whole wizard and fail at the very
-    // end, refuse up front and say why.
+    // never got installing onto virtual disks (VDI/VMDK/qcow2) reliable
+    // enough to actually ship — GPT/ESP handling on those virtual disk
+    // formats kept breaking in ways real hardware just never does. so
+    // instead of letting someone click through the whole wizard and eat
+    // a failure right at the end, just refuse up front and tell them why.
     private bool is_running_in_vm () {
         string out_str = "", err_str = "";
         int status = 0;
@@ -4328,9 +4362,10 @@ row.combo, row.action {
 
 OOBECSS
 
-# ── Watermark icon: reuse the existing KibaOS logo as the symbolic
-# watermark rather than generating a separate asset — same K-mark already
-# used for the panel/branding elsewhere in this build. ────────────────────
+# ── Watermark icon: just reusing the existing KibaOS logo as the symbolic
+# watermark instead of making a whole separate asset — it's the same
+# K-mark already used for the panel/branding everywhere else in this
+# build, no reason to duplicate it. ────────────────────────────────────────
 mkdir -p /usr/share/icons/hicolor/scalable/actions
 cp /usr/share/kibaos/logo-256.png /usr/share/icons/hicolor/scalable/actions/kibaos-watermark-symbolic.png 2>/dev/null || true
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
@@ -4344,15 +4379,16 @@ ninja -C build install
 cd /
 
 # ── Privileged backend: libkibadisk + kibaos-oobe-backend ─────────────────
-# Replaces the old Python/archinstall-based backend entirely. No archinstall,
-# no parted, no blkid/partprobe subprocesses for the disk-critical path --
-# see kiba_gpt.c/kiba_fs.c/kiba_udev.c for the from-scratch GPT writer,
-# mkfs/mount wrapper, and udev-settle replacement respectively. The only
-# external tools retained are ones with no sane from-scratch replacement:
-# unsquashfs, mkfs.fat, mkfs.ext4, useradd/chpasswd, refind-install, mkinitcpio,
-# locale-gen, pacman -- all invoked via posix_spawn argv arrays, never a
-# shell, so there's no string-quoting/injection surface anywhere in this
-# backend (mirrors the argv fix already applied on the Vala/sudo side).
+# this fully replaces the old Python/archinstall-based backend. no
+# archinstall, no parted, no blkid/partprobe subprocesses anywhere near
+# the disk-critical path — check kiba_gpt.c/kiba_fs.c/kiba_udev.c for the
+# from-scratch GPT writer, mkfs/mount wrapper, and udev-settle
+# replacement respectively. the only external tools I kept around are
+# ones that genuinely have no sane from-scratch replacement: unsquashfs,
+# mkfs.fat, mkfs.ext4, useradd/chpasswd, refind-install, mkinitcpio,
+# locale-gen, pacman — all invoked via posix_spawn argv arrays, never a
+# shell, so there's zero string-quoting/injection surface in this
+# backend (same argv-array fix I already did on the Vala/sudo side).
 echo "=== Building libkibadisk (disk/install backend library) ==="
 mkdir -p /usr/share/kibaos-oobe/src/disk
 cd /usr/share/kibaos-oobe/src/disk
@@ -6626,7 +6662,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=budgie-wayfire
+Session=budgie-desktop
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -6811,12 +6847,15 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
  * (panel, Raven, Budgie Menu, OSD, tooltips, context menus), not to every
  * button and row — restraint matters more than coverage here.
  *
- * Caveat: this governs GTK widget-state transitions only — separate from
- * Wayfire's wobbly plugin, which now provides real compositor-level window
- * drag physics (see wayfire.ini). Raven/the Budgie Menu's open/close slide
- * is still Budgie's own compiled animation code, not GTK CSS — the opacity
- * transitions below are best-effort and may be superseded by that native
- * motion. Verify visually.
+ * Caveat: this only governs GTK widget-state transitions — it's NOT doing
+ * compositor-level window drag physics. that used to be Wayfire's wobbly
+ * plugin, but labwc has no wobbly equivalent (see the LABWC CONFIG
+ * section for the whole story on that), so window dragging is back to
+ * flat/rigid movement for now — nothing to verify here, it's just gone
+ * until/unless a labwc plugin fills that gap. Raven/the Budgie Menu's
+ * open/close slide is still Budgie's own compiled animation code, not GTK
+ * CSS — the opacity transitions below are best-effort and may be
+ * superseded by that native motion. Verify visually.
  * ════════════════════════════════════════════════════════════════════════ */
 
 /* === KibaOS: Floating rounded-rectangle panel === */
@@ -7369,9 +7408,11 @@ Rectangle {
             color: "#101828"
             opacity: 0.001
         }
-        // emulated glass: solid translucent fill. Wayfire has a real blur
-        // plugin now, but it's known not to apply behind semi-transparent
-        // layer-shell surfaces (panels) — see wayfire.ini notes.
+        // emulated glass: just a solid translucent fill, no real blur.
+        // labwc doesn't have a blur plugin at all (Wayfire did, sorta — see
+        // LABWC CONFIG notes for the full story on why I dropped it), so
+        // this fake-glass approach is doing all the work here now, not
+        // just backstopping a spot where real blur wouldn't reach anyway.
         Rectangle {
             anchors.fill: parent
             radius: 26
@@ -7477,32 +7518,24 @@ Rectangle {
 }
 SDDMQML
 
-# ── Wayland session — custom Budgie-on-Wayfire .desktop ────────────────
-# Budgie 10.10's own package ships /usr/share/wayland-sessions/
-# budgie-desktop.desktop, whose Exec= launches labwc (Budgie's official
-# recommended/default Wayland compositor as of 10.10 -- see
-# buddiesofbudgie.org/blog/budgie-10-10-released). SDDM's [Wayland]
-# CompositorCommand only controls what the GREETER itself runs on, not
-# the session the user logs into -- that comes entirely from whichever
-# wayland-sessions/*.desktop the Session= key names. So even with
-# CompositorCommand=wayfire set below, `Session=budgie-desktop` was
-# silently handing the actual session to labwc, which has no wobbly
-# plugin at all (its whole design philosophy excludes compositor-level
-# animation) -- hence wobbly windows never worked no matter what
-# wayfire.ini said.
+# ── Wayland session — back to stock Budgie-on-labwc ─────────────────────
+# so, funny enough, this is actually going BACK to how Budgie wants to run.
+# Budgie 10.10's own package already ships /usr/share/wayland-sessions/
+# budgie-desktop.desktop with Exec=labwc baked in — labwc is Budgie's
+# official recommended/default Wayland compositor as of 10.10 (see
+# buddiesofbudgie.org/blog/budgie-10-10-released). I'd previously deleted
+# that stock file and dropped in my own budgie-wayfire.desktop to force
+# Wayfire instead, chasing real compositor-level wobbly window physics
+# that labwc just doesn't have (it's a deliberate design choice on their
+# end — no compositor animation, period). Ripping that back out now: no
+# more deleting the stock session file, no more custom .desktop, we just
+# let Budgie's own packaged session do its thing.
 #
-# Fix: delete the stock labwc-launching session entry so it can't be
-# picked by accident, and drop in our own that runs wayfire directly.
-rm -f /usr/share/wayland-sessions/budgie-desktop.desktop
+# net effect: wobbly window drag and the real Kawase blur plugin are both
+# gone, and there's no labwc equivalent for either — see LABWC CONFIG
+# below for how that's handled (short version: gracefully dropped, not
+# faked, nothing crashes because of it).
 mkdir -p /usr/share/wayland-sessions
-cat > /usr/share/wayland-sessions/budgie-wayfire.desktop << 'BUDGIEWAYFIRE'
-[Desktop Entry]
-Name=Budgie
-Comment=Budgie Desktop on the Wayfire compositor
-Exec=wayfire
-Type=Application
-DesktopNames=Budgie:GNOME
-BUDGIEWAYFIRE
 
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
@@ -7510,14 +7543,14 @@ cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 DisplayServer=wayland
 
 [Wayland]
-CompositorCommand=wayfire
+CompositorCommand=labwc
 
 [Theme]
 Current=kibaos
 
 [Autologin]
 User=liveuser
-Session=budgie-wayfire
+Session=budgie-desktop
 SDDMCONF
 
 mkdir -p /var/lib/sddm
@@ -7525,28 +7558,35 @@ chown sddm:sddm /var/lib/sddm 2>/dev/null || true
 chmod 750 /var/lib/sddm
 
 # ══════════════════════════════════════════════════════════════════════════
-# WAYFIRE CONFIG
+# LABWC CONFIG
 # ══════════════════════════════════════════════════════════════════════════
-# Switched from labwc to Wayfire for real compositor-level wobbly/jelly
-# window physics (labwc's philosophy explicitly excludes any animation).
-# Trade-off, stated plainly: Budgie 10.10 only ships an automatic
-# integration "bridge" (keybindings/theme sync) for labwc. No such bridge
-# exists for Wayfire — Budgie talks to it purely through standard wlroots
-# protocols (layer-shell, foreign-toplevel, etc.), which Wayfire does
-# implement, but this exact combination is genuinely less-tested than
-# Budgie+labwc. The single most important consequence: without an
-# explicit [autostart] entry below, nothing tells Wayfire to launch
-# budgie-desktop at all, so that line is load-bearing, not optional.
+# back on labwc — Budgie's own officially-supported/default compositor,
+# so this gets the real integration bridge (keybinding + theme sync) that
+# Wayfire never had, and it's just a way better-tested combo overall.
 #
-# Wayfire has no system-wide /etc/xdg config fallback the way labwc does —
-# it only reads $XDG_CONFIG_HOME/wayfire.ini (effectively ~/.config/wayfire.ini).
-# So the default lives in /etc/skel and gets copied into every new user's
-# home directory (liveuser, and any user the OOBE installer creates) instead.
+# what this costs us, said plainly: labwc has NO wobbly/jelly window
+# physics and NO real compositor blur plugin, full stop — that's not a
+# config knob I'm missing, it's an intentional design choice on labwc's
+# end (they keep animation out of the compositor on purpose). rather than
+# fake it or leave dangling references to plugins that don't exist here,
+# both features are just gone: the GTK theme's motion-language comment
+# above already flags where wobbly used to hook in, and the login/Raven
+# glass effects fall back to the plain translucent-fill version instead
+# of real Kawase blur. Kortex's compositor IPC bridge is also gone for
+# the same reason — see the note where WAYFIRE IPC used to be, now
+# replaced with a graceful no-op instead of a hard build/crash.
+#
+# unlike Wayfire, labwc DOES read a system-wide config from /etc/xdg/labwc
+# as a fallback, but per-user ~/.config/labwc still wins, so — same as
+# before — the actual default config gets dropped into /etc/skel and
+# copied into every new user's home (liveuser, and whoever the OOBE
+# installer creates).
 # ── Screenshot + screenshot-OCR ──────────────────────────────────────────
-# Bound to Print/Shift+Print/Super+Shift+Print in wayfire.ini's [command]
-# section below. All three copy to the clipboard via wl-copy (so paste-
-# anywhere works immediately) as well as writing a file, and confirm with
-# a toast so a keypress that silently did something isn't left ambiguous.
+# bound to Print/Shift+Print/Super+Shift+Print down in rc.xml's <keyboard>
+# section below. all three copy straight to the clipboard via wl-copy (so
+# paste-anywhere just works right away) as well as saving a file, and pop
+# a toast to confirm — don't want a keypress silently doing something and
+# leaving you wondering if it worked.
 cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
 #!/bin/bash
 # kibaos-screenshot [region] — grabs the full screen by default, or a
@@ -7591,14 +7631,14 @@ SCREENSHOTOCR
 chmod +x /usr/local/bin/kibaos-screenshot-ocr
 
 # ── Output scale: real per-monitor DPI via wlr-randr ──────────────────────
-# Wayfire has no built-in auto-DPI logic -- outputs default to scale 1
-# unless something explicitly sets them. This runs on every session start
-# (wired into wayfire.ini's [autostart] below) so it also re-applies
-# correctly on dock/undock and monitor hotplug, not just at first login.
-# Scale is derived from actual DPI (px / physical size in inches) when the
-# monitor reports its physical dimensions over EDID, falling back to a
-# resolution-only heuristic when it doesn't (common on some external
-# monitors and most VMs).
+# labwc doesn't do auto-DPI either -- outputs just default to scale 1
+# unless something explicitly sets them, same story as before. runs on
+# every session start (wired into the labwc autostart file below) so it
+# re-applies correctly on dock/undock and monitor hotplug too, not just
+# at first login. scale gets worked out from actual DPI (px / physical
+# size in inches) when the monitor reports its physical dimensions over
+# EDID, and falls back to a plain resolution heuristic when it doesn't
+# (common on some external monitors and pretty much all VMs).
 cat > /usr/local/bin/kibaos-apply-output-scale << 'OUTPUTSCALE'
 #!/bin/bash
 # Give the compositor a moment to enumerate outputs on cold start.
@@ -7657,202 +7697,120 @@ rm -f /tmp/.kiba-outputs
 OUTPUTSCALE
 chmod +x /usr/local/bin/kibaos-apply-output-scale
 
-# SKEL is defined here (rather than only at the "SKELETON" section later in
-# this script) because this is its first use: wayfire.ini gets written to
-# /etc/skel so it's copied into every new user's home (liveuser, and any
-# user the OOBE installer creates). Previously SKEL wasn't set until much
-# later in the script, so with `set -ex` (no -u) it silently expanded to
-# an empty string here, writing wayfire.ini to /.config instead of
-# /etc/skel/.config — meaning no user ever actually got it, Wayfire had no
-# [autostart] entry, and budgie-desktop never launched (gray screen, giant
-# cursor, bare compositor). The later "SKELETON" section still re-assigns
-# SKEL="/etc/skel" — that's redundant now but harmless, so it's left as-is.
+# SKEL gets defined here (instead of waiting for the "SKELETON" section
+# further down) because this is its first real use: the labwc config gets
+# written to /etc/skel so it's copied into every new user's home
+# (liveuser, and anyone the OOBE installer creates). SKEL used to not get
+# set until way later in the script, so under `set -ex` (no -u) it just
+# silently expanded to an empty string here, and the config was written to
+# /.config instead of /etc/skel/.config — meaning nobody actually got it,
+# nothing autostarted budgie-desktop, gray screen and giant cursor on a
+# bare compositor. The later "SKELETON" section still re-assigns
+# SKEL="/etc/skel" too — redundant now, but harmless, so left as-is.
 SKEL="/etc/skel"
-mkdir -p "${SKEL}/.config"
-cat > "${SKEL}/.config/wayfire.ini" << 'WAYFIREINI'
-[core]
-vwidth = 4
-vheight = 1
-plugins = \
-    autostart \
-    decoration \
-    move \
-    resize \
-    wobbly \
-    animate \
-    grid \
-    place \
-    expo \
-    vswitch \
-    switcher \
-    fast-switcher \
-    foreign-toplevel \
-    gtk-shell \
-    idle \
-    wm-actions \
-    command \
-    shortcuts-inhibit \
-    blur \
-    ipc \
-    ipc-rules
+mkdir -p "${SKEL}/.config/labwc"
 
-# session-lock is intentionally NOT loaded above. This is a live/installer
-# session — nothing in this image wires up a lockscreen UI (gtklock is
-# installed but never invoked), so if anything ever triggered a lock here
-# (idle timeout, a stray keybinding, a client using the wlr session-lock
-# protocol) the user would be stuck on a black surface with no way back in,
-# potentially mid-install. Easiest, safest fix: don't load the plugin at all.
+# rc.xml — labwc's main config: window rules, theme geometry, keybinds.
+# no [core] plugin list like wayfire.ini had, because labwc doesn't have
+# plugins at all — it's one static binary with a fixed feature set, on
+# purpose. virtual desktop count replaces Wayfire's vwidth/vheight grid.
+cat > "${SKEL}/.config/labwc/rc.xml" << 'LABWCRC'
+<?xml version="1.0"?>
+<labwc_config>
+  <core>
+    <gap>0</gap>
+  </core>
 
-# DPMS-off and the built-in cube/black-screen "screensaver" are both
-# disabled outright (-1) for the same reason: someone can walk away from a
-# multi-minute unattended install and the screen going dark/off must never
-# be mistaken for the session being gone. -1 disables a timeout entirely.
-[idle]
-dpms_timeout = -1
-screensaver_timeout = -1
+  <desktops>
+    <number>4</number>
+  </desktops>
 
-# No labwc-style bridge exists for Wayfire — this is what actually starts
-# the Budgie shell. Without it, Wayfire boots to an empty compositor.
-[autostart]
-autostart_scale = kibaos-apply-output-scale
-autostart_budgie = budgie-desktop
+  <!-- border colors as plain hex, unlike Wayfire's decoration plugin which
+       needed 0.0-1.0 floats -- #1a2030 active, #232b3a inactive, same
+       values as before, just a saner format this time -->
+  <theme>
+    <name>kibaos</name>
+    <titlebar>
+      <height>0</height>
+    </titlebar>
+    <border>
+      <width>1</width>
+    </border>
+  </theme>
 
-# RGBA as four floats from 0.0-1.0 — Wayfire's decoration plugin does NOT
-# accept hex colors. #1a2030 -> 0.102 0.125 0.188 ; #232b3a -> 0.137 0.169 0.227
-[decoration]
-active_color   = 0.102 0.125 0.188 1.0
-inactive_color = 0.137 0.169 0.227 1.0
-border_size = 1
+  <!-- Print = full-screen screenshot, Shift+Print = region screenshot,
+       both go to the clipboard + ~/Pictures/Screenshots. Super+Shift+Print
+       = region -> OCR -> text on the clipboard (see the two scripts
+       written just above). -->
+  <keyboard>
+    <keybind key="Print">
+      <action name="Execute" command="kibaos-screenshot"/>
+    </keybind>
+    <keybind key="S-Print">
+      <action name="Execute" command="kibaos-screenshot region"/>
+    </keybind>
+    <keybind key="W-S-Print">
+      <action name="Execute" command="kibaos-screenshot-ocr"/>
+    </keybind>
+  </keyboard>
+</labwc_config>
+LABWCRC
 
-# Tuned softer than Compiz's nostalgia-mode defaults (friction 3.0) so it
-# reads as an organic settle rather than cartoon jelly, matching the
-# settle/fade motion language already in the GTK theme. Key names confirmed
-# against Wayfire's own docs; exact feel is unverified until it boots —
-# tune by hand from there.
-[wobbly]
-friction = 4.5
-spring_k = 8.0
-grid_resolution = 6
+# themerc-override — labwc's flat-file theme knobs, separate from rc.xml.
+# this is where the active/inactive titlebar colors actually live (rc.xml
+# only points at a theme NAME). plain hex, no float conversion needed.
+mkdir -p "${SKEL}/.config/labwc/themes/kibaos"
+cat > "${SKEL}/.config/labwc/themes/kibaos/themerc" << 'LABWCTHEME'
+window.active.border.color: #1a2030
+window.inactive.border.color: #232b3a
+window.active.title.bg.color: #1a2030
+window.inactive.title.bg.color: #232b3a
+LABWCTHEME
 
-# Handles open/close/minimize transitions -- distinct from [wobbly] above,
-# which only affects live move/resize. Zoom on open/close reads as "grow
-# from/shrink to origin", closer to what people expect from a modern DE;
-# fade is reserved for overlay-type surfaces (menus/popovers) where a zoom
-# would look wrong. Key names/values confirmed against animate.cpp and
-# community wayfire.ini examples.
-[animate]
-open_animation = zoom
-close_animation = zoom
-minimize_animation = zoom
-duration = 300
-zoom_duration = 300
-fade_duration = 200
-enabled_for = (type equals "toplevel" | (type equals "x-or" & focusable equals true))
-fade_enabled_for = type equals "overlay"
+# autostart — labwc's equivalent of Wayfire's [autostart] section, just a
+# plain shell script labwc sources on session start. THIS is what
+# actually launches Budgie now instead of Wayfire's autostart_budgie line
+# -- without it, labwc boots to a totally empty compositor, same
+# load-bearing deal as before. no [idle] plugin equivalent to disable
+# here, because labwc doesn't blank the screen on its own in the first
+# place -- that'd be swayidle's job, and swayidle is installed but
+# deliberately never invoked anywhere in this image, so idle/DPMS
+# blanking mid-install just isn't a thing that can happen. simplest fix
+# available: don't run the thing that would cause the problem.
+cat > "${SKEL}/.config/labwc/autostart" << 'LABWCAUTOSTART'
+#!/bin/bash
+kibaos-apply-output-scale &
+budgie-desktop &
+LABWCAUTOSTART
+chmod +x "${SKEL}/.config/labwc/autostart"
 
-# Blur is a real Wayfire plugin (unlike labwc, which has none at all), but
-# a known upstream limitation (WayfireWM/wayfire#1399) means it historically
-# does NOT apply behind semi-transparent layer-shell surfaces like Budgie's
-# panel/Raven — so this will likely blur behind floating app windows
-# (e.g. a translucent terminal) but NOT produce real frosted-glass behind
-# the panel itself. The panel still relies on the alpha-transparency
-# illusion already built into the GTK theme. Verify visually either way.
-[blur]
-method = kawase
-mode = normal
-kawase_offset = 2
-kawase_degrade = 3
-kawase_iterations = 2
-
-# Print = full-screen screenshot, Shift+Print = region screenshot, both to
-# clipboard + ~/Pictures/Screenshots. Super+Shift+Print = region -> OCR ->
-# text on the clipboard (see the two scripts written just above).
-[command]
-binding_screenshot_full   = KEY_PRINT
-command_screenshot_full   = kibaos-screenshot
-binding_screenshot_region = <shift> KEY_PRINT
-command_screenshot_region = kibaos-screenshot region
-binding_screenshot_ocr    = <super> <shift> KEY_PRINT
-command_screenshot_ocr    = kibaos-screenshot-ocr
-WAYFIREINI
+# environment — plain KEY=VALUE, sourced into the session before autostart
+# runs. wayfire.ini had no equivalent of this since it was one flat INI
+# file; labwc splits config into rc.xml/environment/autostart on purpose.
+cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
+XDG_CURRENT_DESKTOP=Budgie:GNOME
+LABWCENV
 
 # ══════════════════════════════════════════════════════════════════════════
-# WAYFIRE IPC — Kortex's real compositor bridge
+# COMPOSITOR IPC — none, on purpose, and that's fine
 # ══════════════════════════════════════════════════════════════════════════
-# `ipc`/`ipc-rules` (enabled above) ship in wayfire-plugins-extra, which is
-# AUR-only on Arch (no core/extra package — confirmed against archlinux.org
-# and the AUR page), so plain `pacman -S` can't resolve it. Built from
-# source here instead, same call as Kortex's own Nuitka compile: this whole
-# script already runs inside the arch-chroot (see customize_airootfs.sh),
-# so a source build lands directly in the target image, no AUR helper
-# needed. Once `ipc` is loaded, Wayfire exposes its IPC socket path via the
-# WAYFIRE_SOCKET env var automatically — no manual socket config required.
-echo "=== Building wayfire-plugins-extra (ipc, ipc-rules) ==="
-pacman -S --noconfirm --needed meson ninja cmake pkgconf git cairo glibmm wayland-protocols
-pacman -Scc --noconfirm
-
-# Pinned to v0.10.0, NOT master — master's meson.build now requires
-# wayfire >=0.11.0.
+# this whole section used to be a from-source build of wayfire-plugins-
+# extra (ipc/ipc-rules, AUR-only, plus a pinned wayfire downgrade just to
+# get it compiling) so Kortex could talk to Wayfire's IPC socket via
+# `wfctl` for live window-focus/launch/move events. labwc has nothing
+# like that — no IPC socket, no plugin system to add one, nothing to
+# build here at all. so none of that happens anymore: no meson/ninja
+# build, no wayfire version pin, no wfctl pip install.
 #
-# Arch's extra/wayfire has since moved past the 0.10.1 build this tag was
-# written against and now ships the newer float-based scene-render API
-# (wf::regionf_t/geometryf_t, render_instance_t::schedule_instructions),
-# which v0.10.0's annotate.cpp doesn't implement — so whatever the
-# packages.x86_64 install pulled down as "wayfire" no longer compiles
-# against this tag. Rather than chasing wayfire-plugins-extra tags/master
-# to match whatever Arch ships this week, pin wayfire itself back to the
-# last 0.10.1 build from the Arch Linux Archive and hold it there — both
-# in this build chroot (so the compile below succeeds) and in the shipped
-# image (so a routine `pacman -Syu` on an installed KibaOS doesn't
-# silently re-break ipc/ipc-rules months later).
-echo "=== Pinning wayfire to 0.10.1 (last version wayfire-plugins-extra v0.10.0 supports) ==="
-WF_PIN_DIR="/tmp/wayfire-pin"
-mkdir -p "${WF_PIN_DIR}"
-cd "${WF_PIN_DIR}"
-
-# Discover the newest 0.10.1 build in the archive — pkgrel can bump on
-# rebuilds against newer deps, so don't hardcode it.
-WF_PIN_FILE="$(curl -fsSL https://archive.archlinux.org/packages/w/wayfire/ \
-  | grep -oE 'wayfire-0\.10\.1-[0-9]+-x86_64\.pkg\.tar\.zst' \
-  | sort -t- -k3 -n | uniq | tail -1)"
-[ -n "${WF_PIN_FILE}" ] || { echo "FATAL: no wayfire 0.10.1 build found in the Arch Linux Archive." >&2; exit 1; }
-
-curl -fsSLO "https://archive.archlinux.org/packages/w/wayfire/${WF_PIN_FILE}"
-
-# Archived builds are still signed with the same official packager keys,
-# but LocalFileSigLevel isn't relaxed by default for -U installs of a
-# standalone file — set it once so the downgrade doesn't get blocked on a
-# sig lookup quirk; this is a deliberate, pinned downgrade of an
-# HTTPS-fetched official package, not an unverified third-party binary.
-grep -q '^LocalFileSigLevel' /etc/pacman.conf || \
-  sed -i '/^\[options\]/a LocalFileSigLevel = Optional' /etc/pacman.conf
-
-pacman -U --noconfirm "${WF_PIN_FILE}"
-
-# Hold it there. This edits the chroot's own /etc/pacman.conf, which IS
-# the final image's pacman.conf, so installed systems inherit the hold.
-grep -q '^IgnorePkg.*wayfire\b' /etc/pacman.conf || {
-  grep -q '^IgnorePkg' /etc/pacman.conf \
-    && sed -i '/^IgnorePkg/ s/$/ wayfire/' /etc/pacman.conf \
-    || sed -i '/^\[options\]/a IgnorePkg = wayfire' /etc/pacman.conf
-}
-
-cd /
-rm -rf "${WF_PIN_DIR}"
-
-git clone --depth=1 --branch v0.10.0 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
-cd /tmp/wayfire-plugins-extra
-meson setup build --prefix=/usr --buildtype=release
-ninja -C build
-ninja -C build install
-cd /
-rm -rf /tmp/wayfire-plugins-extra
-
-# Kortex talks to the ipc/ipc-rules socket through `wfctl` (pip: wfctl,
-# github.com/killown/wfctl) rather than the raw JSON-RPC protocol directly —
-# see core.py's WindowEventSource for why and its documented caveats.
-echo "=== Installing wfctl (Wayfire IPC client used by Kortex) ==="
-pip install --break-system-packages --no-cache-dir wfctl
+# Kortex itself already knows how to handle this gracefully (see
+# WindowEventSource in core.py) — on labwc it just detects there's no
+# WAYFIRE_SOCKET/wfctl available, logs that it's running without a
+# compositor event feed, and quietly disables the window-tracking
+# features that depended on it instead of crashing or busy-looping
+# looking for a socket that will never show up. Everything else Kortex
+# does (usage prediction, break reminders, driver/service auto-repair)
+# doesn't touch this and keeps working exactly the same.
+echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # OTA UPDATE SYSTEM
@@ -7979,13 +7937,13 @@ while IFS= read -r line; do
   case "${FILEPATH}" in
     etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
       NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/wayfire*)
-      # Note: wayfire.ini now lives per-user (Wayfire has no system-wide
-      # /etc/xdg fallback), seeded from /etc/skel at account creation. An
-      # OTA patch to the skel copy only affects NEWLY created users from
-      # that point on — it can't retroactively update already-installed
-      # users' own ~/.config/wayfire.ini. Only the binary itself triggers
-      # a restart here.
+    usr/bin/labwc*)
+      # note - labwc's config lives per-user too (in ~/.config/labwc,
+      # seeded from /etc/skel at account creation, same deal as before).
+      # an OTA patch to the skel copy only touches NEWLY created users
+      # from that point forward — it can't retroactively update
+      # already-installed users' own ~/.config/labwc/. only the binary
+      # itself triggers a restart here.
       NEEDS_COMPOSITOR_RESTART=true ;;
   esac
 done < "${MANIFEST}"
@@ -8123,16 +8081,17 @@ rollback_patch() {
 }
 
 # ── Restart compositor: full session bounce, not in-place reconfigure ─────
-# Wayfire has documented crash-on-config-reload reports (no general
-# "reconfigure" signal equivalent to labwc's, and what reload support
-# exists is plugin-specific, not whole-compositor). Rather than gamble on
-# an in-place reload inside an unattended OTA patcher, this restarts the
-# whole greeter/session — slower, but it's not going to leave the user
-# stuck on a half-reloaded compositor.
+# labwc actually does support a live reconfigure (SIGHUP, or its own
+# "Reconfigure" action) unlike Wayfire, which never really had a clean
+# equivalent. but I'm still not trusting an in-place reload inside an
+# unattended OTA patcher running on someone else's machine with no one
+# watching — a half-reloaded compositor plus Budgie's shell state getting
+# out of sync is a worse failure mode than just eating the extra second
+# for a full session bounce. slower, but nobody ends up stuck.
 restart_compositor() {
-  log "Restarting session (wayfire via sddm)..."
+  log "Restarting session (labwc via sddm)..."
   systemctl restart sddm 2>/dev/null || \
-  pkill -TERM wayfire 2>/dev/null || true
+  pkill -TERM labwc 2>/dev/null || true
   sleep 1
   log "Session restarted."
 }
@@ -8334,17 +8293,19 @@ gsettings set org.nemo.preferences default-folder-viewer       'icon-view'
 gsettings set org.nemo.icon-view default-zoom-level            'standard'
 gsettings set org.nemo.preferences show-location-entry         false
 
-# ── Panel config, using the schema verified directly from upstream source ─
-# (src/panel/manager.vala, BuddiesOfBudgie/budgie-desktop main branch):
+# ── Panel config, schema verified straight from upstream source ──────────
+# (src/panel/manager.vala, BuddiesOfBudgie/budgie-desktop main branch), so
+# this isn't a guess:
 #   ROOT_SCHEMA      = com.solus-project.budgie-panel          (hyphenated!)
 #   TOPLEVEL_PREFIX  = /com/solus-project/budgie-panel/panels
 #   PANEL_KEY_POSITION    = "location"       (not "position")
 #   PANEL_KEY_SHADOW      = "enable-shadow"  (not "shadow")
 #   PANEL_KEY_APPLETS     = "applets"        (flat ordered UUID list)
-# The previous version of this block used "com.solus-project.budgie.panel"
-# (dotted) with keys "position"/"shadow" — neither the schema nor those key
-# names exist upstream, so those dconf writes were very likely a silent
-# no-op the whole time, not actually configuring anything.
+# the previous version of this block was using
+# "com.solus-project.budgie.panel" (dotted) with keys "position"/"shadow"
+# — neither that schema nor those key names actually exist upstream, so
+# those dconf writes were almost certainly a silent no-op this whole
+# time, not configuring anything at all.
 PANEL_UUID=$(gsettings get com.solus-project.budgie-panel panels 2>/dev/null | \
   tr -d "[]' " | cut -d',' -f1)
 if [ -z "${PANEL_UUID}" ]; then
@@ -8358,11 +8319,12 @@ dconf write "${PANEL_PATH}transparency"  "'DYNAMIC'"
 dconf write "${PANEL_PATH}enable-shadow" "true"
 
 # ── Centered dock: applets + pinned launchers, matching the mockup's order ─
-# Budgie's icon-tasklist applet PERMANENTLY crashes the session on every
-# future login if pinned-launchers references a .desktop file that doesn't
-# exist (solus-project/budgie-desktop#1480 — confirmed, not theoretical).
-# So: probe the real filesystem for whichever desktop-id variant actually
-# shipped, rather than hardcoding a guess and hoping it's right.
+# Budgie's icon-tasklist applet will PERMANENTLY crash the session on
+# every future login if pinned-launchers points at a .desktop file that
+# doesn't actually exist (solus-project/budgie-desktop#1480 — confirmed
+# this happens, not a maybe). so: probe the real filesystem for whichever
+# desktop-id variant actually got installed, instead of hardcoding a
+# guess and hoping it's right.
 find_desktop_id() {
   for candidate in "$@"; do
     [ -f "/usr/share/applications/${candidate}" ] && { echo "${candidate}"; return 0; }
@@ -8382,16 +8344,16 @@ do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
 
-# Each applet UUID needs two things written: (1) a generic "which plugin is
-# this UUID" lookup entry, and (2) that plugin's OWN settings at ITS OWN
-# settings-prefix. (1) is extrapolated by direct structural analogy to the
-# now-confirmed TOPLEVEL_SCHEMA/TOPLEVEL_PREFIX pattern above — I have not
-# directly observed this exact const in source the way I have for the panel
-# schema, so flag it as the one remaining inferential step if applets don't
-# show up. (2) for icon-tasklist specifically IS directly confirmed: Budgie's
-# own docs give the Budgie Menu applet's settings-prefix as
-# /com/solus-project/budgie-panel/instance/budgie-menu/{uuid} — same pattern
-# applies to icon-tasklist's instance path below.
+# each applet UUID needs two things written: (1) a generic "which plugin
+# is this UUID" lookup entry, and (2) that plugin's OWN settings at ITS
+# OWN settings-prefix. (1) I got by direct structural analogy to the
+# now-confirmed TOPLEVEL_SCHEMA/TOPLEVEL_PREFIX pattern above — haven't
+# directly observed this exact const in source the way I did for the
+# panel schema, so flagging it as the one remaining inferential step if
+# applets don't show up. (2) for icon-tasklist specifically IS directly
+# confirmed: Budgie's own docs give the Budgie Menu applet's
+# settings-prefix as /com/solus-project/budgie-panel/instance/budgie-menu/
+# {uuid}, same pattern applies to icon-tasklist's instance path below.
 add_applet() {
   local plugin_name="$1"
   local uuid
@@ -8430,10 +8392,11 @@ AUTOCFG
 
 # ── OEM-mode autostart: launches io.kibaos.oobe (which self-detects
 # OEM-finish mode via /etc/kibaos/oem-pending, see main.vala) on login to
-# the temporary 'oem' autologin account set up by kibaos-oem-prepare. A
-# plain Exec= can't conditionally skip launching, so the condition is
-# wrapped in a one-line shell test instead — on a normal (non-OEM) install
-# this marker never exists, so the test fails and nothing launches. ───────
+# the temporary 'oem' autologin account kibaos-oem-prepare sets up. a
+# plain Exec= can't conditionally skip launching, so the condition gets
+# wrapped in a one-line shell test instead — on a normal (non-OEM)
+# install this marker never exists, so the test just fails and nothing
+# launches. ───────────────────────────────────────────────────────────
 cat > "${SKEL}/.config/autostart/kibaos-oem-finish.desktop" << 'OEMAUTOCFG'
 [Desktop Entry]
 Type=Application
@@ -8446,11 +8409,11 @@ OEMAUTOCFG
 
 # ── Live-session autostart: launches the OOBE installer automatically on
 # the regular live boot (the 'liveuser' autologin session), so the person
-# lands straight in the installer instead of an empty desktop. Gated to
-# liveuser specifically (via `whoami`) so this never fires after a real
-# install, on the OEM-finish account (which has its own autostart entry
-# above), or for any other account this .config/autostart skeleton gets
-# copied into down the line. ─────────────────────────────────────────────
+# lands straight in the installer instead of staring at an empty desktop.
+# gated to liveuser specifically (via `whoami`) so this never fires after
+# a real install, on the OEM-finish account (which has its own autostart
+# entry above), or on any other account this .config/autostart skeleton
+# ends up getting copied into down the line. ────────────────────────────
 cat > "${SKEL}/.config/autostart/kibaos-install-launch.desktop" << 'LIVELAUNCH'
 [Desktop Entry]
 Type=Application
@@ -8565,19 +8528,19 @@ chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
 
 # ── No firewall package on KibaOS ──────────────────────────────────────────
-# ufw was previously included, but its packaging hooks misbehave inside
-# this chroot build container even beyond just the `ufw enable` CLI
-# command (confirmed: removing that one call wasn't sufficient — something
-# in ufw's own systemd-enable-time hooks still tries a /proc-dependent
-# SSH-detection check and fails the same way, since there's no real /proc
-# in this build environment). Rather than keep fighting a third-party
-# tool's chroot incompatibility for a build-time-only customization step
-# that was never going to filter live traffic anyway, ufw is dropped
-# entirely. KibaOS currently ships with no firewall configured by default —
-# worth revisiting later (e.g. via nftables directly, or a different
-# firewall frontend) if network-facing security hardening becomes a
-# priority, but it's not a build-blocking concern for a desktop live/
-# install image the way it might be for a server image.
+# ufw used to be in here, but its packaging hooks just don't behave
+# inside this chroot build container, and it goes beyond just the
+# `ufw enable` CLI call (confirmed — removing that one call wasn't even
+# enough, something in ufw's own systemd-enable-time hooks still tries a
+# /proc-dependent SSH-detection check and fails the same way, since
+# there's no real /proc in this build environment). rather than keep
+# fighting a third-party tool's chroot incompatibility for a
+# build-time-only step that was never going to filter live traffic
+# anyway, ufw's just gone entirely now. so KibaOS currently ships with no
+# firewall configured by default — worth coming back to eventually (maybe
+# straight nftables, or a different frontend) if network-facing hardening
+# ever becomes a priority, but it's not a build-blocking concern for a
+# desktop live/install image the way it'd be for a server image.
 
 # ══════════════════════════════════════════════════════════════════════════
 # DESKTOP SHORTCUTS
@@ -8594,19 +8557,21 @@ XDG_VIDEOS_DIR="$HOME/Videos"
 USERDIRS
 
 # ── Nemo/GTK sidebar bookmarks: a clean "quick access" list ────────────────
-# Windows' C:\Users\<name> feels tidy because Explorer's nav pane only ever
-# shows Desktop/Documents/Downloads/Pictures/Music/Videos plus the user's
-# own Home — everything else (AppData-equivalent: our dotfiles in ~/.config,
-# ~/.local, ~/.cache) is already hidden by the leading dot, same as AppData
-# is hidden by its own attribute. This seeds the same short, fixed list in
-# Nemo's sidebar on first login, nothing more — no stray "Other Locations"/
-# raw filesystem browsing front and center.
+# Windows' C:\Users\<name> feels tidy because Explorer's nav pane only
+# ever shows Desktop/Documents/Downloads/Pictures/Music/Videos plus the
+# user's own Home — everything else (our AppData-equivalent: ~/.config,
+# ~/.local, ~/.cache) is already hidden by the leading dot, same deal as
+# AppData being hidden by its own attribute on Windows. this seeds that
+# same short, fixed list into Nemo's sidebar on first login, nothing
+# more — no stray "Other Locations"/raw filesystem browsing sitting front
+# and center.
 #
-# NOTE: this can't be a static /etc/skel file — GTK bookmark files are plain
-# file:// URIs with no variable expansion, and skel is copied byte-for-byte
-# at account creation before the real username exists. So instead this runs
-# once per new user via a first-login script gated on a marker file, using
-# a real $HOME at the time it actually runs.
+# heads up: this can't just be a static /etc/skel file — GTK bookmark
+# files are plain file:// URIs with zero variable expansion, and skel
+# gets copied byte-for-byte at account creation before the real username
+# even exists. so instead this runs once per new user via a first-login
+# script gated on a marker file, using a real $HOME at the moment it
+# actually runs.
 mkdir -p /etc/skel/.config/autostart
 cat > /usr/local/bin/kibaos-first-login-setup << 'FIRSTLOGIN'
 #!/bin/bash
@@ -8862,8 +8827,9 @@ Categories=System;
 ABOUTDESK
 
 # ── Hide Avahi network browser (avahi-discover / avahi-ui-tools) ──────────
-# Avahi pulls in a "Network Browser" launcher we don't want in the app grid.
-# Override both the avahi-discover and bssh/bvnc desktop files with NoDisplay.
+# avahi drags in a "Network Browser" launcher nobody needs in the app
+# grid. override both avahi-discover and bssh/bvnc's desktop files with
+# NoDisplay so they stop showing up.
 for _avahi_desk in avahi-discover bssh bvnc; do
   if [ -f "/usr/share/applications/${_avahi_desk}.desktop" ]; then
     cp "/usr/share/applications/${_avahi_desk}.desktop" \
@@ -8874,8 +8840,8 @@ for _avahi_desk in avahi-discover bssh bvnc; do
 done
 
 # ── Hide gnome-terminal from the app launcher / shortcuts ─────────────────
-# Terminal access is available via right-click and other paths; we don't want
-# it pinned or visible in the main shortcut list.
+# terminal's still reachable via right-click and other paths, just don't
+# want it pinned or sitting visible in the main shortcut list.
 if [ -f "/usr/share/applications/org.gnome.Terminal.desktop" ]; then
   sed -i 's/^NoDisplay=.*/NoDisplay=true/' \
       "/usr/share/applications/org.gnome.Terminal.desktop" || true
@@ -8884,9 +8850,10 @@ if [ -f "/usr/share/applications/org.gnome.Terminal.desktop" ]; then
 fi
 
 # ── Hide budgie-control-center from the app launcher ───────────────────────
-# Pulled in transitively as a dependency of the budgie package group; can't
-# be removed without risking breaking budgie itself, but it's superseded as
-# the visible Settings app below, so just keep it out of the menu.
+# gets pulled in transitively as a dependency of the budgie package
+# group, so can't just remove it without risking breaking budgie itself
+# — but it's superseded by the visible Settings app below, so just keep
+# it out of the menu instead.
 for _bcc_desk in budgie-control-center.desktop \
                  org.buddiesofbudgie.BudgieControlCenter.desktop; do
   if [ -f "/usr/share/applications/${_bcc_desk}" ]; then
@@ -8897,12 +8864,13 @@ for _bcc_desk in budgie-control-center.desktop \
 done
 
 # ── Rename gnome-control-center to "Settings" ───────────────────────────────
-# Plain upstream GNOME Settings, not the Budgie fork -- current libadwaita
-# builds use the sidebar+search layout, closer to macOS System Settings than
-# budgie-control-center's older layout. Upstream desktop file calls it
-# "Settings" already in most locales, but strip localised Name[xx]= lines so
-# a non-English locale can't override our label, matching the other rebrands
-# in this block.
+# plain upstream GNOME Settings here, not the Budgie fork -- current
+# libadwaita builds use the sidebar+search layout, which reads a lot
+# closer to macOS System Settings than budgie-control-center's older
+# layout does. upstream's desktop file already calls it "Settings" in
+# most locales, but strip the localised Name[xx]= lines anyway so a
+# non-English locale can't override the label — matching the other
+# rebrands in this block.
 for _gcc_desk in gnome-control-center.desktop \
                  org.gnome.Settings.desktop; do
   if [ -f "/usr/share/applications/${_gcc_desk}" ]; then
@@ -8911,14 +8879,15 @@ for _gcc_desk in gnome-control-center.desktop \
   fi
 done
 
-# gnome-control-center registers each panel as its own (usually NoDisplay)
-# .desktop file purely for search indexing (e.g. "gnome-wifi-panel.desktop"
-# launches `gnome-control-center wifi`). A few of those panels are
-# GNOME-Shell-specific and meaningless under Wayfire/Budgie, so drop them
-# from search too. This list is a best-effort starting point based on
-# current upstream panel naming -- check `ls /usr/share/applications/
-# gnome-*-panel.desktop` on a built image and extend/trim as needed, since
-# exact panel-desktop-id naming does shift between GNOME releases.
+# gnome-control-center registers each panel as its own (usually
+# NoDisplay) .desktop file just for search indexing (e.g.
+# "gnome-wifi-panel.desktop" launches `gnome-control-center wifi`). a
+# few of those panels are GNOME-Shell-specific and don't mean anything
+# under labwc/Budgie, so hide them from search too. this list is a
+# best-effort starting point based on current upstream panel naming --
+# check `ls /usr/share/applications/gnome-*-panel.desktop` on a built
+# image and extend/trim as needed, since the exact panel-desktop-id
+# naming does shift between GNOME releases.
 for _panel_desk in gnome-multitasking-panel.desktop \
                     gnome-search-panel.desktop \
                     gnome-wwan-panel.desktop \
@@ -8949,10 +8918,15 @@ if [ -f "/usr/share/applications/nm-connection-editor.desktop" ]; then
 fi
 
 # ── Hide cmake-gui from the app launcher ───────────────────────────────────
-# cmake is a build dependency pulled in above only to compile
-# wayfire-plugins-extra from source; Arch's cmake package ships a
-# cmake-gui.desktop entry alongside it, which has no business showing up
-# in a consumer app menu.
+# leftover safety net: cmake used to get pulled into this chroot to
+# compile wayfire-plugins-extra from source, and Arch's cmake package
+# drags a cmake-gui.desktop entry along with it -- no business showing up
+# in a consumer app menu. cmake isn't installed in the image at all
+# anymore now that that build's gone (see where WAYFIRE IPC used to be),
+# so this if-check is realistically dead code today. leaving it in
+# anyway in case cmake ever ends up pulled in here again for something
+# else later -- costs nothing to keep, and it's a lot cheaper than
+# forgetting to add it back.
 if [ -f "/usr/share/applications/cmake-gui.desktop" ]; then
   sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/cmake-gui.desktop" || true
   grep -q '^NoDisplay=' "/usr/share/applications/cmake-gui.desktop" \
@@ -8963,11 +8937,12 @@ fi
 # no business being reachable from a consumer desktop.
 echo 'kernel.sysrq = 0' > /etc/sysctl.d/50-kibaos-disable-sysrq.conf
 
-# ── Restrict virtual-terminal switching: Ctrl+Alt+F2 etc. are handled by the
-# kernel's VT layer, not the compositor, so this can't be blocked from
-# Wayfire config. Instead, remove what's waiting on the other VTs — cap
-# logind to one auto-spawned VT and mask the extra getty units so
-# Ctrl+Alt+F2-F6 land on an empty console with no login prompt to reach.
+# ── Restrict virtual-terminal switching: Ctrl+Alt+F2 etc. are handled by
+# the kernel's VT layer, not the compositor, so this can't be blocked
+# from labwc config no matter what. instead, remove what's waiting on
+# the other VTs — cap logind to one auto-spawned VT and mask the extra
+# getty units, so Ctrl+Alt+F2-F6 land on an empty console with no login
+# prompt to even reach.
 grep -q '^NAutoVTs' /etc/systemd/logind.conf \
   && sed -i 's/^NAutoVTs=.*/NAutoVTs=1/' /etc/systemd/logind.conf \
   || echo 'NAutoVTs=1' >> /etc/systemd/logind.conf
@@ -9160,12 +9135,12 @@ systemctl enable systemd-sysext
 systemctl enable fstrim.timer
 
 # systemd-tmpfiles-clean.timer: periodic sweep of tmpfiles.d Age= rules.
-# Add one real rule on top of the stock ones: kibaos-screenshot-ocr (see
-# WAYFIRE CONFIG above) drops its OCR scratch PNG in /tmp via mktemp
+# adding one real rule on top of the stock ones: kibaos-screenshot-ocr
+# (see LABWC CONFIG above) drops its OCR scratch PNG in /tmp via mktemp
 # (now with a "kibaos-ocr." prefix specifically so this rule can target
-# just those files) and already cleans it up on exit, but a killed/
-# crashed OCR run would leak it -- age those out after a day as a
-# backstop. Scoped to the specific prefix rather than touching /tmp's
+# just those files) and already cleans up after itself on exit, but a
+# killed/crashed OCR run would leak it -- age those out after a day as a
+# backstop. scoped to just that prefix instead of touching /tmp's own age
 # own age (already handled by systemd's stock tmpfiles.d/tmp.conf) so
 # this doesn't shadow or conflict with that default.
 cat > /etc/tmpfiles.d/kibaos.conf << 'TMPFILES'
