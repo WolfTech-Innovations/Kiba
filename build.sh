@@ -4759,19 +4759,18 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     char disk_guid_str[37];
     if (have_disk_guid) guid_to_str(&disk->disk_guid, disk_guid_str);
 
-    /* Upper bound: sgdisk, -Z, -a 1, [-U guid], (per part: -n v -t v [-c v] [-u v]), path, NULL */
+    /* Upper bound: sgdisk, -Z, [-U guid], (per part: -n v -t v [-c v] [-u v]), path, NULL */
     char *argv[6 + n_parts * 8 + 2];
     size_t ai = 0;
     argv[ai++] = "sgdisk";
     argv[ai++] = "-Z";                       /* wipe any existing MBR/GPT, start clean */
-    /* sgdisk snaps partition starts to its own alignment grid (2048
-     * sectors / 1MiB by default) even when given an explicit numeric
-     * start -- "-a 1" disables that snapping so the LBAs we computed
-     * above are the LBAs actually written, matching what out_last_lba
-     * reports back to the caller. Verified against a loopback device:
-     * without this flag sgdisk silently moved a partition requested at
-     * LBA 34 to LBA 2048. */
-    argv[ai++] = "-a"; argv[ai++] = "1";
+    /* No -a override here -- sgdisk uses its normal 2048-sector (1MiB)
+     * alignment grid and will snap any explicit numeric start we pass
+     * via -n up to that grid. That means resolved_first/resolved_last
+     * computed below are the LBAs we *requested*, not necessarily the
+     * LBAs sgdisk actually writes when a start isn't already grid-
+     * aligned -- out_last_lba can therefore disagree with the real
+     * on-disk layout in that case. */
     if (have_disk_guid) { argv[ai++] = "-U"; argv[ai++] = disk_guid_str; }
 
     uint64_t prev_end = 0;
