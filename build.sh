@@ -5420,6 +5420,18 @@ bool kiba_find_live_image(char *out_path, size_t out_len);
 int kiba_install_extract_image(const char *image_path, const char *target_root,
                                 kiba_progress_cb cb, void *user_data);
 
+/* mkarchiso's _cleanup_pacstrap_dir() deletes everything under
+ * pacstrap_dir/boot (including vmlinuz-linux and initramfs-linux.img)
+ * *before* the airootfs image is built, so the kernel is never actually
+ * inside the squashfs/erofs image kiba_install_extract_image just
+ * extracted -- it only exists on the boot medium, copied there
+ * separately by mkarchiso alongside the image (as a sibling "boot/"
+ * dir next to the arch dir holding airootfs.sfs/.erofs). Must be
+ * called once, right after kiba_install_extract_image succeeds, or
+ * the installed system boots to nothing. image_path is the same path
+ * kiba_find_live_image returned. */
+int kiba_install_copy_kernel(const char *image_path, const char *target_root);
+
 /* Writes /etc/fstab, /etc/hostname, /etc/hosts, locale.conf,
  * vconsole.conf directly (plain file I/O, not even posix_spawn). */
 int kiba_install_write_configs(const char *target_root,
@@ -5690,6 +5702,61 @@ int kiba_install_extract_image(const char *image_path, const char *target_root,
         rmdir(tmp_mnt);
         return rc;
     }
+}
+
+int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
+    /* image_path is ".../<install_dir>/x86_64/airootfs.sfs" (or
+     * airootfs.erofs). The kernel/initramfs mkarchiso stripped out of
+     * the image live at the sibling "<install_dir>/boot/x86_64/" dir
+     * instead (see kiba_install.h for why). Peel off two path
+     * components to get from the image to <install_dir>. */
+    char work[512];
+    int n = snprintf(work, sizeof(work), "%s", image_path);
+    if (n <= 0 || (size_t)n >= sizeof(work)) {
+        snprintf(g_install_err, sizeof(g_install_err), "image path too long");
+        return -1;
+    }
+
+    char *slash = strrchr(work, '/');   /* strip "/airootfs.sfs" */
+    if (!slash) {
+        snprintf(g_install_err, sizeof(g_install_err), "unexpected image path layout: %s", image_path);
+        return -1;
+    }
+    *slash = '\0';
+
+    slash = strrchr(work, '/');         /* strip "/x86_64" */
+    if (!slash) {
+        snprintf(g_install_err, sizeof(g_install_err), "unexpected image path layout: %s", image_path);
+        return -1;
+    }
+    *slash = '\0';
+    /* work is now ".../<install_dir>" */
+
+    char vmlinuz_src[600], initrd_src[600], vmlinuz_dst[600], initrd_dst[600];
+    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-linux", work);
+    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-linux.img", work);
+    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-linux", target_root);
+    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-linux.img", target_root);
+
+    struct stat st;
+    if (stat(vmlinuz_src, &st) != 0) {
+        snprintf(g_install_err, sizeof(g_install_err),
+                  "kernel not found on boot medium at %s: %s", vmlinuz_src, strerror(errno));
+        return -1;
+    }
+
+    char *argv[] = { (char *)"cp", (char *)"-a", vmlinuz_src, vmlinuz_dst, NULL };
+    if (run_argv(argv) != 0) return -1;
+
+    /* initramfs-linux.img gets rebuilt from scratch a few steps later in
+     * kiba_install_finalize (mkinitcpio -g), so this copy isn't load-
+     * bearing the way vmlinuz-linux is -- but it means the target isn't
+     * momentarily without any initrd at all if that later step fails
+     * partway through, so still worth doing and still best-effort. */
+    char *argv2[] = { (char *)"cp", (char *)"-a", initrd_src, initrd_dst, NULL };
+    run_argv(argv2);
+
+    return 0;
 }
 KIBA_SRC_END_EXTC
 
@@ -6398,6 +6465,14 @@ int main(int argc, char **argv) {
         fail("Could not locate the KibaOS system image on the boot medium.");
     }
     if (kiba_install_extract_image(image_path, target_root, progress_cb, NULL) != 0) {
+        fail(kiba_install_strerror());
+    }
+
+    /* mkarchiso strips vmlinuz-linux/initramfs-linux.img out of the
+     * airootfs before building the image extracted above -- pull them
+     * back in from the boot medium or the install has no kernel. */
+    progress(70, "Copying kernel to target system...");
+    if (kiba_install_copy_kernel(image_path, target_root) != 0) {
         fail(kiba_install_strerror());
     }
 
