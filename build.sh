@@ -7792,11 +7792,54 @@ pacman -S --noconfirm --needed meson ninja cmake pkgconf git cairo glibmm waylan
 pacman -Scc --noconfirm
 
 # Pinned to v0.10.0, NOT master — master's meson.build now requires
-# wayfire >=0.11.0, but Arch's extra/wayfire package (installed above via
-# packages.x86_64) is 0.10.1. If Arch bumps wayfire past 0.11.0 in the
-# future, bump this tag to match — check `pacman -Si wayfire` for the
-# version actually being installed and pick the wayfire-plugins-extra tag
-# whose release notes list that same Wayfire version as a dependency.
+# wayfire >=0.11.0.
+#
+# Arch's extra/wayfire has since moved past the 0.10.1 build this tag was
+# written against and now ships the newer float-based scene-render API
+# (wf::regionf_t/geometryf_t, render_instance_t::schedule_instructions),
+# which v0.10.0's annotate.cpp doesn't implement — so whatever the
+# packages.x86_64 install pulled down as "wayfire" no longer compiles
+# against this tag. Rather than chasing wayfire-plugins-extra tags/master
+# to match whatever Arch ships this week, pin wayfire itself back to the
+# last 0.10.1 build from the Arch Linux Archive and hold it there — both
+# in this build chroot (so the compile below succeeds) and in the shipped
+# image (so a routine `pacman -Syu` on an installed KibaOS doesn't
+# silently re-break ipc/ipc-rules months later).
+echo "=== Pinning wayfire to 0.10.1 (last version wayfire-plugins-extra v0.10.0 supports) ==="
+WF_PIN_DIR="/tmp/wayfire-pin"
+mkdir -p "${WF_PIN_DIR}"
+cd "${WF_PIN_DIR}"
+
+# Discover the newest 0.10.1 build in the archive — pkgrel can bump on
+# rebuilds against newer deps, so don't hardcode it.
+WF_PIN_FILE="$(curl -fsSL https://archive.archlinux.org/packages/w/wayfire/ \
+  | grep -oE 'wayfire-0\.10\.1-[0-9]+-x86_64\.pkg\.tar\.zst' \
+  | sort -t- -k3 -n | uniq | tail -1)"
+[ -n "${WF_PIN_FILE}" ] || { echo "FATAL: no wayfire 0.10.1 build found in the Arch Linux Archive." >&2; exit 1; }
+
+curl -fsSLO "https://archive.archlinux.org/packages/w/wayfire/${WF_PIN_FILE}"
+
+# Archived builds are still signed with the same official packager keys,
+# but LocalFileSigLevel isn't relaxed by default for -U installs of a
+# standalone file — set it once so the downgrade doesn't get blocked on a
+# sig lookup quirk; this is a deliberate, pinned downgrade of an
+# HTTPS-fetched official package, not an unverified third-party binary.
+grep -q '^LocalFileSigLevel' /etc/pacman.conf || \
+  sed -i '/^\[options\]/a LocalFileSigLevel = Optional' /etc/pacman.conf
+
+pacman -U --noconfirm "${WF_PIN_FILE}"
+
+# Hold it there. This edits the chroot's own /etc/pacman.conf, which IS
+# the final image's pacman.conf, so installed systems inherit the hold.
+grep -q '^IgnorePkg.*wayfire\b' /etc/pacman.conf || {
+  grep -q '^IgnorePkg' /etc/pacman.conf \
+    && sed -i '/^IgnorePkg/ s/$/ wayfire/' /etc/pacman.conf \
+    || sed -i '/^\[options\]/a IgnorePkg = wayfire' /etc/pacman.conf
+}
+
+cd /
+rm -rf "${WF_PIN_DIR}"
+
 git clone --depth=1 --branch v0.10.0 https://github.com/WayfireWM/wayfire-plugins-extra /tmp/wayfire-plugins-extra
 cd /tmp/wayfire-plugins-extra
 meson setup build --prefix=/usr --buildtype=release
