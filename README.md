@@ -22,7 +22,7 @@
 <img src="https://img.shields.io/badge/Icons-Numix_Circle-6b5ce7?style=flat-square" alt="Numix Circle Icons">
 <img src="https://img.shields.io/badge/Boot_Splash-Numix_Plymouth-6b5ce7?style=flat-square" alt="Numix Plymouth">
 <img src="https://img.shields.io/badge/Package_Manager-kibapkg-00b0d8?style=flat-square" alt="kibapkg">
-<img src="https://img.shields.io/badge/Installer-archinstall_%2B_squashfs-00b0d8?style=flat-square" alt="archinstall + squashfs installer">
+<img src="https://img.shields.io/badge/Installer-archinstall_%2B_squashfs-00b0d8?style=flat-square" alt="sgdisk + squashfs installer">
 </sub>
 
 <br>
