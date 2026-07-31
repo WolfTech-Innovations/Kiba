@@ -294,12 +294,12 @@ terminal_output gfxterm
 search --no-floppy --set=root --label %ARCHISO_LABEL%
 
 menuentry "KibaOS" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=1G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
     initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
 }
 
 menuentry "KibaOS (safe mode)" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=1G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
     initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
 }
 
@@ -9117,6 +9117,15 @@ chmod 750 /home/liveuser
 # distributes IRQ load across cores instead of pinning everything to CPU0,
 # which matters more on the low-core-count H616 SBC target than on a
 # desktop x86_64 box, but costs nothing either way.
+# systemd-oomd: requires PSI + full cgroups-v2 delegation to even start;
+# fails to launch in this boot environment regardless of available RAM,
+# and its startup failure was cluttering the boot log alongside real
+# early-boot failures. Masked (not just disabled) so no dependency chain
+# can pull it back in. earlyoom (already in packages.x86_64) replaces it
+# as the actual OOM responder.
+systemctl mask systemd-oomd.service systemd-oomd.socket
+systemctl enable earlyoom
+
 systemctl enable irqbalance
 
 # tuned: ships a "balanced" profile out of the box that's a reasonable
