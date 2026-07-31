@@ -2739,8 +2739,17 @@ systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 
 # BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
 WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
-LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/boot.png?raw=true"
 INSTALLER_LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/1419ece4c5c2dbfaa9c0b65f0055b6d70e6b4dbd/branding/installer.png?raw=true"
+# One shared source image now backs both the app-icon set (kibaos.png /
+# hicolor icons) and the Plymouth boot splash -- previously LOGO_URL
+# ("boot.png") and BOOT_SPLASH_URL were two separate fetches of two
+# different images. This is the circular "K" badge over "KibaOS" wordmark
+# lockup on a black field, 1536x1024, landscape -- NOT a pre-cropped square
+# icon like the old boot.png was, so it can't just be resized straight into
+# square icon sizes without letterboxing and dragging the wordmark along.
+# Icon generation below crops out just the circular badge first; the boot
+# splash uses the full lockup (wordmark included) unmodified.
+BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/27a7ccd68060dcaca2b451e7fcc1a9e2ca55e8dc/file_0000000063c4822faf13c8d2e168ea23.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.jpg"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
 LOGO_256="/usr/share/kibaos/logo-256.png"
@@ -2748,13 +2757,29 @@ LOGO_96="/usr/share/kibaos/logo-96.png"
 LOGO_48="/usr/share/kibaos/logo-48.png"
 LOGO_32="/usr/share/kibaos/logo-32.png"
 INSTALLER_LOGO="/usr/share/kibaos/installer-logo.png"
+BOOT_SPLASH_RAW="/usr/share/kibaos/boot-splash-raw.png"
+BOOT_SPLASH="/usr/share/kibaos/boot-splash.png"
 
 mkdir -p /usr/share/kibaos /usr/share/pixmaps
 
+curl -fL --retry 5 --retry-delay 3 -o "${BOOT_SPLASH_RAW}" "${BOOT_SPLASH_URL}" || true
+
+if [ -f "${BOOT_SPLASH_RAW}" ] && file "${BOOT_SPLASH_RAW}" | grep -qi 'image'; then
+  # Boot splash: full lockup (badge + wordmark), scaled down, aspect kept.
+  magick "${BOOT_SPLASH_RAW}" -filter Lanczos -resize '480x480>' "${BOOT_SPLASH}"
+
+  # App icons: crop out just the circular badge before resizing, so square
+  # icon sizes get a clean centered mark instead of a letterboxed lockup
+  # with the wordmark jammed in. Crop box (640x640, offset 450,117) is a
+  # fixed region measured against this specific source image -- centered on
+  # the badge with even padding on all sides, wordmark excluded. If the
+  # source branding image is ever swapped again, re-measure this box.
+  magick "${BOOT_SPLASH_RAW}" -crop 640x640+450+117 +repage "${LOGO_SRC}"
+  rm -f "${BOOT_SPLASH_RAW}"
+fi
+
 curl -fL --retry 5 --retry-delay 3 -o "${WALLPAPER_DEST}" "${WALLPAPER_URL}" || \
   magick -size 1920x1080 gradient:"#003f5c-#0099cc" "${WALLPAPER_DEST}"
-
-curl -fL --retry 5 --retry-delay 3 -o "${LOGO_SRC}" "${LOGO_URL}" || true
 
 if [ -f "${LOGO_SRC}" ] && file "${LOGO_SRC}" | grep -qi 'image'; then
   magick "${LOGO_SRC}" -filter Lanczos -resize 256x256 "${LOGO_256}"
@@ -5986,12 +6011,34 @@ int kiba_install_locale_gen(const char *target_root) {
 
 int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password) {
-    /* Remove live autologin configs (best-effort, plain unlink). */
+    /* Strip the live-session [Autologin] block out of the REAL sddm config.
+     * The old code here unlinked /etc/sddm.conf.d/kibaos-live.conf and
+     * /etc/sddm.conf.d/autologin.conf -- neither of those paths is ever
+     * written anywhere in this build script. The actual autologin config
+     * lives inside /etc/sddm.conf.d/kibaos.conf (baked into every image,
+     * live and installed, at airootfs build time) as:
+     *   [Autologin]
+     *   User=liveuser
+     *   Session=budgie-desktop
+     * That block survived on the installed target untouched, and since
+     * liveuser gets userdel'd a few lines below, SDDM was left trying to
+     * autologin a user that no longer exists -- which is what was actually
+     * causing the installed system to come up with no desktop at all
+     * (labwc/Budgie were never the problem; SDDM never got that far).
+     * Fix: rewrite kibaos.conf on the target without the [Autologin]
+     * section, so it falls through to a normal greeter with Session=
+     * still defaulting to budgie-desktop. */
     char path[1024];
-    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos-live.conf", target_root);
-    unlink(path);
-    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/autologin.conf", target_root);
-    unlink(path);
+    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos.conf", target_root);
+    write_file(path,
+               "[General]\n"
+               "DisplayServer=wayland\n"
+               "\n"
+               "[Wayland]\n"
+               "CompositorCommand=labwc\n"
+               "\n"
+               "[Theme]\n"
+               "Current=kibaos\n");
 
     /* Remove the live user -- best effort, ignore failure if absent. */
     {
@@ -6180,24 +6227,24 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     snprintf(path, sizeof(path), "%s/etc/plymouth", target_root);
     mkdir(path, 0755);
     snprintf(path, sizeof(path), "%s/etc/plymouth/plymouthd.conf", target_root);
-    write_file(path, "[Daemon]\nTheme=numix\nShowDelay=0\nDeviceTimeout=8\n");
+    write_file(path, "[Daemon]\nTheme=kibaos\nShowDelay=0\nDeviceTimeout=8\n");
     {
         /* Sanity-check the theme actually landed in target_root before we
          * try to switch to it -- if the airootfs->target copy ever misses
          * it, this turns a silent "boot shows the stock theme" bug into a
          * clear, logged failure instead. */
         char theme_check[1024];
-        snprintf(theme_check, sizeof(theme_check), "%s/usr/share/plymouth/themes/numix/numix.plymouth", target_root);
+        snprintf(theme_check, sizeof(theme_check), "%s/usr/share/plymouth/themes/kibaos/kibaos.plymouth", target_root);
         struct stat st;
         if (stat(theme_check, &st) != 0) {
-            if (cb) cb(93, "Warning: numix Plymouth theme missing from target, boot splash will use the default theme", user_data);
+            if (cb) cb(93, "Warning: kibaos Plymouth theme missing from target, boot splash will use the default theme", user_data);
         } else {
-            char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"numix", NULL };
+            char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"kibaos", NULL };
             if (chroot_run(target_root, argv) != 0) {
                 /* Non-fatal: a missing splash theme shouldn't abort the
                  * whole install, but MUST be visible, or the initramfs
                  * rebuild below will silently bake in whatever theme was
-                 * already active (the stock default) instead of numix --
+                 * already active (the stock default) instead of kibaos --
                  * this was previously discarded with no error or log line. */
                 if (cb) cb(93, "Warning: plymouth-set-default-theme failed, boot splash will use the default theme", user_data);
             }
@@ -6690,22 +6737,91 @@ cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 # ══════════════════════════════════════════════════════════════════════════
-# BOOT SPLASH — Numix Plymouth theme (github.com/numixproject/numix-plymouth-theme)
+# BOOT SPLASH — custom "kibaos" Plymouth theme (script-type plugin)
 # ══════════════════════════════════════════════════════════════════════════
-# Upstream's own install instructions use `update-alternatives`, which is
-# Debian/Ubuntu-only and doesn't exist on Arch — swapped for Arch's own
-# `plymouth-set-default-theme` below. Everything else (clone + `make
-# install`) is upstream's documented process, unchanged.
-NUMIX_BUILD="/tmp/numix-plymouth-theme"
-rm -rf "${NUMIX_BUILD}"
-git clone --depth 1 https://github.com/numixproject/numix-plymouth-theme.git "${NUMIX_BUILD}"
-make -C "${NUMIX_BUILD}" install
+# Previously the Numix Plymouth theme, cloned + `make install`ed from
+# upstream. Swapped out for a small hand-written script theme so the splash
+# uses WolfTech's own branding image (BOOT_SPLASH, fetched above) instead of
+# generic Numix art. `script` is a built-in Plymouth plugin, so this needs
+# no clone/build step — just the theme dir, the .plymouth descriptor, the
+# .script itself, and the image copied in.
+KIBA_PLYMOUTH_DIR="/usr/share/plymouth/themes/kibaos"
+mkdir -p "${KIBA_PLYMOUTH_DIR}"
+
+if [ -f "${BOOT_SPLASH}" ]; then
+  cp "${BOOT_SPLASH}" "${KIBA_PLYMOUTH_DIR}/splash.png"
+else
+  # Fallback so the theme never references a missing image if the fetch
+  # above failed — reuse the existing 256px logo instead.
+  cp /usr/share/kibaos/logo-256.png "${KIBA_PLYMOUTH_DIR}/splash.png" 2>/dev/null || true
+fi
+
+cat > "${KIBA_PLYMOUTH_DIR}/kibaos.plymouth" << 'PLYMOUTHDESC'
+[Plymouth Theme]
+Name=KibaOS
+Description=KibaOS boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/kibaos
+ScriptFile=/usr/share/plymouth/themes/kibaos/kibaos.script
+PLYMOUTHDESC
+
+cat > "${KIBA_PLYMOUTH_DIR}/kibaos.script" << 'PLYMOUTHSCRIPT'
+// KibaOS boot splash — Plymouth script theme.
+// Centered brand image on a dark background, with a small three-dot
+// progress pulse underneath and a minimal password prompt for
+// full-disk-encryption unlocks.
+
+Window.SetBackgroundTopColor(0.043, 0.055, 0.078);
+Window.SetBackgroundBottomColor(0.043, 0.055, 0.078);
+
+logo.image = Image("splash.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
+logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
+logo.sprite.SetOpacity(1);
+
+dot_count = 3;
+dot_spacing = 26;
+dots = [];
+for (i = 0; i < dot_count; i++) {
+  dots[i].image = Image.Text("•", 1, 1, 1, 1, "Sans 28");
+  dots[i].sprite = Sprite(dots[i].image);
+  dots[i].sprite.SetX(Window.GetWidth() / 2 - (dot_count * dot_spacing) / 2 + i * dot_spacing);
+  dots[i].sprite.SetY(logo.sprite.GetY() + logo.image.GetHeight() + 36);
+  dots[i].sprite.SetOpacity(0.25);
+}
+
+progress_tick = 0;
+fun refresh_callback() {
+  progress_tick++;
+  active = Math.Int(progress_tick / 8) % dot_count;
+  for (i = 0; i < dot_count; i++) {
+    if (i == active)
+      dots[i].sprite.SetOpacity(1);
+    else
+      dots[i].sprite.SetOpacity(0.25);
+  }
+}
+Plymouth.SetRefreshFunction(refresh_callback);
+
+fun display_password_callback(prompt, bullets) {
+  if (prompt == "")
+    prompt = "Enter your password to unlock the disk:";
+  prompt_text.image = Image.Text(prompt, 1, 1, 1, 1);
+  prompt_text.sprite = Sprite(prompt_text.image);
+  prompt_text.sprite.SetX(Window.GetWidth() / 2 - prompt_text.image.GetWidth() / 2);
+  prompt_text.sprite.SetY(dots[0].sprite.GetY() + 50);
+}
+Plymouth.SetDisplayPasswordFunction(display_password_callback);
+PLYMOUTHSCRIPT
 
 # Plymouth daemon config — must be written before mkinitcpio bakes it in
 mkdir -p /etc/plymouth
 cat > /etc/plymouth/plymouthd.conf << 'PLYMOUTHD'
 [Daemon]
-Theme=numix
+Theme=kibaos
 ShowDelay=0
 DeviceTimeout=8
 PLYMOUTHD
@@ -6718,9 +6834,8 @@ PLYMOUTHD
 # rebuild in here just gets overwritten — and running it against the wrong
 # config (installed.conf, which is for the INSTALLED system, not this live
 # ISO) was actively wrong on top of being redundant.
-plymouth-set-default-theme numix 2>/dev/null || true
-rm -rf "${NUMIX_BUILD}"
-echo "=== Boot splash: Numix Plymouth theme installed ==="
+plymouth-set-default-theme kibaos 2>/dev/null || true
+echo "=== Boot splash: custom kibaos Plymouth theme installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # ICON THEME — Numix Circle (github.com/numixproject/numix-icon-theme-circle)
@@ -8853,13 +8968,47 @@ fi
 # gets pulled in transitively as a dependency of the budgie package
 # group, so can't just remove it without risking breaking budgie itself
 # — but it's superseded by the visible Settings app below, so just keep
-# it out of the menu instead.
+# it out of the menu instead. budgie-desktop-settings (the separate
+# panel/applet-layout configurator) is the same story — GNOME Settings
+# is the one and only settings entry point users should see.
 for _bcc_desk in budgie-control-center.desktop \
-                 org.buddiesofbudgie.BudgieControlCenter.desktop; do
+                 org.buddiesofbudgie.BudgieControlCenter.desktop \
+                 budgie-desktop-settings.desktop \
+                 org.buddiesofbudgie.BudgieDesktopSettings.desktop; do
   if [ -f "/usr/share/applications/${_bcc_desk}" ]; then
     sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/${_bcc_desk}" || true
     grep -q '^NoDisplay=' "/usr/share/applications/${_bcc_desk}" \
       || echo 'NoDisplay=true' >> "/usr/share/applications/${_bcc_desk}"
+  fi
+done
+
+# ── Hide dev/power-user tooling that has no business in a consumer app menu
+# Kvantum Manager (Qt theme engine config, pulled in as a Qt/KDE-lib dep),
+# Sysprof (system profiler), GNOME Extensions (Budgie doesn't run
+# gnome-shell extensions, this is a stray dep of some GNOME component),
+# qv4l2/qvidcap (the v4l-utils Qt test/capture utilities — camera driver
+# debugging tools, not something an end user should stumble into),
+# tuned-gui (the tuned power-profile daemon's own GUI — tuned itself stays
+# enabled as a service, just the standalone control panel is redundant now
+# that power profile switching lives in Settings), and lstopo (hwloc's
+# hardware-topology visualizer). all several candidate desktop-file names
+# are covered since exact IDs drift across distro packaging.
+for _hidden_desk in kvantummanager.desktop \
+                     org.gnome.Sysprof.desktop \
+                     sysprof.desktop \
+                     sysprof4.desktop \
+                     org.gnome.Extensions.desktop \
+                     com.github.hedges.gnome-extensions.desktop \
+                     qv4l2.desktop \
+                     qvidcap.desktop \
+                     tuned-gui.desktop \
+                     tuned-adm-gui.desktop \
+                     lstopo.desktop \
+                     hwloc.desktop; do
+  if [ -f "/usr/share/applications/${_hidden_desk}" ]; then
+    sed -i 's/^NoDisplay=.*/NoDisplay=true/' "/usr/share/applications/${_hidden_desk}" || true
+    grep -q '^NoDisplay=' "/usr/share/applications/${_hidden_desk}" \
+      || echo 'NoDisplay=true' >> "/usr/share/applications/${_hidden_desk}"
   fi
 done
 
