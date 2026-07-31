@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/k-logo.svg" width="250" alt="Animated K">
+  <img src="https://github.com/WolfTech-Innovations/Kiba/blob/27a7ccd68060dcaca2b451e7fcc1a9e2ca55e8dc/file_0000000063c4822faf13c8d2e168ea23.png?raw=true" width="250" alt="Animated K">
 </p>
 
 > [!IMPORTANT]
