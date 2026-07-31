@@ -2800,7 +2800,7 @@ echo "=== AUR packages installed ==="
 #     writer or a libfdisk link dependency. No archinstall, no parted,
 #     no blkid/partprobe subprocess anywhere in the disk-critical path.
 #     The handful of remaining external tools (sgdisk, unsquashfs,
-#     mkfs.fat/mkfs.ext4, arch-chroot, grub-install, mkinitcpio,
+#     mkfs.fat/mkfs.ext4, arch-chroot, bootctl, mkinitcpio,
 #     useradd/chpasswd, locale-gen, pacman) have no sane from-scratch
 #     replacement and are invoked via argv arrays, never a shell.
 #     See /usr/share/kibaos-oobe/src/disk/ for
@@ -4348,7 +4348,7 @@ cd /
 # see kiba_gpt.c/kiba_fs.c/kiba_udev.c for the from-scratch GPT writer,
 # mkfs/mount wrapper, and udev-settle replacement respectively. The only
 # external tools retained are ones with no sane from-scratch replacement:
-# unsquashfs, mkfs.fat, mkfs.ext4, useradd/chpasswd, grub-install, mkinitcpio,
+# unsquashfs, mkfs.fat, mkfs.ext4, useradd/chpasswd, bootctl, mkinitcpio,
 # locale-gen, pacman -- all invoked via posix_spawn argv arrays, never a
 # shell, so there's no string-quoting/injection surface anywhere in this
 # backend (mirrors the argv fix already applied on the Vala/sudo side).
@@ -5387,8 +5387,8 @@ cat > kiba_install.h << 'KIBA_SRC_END_INSTH'
  * Same rule as kiba_fs.c: no shell, no string-parsing of subprocess
  * stdout. Where a maintained external tool is the only sane
  * implementation of something complex (unsquashfs's LZMA/xz/zstd
- * decompression, arch-chroot's mount namespace setup, grub-install's
- * GRUB installation), it's invoked via posix_spawnp with a
+ * decompression, arch-chroot's mount namespace setup, bootctl's
+ * systemd-boot installation), it's invoked via posix_spawnp with a
  * literal argv array -- never system()/popen(), so there's no shell
  * to inject into and no string protocol to desync.
  *
@@ -5437,22 +5437,28 @@ int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password);
 
 /* Removes live-only files/packages, installs the bootloader via
- * posix_spawnp arch-chroot grub-install + grub-mkconfig, enables
- * services, rebuilds the initramfs. */
-/* root_partno/disk_path are no longer used by the GRUB path (grub-mkconfig
- * reads /etc/fstab, already written with the real filesystem UUID, to work
- * out root= itself) but are kept in the signature for compatibility with
- * the rest of the install pipeline. */
+ * posix_spawnp arch-chroot bootctl (systemd-boot) plus a hand-written
+ * loader.conf/loader entry, enables services, rebuilds the initramfs.
+ * This only affects the INSTALLED system's bootloader -- the live ISO
+ * itself still boots via GRUB (see the archiso profile config), this
+ * function is never invoked for the ISO build. */
+/* root_partno/disk_path are no longer used by the systemd-boot path
+ * (the loader entry is written directly from root_uuid, which the
+ * caller already resolved from the freshly-formatted filesystem) but
+ * are kept in the signature for compatibility with the rest of the
+ * install pipeline. */
 /* dualboot: when true, the ESP being installed to is shared with an
  * existing OS. We leave that OS's own boot files on the ESP completely
- * untouched (grub-install only ever adds KibaOS's own files under
- * /EFI/KibaOS and an NVRAM entry -- it never removes anyone else's), but
- * we also configure GRUB (via /etc/default/grub + os-prober) to actually
- * show a menu with the other OS's entries auto-discovered, rather than
- * the whole-disk install's silent single-OS auto-boot, so the user gets
- * a real choice at boot instead of KibaOS silently taking over. */
+ * untouched (bootctl install only ever adds KibaOS's own files under
+ * /EFI/systemd, /EFI/KibaOS's loader entry, and an NVRAM entry -- it
+ * never removes anyone else's). Unlike GRUB, systemd-boot auto-discovers
+ * other EFI bootloaders already present on the ESP on its own (no
+ * os-prober equivalent needed) -- we just give it a longer timeout on
+ * dual-boot installs so that menu is actually visible instead of
+ * auto-booting straight into KibaOS. */
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, int root_partno, bool dualboot,
+                           const char *root_part, const char *root_uuid,
+                           int root_partno, bool dualboot,
                            kiba_progress_cb cb, void *user_data);
 
 /* Human-readable description of the last failure from any kiba_install_*
@@ -5910,7 +5916,8 @@ int kiba_install_create_user(const char *target_root, const char *username,
 }
 
 int kiba_install_finalize(const char *target_root, const char *disk_path,
-                           const char *root_part, int root_partno, bool dualboot,
+                           const char *root_part, const char *root_uuid,
+                           int root_partno, bool dualboot,
                            kiba_progress_cb cb, void *user_data) {
     char path[1024];
 
@@ -5936,9 +5943,16 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     {
+        /* grub/os-prober only ever existed to boot the INSTALLED system;
+         * now that's systemd-boot's job (bootctl, built into the systemd
+         * package that's already present, no extra install needed), so
+         * drop them here same as the other live/no-longer-needed
+         * packages. The live ISO itself is unaffected -- it's built from
+         * a separate GRUB-based archiso profile, not this chroot. */
         char *argv[] = {
             (char *)"pacman", (char *)"-Rns", (char *)"--noconfirm",
-            (char *)"archiso", (char *)"mkinitcpio-archiso", (char *)"squashfs-tools", NULL
+            (char *)"archiso", (char *)"mkinitcpio-archiso", (char *)"squashfs-tools",
+            (char *)"grub", (char *)"os-prober", NULL
         };
         chroot_run(target_root, argv); /* best-effort, same as old backend */
     }
@@ -5947,8 +5961,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         /* KibaOS is UEFI-only, which needs /sys/firmware/efi/efivars to
          * write the NVRAM boot entry. Fail fast with a clear message
-         * instead of letting grub-install die with a cryptic error --
-         * this also covers VMs, which are not supported. */
+         * instead of letting bootctl die with a cryptic error -- this
+         * also covers VMs, which are not supported. */
         if (access("/sys/firmware/efi", F_OK) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err),
                      "KibaOS requires UEFI boot. This system appears to have "
@@ -5957,67 +5971,74 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             return -1;
         }
 
+        /* bootctl install copies systemd-boot's own EFI stub to
+         * <esp>/EFI/systemd/ and <esp>/EFI/BOOT/BOOTX64.EFI (the
+         * removable fallback path), and registers the NVRAM boot entry
+         * itself -- no separate --bootloader-id needed, systemd-boot
+         * always identifies itself the same way. --esp-path=/boot
+         * matches where we already have the ESP mounted. */
         char *argv[] = {
-            (char *)"grub-install", (char *)"--target=x86_64-efi",
-            (char *)"--efi-directory=/boot", (char *)"--bootloader-id=KibaOS",
-            (char *)"--recheck", NULL
+            (char *)"bootctl", (char *)"--esp-path=/boot", (char *)"install", NULL
         };
         if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install failed");
+            snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
             return -1;
         }
     }
 
-    /* /etc/default/grub — quiet/splash cmdline, timeout behavior, and
-     * (on dual-boot installs) os-prober so GRUB picks up the other OS's
-     * entries automatically instead of hiding everything but KibaOS. */
-    snprintf(path, sizeof(path), "%s/etc/default/grub", target_root);
-    /* lsm= sets the LSM init order/stack; apparmor must be present in it
-     * for the apparmor.service enabled below to actually enforce anything
-     * (the old apparmor=1/security=apparmor params are deprecated and get
-     * ignored -- confirmed against the current kernel AppArmor docs).
-     * capability is omitted since the kernel always includes it anyway. */
+    /* systemd-boot has no grub-mkconfig equivalent -- loader.conf and
+     * the per-entry file are just plain text we write ourselves. Kernel
+     * cmdline options mirror what /etc/default/grub used to carry
+     * (lsm= sets the LSM init order/stack; apparmor must be present in
+     * it for the apparmor.service enabled below to actually enforce
+     * anything -- the old apparmor=1/security=apparmor params are
+     * deprecated and get ignored, confirmed against the current kernel
+     * AppArmor docs; capability is omitted since the kernel always
+     * includes it anyway). */
+    snprintf(path, sizeof(path), "%s/boot/loader", target_root);
+    mkdir(path, 0755);
+    snprintf(path, sizeof(path), "%s/boot/loader/entries", target_root);
+    mkdir(path, 0755);
+
+    snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
+    /* dualboot: give the menu a real timeout so other EFI bootloaders
+     * systemd-boot auto-discovers on the ESP (its built-in equivalent of
+     * os-prober) are actually visible instead of auto-booting straight
+     * into KibaOS. Whole-disk install: timeout 0 to boot straight in,
+     * matching GRUB's old timeout=0 auto-boot behavior. */
     if (dualboot) {
         write_file(path,
-                   "GRUB_DISTRIBUTOR=\"KibaOS\"\n"
-                   "GRUB_DEFAULT=0\n"
-                   "GRUB_TIMEOUT=5\n"
-                   "GRUB_TIMEOUT_STYLE=menu\n"
-                   "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
-                   "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                   "plymouth.use-simpledrm=1 "
-                   "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n"
-                   "GRUB_CMDLINE_LINUX=\"\"\n"
-                   "GRUB_DISABLE_OS_PROBER=false\n");
+                   "default kibaos.conf\n"
+                   "timeout 5\n"
+                   "console-mode max\n"
+                   "editor no\n");
     } else {
         write_file(path,
-                   "GRUB_DISTRIBUTOR=\"KibaOS\"\n"
-                   "GRUB_DEFAULT=0\n"
-                   "GRUB_TIMEOUT=0\n"
-                   "GRUB_TIMEOUT_STYLE=hidden\n"
-                   "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
-                   "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                   "plymouth.use-simpledrm=1 "
-                   "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n"
-                   "GRUB_CMDLINE_LINUX=\"\"\n"
-                   "GRUB_DISABLE_OS_PROBER=true\n");
+                   "default kibaos.conf\n"
+                   "timeout 0\n"
+                   "console-mode max\n"
+                   "editor no\n");
     }
 
-    /* grub-mkconfig introspects the mounted root filesystem (via
-     * /etc/fstab, already written with the real UUID a few steps ago) to
-     * work out root=UUID=... itself -- no manual PARTUUID patching needed
-     * the way bootctl's static loader entries required. */
+    snprintf(path, sizeof(path), "%s/boot/loader/entries/kibaos.conf", target_root);
     {
-        char *argv[] = {
-            (char *)"grub-mkconfig", (char *)"-o", (char *)"/boot/grub/grub.cfg", NULL
-        };
-        if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "grub-mkconfig failed");
+        char entry[1024];
+        snprintf(entry, sizeof(entry),
+                 "title   KibaOS\n"
+                 "linux   /vmlinuz-linux\n"
+                 "initrd  /initramfs-linux.img\n"
+                 "options root=UUID=%s rw quiet splash loglevel=3 "
+                 "rd.udev.log_level=3 vt.global_cursor_default=0 "
+                 "plymouth.use-simpledrm=1 "
+                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\n",
+                 root_uuid);
+        if (write_file(path, entry) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "writing systemd-boot loader entry failed");
             return -1;
         }
     }
 
-    (void)disk_path;  /* no longer needed -- grub-mkconfig reads fstab, not the GPT */
+    (void)disk_path;   /* no longer needed -- the loader entry is written directly from root_uuid */
     (void)root_partno;
 
     if (cb) cb(88, "Enabling services...", user_data);
@@ -6104,8 +6125,8 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
  * partprobe as subprocesses: all of that is libkibadisk (kiba_gpt.c /
  * kiba_fs.c / kiba_udev.c). The only external tools left are the ones
  * with no sane from-scratch replacement: sgdisk (GPT writer, see
- * kiba_gpt.c), unsquashfs, useradd/chpasswd, grub-install,
- * grub-mkconfig, mkinitcpio, locale-gen, pacman -- all invoked via argv
+ * kiba_gpt.c), unsquashfs, useradd/chpasswd, bootctl,
+ * mkinitcpio, locale-gen, pacman -- all invoked via argv
  * arrays inside libkibadisk, never through a shell.
  *
  * Output protocol is unchanged on purpose: "PROGRESS <pct> <msg>" on
@@ -6343,7 +6364,7 @@ int main(int argc, char **argv) {
     }
     /* Dual-boot: the ESP already belongs to the other OS and already has
      * a filesystem on it, plus that OS's own boot files -- formatting it
-     * would destroy them. grub-install (further down) only ever adds
+     * would destroy them. bootctl install (further down) only ever adds
      * KibaOS's own files there, so we deliberately never touch the ESP's
      * filesystem in this mode. */
     if (kiba_fs_format(root_part, KIBA_FS_EXT4, "KIBAOS-ROOT") != 0) {
@@ -6411,7 +6432,7 @@ int main(int argc, char **argv) {
     }
 
     /* ── 10. Bootloader, services, initramfs ─────────────────────────── */
-    if (kiba_install_finalize(target_root, disk, root_part, root_partno, dualboot,
+    if (kiba_install_finalize(target_root, disk, root_part, root_uuid, root_partno, dualboot,
                                progress_cb, NULL) != 0) {
         fail(kiba_install_strerror());
     }
@@ -9018,8 +9039,9 @@ systemctl enable systemd-tmpfiles-clean.timer
 # SECURITY — AppArmor, Firejail, Secure Boot (sbctl)
 # ══════════════════════════════════════════════════════════════════════════
 # AppArmor: the LSM itself is only live if apparmor is in the kernel's
-# lsm= boot param (set above in /etc/default/grub for installed systems;
-# see kiba_gpt.c's GRUB_CMDLINE_LINUX_DEFAULT). Enabling the service here
+# lsm= boot param (set above in the systemd-boot loader entry for
+# installed systems; see kiba_install_finish.c's kiba_install_finalize()).
+# Enabling the service here
 # just makes it load whatever profiles ship in /etc/apparmor.d/ at boot
 # once that param is active -- profile enforcement (aa-enforce/aa-complain
 # for individual apps) is left to Remi/the end user, since KibaOS doesn't
@@ -9050,7 +9072,10 @@ cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
 #!/usr/bin/env bash
 # Run this AFTER installing KibaOS, on the real target machine, with
 # Secure Boot's Setup Mode enabled in firmware settings. It creates and
-# enrolls your own Secure Boot keys, then signs the kernel and GRUB.
+# enrolls your own Secure Boot keys, then signs the kernel and
+# systemd-boot's own EFI stub (both copies bootctl installs -- the
+# primary loader under EFI/systemd/ and the removable fallback path
+# firmware falls back to on some boards).
 set -e
 echo "This will create and enroll new Secure Boot keys on THIS machine"
 echo "and is not easily reversible. Only continue if you understand what"
@@ -9062,7 +9087,8 @@ sudo sbctl status
 sudo sbctl create-keys
 sudo sbctl enroll-keys -m
 sudo sbctl sign -s /boot/vmlinuz-linux
-sudo sbctl sign -s /boot/EFI/KibaOS/grubx64.efi
+sudo sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi
+sudo sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
 sudo sbctl verify
 echo "Done. Reboot and re-enable Secure Boot in firmware settings."
 SBCTLSETUP
