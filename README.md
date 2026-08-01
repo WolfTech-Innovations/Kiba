@@ -56,7 +56,7 @@ KibaOS is built and maintained by **Kiba Labs**.
 
 ### Want KibaOS on real hardware?
 
-We're happy to recommend **[CurrentBuild](https://www.currentbuild.com)**, a builder of Linux-first desktops, workstations, and laptops. This is just a recommendation — CurrentBuild is not affiliated with KibaOS and does not pre-install KibaOS on the machines they sell. If you're looking for hardware that's well-suited to running Linux in general, they're a solid option to check out; you'll still need to install KibaOS yourself by following the steps below.
+We're happy to tell you about our partners, **[ArkPC](https://arkpc.com.au)**, a builder of Linux-first desktops, workstations, and laptops. This is just a recommendation — Ark is affiliated with KibaOS and will pre-install KibaOS on the machines they sell. If you're looking for hardware that's well-suited to running Linux in general, it you still want to install KibaOS yourself by following the steps below.
 
 ---
 
@@ -64,7 +64,7 @@ We're happy to recommend **[CurrentBuild](https://www.currentbuild.com)**, a bui
 
 - [What KibaOS Includes](#what-kibaos-includes)
 - [Design & Theming](#design--theming)
-- [Recommended Hardware: CurrentBuild](#want-kibaos-on-real-hardware)
+- [Recommended Hardware: ArkPC](#want-kibaos-on-real-hardware)
 - [Getting Started](#getting-started)
   - [Step 1: Download the ISO](#step-1-download-the-iso)
   - [Step 2: Write It to a USB Drive](#step-2-write-it-to-a-usb-drive)
