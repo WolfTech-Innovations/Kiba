@@ -56,7 +56,7 @@ KibaOS is built and maintained by **Kiba Labs**.
 
 ### Want KibaOS on real hardware?
 
-We're happy to tell you about our partners, **[ArkPC](https://arkpc.com.au)**, a builder of Linux-first desktops, workstations, and laptops. This is just a recommendation — Ark is affiliated with KibaOS and will pre-install KibaOS on the machines they sell. If you're looking for hardware that's well-suited to running Linux in general, it you still want to install KibaOS yourself by following the steps below.
+We're happy to tell you about our partners, **[ArkPC](https://arkpc.com.au)**, a builder of Linux-first desktops, workstations, and laptops. ArkPC is affiliated with KibaOS and plan to/may soon pre-install KibaOS on the machines they sell. If you're looking for hardware that's well-suited to running Linux in general, if you still want to install KibaOS yourself by following the steps below.
 
 ---
 
