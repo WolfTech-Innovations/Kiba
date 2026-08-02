@@ -169,6 +169,7 @@ gnome-text-editor
 loupe
 evince
 papirus-icon-theme
+adwaita-icon-theme
 accountsservice
 sassc
 meson
@@ -2887,7 +2888,6 @@ using Adw;
 using Gee;
 
 public struct OobeSummaryItem {
-    public string icon;
     public string key;
     public string val;
 }
@@ -3017,12 +3017,6 @@ public class KibaOOBE : Adw.Application {
     // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_vm_blocked_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
-
-        var icon = new Gtk.Image.from_icon_name ("dialog-warning-symbolic") {
-            pixel_size = 56,
-            halign     = Gtk.Align.START
-        };
-        content.append (icon);
 
         content.append (oobe_heading (
             t ("Installation isn't available in a virtual machine",
@@ -3166,8 +3160,8 @@ public class KibaOOBE : Adw.Application {
         });
         corner.append (lang_btn);
 
-        var dark_btn = new Gtk.Button.from_icon_name (
-            is_dark ? "weather-clear-symbolic" : "weather-clear-night-symbolic");
+        var dark_btn = new Gtk.Button.with_label (
+            is_dark ? t ("Light", "Açık", "Jasny") : t ("Dark", "Koyu", "Ciemny"));
         dark_btn.add_css_class ("oobe-corner-button");
         dark_btn.tooltip_text = is_dark
             ? t ("Switch to light mode", "Açık moda geç", "Przełącz na jasny motyw")
@@ -3431,12 +3425,13 @@ public class KibaOOBE : Adw.Application {
             int    pct         = int.parse (signal_str);
             string signal_pct  = "%d%%".printf (int.max (0, int.min (100, pct)));
 
-            // Choose signal icon based on nmcli's 0-100 signal percentage
-            string icon_name;
-            if      (pct >= 80) icon_name = "network-wireless-signal-excellent-symbolic";
-            else if (pct >= 55) icon_name = "network-wireless-signal-good-symbolic";
-            else if (pct >= 30) icon_name = "network-wireless-signal-ok-symbolic";
-            else                icon_name = "network-wireless-signal-weak-symbolic";
+            // Choose a text signal-bar glyph based on nmcli's 0-100 signal
+            // percentage, instead of an icon-theme lookup.
+            string signal_bars;
+            if      (pct >= 80) signal_bars = "▂▄▆█";
+            else if (pct >= 55) signal_bars = "▂▄▆";
+            else if (pct >= 30) signal_bars = "▂▄";
+            else                signal_bars = "▂";
 
             var row = new Adw.ActionRow () {
                 title         = ssid,
@@ -3447,8 +3442,7 @@ public class KibaOOBE : Adw.Application {
                 subtitle_lines = 2,
                 activatable   = true
             };
-            row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
-            if (secured) row.add_suffix (new Gtk.Image.from_icon_name ("system-lock-screen-symbolic"));
+            row.add_prefix (new Gtk.Label (signal_bars) { css_classes = { "oobe-signal-glyph" } });
             list_box.append (row);
 
             ssid_list    += ssid;
@@ -3459,7 +3453,6 @@ public class KibaOOBE : Adw.Application {
             var row = new Adw.ActionRow () {
                 title = t ("No networks found nearby", "Yakında ağ bulunamadı", "Nie znaleziono pobliskich sieci")
             };
-            row.add_prefix (new Gtk.Image.from_icon_name ("network-offline-symbolic"));
             list_box.append (row);
         }
 
@@ -3783,7 +3776,6 @@ public class KibaOOBE : Adw.Application {
 
         foreach (var opt in options) {
             var row = new Adw.ActionRow () { title = opt.label };
-            row.add_prefix (new Gtk.Image.from_icon_name ("drive-harddisk-symbolic"));
             row.set_data ("devpath", opt.devpath);
             picker.append (row);
         }
@@ -3823,7 +3815,6 @@ public class KibaOOBE : Adw.Application {
                            "Bu diskteki her şeyi silip yalnızca KibaOS'u kurun.",
                            "Usuń wszystko z tego dysku i zainstaluj wyłącznie KibaOS.")
         };
-        erase_row.add_prefix (new Gtk.Image.from_icon_name ("edit-delete-symbolic"));
         erase_row.set_data ("mode", "erase");
         picker.append (erase_row);
 
@@ -3833,7 +3824,6 @@ public class KibaOOBE : Adw.Application {
                            "Mevcut sistemi koru, KibaOS'u yanındaki boş alana kur (çift önyükleme).",
                            "Zachowaj to, co już tu jest, i zainstaluj KibaOS w wolnym miejscu obok (dual boot).")
         };
-        alongside_row.add_prefix (new Gtk.Image.from_icon_name ("drive-multidisk-symbolic"));
         alongside_row.set_data ("mode", "alongside");
         picker.append (alongside_row);
 
@@ -3919,13 +3909,13 @@ public class KibaOOBE : Adw.Application {
         summary.overflow = Gtk.Overflow.HIDDEN;
 
         OobeSummaryItem[] items = {
-            { "drive-harddisk-symbolic",   t ("Storage", "Depolama", "Pamięć"),
+            { t ("Storage", "Depolama", "Pamięć"),
               selected_disk == "" ? t ("Auto-detected", "Otomatik algılandı", "Wykryto automatycznie") : GLib.Path.get_basename (selected_disk) },
-            { "drive-multidisk-symbolic",  t ("Install mode", "Kurulum modu", "Tryb instalacji"),
+            { t ("Install mode", "Kurulum modu", "Tryb instalacji"),
               install_mode == "alongside" ? t ("Install alongside (dual boot)", "Yanına kur (çift önyükleme)", "Zainstaluj obok (dual boot)") : t ("Erase disk", "Diski sil", "Wyczyść dysk") },
-            { "preferences-desktop-locale-symbolic", t ("Language", "Dil", "Język"), selected_locale },
-            { "input-keyboard-symbolic",   t ("Keyboard", "Klavye", "Klawiatura"), selected_keymap },
-            { "system-users-symbolic",     t ("Account", "Hesap", "Konto"),
+            { t ("Language", "Dil", "Język"), selected_locale },
+            { t ("Keyboard", "Klavye", "Klawiatura"), selected_keymap },
+            { t ("Account", "Hesap", "Konto"),
               username_value == "" ? t ("(not set)", "(ayarlanmadı)", "(nie ustawiono)") : username_value }
         };
         bool first = true;
@@ -3938,7 +3928,6 @@ public class KibaOOBE : Adw.Application {
             first = false;
             var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12);
             row.add_css_class ("oobe-summary-row");
-            row.append (new Gtk.Image.from_icon_name (item.icon));
             var lbl = new Gtk.Label (item.key);
             lbl.add_css_class ("oobe-summary-key");
             row.append (lbl);
@@ -3986,9 +3975,8 @@ public class KibaOOBE : Adw.Application {
     private Adw.NavigationPage build_done_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
 
-        var check = new Gtk.Image.from_icon_name ("emblem-ok-symbolic") {
-            pixel_size = 56,
-            halign     = Gtk.Align.START
+        var check = new Gtk.Label ("✓") {
+            halign = Gtk.Align.START
         };
         check.add_css_class ("oobe-done-check");
         content.append (check);
@@ -4285,6 +4273,15 @@ window.dark .oobe-step-label { color: rgba(255,255,255,0.40); }
 /* ── List / pickers ────────────────────────────────────────────────────── */
 .oobe-list { background: transparent; }
 
+.oobe-signal-glyph {
+    font-family: monospace;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0099cc;
+    min-width: 34px;
+}
+window.dark .oobe-signal-glyph { color: #22c1ec; }
+
 .oobe-list row,
 listview > row {
     background:    rgba(248,250,252,0.9);
@@ -4359,6 +4356,8 @@ window.dark row.combo, window.dark row.action {
 /* ── Done check icon ───────────────────────────────────────────────────── */
 .oobe-done-check {
     color: #0099cc;
+    font-size: 48px;
+    font-weight: 800;
     animation: pop-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 @keyframes pop-in {
