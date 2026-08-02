@@ -5,7 +5,7 @@
 > [!IMPORTANT]
 >
 > KibaOS only supports UEFI-based systems. Virtual machine installation is currently unsupported because KibaOS is designed to run on physical hardware.
-
+> - **Known issue:** Some USB drives (especially external SSD/HDD enclosures) may not install properly — installer can mistake them for an already-set-up system and skip the install entirely, with no error shown. Stick to a standard USB flash drive until this is fixed.
 
 <div align="center">
 
