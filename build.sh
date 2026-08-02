@@ -229,7 +229,7 @@ gnome-calendar
 gnome-notes
 gnome-music
 gnome-todo
-gnome-videos
+totem
 gstreamer
 gst-plugins-base
 gst-plugins-good
@@ -3862,6 +3862,11 @@ public class KibaOOBE : Adw.Application {
 
         var group = new Adw.PreferencesGroup ();
         group.add_css_class ("oobe-prefs-group");
+        // "overflow: hidden" in oobe.css doesn't do anything -- GTK4's CSS
+        // engine doesn't have that property, confirmed by the theme parser
+        // warning it throws on startup. Clipping child rows to the
+        // rounded-corner container is a widget property, not CSS.
+        group.overflow = Gtk.Overflow.HIDDEN;
 
         var hostname_entry = new Adw.EntryRow () { title = t ("Computer name", "Bilgisayar adı", "Nazwa komputera") };
         hostname_entry.text = "kibaos";
@@ -3911,6 +3916,7 @@ public class KibaOOBE : Adw.Application {
         // Summary card
         var summary = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
         summary.add_css_class ("oobe-summary-box");
+        summary.overflow = Gtk.Overflow.HIDDEN;
 
         OobeSummaryItem[] items = {
             { "drive-harddisk-symbolic",   t ("Storage", "Depolama", "Pamięć"),
@@ -4181,8 +4187,6 @@ window.dark .oobe-corner-button:hover { background: rgba(51,65,85,0.85); }
     background:    transparent;
     border:        none;
     box-shadow:    none;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
     animation: card-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 window.dark .oobe-card {
