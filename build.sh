@@ -229,6 +229,11 @@ gnome-calendar
 gnome-notes
 gnome-music
 gnome-todo
+gnome-videos
+gstreamer
+gst-plugins-base
+gst-plugins-good
+gst-plugins-bad
 plymouth
 squashfs-tools
 
@@ -2977,10 +2982,23 @@ public class KibaOOBE : Adw.Application {
             default_width  = 1280,
             default_height = 800,
             fullscreened   = true,
+            decorated      = false,
+            resizable      = false,
             title          = in_vm ? "KibaOS Setup"
                              : is_oem_mode ? "Finish Setting Up KibaOS" : "KibaOS Setup"
         };
         window.add_css_class ("kibaos-oobe-window");
+        // No decorations means no close button already, but Alt+F4/compositor
+        // shortcuts can still fire a close request -- OOBE isn't something
+        // you dismiss out from under yourself mid-install, same as Windows'
+        // setup flow never gives you a way out either. Block it outright.
+        window.close_request.connect (() => { return true; });
+        // Belt-and-suspenders: if a compositor keybinding (or anything else)
+        // ever drops fullscreen out from under us, snap straight back into
+        // it instead of leaving OOBE sitting in a windowed state.
+        window.notify["fullscreened"].connect (() => {
+            if (!window.fullscreened) window.fullscreen ();
+        });
         // Default to dark mode regardless of system preference; the toggle
         // on every page still lets the user switch to light from there.
         Adw.StyleManager.get_default ().color_scheme = Adw.ColorScheme.FORCE_DARK;
@@ -3050,7 +3068,7 @@ public class KibaOOBE : Adw.Application {
         var card = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
             halign = Gtk.Align.CENTER,
             valign = Gtk.Align.CENTER,
-            width_request = 600
+            width_request = 640
         };
         card.add_css_class ("oobe-card");
 
@@ -3058,7 +3076,7 @@ public class KibaOOBE : Adw.Application {
         if (step_total > 1) {
             var dots_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
                 halign = Gtk.Align.CENTER,
-                margin_bottom = 20
+                margin_bottom = 10
             };
             for (int i = 0; i < step_total; i++) {
                 var dot = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) {};
@@ -3067,6 +3085,15 @@ public class KibaOOBE : Adw.Application {
                 dots_row.append (dot);
             }
             card.append (dots_row);
+
+            var step_label = new Gtk.Label (
+                t ("Step %d of %d", "Adım %d / %d", "Krok %d z %d")
+                    .printf (step_index + 1, step_total)) {
+                halign = Gtk.Align.CENTER,
+                margin_bottom = 16
+            };
+            step_label.add_css_class ("oobe-step-label");
+            card.append (step_label);
         }
 
         // Content + nav row wrapped in a box with padding
@@ -3326,6 +3353,24 @@ public class KibaOOBE : Adw.Application {
         };
         status_label.add_css_class ("oobe-subtitle");
 
+        // Network is now required (codec install during finalize needs it,
+        // and skipping used to leave people on a system with no way to
+        // reach the mirrors afterward either). Next just refuses to
+        // navigate until this is true -- either flipped by
+        // do_connect_async below, or here already if wired/some other
+        // connection is already up (don't force a Wi-Fi-specific flow on
+        // someone plugged into Ethernet).
+        bool[] connected_box = { false };
+        try {
+            string state_out = "";
+            GLib.Process.spawn_command_line_sync (
+                "nmcli -t -f STATE general status", out state_out);
+            if (state_out.strip () == "connected") {
+                connected_box[0] = true;
+                status_label.label = t ("Already connected ✓", "Zaten bağlı ✓", "Już połączono ✓");
+            }
+        } catch (GLib.SpawnError e) {}
+
         // ── Discover the first NetworkManager-managed wireless device ─────
         string wifi_dev = "";
         try {
@@ -3394,9 +3439,13 @@ public class KibaOOBE : Adw.Application {
             else                icon_name = "network-wireless-signal-weak-symbolic";
 
             var row = new Adw.ActionRow () {
-                title       = ssid,
-                subtitle    = signal_pct,
-                activatable = true
+                title         = ssid,
+                subtitle      = "%s\n%s".printf (signal_pct,
+                                    secured
+                                        ? t ("Secured", "Güvenli", "Zabezpieczona")
+                                        : t ("Open", "Açık", "Otwarta")),
+                subtitle_lines = 2,
+                activatable   = true
             };
             row.add_prefix (new Gtk.Image.from_icon_name (icon_name));
             if (secured) row.add_suffix (new Gtk.Image.from_icon_name ("system-lock-screen-symbolic"));
@@ -3469,7 +3518,7 @@ public class KibaOOBE : Adw.Application {
                     status_label.remove_css_class ("oobe-error");
                     status_label.add_css_class ("oobe-subtitle");
                     status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…", "Łączenie z %s…").printf (ssid);
-                    do_connect_async (dev_box[0], ssid, password, status_label);
+                    do_connect_async (dev_box[0], ssid, password, status_label, connected_box);
                 });
 
                 dialog.present ();
@@ -3477,11 +3526,19 @@ public class KibaOOBE : Adw.Application {
             } else {
                 // ── Open network — connect directly ───────────────────────
                 status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…", "Łączenie z %s…").printf (ssid);
-                do_connect_async (dev_box[0], ssid, null, status_label);
+                do_connect_async (dev_box[0], ssid, null, status_label, connected_box);
             }
         });
 
         return make_page ("Wi-Fi", content, t ("Next", "İleri", "Dalej"), () => {
+            if (!connected_box[0]) {
+                status_label.remove_css_class ("oobe-subtitle");
+                status_label.add_css_class ("oobe-error");
+                status_label.label = t ("Connect to a network to continue -- KibaOS needs it to fetch media codecs during install.",
+                                         "Devam etmek için bir ağa bağlanın -- KibaOS, kurulum sırasında medya kodeklerini almak için buna ihtiyaç duyar.",
+                                         "Połącz się z siecią, aby kontynuować -- KibaOS potrzebuje jej do pobrania kodeków multimedialnych podczas instalacji.");
+                return;
+            }
             nav_view.push (build_locale_page ());
         }, false, 1, 6);
     }
@@ -3493,7 +3550,8 @@ public class KibaOOBE : Adw.Application {
     // confirm association. Updates status_label on each step.
     private void do_connect_async (string dev, string ssid,
                                     string? password,
-                                    Gtk.Label status_label) {
+                                    Gtk.Label status_label,
+                                    bool[] connected_box) {
         // Build argv — no shell, no quoting/injection surface
         string[] argv_arr;
         if (password != null) {
@@ -3556,6 +3614,7 @@ public class KibaOOBE : Adw.Application {
 
                     if (associated) {
                         lbl.label = t ("Connected to %s ✓", "%s ağına bağlanıldı ✓", "Połączono z %s ✓").printf (ssid_copy);
+                        connected_box[0] = true;
                         return GLib.Source.REMOVE;
                     }
                     if (attempts[0] >= 30) {   // 30 × 500 ms = 15 s
@@ -4112,38 +4171,35 @@ window.dark .oobe-corner-button {
 window.dark .oobe-corner-button:hover { background: rgba(51,65,85,0.85); }
 
 /* ── Card ──────────────────────────────────────────────────────────────── */
+/* Windows' OOBE puts content straight on the full-bleed background with no
+ * visible container at all -- no border, no shadow, no card edge to notice.
+ * That's deliberate: one less visual boundary for the eye to register while
+ * reading a screen you'll only ever see once. Acrylic/card-style framing
+ * stays reserved for genuinely transient surfaces (the Wi-Fi password
+ * dialog, which already uses Adw.MessageDialog rather than this class). */
 .oobe-card {
-    background:    rgba(255,255,255,0.88);
-    border:        1px solid rgba(255,255,255,0.70);
-    border-radius: 28px;
-    box-shadow:
-        0 2px 4px  rgba(0,0,0,0.04),
-        0 8px 24px rgba(0,0,0,0.10),
-        0 32px 64px rgba(0,0,0,0.12);
-    backdrop-filter: blur(40px) saturate(1.8);
-    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+    background:    transparent;
+    border:        none;
+    box-shadow:    none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
     animation: card-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
-    transition:
-        background-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
-        border-color     220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 window.dark .oobe-card {
-    background:    rgba(17,24,39,0.86);
-    border:        1px solid rgba(255,255,255,0.08);
-    box-shadow:
-        0 2px 4px  rgba(0,0,0,0.20),
-        0 8px 24px rgba(0,0,0,0.30),
-        0 32px 64px rgba(0,0,0,0.40);
+    background:    transparent;
+    border:        none;
+    box-shadow:    none;
 }
 
 @keyframes card-in {
-    from { opacity: 0; transform: translateY(22px) scale(0.97); }
-    to   { opacity: 1; transform: translateY(0)    scale(1);    }
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0);    }
 }
 
-/* Inner padding */
+/* Inner padding -- extra room now that there's no card edge doing any of
+ * the visual separation work; whitespace is the boundary instead. */
 .oobe-inner {
-    padding: 40px 44px 36px;
+    padding: 8px 12px 12px;
 }
 
 /* ── Step dots ─────────────────────────────────────────────────────────── */
@@ -4166,17 +4222,18 @@ window.dark .oobe-step-dot-active { background: #22c1ec; }
 
 /* ── Typography ────────────────────────────────────────────────────────── */
 .oobe-title {
-    font-size:      26px;
+    font-size:      30px;
     font-weight:    650;
     color:          #0f172a;
     letter-spacing: -0.4px;
-    margin-bottom:  2px;
+    line-height:    1.25;
+    margin-bottom:  4px;
     animation: fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
 }
 .oobe-subtitle {
-    font-size:   14px;
+    font-size:   16px;
     color:       #64748b;
-    line-height: 1.55;
+    line-height: 1.6;
     animation:   fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
 }
 @keyframes fade-up {
@@ -4188,20 +4245,29 @@ window.dark .oobe-subtitle { color: #94a3b8; }
 window.dark .oobe-brand    { color: rgba(255,255,255,0.75); }
 
 /* Status text that means "this went wrong" — distinct from the neutral
- * .oobe-subtitle so an error doesn't read as just another status update. */
+ * .oobe-subtitle so an error doesn't read as just another status update.
+ * Deliberately no shake/motion here: a startling animation adds stress
+ * right when someone's already hit a snag, a steady color change says
+ * the same thing calmly. */
 .oobe-error {
-    font-size:   14px;
+    font-size:   16px;
     color:       #dc2626;
-    line-height: 1.55;
-    animation:   shake 340ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+    line-height: 1.6;
+    animation:   fade-up 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 window.dark .oobe-error { color: #f87171; }
-@keyframes shake {
-    10%, 90% { transform: translateX(-1px); }
-    20%, 80% { transform: translateX(2px);  }
-    30%, 50%, 70% { transform: translateX(-3px); }
-    40%, 60% { transform: translateX(3px);  }
+
+/* ── Step counter (text alongside the dots) ──────────────────────────────
+ * "Step 3 of 6" removes any guesswork about how much is left -- knowing
+ * where you are and how far there is to go is one of the cheapest ways to
+ * lower anxiety in a multi-step flow you can't preview ahead of time. */
+.oobe-step-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(0,0,0,0.38);
+    letter-spacing: 0.2px;
 }
+window.dark .oobe-step-label { color: rgba(255,255,255,0.40); }
 
 /* ── Wi-Fi canvas ──────────────────────────────────────────────────────── */
 .oobe-wifi-canvas {
@@ -4220,8 +4286,8 @@ listview > row {
     background:    rgba(248,250,252,0.9);
     border:        1px solid rgba(0,0,0,0.07);
     border-radius: 14px;
-    margin:        3px 0;
-    padding:       10px 14px;
+    margin:        4px 0;
+    padding:       14px 16px;
     color:         #1e293b;
     transition:
         background-color 180ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -4302,9 +4368,10 @@ window.dark row.combo, window.dark row.action {
     color:         #ffffff;
     border:        none;
     border-radius: 999px;
-    padding:       11px 28px;
+    padding:       15px 34px;
     font-weight:   650;
-    font-size:     14px;
+    font-size:     16px;
+    min-width:     120px;
     box-shadow:    0 1px 3px rgba(0,153,204,0.35);
     transition:
         background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -4328,8 +4395,9 @@ window.dark row.combo, window.dark row.action {
     color:         #475569;
     border:        1px solid rgba(0,0,0,0.14);
     border-radius: 999px;
-    padding:       11px 24px;
-    font-size:     14px;
+    padding:       15px 28px;
+    font-size:     16px;
+    min-width:     100px;
     transition:
         background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
         border-color     140ms cubic-bezier(0.22, 1, 0.36, 1);
@@ -5983,10 +6051,10 @@ int kiba_install_write_configs(const char *target_root,
                 FILE *fw = fopen(path, "w");
                 if (fw) { fwrite(buf, 1, strlen(buf), fw); fclose(fw); }
                 free(buf);
-            } else {
-                fclose(f);
             }
+            /* f already closed above on the success path */
         }
+        /* fopen() failed: f is NULL here, nothing to close */
     }
 
     snprintf(path, sizeof(path), "%s/etc/locale.conf", target_root);
@@ -6056,10 +6124,10 @@ int kiba_install_create_user(const char *target_root, const char *username,
                     }
                 }
                 free(buf);
-            } else {
-                fclose(f);
             }
+            /* f already closed above on the success path */
         }
+        /* fopen() failed: f is NULL here, nothing to close */
     }
 
     /* Remove the live user -- best effort, ignore failure if absent. */
@@ -6233,6 +6301,51 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         for (size_t i = 0; i < sizeof(services)/sizeof(services[0]); i++) {
             char *argv[] = { (char *)"systemctl", (char *)"enable", (char *)services[i], NULL };
             chroot_run(target_root, argv); /* best-effort */
+        }
+    }
+
+    if (cb) cb(89, "Copying network configuration...", user_data);
+    {
+        /* arch-chroot shares the host's network namespace, so the live
+         * session's own connection is already what pacman used above and
+         * below -- this copy isn't for that. It's so the INSTALLED system
+         * comes up already connected on first boot instead of making
+         * someone re-enter the Wi-Fi password they just typed into OOBE
+         * two minutes ago. NetworkManager refuses to load a connection
+         * profile unless it's mode 600 owned by root, so that's set
+         * explicitly rather than trusting whatever the live session left
+         * them as. */
+        snprintf(path, sizeof(path), "%s/etc/NetworkManager/system-connections", target_root);
+        mkdir(path, 0700);
+
+        char *argv[] = {
+            (char *)"bash", (char *)"-c",
+            (char *)"cp -a /etc/NetworkManager/system-connections/. \"$1\"/ 2>/dev/null; "
+                    "chown -R root:root \"$1\"; find \"$1\" -type f -exec chmod 600 {} +",
+            (char *)"--", path, NULL
+        };
+        run_argv(argv); /* best-effort -- fine if the live session never had a saved connection */
+    }
+
+    if (cb) cb(90, "Installing media codecs...", user_data);
+    {
+        /* gst-plugins-ugly, gst-libav, and ffmpeg cover the actually
+         * patent-encumbered codecs (h264, mp3, aac, etc.) -- deliberately
+         * left out of packages.x86_64 so the ISO itself never carries
+         * them, and pulled here instead, straight onto the disk being
+         * installed to. This needs a live network connection on the
+         * install machine; if there isn't one, pacman just fails and we
+         * carry on -- Totem still plays the royalty-free formats gst-
+         * plugins-good/-bad already cover from the ISO packages, and the
+         * user can pull these later from Settings/pacman once online. */
+        char *argv[] = {
+            (char *)"pacman", (char *)"-S", (char *)"--noconfirm", (char *)"--needed",
+            (char *)"gst-plugins-ugly", (char *)"gst-libav", (char *)"ffmpeg", NULL
+        };
+        if (chroot_run(target_root, argv) != 0 && cb) {
+            cb(90, "Warning: couldn't fetch proprietary codecs (offline?) -- "
+                   "install gst-plugins-ugly, gst-libav, and ffmpeg later from Settings",
+               user_data);
         }
     }
 
