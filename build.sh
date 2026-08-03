@@ -511,6 +511,38 @@ echo "=== Installing Kortex build + runtime dependencies ==="
 # without an AUR helper. Installing via pip avoids that dependency entirely.
 pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
 pip install --break-system-packages --no-cache-dir nuitka
+# pywayland: real client bindings for the labwc bridge (WindowEventSource
+# below talks to zwlr_foreign_toplevel_manager_v1 directly instead of
+# shelling out — labwc's own wlrctl build has no watch/event-stream mode
+# and no move/resize actions, so a CLI wrapper isn't an option here, see
+# kortexd/labwc_bridge.py for the full rationale). Same story as nuitka
+# above: python-pywayland is AUR-only, pip sidesteps that. Its cffi
+# extension builds against libwayland-client, whose headers already come
+# from the "wayland" package pulled in earlier for the compositor itself.
+pip install --break-system-packages --no-cache-dir pywayland cffi
+
+# ---- generate the wlr-foreign-toplevel-management-v1 protocol module ----
+# pywayland only ships bindings for core wayland.xml out of the box; wlr
+# protocol extensions (this one lives in the wlr-protocols repo, not
+# wayland-protocols) have to be scanned separately. Using the documented
+# Python scanner API (Protocol.parse_file / Protocol.output) rather than
+# guessing pywayland-scanner's CLI flag names, since that's the form
+# actually pinned down in pywayland's own docs.
+WLR_FOREIGN_TOPLEVEL_XML="/tmp/wlr-foreign-toplevel-management-unstable-v1.xml"
+curl -fL --retry 5 --retry-delay 3 -o "${WLR_FOREIGN_TOPLEVEL_XML}" \
+  "https://raw.githubusercontent.com/swaywm/wlr-protocols/master/unstable/wlr-foreign-toplevel-management-unstable-v1.xml"
+
+mkdir -p /usr/lib/kortex/kortexd/_protocols
+python3 - "${WLR_FOREIGN_TOPLEVEL_XML}" /usr/lib/kortex/kortexd/_protocols << 'PYWAYLAND_GEN_PY'
+import sys
+from pywayland.scanner import Protocol
+
+xml_path, out_dir = sys.argv[1], sys.argv[2]
+protocol = Protocol.parse_file(xml_path)
+protocol.output(out_dir, {})
+PYWAYLAND_GEN_PY
+touch /usr/lib/kortex/kortexd/_protocols/__init__.py
+rm -f "${WLR_FOREIGN_TOPLEVEL_XML}"
 
 mkdir -p /usr/lib/kortex/kortexd/assets
 
@@ -750,6 +782,22 @@ class Store:
             row = c.fetchone()
             total = row["tw"] or 0.0
             return total / (total + kappa)
+
+    def get_last_placement_monitor(self, app):
+        """Most-recently-updated monitor with a learned placement for this
+        app, or None. Used as a fallback when the window-event backend
+        can't report which monitor a launch happened on — the labwc
+        bridge, notably, since zwlr_foreign_toplevel_manager_v1 has no
+        output info available at launch time (see WindowEventSource /
+        labwc_bridge.py docstrings).
+        """
+        with self.cursor() as c:
+            c.execute(
+                "SELECT monitor FROM placement WHERE app=? ORDER BY updated DESC LIMIT 1",
+                (app,),
+            )
+            row = c.fetchone()
+            return row["monitor"] if row else None
 
     # ---- friction ----
     # 'reverted' (user manually undid an automatic Kortex action) is a much
@@ -1801,6 +1849,377 @@ class KortexNotifier:
         return False
 KORTEX_NOTIFIER_PY
 
+# ══════════════════════════════════════════════════════════════════════════
+# KORTEX LABWC BRIDGE — replaces the old Wayfire/wfctl WindowEventSource
+# backend with a real one for labwc.
+#
+# What labwc actually exposes, and what that does and doesn't buy us:
+#
+#   - zwlr_foreign_toplevel_manager_v1 (labwc >=2.1.0) gives us, per
+#     toplevel: app_id, title, output_enter/leave, and a `state` event
+#     whose bitset includes "activated" — i.e. focus tracking and launch
+#     detection are both real and event-driven, no polling. This is the
+#     part Kortex's usage model (Beta posteriors, KDE density, break
+#     pressure) actually depends on, and it fully works.
+#
+#   - That protocol has NO geometry/rectangle event on the toplevel
+#     handle — title/app_id/state/output/done/closed, nothing else. So
+#     there is no way to observe where the user drags or resizes a
+#     window under labwc, at all, with anything currently implemented.
+#     Wayfire's IPC (the old backend) did expose this; labwc doesn't.
+#     on_window_moved() — the *learning* half of placement — has no data
+#     source here and stays a documented no-op, same as the whole class
+#     used to be pre-bridge. If labwc's foreign-toplevel implementation
+#     ever grows a geometry event, or ext-foreign-toplevel-list gains
+#     one, this is the only place that needs to change.
+#
+#   - There is also no live move/resize request anywhere in the
+#     protocol, and wlrctl (which only wraps this same protocol) doesn't
+#     have one either — see wlrctl(1): minimize/maximize/fullscreen/
+#     focus/find/wait/waitfor, that's the complete list, no move/resize.
+#     In Wayland generally, compositors don't take positioning requests
+#     from arbitrary external clients over IPC; the one place labwc
+#     *does* accept a position is a windowRule's <action name="MoveTo">/
+#     <action name="ResizeTo">, applied by labwc itself as a window
+#     maps, and reloadable at runtime via SIGHUP.
+#
+#     So the *application* half of placement (move_window, below) works,
+#     but the mechanism is different in kind from the old wfctl one: it
+#     doesn't reach in and shove a live window to a new spot, it writes
+#     a rule that labwc applies the next time that app_id maps. Since
+#     KortexDaemon.on_window_launch already only ever calls move_window
+#     right as a launch is detected — never on an already-settled window
+#     — the practical behavior converges anyway, with one caveat: the
+#     rule has to exist *before* that particular instance maps to catch
+#     it. A launch is detected via toplevel_created, which only fires
+#     after mapping, so the instance that triggered the rule write is
+#     itself too late — it'll be positioned by whatever labwc/the app
+#     picked by default. The next launch of that app_id (including the
+#     very common case of quit/relaunch) picks the rule up correctly.
+#     This is a one-launch lag, not a missing feature, and it's called
+#     out again at the LabwcPlacementRules docstring.
+# ══════════════════════════════════════════════════════════════════════════
+echo "=== Installing kortexd labwc bridge ==="
+cat > /usr/lib/kortex/kortexd/labwc_bridge.py << 'KORTEX_LABWC_BRIDGE_PY'
+"""
+kortexd.labwc_bridge
+---------------------
+Real WindowEventSource backend for labwc. See the build script's banner
+comment above this file's install step for the full rationale; short
+version: focus/launch tracking is real and event-driven (foreign-toplevel
+protocol), placement learning (on_window_moved) has no protocol source and
+is a documented no-op, and placement application (move_window) works by
+writing a labwc windowRule + SIGHUP reload rather than a live move, which
+takes effect on that app_id's *next* launch rather than the one that
+triggered it.
+
+Capability is detected by trying to bind the protocol global itself,
+rather than checking the compositor name — if some other compositor ever
+implements zwlr_foreign_toplevel_manager_v1, this backend works there too
+with zero changes, and if labwc ever stops advertising it for any reason,
+this degrades the same way the old wfctl path did: log once, no-op.
+"""
+
+import logging
+import os
+import shutil
+import subprocess
+import threading
+import time
+
+log = logging.getLogger("kortexd.labwc_bridge")
+
+try:
+    from pywayland.client import Display
+    from .._protocols.wlr_foreign_toplevel_management_unstable_v1 import (
+        ZwlrForeignToplevelManagerV1,
+    )
+    _HAVE_PYWAYLAND = True
+except Exception as e:  # pywayland missing, protocol module missing, etc.
+    _HAVE_PYWAYLAND = False
+    _IMPORT_ERROR = e
+
+
+# Bit values from the protocol's zwlr_foreign_toplevel_handle_v1.state
+# enum. Kept as a local constant rather than pulled from the generated
+# module since only "activated" is actually used here.
+_STATE_ACTIVATED = 2
+
+
+class LabwcToplevelWatcher:
+    """Binds zwlr_foreign_toplevel_manager_v1 and turns its events into the
+    same on_focus/on_launch/on_close callback shape WindowEventSource
+    already expects from the old wfctl backend, so core.py's KortexDaemon
+    doesn't need to know which backend is live underneath it.
+
+    Runs its own Wayland connection on a dedicated thread — kortexd
+    already owns the GTK main loop for the notifier (see core.py's
+    docstring on thread ownership), so this can't share a loop with
+    that; a second, separate wl_display connection is the simplest way
+    to keep the two totally independent.
+    """
+
+    def __init__(self, on_focus, on_launch, on_close):
+        self.on_focus = on_focus
+        self.on_launch = on_launch
+        self.on_close = on_close
+        self._display = None
+        self._manager = None
+        self._known = {}   # handle -> {"app_id": str, "activated": bool}
+        self._thread = None
+        self._stop = threading.Event()
+
+    @staticmethod
+    def available():
+        """Cheap pre-check before spinning up a thread: pywayland has to
+        have imported cleanly, and a compositor socket has to exist to
+        even try connecting to. Doesn't guarantee the global is
+        advertised — that's only knowable after actually binding the
+        registry, which start() does.
+        """
+        if not _HAVE_PYWAYLAND:
+            log.info(
+                f"LabwcToplevelWatcher unavailable: pywayland/protocol "
+                f"module didn't import ({_IMPORT_ERROR}). Window-event "
+                f"tracking is disabled; everything else in Kortex is "
+                f"unaffected."
+            )
+            return False
+        if not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_RUNTIME_DIR")):
+            log.info("LabwcToplevelWatcher unavailable: no Wayland session in env")
+            return False
+        return True
+
+    def start(self):
+        if not self.available():
+            return False
+        try:
+            self._display = Display()
+            self._display.connect()
+        except Exception as e:
+            log.info(f"LabwcToplevelWatcher: couldn't connect to compositor: {e}")
+            return False
+
+        registry = self._display.get_registry()
+        found = {"manager": None}
+
+        def _global_handler(reg, name, interface, version):
+            if interface == "zwlr_foreign_toplevel_manager_v1":
+                found["manager"] = reg.bind(name, ZwlrForeignToplevelManagerV1, version)
+
+        registry.dispatcher["global"] = _global_handler
+        self._display.dispatch(block=True)
+        self._display.roundtrip()
+
+        if found["manager"] is None:
+            log.info(
+                "LabwcToplevelWatcher: compositor doesn't advertise "
+                "zwlr_foreign_toplevel_manager_v1 (expected pre-2.1.0 "
+                "labwc, or a compositor without this protocol at all). "
+                "Window-event tracking is disabled; everything else in "
+                "Kortex is unaffected."
+            )
+            self._display.disconnect()
+            return False
+
+        self._manager = found["manager"]
+        self._manager.dispatcher["toplevel"] = self._on_toplevel_created
+        self._thread = threading.Thread(target=self._run_loop, daemon=True)
+        self._thread.start()
+        log.info("LabwcToplevelWatcher started (zwlr_foreign_toplevel_manager_v1)")
+        return True
+
+    def stop(self):
+        self._stop.set()
+
+    def _run_loop(self):
+        while not self._stop.is_set():
+            try:
+                self._display.dispatch(block=True)
+            except Exception as e:
+                log.warning(f"labwc bridge dispatch loop crashed, restarting in 5s: {e}")
+                time.sleep(5)
+                try:
+                    self._display.connect()
+                except Exception:
+                    pass
+
+    def _on_toplevel_created(self, manager, handle):
+        state = {"app_id": None, "title": None, "activated": False, "seen": False}
+        self._known[handle] = state
+
+        def _on_app_id(h, app_id):
+            state["app_id"] = app_id
+
+        def _on_title(h, title):
+            state["title"] = title
+
+        def _on_state(h, states_bytes):
+            # states_bytes is a packed array of uint32 state enum values
+            was_active = state["activated"]
+            state["activated"] = _STATE_ACTIVATED in _unpack_states(states_bytes)
+            if state["activated"] and not was_active and state["app_id"]:
+                self.on_focus(state["app_id"])
+
+        def _on_done(h):
+            if not state["seen"] and state["app_id"]:
+                state["seen"] = True
+                self.on_launch(state["app_id"])
+
+        def _on_closed(h):
+            app_id = state.get("app_id")
+            self._known.pop(handle, None)
+            if app_id:
+                self.on_close(app_id)
+
+        handle.dispatcher["app_id"] = _on_app_id
+        handle.dispatcher["title"] = _on_title
+        handle.dispatcher["state"] = _on_state
+        handle.dispatcher["done"] = _on_done
+        handle.dispatcher["closed"] = _on_closed
+
+
+def _unpack_states(raw) -> set:
+    """The state event's argument is a wl_array of uint32 — pywayland
+    hands it back as raw bytes rather than pre-decoded ints.
+    """
+    import struct
+    n = len(raw) // 4
+    return set(struct.unpack(f"{n}I", raw[: n * 4]))
+
+
+class LabwcPlacementRules:
+    """Applies learned placements the only way labwc actually allows:
+    a windowRule with MoveTo/ResizeTo, written into a clearly-delimited
+    managed block inside rc.xml, reloaded live via SIGHUP.
+
+    IMPORTANT — this is NOT a live move. It takes effect the next time
+    the given app_id's window maps, not the instance that was open when
+    move_window() was called (see the build script banner comment above
+    this file's install step for why: there's no protocol request to
+    reposition an already-mapped window under labwc). For an app that
+    gets relaunched routinely — which is the normal case Kortex's
+    placement-confidence threshold is built around, since it only fires
+    after repeated consistent launches of the *same* app — this reaches
+    the same end state as a live move within one more launch of it.
+
+    The managed block is delimited with comments so this can coexist
+    with whatever windowRules Chris already has by hand in rc.xml
+    elsewhere in the file; only the content between the markers is ever
+    rewritten.
+    """
+
+    BEGIN_MARKER = "<!-- KORTEX:BEGIN managed placement rules, do not hand-edit -->"
+    END_MARKER = "<!-- KORTEX:END -->"
+
+    def __init__(self, rc_xml_path=None):
+        self.rc_xml_path = rc_xml_path or os.path.expanduser("~/.config/labwc/rc.xml")
+        self._rules = {}   # app_id -> (x, y, w, h)
+        self._lock = threading.Lock()
+
+    def set_rule(self, app_id: str, x: int, y: int, w: int, h: int):
+        with self._lock:
+            self._rules[app_id] = (x, y, w, h)
+            self._write_and_reload()
+
+    def clear_rule(self, app_id: str):
+        with self._lock:
+            if self._rules.pop(app_id, None) is not None:
+                self._write_and_reload()
+
+    def _write_and_reload(self):
+        if not os.path.isfile(self.rc_xml_path):
+            log.warning(f"LabwcPlacementRules: no rc.xml at {self.rc_xml_path}, skipping")
+            return
+        try:
+            with open(self.rc_xml_path, "r") as f:
+                content = f.read()
+        except OSError as e:
+            log.warning(f"LabwcPlacementRules: couldn't read rc.xml: {e}")
+            return
+
+        block_lines = [self.BEGIN_MARKER, "<windowRules>"]
+        for app_id, (x, y, w, h) in self._rules.items():
+            escaped = app_id.replace("&", "&amp;").replace('"', "&quot;")
+            block_lines.append(f'  <windowRule identifier="{escaped}" matchOnce="true">')
+            block_lines.append(f'    <action name="MoveTo" x="{x}" y="{y}" />')
+            block_lines.append(f'    <action name="ResizeTo" width="{w}" height="{h}" />')
+            block_lines.append("  </windowRule>")
+        block_lines.append("</windowRules>")
+        block_lines.append(self.END_MARKER)
+        block = "\n".join(block_lines)
+
+        if self.BEGIN_MARKER in content and self.END_MARKER in content:
+            pre = content.split(self.BEGIN_MARKER)[0]
+            post = content.split(self.END_MARKER)[1]
+            new_content = pre + block + post
+        elif "</labwc_config>" in content:
+            new_content = content.replace("</labwc_config>", block + "\n</labwc_config>")
+        else:
+            log.warning(
+                "LabwcPlacementRules: rc.xml has no </labwc_config> closing "
+                "tag and no existing managed block — refusing to guess "
+                "where to insert, leaving rc.xml untouched"
+            )
+            return
+
+        tmp_path = self.rc_xml_path + ".kortex-tmp"
+        try:
+            with open(tmp_path, "w") as f:
+                f.write(new_content)
+            os.replace(tmp_path, self.rc_xml_path)
+        except OSError as e:
+            log.warning(f"LabwcPlacementRules: couldn't write rc.xml: {e}")
+            return
+
+        self._reload_labwc()
+
+    def _reload_labwc(self):
+        # Same-user SIGHUP — kortexd runs as a per-user systemd service,
+        # same UID as the compositor it's reconfiguring, so this needs
+        # no privilege escalation (unlike kortex-helper's repair actions).
+        try:
+            r = subprocess.run(["pgrep", "-x", "labwc"], capture_output=True, text=True)
+            pids = [p for p in r.stdout.split() if p]
+            for pid in pids:
+                os.kill(int(pid), 1)  # SIGHUP
+        except Exception as e:
+            log.warning(f"LabwcPlacementRules: couldn't SIGHUP labwc: {e}")
+
+
+def resolve_monitor_origin(monitor_name: str):
+    """Global-coordinate (x, y) origin of a named output, so a per-monitor
+    learned placement can be turned into the absolute coordinates MoveTo
+    wants. Shells out to wlr-randr (already in the image for the
+    display-settings panel) rather than adding a second Wayland protocol
+    binding here just for output geometry — wlr-randr's plain-text output
+    is stable enough for this one field, and it's already a hard
+    dependency of the image regardless of Kortex.
+    """
+    if shutil.which("wlr-randr") is None:
+        return None
+    try:
+        out = subprocess.run(["wlr-randr"], capture_output=True, text=True, timeout=5).stdout
+    except Exception:
+        return None
+
+    current_output = None
+    for line in out.splitlines():
+        if line and not line.startswith(" "):
+            current_output = line.split()[0]
+            continue
+        stripped = line.strip()
+        if current_output == monitor_name and stripped.startswith("Position"):
+            # e.g. "Position 1920,0"
+            coords = stripped.split()[-1]
+            try:
+                x_str, y_str = coords.split(",")
+                return (int(x_str), int(y_str))
+            except ValueError:
+                return None
+    return None
+KORTEX_LABWC_BRIDGE_PY
+
 cat > /usr/lib/kortex/kortexd/core.py << 'KORTEX_CORE_PY'
 """
 kortexd.core
@@ -1834,6 +2253,7 @@ from .storage import Store
 from . import models
 from .repair import RepairEngine, watch_journal
 from .notifier import KortexNotifier
+from .labwc_bridge import LabwcToplevelWatcher, LabwcPlacementRules, resolve_monitor_origin
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s kortexd: %(message)s")
 log = logging.getLogger("kortexd")
@@ -1852,41 +2272,47 @@ def _run(cmd, timeout=15):
 
 
 class WindowEventSource:
-    """Was a Wayfire IPC bridge via the `wfctl` CLI (pip: wfctl,
-    github.com/killown/wfctl), tailing `wfctl -m`'s event stream and
-    parsing one JSON object per line — same "tail a subprocess, parse
-    lines" shape as repair.py's watch_journal(), so it followed the
-    pattern already established here instead of adding a second I/O style.
+    """Focus/launch/close events, plus best-effort placement, from
+    whichever compositor backend is actually available. Two backends,
+    tried in order, so KortexDaemon's call sites never need to know or
+    care which one is live:
 
-    labwc has nothing resembling this — no IPC socket, no plugin system
-    to bolt one onto. Rather than rip the class out (Kortex's other code
-    still constructs and wires it up the same way, and I'd rather that
-    keep working untouched than thread None-checks through every call
-    site), start() below just checks whether `wfctl` even exists on
-    $PATH first. If it doesn't, this logs once and quietly never spins up
-    the watcher thread — every method is still callable, on_focus/
-    on_move/on_launch just never fire, and move_window()'s _run() calls
-    fail closed (logged, not raised) since there's no view to resolve.
-    Nothing in here crashes, retries forever, or hangs waiting on a
-    socket that's never coming.
+      1. labwc, via LabwcToplevelWatcher (kortexd.labwc_bridge) — real,
+         event-driven, talks to zwlr_foreign_toplevel_manager_v1
+         directly. This is the current image's compositor and the
+         primary path now. See labwc_bridge.py's module docstring and
+         the build script's banner comment above its install step for
+         exactly what this protocol does and doesn't expose — short
+         version: focus/launch/close are real, live window geometry
+         (on_move) is not observable at all under this protocol, and
+         placement application goes through a windowRule + SIGHUP
+         reload rather than a live move, taking effect on that app_id's
+         *next* launch rather than the instance that triggered it.
 
-    Kept in case a labwc IPC/plugin story ever materializes upstream —
-    at that point this class is still exactly where the bridge would
-    plug back in.
+      2. wfctl / Wayfire IPC (pip: wfctl, github.com/killown/wfctl) —
+         the original backend, from when this image ran Wayfire instead
+         of labwc. Left in as a fallback purely in case this ever runs
+         on a Wayfire session again; on a labwc-only image it will
+         simply never find `wfctl` on $PATH and get skipped.
 
-    CAVEAT (left over from the Wayfire days, still accurate if wfctl ever
-    comes back): the event/field names below (event, view.app-id,
-    view.geometry, view-mapped/focused/geometry-changed) were based on
-    wfctl's documented command surface and Wayfire's IPC changelog, never
-    checked field-by-field against a live socket — if they ever turn out
-    wrong, only _handle_event() needs to change.
+      3. True no-op — if neither backend is available (unknown
+         compositor, headless, whatever), every method here is still
+         safely callable and just does nothing. Same fail-closed
+         philosophy this class always had.
 
-    CAVEAT: clicks were never covered either way — Wayfire's IPC had no
-    raw pointer-button event by design (wlroots compositors deliberately
-    don't let one client see another client's input), so `on_click` was
-    already dead code before labwc entered the picture. Rage/dead-click
-    detection would need a per-toolkit (GTK/Qt) hook instead, separate
-    work from anything an IPC bridge could ever cover.
+    CAVEAT (left over from the Wayfire days, still accurate for that
+    fallback path): the wfctl event/field names below (event,
+    view.app-id, view.geometry, view-mapped/focused/geometry-changed)
+    were based on wfctl's documented command surface and Wayfire's IPC
+    changelog, never checked field-by-field against a live socket — if
+    they ever turn out wrong, only _handle_wfctl_event() needs to change.
+
+    CAVEAT: clicks aren't covered by either backend — no wlroots-based
+    compositor IPC hands one client another client's raw pointer input
+    by design, so `on_click` is wired but nothing calls it yet.
+    Rage/dead-click detection would need a per-toolkit (GTK/Qt) hook
+    instead, separate work from anything a compositor-IPC bridge could
+    ever cover.
     """
 
     def __init__(self, on_focus, on_move, on_click, on_launch=None):
@@ -1894,19 +2320,35 @@ class WindowEventSource:
         self.on_move = on_move
         self.on_click = on_click
         self.on_launch = on_launch
-        self._known_views = set()   # view ids already seen -> mapped vs re-mapped
-        self._view_apps = {}        # view id -> app-id, so move_window can resolve one
+        self._known_views = set()   # wfctl path: view ids seen -> mapped vs re-mapped
+        self._view_apps = {}        # wfctl path: view id -> app-id, for move_window
+        self._backend = None        # "labwc", "wfctl", or None
+        self._labwc_watcher = None
+        self._labwc_rules = LabwcPlacementRules()
 
     def start(self):
-        if shutil.which("wfctl") is None:
-            log.info(
-                "WindowEventSource: no wfctl on PATH (expected under labwc — "
-                "no compositor IPC exists). Window-event tracking is disabled; "
-                "everything else in Kortex is unaffected."
-            )
+        watcher = LabwcToplevelWatcher(
+            on_focus=self.on_focus,
+            on_launch=lambda app: self.on_launch and self.on_launch(app, None, None),
+            on_close=lambda app: None,  # on_window_close isn't wired to a source yet either backend
+        )
+        if watcher.start():
+            self._labwc_watcher = watcher
+            self._backend = "labwc"
+            log.info("WindowEventSource started (labwc bridge, zwlr_foreign_toplevel_manager_v1)")
             return
-        threading.Thread(target=self._watch_loop, daemon=True).start()
-        log.info("WindowEventSource started (wfctl -m watching compositor IPC)")
+
+        if shutil.which("wfctl") is not None:
+            self._backend = "wfctl"
+            threading.Thread(target=self._watch_loop, daemon=True).start()
+            log.info("WindowEventSource started (wfctl -m watching compositor IPC)")
+            return
+
+        log.info(
+            "WindowEventSource: no working backend (neither the labwc "
+            "bridge nor wfctl came up). Window-event tracking is "
+            "disabled; everything else in Kortex is unaffected."
+        )
 
     def _watch_loop(self):
         while True:
@@ -1929,11 +2371,11 @@ class WindowEventSource:
                     event = json.loads(line)
                 except ValueError:
                     continue  # non-JSON output line — ignore, don't crash the watcher
-                self._handle_event(event)
+                self._handle_wfctl_event(event)
         finally:
             proc.terminate()
 
-    def _handle_event(self, event):
+    def _handle_wfctl_event(self, event):
         kind = event.get("event") or event.get("type")
         view = event.get("view") or {}
         app = view.get("app-id") or view.get("app_id") or event.get("app-id")
@@ -1970,25 +2412,62 @@ class WindowEventSource:
         # docstring. on_click is wired but nothing ever calls it yet.
 
     def move_window(self, app, monitor, x, y, w, h):
-        """Applies a placement via wfctl (used both for Kortex-initiated
-        shifts and for reverting one via the Undo button). wfctl's
-        move/resize subcommands take a numeric view id, not an app name, so
-        resolve one from the most recent view we've seen for this app.
+        """Applies a placement, via whichever backend is live.
+
+        wfctl backend: live move/resize on the current view (used both
+        for Kortex-initiated shifts and for reverting one via the Undo
+        button) — same as it always did.
+
+        labwc backend: NOT a live move — see this class's and
+        labwc_bridge.LabwcPlacementRules's docstrings for why one isn't
+        possible under labwc's currently-implemented protocol set. This
+        writes/refreshes a windowRule (MoveTo/ResizeTo) for `app` and
+        SIGHUPs labwc to reload it, which then applies the next time
+        `app` maps a window — not necessarily the instance open right
+        now. `monitor` is treated as an output *name* (matching
+        wlr-randr's naming) and resolved to a global-coordinate origin
+        that x/y get added to, since labwc's MoveTo takes coordinates in
+        the full multi-output layout space, not per-output-relative
+        ones — if `monitor` doesn't resolve to a known output, x/y are
+        used as-is on the assumption they're already global.
         """
-        view_id = self._resolve_view_id(app)
-        if view_id is None:
-            log.warning(f"move_window: no live view found for {app!r}, skipping")
+        if self._backend == "labwc":
+            ox, oy = 0, 0
+            origin = resolve_monitor_origin(monitor) if monitor else None
+            if origin:
+                ox, oy = origin
+            self._labwc_rules.set_rule(app, int(x) + ox, int(y) + oy, int(w), int(h))
             return
-        ok1, out1 = _run(["wfctl", "move", "view", str(view_id), str(int(x)), str(int(y))])
-        ok2, out2 = _run(["wfctl", "resize", "view", str(view_id), str(int(w)), str(int(h))])
-        if not (ok1 and ok2):
-            log.warning(f"move_window failed for {app!r} (view {view_id}): {out1} / {out2}")
+
+        if self._backend == "wfctl":
+            view_id = self._resolve_view_id(app)
+            if view_id is None:
+                log.warning(f"move_window: no live view found for {app!r}, skipping")
+                return
+            ok1, out1 = _run(["wfctl", "move", "view", str(view_id), str(int(x)), str(int(y))])
+            ok2, out2 = _run(["wfctl", "resize", "view", str(view_id), str(int(w)), str(int(h))])
+            if not (ok1 and ok2):
+                log.warning(f"move_window failed for {app!r} (view {view_id}): {out1} / {out2}")
+            return
+
+        log.warning(f"move_window: no backend available, skipping placement for {app!r}")
 
     def _resolve_view_id(self, app):
         for vid, a in self._view_apps.items():
             if a == app:
                 return vid
         return None
+
+    def clear_placement(self, app):
+        """Stops applying a learned placement for `app` going forward.
+        Only meaningful for the labwc backend, where "undo" without a
+        known prior position means removing the windowRule rather than
+        moving anywhere (see KortexDaemon._undo_shift) — the wfctl
+        backend always has a real old_xywh to move back to instead, so
+        this is never reached on that path.
+        """
+        if self._backend == "labwc":
+            self._labwc_rules.clear_rule(app)
 
 
 class KortexDaemon:
@@ -2051,16 +2530,33 @@ class KortexDaemon:
         user cares about yet — rather than repositioning something live
         under the user's cursor. This is the only place a learned placement
         actually gets applied.
+
+        Under the labwc backend, `monitor` and `current_xywh` both arrive
+        as None — zwlr_foreign_toplevel_manager_v1 doesn't hand back
+        geometry or (at launch time) even a resolved output, so there's
+        nothing to fill them in with. Falls back to the most-recently-
+        learned monitor for this app rather than guessing 0, and skips
+        the "already there" short-circuit since there's no current
+        geometry to compare against — move_window() is idempotent
+        (rewrites the same windowRule) so a redundant call just costs a
+        wasted SIGHUP, not a wrong result.
         """
         confidence = self.store.get_placement_confidence(app)
         if confidence < self.PLACEMENT_APPLY_THRESHOLD:
             return  # still just accumulating weight, not acted on yet
 
-        learned = self.store.get_placement(app, monitor)
-        if not learned or learned[:4] == current_xywh:
-            return  # nothing to change, or already there
+        if monitor is None:
+            monitor = self.store.get_last_placement_monitor(app)
+            if monitor is None:
+                return  # no history to fall back to yet
 
-        old_xywh = current_xywh
+        learned = self.store.get_placement(app, monitor)
+        if not learned:
+            return
+        if current_xywh is not None and learned[:4] == current_xywh:
+            return  # already there (only knowable on backends with live geometry)
+
+        old_xywh = current_xywh  # may be None under labwc — _undo_shift handles that
         new_xywh = learned[:4]
         self.window_source.move_window(app, monitor, *new_xywh)
         self.notifier.on_preference_shift(
@@ -2068,8 +2564,15 @@ class KortexDaemon:
         )
 
     def _undo_shift(self, app, monitor, old_xywh):
-        # Move it back...
-        self.window_source.move_window(app, monitor, *old_xywh)
+        # Move it back — or, under labwc when old_xywh is unknown (see
+        # on_window_launch), just stop applying the learned rule going
+        # forward rather than moving to a position we never actually
+        # observed. Either way this is "undo the automatic behavior,"
+        # not "reproduce the exact prior pixel position."
+        if old_xywh is not None:
+            self.window_source.move_window(app, monitor, *old_xywh)
+        else:
+            self.window_source.clear_placement(app)
         # ...and log a 'reverted' friction event rather than reusing 'rage' —
         # "user undid an automatic action" is a stronger, more specific
         # signal than click-frustration, so it gets its own weighted kind
@@ -2210,7 +2713,23 @@ WantedBy=graphical-session.target
 KORTEX_SERVICE_UNIT
 
 echo "=== Compiling kortexd (Nuitka -> native x86_64 binary) ==="
-cd /usr/lib/kortex
+# --include-package=pywayland: needed explicitly, unlike kortexd's own
+# submodules — pywayland isn't imported unconditionally at module scope
+# (labwc_bridge.py wraps the import in try/except so the daemon still
+# runs on non-labwc/non-Wayland sessions), and Nuitka's static import
+# scan can miss packages that are only ever reached through a guarded
+# import. --include-package-data pulls in pywayland's bundled protocol
+# XML/cffi build artifacts alongside it.
+#
+# CAVEAT, not yet verified end-to-end: pywayland's Wayland calls go
+# through a cffi extension module (_ffi), and cffi extensions inside a
+# Nuitka --onefile binary are a known rough edge — the onefile bootstrap
+# unpacks to a temp dir at runtime and dynamic/cffi-loaded .so files
+# don't always resolve correctly from there. If kortexd's labwc bridge
+# comes up as unavailable in a compiled build despite working fine when
+# run straight from `python -m kortexd`, this is the first place to
+# check — --standalone (non-onefile) sidesteps the temp-unpack step
+# entirely and is the fallback if onefile turns out not to work here.
 python -m nuitka \
   --standalone \
   --onefile \
@@ -2218,6 +2737,8 @@ python -m nuitka \
   --output-filename=kortexd \
   --include-package=kortexd \
   --include-package-data=kortexd \
+  --include-package=pywayland \
+  --include-package-data=pywayland \
   --python-flag=-m \
   --assume-yes-for-downloads \
   --lto=yes \
@@ -2755,7 +3276,7 @@ INSTALLER_LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/1419ece4c5
 # square icon sizes without letterboxing and dragging the wordmark along.
 # Icon generation below crops out just the circular badge first; the boot
 # splash uses the full lockup (wordmark included) unmodified.
-BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/27a7ccd68060dcaca2b451e7fcc1a9e2ca55e8dc/file_0000000063c4822faf13c8d2e168ea23.png?raw=true"
+BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.jpg"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
 LOGO_256="/usr/share/kibaos/logo-256.png"
@@ -2820,6 +3341,30 @@ if [ -f "${INSTALLER_LOGO}.raw" ] && file "${INSTALLER_LOGO}.raw" | grep -qi 'im
 else
   rm -f "${INSTALLER_LOGO}.raw"
   cp "${LOGO_256}" "${INSTALLER_LOGO}"   # fallback: reuse the generic logo
+fi
+
+# ── OOBE welcome-screen cursive font ──────────────────────────────────────
+# "Sacramento" (SIL Open Font License, Google Fonts / google/fonts repo) --
+# a minimal, restrained monoline script, deliberately chosen over heavier/
+# more ornate script faces (e.g. Dancing Script) for a cleaner look. GTK
+# CSS has no @font-face -- the only way to use a custom typeface is to
+# actually install it system-wide and reference the family name, so it
+# needs to be baked into the image rather than referenced by URL like the
+# wallpaper/logo art above.
+mkdir -p /usr/share/fonts/kibaos
+curl -fL --retry 5 --retry-delay 3 \
+  -o /usr/share/fonts/kibaos/Sacramento.ttf \
+  "https://raw.githubusercontent.com/google/fonts/main/ofl/sacramento/Sacramento-Regular.ttf" \
+  || true
+if [ -f /usr/share/fonts/kibaos/Sacramento.ttf ] && \
+   file /usr/share/fonts/kibaos/Sacramento.ttf | grep -qi 'truetype\|font'; then
+  fc-cache -f /usr/share/fonts/kibaos
+else
+  # Download failed -- don't leave a zero-byte/corrupt file around for
+  # fontconfig to trip over; the CSS falls back to the generic "cursive"
+  # family (whatever fontconfig maps that to, if anything's installed) or
+  # plain sans if nothing is, so this degrades instead of breaking.
+  rm -f /usr/share/fonts/kibaos/Sacramento.ttf
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -2999,10 +3544,10 @@ public class KibaOOBE : Adw.Application {
         window.notify["fullscreened"].connect (() => {
             if (!window.fullscreened) window.fullscreen ();
         });
-        // Default to dark mode regardless of system preference; the toggle
-        // on every page still lets the user switch to light from there.
-        Adw.StyleManager.get_default ().color_scheme = Adw.ColorScheme.FORCE_DARK;
-        is_dark = true;
+        // Default to light mode; the toggle on every page still lets the
+        // user switch to dark from there.
+        Adw.StyleManager.get_default ().color_scheme = Adw.ColorScheme.FORCE_LIGHT;
+        is_dark = false;
         apply_dark_mode ();
         nav_view = new Adw.NavigationView ();
         window.set_content (nav_view);
@@ -3229,24 +3774,45 @@ public class KibaOOBE : Adw.Application {
     // Page 1: Welcome
     // ══════════════════════════════════════════════════════════════════
     private Adw.NavigationPage build_welcome_page () {
-        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 32);
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20) {
+            halign = Gtk.Align.CENTER
+        };
 
-        // Logo
+        // Logo — centered above the greeting, Apple's own "Hello" screen
+        // skips a brand mark entirely and lets the greeting carry the
+        // whole moment, but KibaOS keeps a small centered one here since
+        // the persistent corner wordmark is easy to miss on a first boot.
         var logo = new Gtk.Image.from_file ("/usr/share/kibaos/installer-logo.png") {
-            pixel_size = 80,
-            halign     = Gtk.Align.START
+            pixel_size = 64,
+            halign     = Gtk.Align.CENTER
         };
         content.append (logo);
 
-        content.append (oobe_heading (
-            t ("Welcome to KibaOS", "KibaOS'a Hoş Geldiniz", "Witamy w KibaOS"),
+        // The greeting itself -- just "Welcome", set in a script face, the
+        // way Apple's own out-of-box "Hello" moment leans on the word
+        // alone rather than a full sentence explaining what's coming.
+        var greeting = new Gtk.Label (
+            t ("Welcome", "Hoş geldiniz", "Witamy")) {
+            halign = Gtk.Align.CENTER,
+            justify = Gtk.Justification.CENTER
+        };
+        greeting.add_css_class ("oobe-cursive-greeting");
+        content.append (greeting);
+
+        var subtitle = new Gtk.Label (
             t ("Let's get your system set up. This should only take a few minutes.",
                "Sisteminizi kuralım. Bu işlem yalnızca birkaç dakika sürecek.",
-               "Skonfigurujmy Twój system. To zajmie tylko kilka minut.")));
+               "Skonfigurujmy Twój system. To zajmie tylko kilka minut.")) {
+            halign = Gtk.Align.CENTER,
+            justify = Gtk.Justification.CENTER,
+            margin_top = 4
+        };
+        subtitle.add_css_class ("oobe-subtitle");
+        content.append (subtitle);
 
         var nav_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
-            halign = Gtk.Align.START,
-            margin_top = 20
+            halign = Gtk.Align.CENTER,
+            margin_top = 24
         };
         var try_btn = new Gtk.Button.with_label (t ("Try KibaOS", "KibaOS'u Dene", "Wypróbuj KibaOS"));
         try_btn.add_css_class ("oobe-secondary-button");
@@ -3951,6 +4517,8 @@ public class KibaOOBE : Adw.Application {
     // ══════════════════════════════════════════════════════════════════
     private Gtk.Label      progress_label;
     private Gtk.ProgressBar progress_bar;
+    private Gtk.Stack      feature_stack;
+    private uint            feature_timer_id = 0;
 
     private Adw.NavigationPage build_installing_page () {
         var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
@@ -3966,7 +4534,76 @@ public class KibaOOBE : Adw.Application {
         progress_label.add_css_class ("oobe-subtitle");
         content.append (progress_label);
 
+        // Feature slideshow -- something to actually read while the real
+        // progress line above is stuck on one status for a while (e.g.
+        // "Copying files…" during the unsquashfs step, which takes a lot
+        // longer than everything else combined and gives no finer-grained
+        // updates). Cycles independently of install progress; the two
+        // labels aren't tied together.
+        string[,] features = {
+            { t ("Your computer learns how you use it", "Bilgisayarınız sizi nasıl kullandığınızı öğrenir", "Twój komputer uczy się, jak go używasz"),
+              t ("KibaOS quietly notices your habits and adjusts things to fit — everything stays on your computer.",
+                 "KibaOS alışkanlıklarınızı sessizce fark eder ve buna göre ayarlar yapar — her şey bilgisayarınızda kalır.",
+                 "KibaOS po cichu zauważa Twoje nawyki i odpowiednio się dostosowuje — wszystko zostaje na Twoim komputerze.") },
+            { t ("Built just for this installer", "Sadece bu kurulum için yapıldı", "Zbudowany specjalnie dla tego instalatora"),
+              t ("This setup screen was made specifically for KibaOS, not borrowed from another system.",
+                 "Bu kurulum ekranı özellikle KibaOS için yapıldı, başka bir sistemden alınmadı.",
+                 "Ten ekran instalacji został stworzony specjalnie dla KibaOS, a nie zapożyczony z innego systemu.") },
+            { t ("Starts up fast", "Hızlı açılır", "Szybko się uruchamia"),
+              t ("KibaOS uses your computer's modern startup process, which gets you to the desktop quicker.",
+                 "KibaOS, bilgisayarınızın modern açılış sürecini kullanır ve bu sayede masaüstüne daha hızlı ulaşırsınız.",
+                 "KibaOS korzysta z nowoczesnego procesu uruchamiania komputera, dzięki czemu szybciej trafiasz na pulpit.") },
+            { t ("Fixes small problems on its own", "Küçük sorunları kendi kendine çözer", "Samodzielnie naprawia drobne problemy"),
+              t ("If something starts acting up, KibaOS notices and tries to repair it automatically.",
+                 "Bir şey tuhaf davranmaya başlarsa, KibaOS bunu fark eder ve otomatik olarak onarmaya çalışır.",
+                 "Jeśli coś zacznie działać nieprawidłowo, KibaOS to zauważy i spróbuje to automatycznie naprawić.") },
+            { t ("Ready to play your videos and music", "Videolarınızı ve müziklerinizi oynatmaya hazır", "Gotowy do odtwarzania Twoich filmów i muzyki"),
+              t ("A video player and everything it needs are already installed — nothing extra to download.",
+                 "Bir video oynatıcı ve ihtiyaç duyduğu her şey zaten kurulu — indirmeniz gereken ekstra bir şey yok.",
+                 "Odtwarzacz wideo i wszystko, czego potrzebuje, jest już zainstalowane — nie trzeba niczego dodatkowo pobierać.") }
+        };
+
+        feature_stack = new Gtk.Stack () {
+            transition_type = Gtk.StackTransitionType.CROSSFADE,
+            transition_duration = 420,
+            margin_top = 40,
+            halign = Gtk.Align.CENTER
+        };
+        feature_stack.add_css_class ("oobe-feature-stack");
+        for (int i = 0; i < features.length[0]; i++) {
+            var pane = new Gtk.Box (Gtk.Orientation.VERTICAL, 6) { halign = Gtk.Align.CENTER };
+            var f_title = new Gtk.Label (features[i, 0]) { halign = Gtk.Align.CENTER, justify = Gtk.Justification.CENTER };
+            f_title.add_css_class ("oobe-feature-title");
+            var f_body = new Gtk.Label (features[i, 1]) {
+                halign = Gtk.Align.CENTER, justify = Gtk.Justification.CENTER, wrap = true, max_width_chars = 46
+            };
+            f_body.add_css_class ("oobe-feature-body");
+            pane.append (f_title);
+            pane.append (f_body);
+            feature_stack.add_named (pane, i.to_string ());
+        }
+        feature_stack.visible_child_name = "0";
+        content.append (feature_stack);
+
+        int feature_index = 0;
+        int feature_count = features.length[0];
+        feature_timer_id = GLib.Timeout.add_seconds (5, () => {
+            feature_index = (feature_index + 1) % feature_count;
+            feature_stack.visible_child_name = feature_index.to_string ();
+            return GLib.Source.CONTINUE;
+        });
+
         return make_page ("Installing", content, null, null, true);
+    }
+
+    // Stops the feature-slideshow timer -- called once install finishes
+    // (success or failure) so it doesn't keep firing against a stack that
+    // no longer has a reason to update once this page is behind us.
+    private void stop_feature_slideshow () {
+        if (feature_timer_id != 0) {
+            GLib.Source.remove (feature_timer_id);
+            feature_timer_id = 0;
+        }
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -4056,6 +4693,7 @@ public class KibaOOBE : Adw.Application {
                 }
             }
             yield proc.wait_async ();
+            stop_feature_slideshow ();
             if (proc.get_exit_status () == 0) {
                 nav_view.push (build_done_page ());
             } else if (last_fatal_message != "") {
@@ -4070,6 +4708,7 @@ public class KibaOOBE : Adw.Application {
                     "Coś poszło nie tak. Szczegóły znajdziesz w /var/log/kibaos-oobe.log.");
             }
         } catch (GLib.Error e) {
+            stop_feature_slideshow ();
             progress_label.label = t ("Lost connection to installer: %s",
                                        "Kurulum programıyla bağlantı kesildi: %s",
                                        "Utracono połączenie z instalatorem: %s").printf (e.message);
@@ -4117,18 +4756,11 @@ cat > /usr/share/kibaos-oobe/oobe.css << 'OOBECSS'
 window.kibaos-oobe-window { background: transparent; }
 
 .oobe-background {
-    background: linear-gradient(160deg,
-        rgba(180,210,240,0.55) 0%,
-        rgba(220,235,250,0.40) 50%,
-        rgba(200,220,245,0.55) 100%);
-    /* Blurred wallpaper shows through — the card pops as the focal point */
+    background: #ffffff;
     transition: background 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 window.dark .oobe-background {
-    background: linear-gradient(160deg,
-        rgba(8,14,24,0.75) 0%,
-        rgba(14,20,32,0.55) 50%,
-        rgba(6,10,18,0.75) 100%);
+    background: #12161d;
 }
 
 /* ── Brand wordmark ────────────────────────────────────────────────────── */
@@ -4136,15 +4768,14 @@ window.dark .oobe-background {
     font-size: 15px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    color: rgba(255,255,255,0.85);
-    text-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    color: rgba(15,23,42,0.80);
 }
 
 /* ── Corner controls (language / dark-mode toggle) ───────────────────────── */
 .oobe-corner-button {
-    background:    rgba(255,255,255,0.55);
+    background:    rgba(15,23,42,0.05);
     color:         #334155;
-    border:        1px solid rgba(255,255,255,0.6);
+    border:        1px solid rgba(15,23,42,0.10);
     border-radius: 999px;
     min-width:     34px;
     min-height:    34px;
@@ -4155,7 +4786,7 @@ window.dark .oobe-background {
         background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
         transform         140ms cubic-bezier(0.22, 1, 0.36, 1);
 }
-.oobe-corner-button:hover  { background: rgba(255,255,255,0.85); transform: translateY(-1px); }
+.oobe-corner-button:hover  { background: rgba(15,23,42,0.09); transform: translateY(-1px); }
 .oobe-corner-button:active { transform: translateY(0); transition-duration: 70ms; }
 window.dark .oobe-corner-button {
     background: rgba(30,41,59,0.65);
@@ -4213,6 +4844,21 @@ window.dark .oobe-step-dot-active { background: #22c1ec; }
 .oobe-nav-row { margin-top: 4px; }
 
 /* ── Typography ────────────────────────────────────────────────────────── */
+/* Cursive "Welcome" greeting, welcome page only -- Apple's own out-of-box
+ * "Hello" screen leans on an animated script rendering of the greeting as
+ * the whole moment; this is the static equivalent. Falls back to the
+ * fontconfig generic "cursive" family (or plain sans if even that isn't
+ * present) if the Dancing Script install ever failed at build time. */
+.oobe-cursive-greeting {
+    font-family: "Sacramento", cursive;
+    font-size: 72px;
+    font-weight: 400;
+    color: #0f172a;
+    margin-top: 4px;
+    animation: fade-up 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+window.dark .oobe-cursive-greeting { color: #f1f5f9; }
+
 .oobe-title {
     font-size:      30px;
     font-weight:    650;
@@ -4286,7 +4932,7 @@ window.dark .oobe-signal-glyph { color: #22c1ec; }
 listview > row {
     background:    rgba(248,250,252,0.9);
     border:        1px solid rgba(0,0,0,0.07);
-    border-radius: 14px;
+    border-radius: 18px;
     margin:        4px 0;
     padding:       14px 16px;
     color:         #1e293b;
@@ -4317,7 +4963,7 @@ window.dark .oobe-list row:selected {
 
 /* ── Preferences group (account page) ─────────────────────────────────── */
 .oobe-prefs-group {
-    border-radius: 16px;
+    border-radius: 20px;
     overflow: hidden;
 }
 
@@ -4325,7 +4971,7 @@ window.dark .oobe-list row:selected {
 .oobe-summary-box {
     background:    rgba(248,250,252,0.9);
     border:        1px solid rgba(0,0,0,0.07);
-    border-radius: 16px;
+    border-radius: 20px;
     overflow:      hidden;
     margin-top:    8px;
 }
@@ -4375,15 +5021,15 @@ window.dark row.combo, window.dark row.action {
     font-weight:   650;
     font-size:     16px;
     min-width:     120px;
-    box-shadow:    0 1px 3px rgba(0,153,204,0.35);
+    box-shadow:    0 1px 2px rgba(15,23,42,0.12);
     transition:
         background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
         box-shadow       140ms cubic-bezier(0.22, 1, 0.36, 1),
         transform        120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .oobe-primary-button:hover {
-    background: #00aee3;
-    box-shadow: 0 4px 14px rgba(0,153,204,0.40);
+    background: #0091c2;
+    box-shadow: 0 2px 6px rgba(15,23,42,0.16);
     transform:  translateY(-1px);
 }
 .oobe-primary-button:active {
@@ -4424,6 +5070,25 @@ window.dark .oobe-secondary-button:active { background: rgba(255,255,255,0.14); 
     transition:  all 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 window.dark .oobe-progress trough { background: rgba(255,255,255,0.10); }
+
+/* ── Feature slideshow (installing page) ─────────────────────────────────
+ * Something to read while the real progress line is stuck on one status
+ * for a while -- unsquashfs extraction in particular takes far longer
+ * than anything else in the install and gives no finer-grained updates. */
+.oobe-feature-stack { min-height: 90px; }
+.oobe-feature-title {
+    font-size:   17px;
+    font-weight: 650;
+    color:       #0f172a;
+}
+.oobe-feature-body {
+    font-size:   14px;
+    color:       #64748b;
+    line-height: 1.5;
+    margin-top:  2px;
+}
+window.dark .oobe-feature-title { color: #f1f5f9; }
+window.dark .oobe-feature-body  { color: #94a3b8; }
 
 /* ── Form entries ──────────────────────────────────────────────────────── */
 entry, row.entry, .oobe-prefs-group entry {
@@ -6170,7 +6835,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
                            kiba_progress_cb cb, void *user_data) {
     char path[1024];
 
-    if (cb) cb(80, "Removing live-only tools...", user_data);
+    if (cb) cb(80, "Cleaning up installer files...", user_data);
 
     static const char *live_only[] = {
         "usr/share/applications/kibaos-install.desktop",
@@ -6206,7 +6871,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         chroot_run(target_root, argv); /* best-effort, same as old backend */
     }
 
-    if (cb) cb(84, "Installing bootloader...", user_data);
+    if (cb) cb(84, "Setting up your computer to start KibaOS...", user_data);
     {
         /* KibaOS is UEFI-only, which needs /sys/firmware/efi/efivars to
          * write the NVRAM boot entry. Fail fast with a clear message
@@ -6295,7 +6960,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     (void)disk_path;   /* no longer needed -- the loader entry is written directly from root_uuid */
     (void)root_partno;
 
-    if (cb) cb(88, "Enabling services...", user_data);
+    if (cb) cb(88, "Turning on background features...", user_data);
     {
         static const char *services[] = {
             "NetworkManager", "sddm", "bluetooth",
@@ -6307,7 +6972,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         }
     }
 
-    if (cb) cb(89, "Copying network configuration...", user_data);
+    if (cb) cb(89, "Saving your Wi-Fi settings...", user_data);
     {
         /* arch-chroot shares the host's network namespace, so the live
          * session's own connection is already what pacman used above and
@@ -6330,7 +6995,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         run_argv(argv); /* best-effort -- fine if the live session never had a saved connection */
     }
 
-    if (cb) cb(90, "Installing media codecs...", user_data);
+    if (cb) cb(90, "Adding support for videos and music...", user_data);
     {
         /* gst-plugins-ugly, gst-libav, and ffmpeg cover the actually
          * patent-encumbered codecs (h264, mp3, aac, etc.) -- deliberately
@@ -6346,13 +7011,13 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             (char *)"gst-plugins-ugly", (char *)"gst-libav", (char *)"ffmpeg", NULL
         };
         if (chroot_run(target_root, argv) != 0 && cb) {
-            cb(90, "Warning: couldn't fetch proprietary codecs (offline?) -- "
-                   "install gst-plugins-ugly, gst-libav, and ffmpeg later from Settings",
+            cb(90, "Couldn't add video/music support right now (no internet?) -- "
+                   "you can add it later from Settings",
                user_data);
         }
     }
 
-    if (cb) cb(91, "Applying boot theme...", user_data);
+    if (cb) cb(91, "Adding your startup screen...", user_data);
     snprintf(path, sizeof(path), "%s/etc/sysctl.d", target_root);
     mkdir(path, 0755);
     snprintf(path, sizeof(path), "%s/etc/sysctl.d/20-quiet-printk.conf", target_root);
@@ -6375,7 +7040,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         snprintf(theme_check, sizeof(theme_check), "%s/usr/share/plymouth/themes/kibaos/kibaos.plymouth", target_root);
         struct stat st;
         if (stat(theme_check, &st) != 0) {
-            if (cb) cb(93, "Warning: kibaos Plymouth theme missing from target, boot splash will use the default theme", user_data);
+            if (cb) cb(93, "Couldn't find the KibaOS startup screen -- using the default one instead", user_data);
         } else {
             char *argv[] = { (char *)"plymouth-set-default-theme", (char *)"kibaos", NULL };
             if (chroot_run(target_root, argv) != 0) {
@@ -6384,12 +7049,12 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
                  * rebuild below will silently bake in whatever theme was
                  * already active (the stock default) instead of kibaos --
                  * this was previously discarded with no error or log line. */
-                if (cb) cb(93, "Warning: plymouth-set-default-theme failed, boot splash will use the default theme", user_data);
+                if (cb) cb(93, "Couldn't set the KibaOS startup screen -- using the default one instead", user_data);
             }
         }
     }
 
-    if (cb) cb(94, "Rebuilding initramfs...", user_data);
+    if (cb) cb(94, "Finishing up...", user_data);
     {
         char *argv[] = {
             (char *)"mkinitcpio", (char *)"-c", (char *)"/etc/mkinitcpio.conf.d/installed.conf",
