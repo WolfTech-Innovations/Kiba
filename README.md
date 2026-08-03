@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/WolfTech-Innovations/Kiba/blob/27a7ccd68060dcaca2b451e7fcc1a9e2ca55e8dc/file_0000000063c4822faf13c8d2e168ea23.png?raw=true" width="250" alt="Kiba Badge">
+  <img src="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true" width="250" alt="Kiba Badge">
 </p>
 
 > [!IMPORTANT]
