@@ -2752,6 +2752,17 @@ echo "=== Compiling kortexd (Nuitka -> native x86_64 binary) ==="
 # run straight from `python -m kortexd`, this is the first place to
 # check — --standalone (non-onefile) sidesteps the temp-unpack step
 # entirely and is the fallback if onefile turns out not to work here.
+#
+# Working directory matters here: `kortexd` below is a bare module name,
+# resolved via --python-flag=-m against the CURRENT directory (nothing
+# earlier in this script ever cd's into /usr/lib/kortex — the last cd
+# anywhere above this point is `cd "${WORKDIR}"` for the archiso profile
+# at the very top). Without this cd, Nuitka looks for `kortexd` wherever
+# that leaves us and fails with "file 'kortexd' is not found". The
+# `build/kortexd` relative path in the install step below, and the
+# absolute /usr/lib/kortex/... cleanup paths after it, both already
+# assumed this cwd — this was the one piece that was missing.
+cd /usr/lib/kortex
 python -m nuitka \
   --standalone \
   --onefile \
