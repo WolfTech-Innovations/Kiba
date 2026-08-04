@@ -424,7 +424,35 @@ pacman -Syy --noconfirm
 # of space, not any one install being huge. -Scc (double-c) nukes cached
 # packages of every version, not just the outdated ones.
 pacman -Scc --noconfirm
+# --- BEGIN: ensure wayland/wlr protocol XMLs and pywayland scanner are available ---
+set -euo pipefail
+set -x
 
+# Install basic tooling (pacman inside the arch container)
+pacman -Sy --noconfirm --needed git python-pip || true
+
+# Prefer distro packages if available
+pacman -Sy --noconfirm --needed wayland-protocols || true
+pacman -Sy --noconfirm --needed wlr-protocols || true
+
+# Ensure kernel headers and syslinux to avoid DKMS/memdisk errors
+pacman -Sy --noconfirm --needed linux-headers syslinux || true
+
+# Ensure a recent pywayland/pywayland-scanner is present (pip fallback)
+pip install --upgrade pywayland pywayland-scanner || true
+
+# If wlr-protocols package wasn't available, clone XMLs into system path
+if [ ! -d /usr/share/wayland-protocols/wlr-protocols ]; then
+  echo "wlr-protocols not found in pacman; cloning repository as fallback..."
+  rm -rf /tmp/wlr-protocols
+  git clone --depth=1 https://github.com/swaywm/wlr-protocols.git /tmp/wlr-protocols
+  install -d -m755 /usr/share/wayland-protocols/wlr-protocols
+  cp -f /tmp/wlr-protocols/*.xml /usr/share/wayland-protocols/wlr-protocols/ || true
+fi
+
+# Make sure the scanner sees the XMLs
+export XDG_DATA_DIRS="/usr/share/wayland-protocols:${XDG_DATA_DIRS:-/usr/share}"
+# --- END: ensure wayland/wlr protocol XMLs and pywayland scanner are available ---
 # ── Silent Wine wrapper ────────────────────────────────────────────────────
 cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
 #!/usr/bin/env bash
