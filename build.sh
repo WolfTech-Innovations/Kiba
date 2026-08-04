@@ -132,8 +132,6 @@ python
 pyalpm
 parted
 gptfdisk
-wine
-wine-mono
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
@@ -237,6 +235,21 @@ gst-plugins-good
 gst-plugins-bad
 plymouth
 squashfs-tools
+
+# ── Windows app support (WinApps) ────────────────────────────────────────
+# Runtime deps per https://github.com/winapps-org/winapps. curl, git,
+# libnotify already pulled in above for other reasons. Arch's "freerdp"
+# package is already v3+, unlike Debian which needs the freerdp3-x11 split.
+# pciutils (lspci) is for kibaos-winapps-setup's automatic NVIDIA GPU
+# passthrough detection -- not a WinApps dependency itself.
+freerdp
+docker
+docker-compose
+dialog
+iproute2
+openbsd-netcat
+zenity
+pciutils
 
 # ── Security ────────────────────────────────────────────────────────────
 sbctl
@@ -415,7 +428,7 @@ pacman -Syy --noconfirm
 
 # ── clear out disk before we install anything else ──────────────────────────
 # by now mkarchiso's already pacstrapped the whole ~195-package
-# packages.x86_64 list (chromium, wine, mesa, all of it) into this
+# packages.x86_64 list (chromium, mesa, all of it) into this
 # airootfs, and every single .pkg.tar.zst is still sitting in the cache —
 # nothing cleared it until the very end of the script before. everything
 # coming up next (Kortex's own installs, the Nuitka onefile compile,
@@ -424,21 +437,6 @@ pacman -Syy --noconfirm
 # of space, not any one install being huge. -Scc (double-c) nukes cached
 # packages of every version, not just the outdated ones.
 pacman -Scc --noconfirm
-
-# ── Silent Wine wrapper ────────────────────────────────────────────────────
-cat > /usr/local/bin/wine-silent << 'WINEWRAPPER'
-#!/usr/bin/env bash
-export WINEDEBUG=-all
-export WINEPREFIX="${HOME}/.wine"
-export WINEARCH=win64
-export QT_QPA_PLATFORM=wayland
-export GDK_BACKEND=wayland
-if [ ! -d "${WINEPREFIX}" ]; then
-  wineboot --init 2>/dev/null
-fi
-exec wine "$@" 2>/dev/null
-WINEWRAPPER
-chmod +x /usr/local/bin/wine-silent
 
 # earlyoom (just polls free mem/swap thresholds) and systemd-oomd
 # (cgroup-aware, uses PSI) both do the same job of OOM-killing stuff, so
@@ -467,36 +465,18 @@ fs.inotify.max_user_watches=524288
 net.core.netdev_max_backlog=16384
 SYSCTL
 
-mkdir -p /etc/binfmt.d
-cat > /etc/binfmt.d/wine.conf << 'BINFMT'
-:DOSWin:M::MZ::/usr/local/bin/wine-silent:
-BINFMT
-
-mkdir -p /usr/share/applications
-cat > /usr/share/applications/wine-exe.desktop << 'WINEDESKTOP'
-[Desktop Entry]
-Name=Windows Program
-Exec=/usr/local/bin/wine-silent %f
-MimeType=application/x-ms-dos-executable;application/x-msdos-program;application/x-msdownload;
-Type=Application
-NoDisplay=true
-StartupNotify=false
-WINEDESKTOP
-
-mkdir -p /usr/share/mime/packages
-cat > /usr/share/mime/packages/wine.xml << 'WINEXML'
-<?xml version="1.0" encoding="UTF-8"?>
-<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
-  <mime-type type="application/x-ms-dos-executable">
-    <comment>Windows Executable</comment>
-    <glob pattern="*.exe"/>
-    <glob pattern="*.EXE"/>
-    <glob pattern="*.msi"/>
-    <glob pattern="*.MSI"/>
-  </mime-type>
-</mime-info>
-WINEXML
-update-mime-database /usr/share/mime 2>/dev/null || true
+# NOTE: there used to be a binfmt_misc registration here
+# (/etc/binfmt.d/wine.conf, matching on the MZ header) that routed .exe
+# execution straight through Wine at the kernel level. That's gone now
+# along with Wine itself -- and removing it is actually a bugfix in its
+# own right: binfmt_misc intercepts execution before xdg-mime ever gets
+# consulted, so as long as that registration existed, double-clicking an
+# .exe in Nemo would run it via binfmt_misc/wine-silent regardless of
+# what kibaos-run-exe.desktop was set as the default handler for down in
+# the WinApps section below. Now that nothing claims the MZ magic at the
+# binfmt level, that mimeapps.list default is the only thing in play, so
+# .exe/.msi double-clicks go through kibaos-run-exe -> WinApps like they
+# were always supposed to.
 
 # ══════════════════════════════════════════════════════════════════════════
 # KORTEX — adaptive daemon (usage prediction, break reminders, layout
@@ -3376,30 +3356,6 @@ else
   cp "${LOGO_256}" "${INSTALLER_LOGO}"   # fallback: reuse the generic logo
 fi
 
-# ── OOBE welcome-screen cursive font ──────────────────────────────────────
-# "Sacramento" (SIL Open Font License, Google Fonts / google/fonts repo) --
-# a minimal, restrained monoline script, deliberately chosen over heavier/
-# more ornate script faces (e.g. Dancing Script) for a cleaner look. GTK
-# CSS has no @font-face -- the only way to use a custom typeface is to
-# actually install it system-wide and reference the family name, so it
-# needs to be baked into the image rather than referenced by URL like the
-# wallpaper/logo art above.
-mkdir -p /usr/share/fonts/kibaos
-curl -fL --retry 5 --retry-delay 3 \
-  -o /usr/share/fonts/kibaos/Sacramento.ttf \
-  "https://raw.githubusercontent.com/google/fonts/main/ofl/sacramento/Sacramento-Regular.ttf" \
-  || true
-if [ -f /usr/share/fonts/kibaos/Sacramento.ttf ] && \
-   file /usr/share/fonts/kibaos/Sacramento.ttf | grep -qi 'truetype\|font'; then
-  fc-cache -f /usr/share/fonts/kibaos
-else
-  # Download failed -- don't leave a zero-byte/corrupt file around for
-  # fontconfig to trip over; the CSS falls back to the generic "cursive"
-  # family (whatever fontconfig maps that to, if anything's installed) or
-  # plain sans if nothing is, so this degrades instead of breaking.
-  rm -f /usr/share/fonts/kibaos/Sacramento.ttf
-fi
-
 # ══════════════════════════════════════════════════════════════════════════
 # AUR PACKAGES
 # ══════════════════════════════════════════════════════════════════════════
@@ -3821,15 +3777,17 @@ public class KibaOOBE : Adw.Application {
         };
         content.append (logo);
 
-        // The greeting itself -- just "Welcome", set in a script face, the
-        // way Apple's own out-of-box "Hello" moment leans on the word
-        // alone rather than a full sentence explaining what's coming.
+        // The greeting itself -- plain system font, same treatment as
+        // every other page title. HIG is explicit that custom/script
+        // faces are for branding moments or "an immersive gaming
+        // experience," not a plain OS installer -- one typeface used
+        // consistently reads calmer and more native than a flourish here.
         var greeting = new Gtk.Label (
             t ("Welcome", "Hoş geldiniz", "Witamy")) {
             halign = Gtk.Align.CENTER,
             justify = Gtk.Justification.CENTER
         };
-        greeting.add_css_class ("oobe-cursive-greeting");
+        greeting.add_css_class ("oobe-welcome-greeting");
         content.append (greeting);
 
         var subtitle = new Gtk.Label (
@@ -4472,6 +4430,10 @@ public class KibaOOBE : Adw.Application {
 
         content.append (group);
 
+        // No WinApps toggle here -- it's a listed, always-on feature (see
+        // WINDOWS APP SUPPORT section), not opt-in. Both backends always
+        // drop /etc/kibaos/winapps-pending unconditionally on finish.
+
         return make_page ("Account", content,
             is_oem_mode ? t ("Finish Setup", "Kurulumu Bitir", "Zakończ konfigurację") : t ("Next", "İleri", "Dalej"), () => {
                 if (is_oem_mode) {
@@ -4868,29 +4830,28 @@ window.dark .oobe-card {
 }
 .oobe-step-dot-active {
     min-width:  22px;
-    background: #0099cc;
+    background: #0071e3;
 }
 window.dark .oobe-step-dot { background: rgba(255,255,255,0.18); }
-window.dark .oobe-step-dot-active { background: #22c1ec; }
+window.dark .oobe-step-dot-active { background: #409cff; }
 
 /* ── Nav row ───────────────────────────────────────────────────────────── */
 .oobe-nav-row { margin-top: 4px; }
 
 /* ── Typography ────────────────────────────────────────────────────────── */
-/* Cursive "Welcome" greeting, welcome page only -- Apple's own out-of-box
- * "Hello" screen leans on an animated script rendering of the greeting as
- * the whole moment; this is the static equivalent. Falls back to the
- * fontconfig generic "cursive" family (or plain sans if even that isn't
- * present) if the Dancing Script install ever failed at build time. */
-.oobe-cursive-greeting {
-    font-family: "Sacramento", cursive;
-    font-size: 72px;
-    font-weight: 400;
-    color: #0f172a;
-    margin-top: 4px;
+/* Welcome-page greeting -- same system font as everything else, just set
+ * large. No script/cursive face: HIG reserves custom typefaces for
+ * branding or "an immersive gaming experience," and a plain OS installer
+ * is neither -- one consistent typeface reads calmer and more native. */
+.oobe-welcome-greeting {
+    font-size:      44px;
+    font-weight:    650;
+    color:          #1d1d1f;
+    letter-spacing: -0.4px;
+    margin-top:     4px;
     animation: fade-up 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-window.dark .oobe-cursive-greeting { color: #f1f5f9; }
+window.dark .oobe-welcome-greeting { color: #f1f5f9; }
 
 .oobe-title {
     font-size:      30px;
@@ -4956,10 +4917,10 @@ window.dark .oobe-step-label { color: rgba(255,255,255,0.40); }
     font-family: monospace;
     font-size: 15px;
     font-weight: 700;
-    color: #0099cc;
+    color: #0071e3;
     min-width: 34px;
 }
-window.dark .oobe-signal-glyph { color: #22c1ec; }
+window.dark .oobe-signal-glyph { color: #409cff; }
 
 .oobe-list row,
 listview > row {
@@ -4976,11 +4937,11 @@ listview > row {
         transform        180ms cubic-bezier(0.22, 1, 0.36, 1);
     animation: fade-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.oobe-list row:hover { background: #f0f9ff; border-color: rgba(0,153,204,0.28); transform: translateX(2px); }
+.oobe-list row:hover { background: #f0f9ff; border-color: rgba(0,113,227,0.28); transform: translateX(2px); }
 .oobe-list row:selected {
-    background: rgba(0,153,204,0.10);
-    border-color: rgba(0,153,204,0.55);
-    box-shadow: 0 0 0 3px rgba(0,153,204,0.14);
+    background: rgba(0,113,227,0.10);
+    border-color: rgba(0,113,227,0.55);
+    box-shadow: 0 0 0 3px rgba(0,113,227,0.14);
 }
 window.dark .oobe-list row,
 window.dark listview > row {
@@ -4988,10 +4949,10 @@ window.dark listview > row {
     border-color: rgba(255,255,255,0.08);
     color: #e2e8f0;
 }
-window.dark .oobe-list row:hover { background: rgba(0,153,204,0.16); border-color: rgba(0,153,204,0.4); }
+window.dark .oobe-list row:hover { background: rgba(0,113,227,0.16); border-color: rgba(0,113,227,0.4); }
 window.dark .oobe-list row:selected {
-    background: rgba(0,153,204,0.22);
-    border-color: rgba(0,153,204,0.6);
+    background: rgba(0,113,227,0.22);
+    border-color: rgba(0,113,227,0.6);
 }
 
 /* ── Preferences group (account page) ─────────────────────────────────── */
@@ -5034,7 +4995,7 @@ window.dark row.combo, window.dark row.action {
 
 /* ── Done check icon ───────────────────────────────────────────────────── */
 .oobe-done-check {
-    color: #0099cc;
+    color: #0071e3;
     font-size: 48px;
     font-weight: 800;
     animation: pop-in 500ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -5046,7 +5007,7 @@ window.dark row.combo, window.dark row.action {
 
 /* ── Buttons ───────────────────────────────────────────────────────────── */
 .oobe-primary-button {
-    background:    #0099cc;
+    background:    #0071e3;
     color:         #ffffff;
     border:        none;
     border-radius: 999px;
@@ -5061,14 +5022,14 @@ window.dark row.combo, window.dark row.action {
         transform        120ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .oobe-primary-button:hover {
-    background: #0091c2;
+    background: #0077ed;
     box-shadow: 0 2px 6px rgba(15,23,42,0.16);
     transform:  translateY(-1px);
 }
 .oobe-primary-button:active {
-    background:        #0088b8;
+    background:        #0068d6;
     transform:         translateY(0);
-    box-shadow:        0 1px 3px rgba(0,153,204,0.20);
+    box-shadow:        0 1px 3px rgba(0,113,227,0.20);
     transition-duration: 70ms;
 }
 
@@ -5098,7 +5059,7 @@ window.dark .oobe-secondary-button:active { background: rgba(255,255,255,0.14); 
     min-height:    6px;
 }
 .oobe-progress progress {
-    background:  linear-gradient(90deg, #0099cc, #00c4f0);
+    background:  linear-gradient(90deg, #0071e3, #409cff);
     border-radius: 999px;
     transition:  all 450ms cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -5135,9 +5096,9 @@ entry, row.entry, .oobe-prefs-group entry {
         box-shadow       160ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 entry:focus-within, row.entry:focus-within {
-    border-color: #0099cc;
+    border-color: #0071e3;
     background:   #ffffff;
-    box-shadow:   0 0 0 3px rgba(0,153,204,0.18);
+    box-shadow:   0 0 0 3px rgba(0,113,227,0.18);
 }
 window.dark entry, window.dark row.entry, window.dark .oobe-prefs-group entry {
     background: rgba(30,41,59,0.7);
@@ -6840,7 +6801,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
     {
         char *argv[] = {
             (char *)"useradd", (char *)"-m",
-            (char *)"-G", (char *)"wheel,audio,video,input,network,storage,power",
+            (char *)"-G", (char *)"wheel,audio,video,input,network,storage,power,docker",
             (char *)"-s", (char *)"/bin/bash",
             (char *)username, NULL
         };
@@ -7117,6 +7078,11 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
  * <mode> is "erase" (wipe the whole disk, original behavior) or
  * "alongside" (dual-boot: keep whatever's already on the disk, reuse its
  * existing ESP, and install KibaOS into the largest free-space gap).
+ * Windows app support (WinApps) is a listed, always-on feature, not a
+ * user choice: this always drops /etc/kibaos/winapps-pending under
+ * target_root so kibaos-winapps-firstrun.desktop (see WINDOWS APP SUPPORT
+ * below) offers the WinApps setup wizard on first login into the freshly
+ * installed system.
  *
  * Internally this no longer touches archinstall, parted, blkid, or
  * partprobe as subprocesses: all of that is libkibadisk (kiba_gpt.c /
@@ -7442,6 +7408,26 @@ int main(int argc, char **argv) {
         fail(kiba_install_strerror());
     }
 
+    /* ── 11. Windows app support ────────────────────────────────────────
+     * Listed as a standing feature, not opt-in, so this always drops the
+     * marker inside the freshly installed root -- the actual setup wizard
+     * (kibaos-winapps-setup) only ever runs later, on first login into the
+     * *installed* system via kibaos-winapps-firstrun.desktop, never from
+     * in here. Mirrors the exact same marker kibaos-oem-finish.sh drops
+     * for OEM-finish mode, just written under target_root instead of the
+     * live root since this path is a fresh install, not an already-booted
+     * system. */
+    {
+        char p[320];
+        snprintf(p, sizeof(p), "%s/etc/kibaos", target_root);
+        mkdir(p, 0755); /* ignore EEXIST -- /etc already exists under target_root */
+        snprintf(p, sizeof(p), "%s/etc/kibaos/winapps-pending", target_root);
+        FILE *f = fopen(p, "w");
+        if (f) fclose(f); /* best-effort: a missed marker just means the
+                            * user runs "Set Up Windows Apps" from the app
+                            * menu themselves instead of it prompting them */
+    }
+
     progress(98, "Finishing up...");
     kiba_fs_umount(boot_dir);
     kiba_fs_umount(target_root);
@@ -7480,7 +7466,9 @@ pacman -Rns --noconfirm gcc base-devel debugedit make patch autoconf automake 2>
 # Just locale/keyboard, the real customer account, and removing the OEM
 # marker + temporary OEM account. Mirrors the standard OEM-imaging pattern
 # (locale/keyboard/account-only finish step, no disk work) used by
-# installers like this one.
+# installers like this one. Also always drops /etc/kibaos/winapps-pending
+# -- WinApps is a listed, always-on feature -- see WINDOWS APP SUPPORT
+# further down for what that marker actually triggers.
 cat > /usr/local/bin/kibaos-oem-finish.sh << 'OEMFINISH'
 #!/usr/bin/env bash
 # Args: $1=locale $2=keymap $3=hostname $4=username $5=password
@@ -7506,7 +7494,7 @@ echo "${HOSTNAME_VAL}" > /etc/hostname
 sed -i "s/127.0.1.1.*/127.0.1.1\t${HOSTNAME_VAL}.localdomain ${HOSTNAME_VAL}/" /etc/hosts 2>/dev/null || true
 
 progress 65 "Creating your account..."
-useradd -m -G wheel,audio,video,input,network,storage,power -s /bin/bash "${USERNAME_VAL}" \
+useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash "${USERNAME_VAL}" \
   || fail "useradd failed"
 echo "${USERNAME_VAL}:${PASSWORD_VAL}" | chpasswd || fail "chpasswd failed"
 
@@ -7516,6 +7504,8 @@ userdel -r oem 2>/dev/null || true
 rm -f /etc/sddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
 
 progress 95 "Finishing up..."
+mkdir -p /etc/kibaos
+touch /etc/kibaos/winapps-pending
 rm -f /etc/kibaos/oem-pending
 
 progress 100 "Done"
@@ -7538,7 +7528,7 @@ set -e
 mkdir -p /etc/kibaos
 touch /etc/kibaos/oem-pending
 
-id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power -s /bin/bash oem
+id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash oem
 passwd -d oem 2>/dev/null || true
 
 mkdir -p /etc/sddm.conf.d
@@ -7697,6 +7687,39 @@ gtk-update-icon-cache -f /usr/share/icons/Numix-Circle 2>/dev/null || true
 gtk-update-icon-cache -f /usr/share/icons/Numix-Circle-Light 2>/dev/null || true
 rm -rf "${NUMIX_ICONS_BUILD}"
 echo "=== Icon theme: Numix Circle installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# WINAPPS — vendor the repo into the image instead of curling it at
+# first-run. Same reasoning as ditching archinstall for libkibadisk: don't
+# make a fresh install's success depend on a network fetch of someone
+# else's script at the exact moment a brand-new user is going through it.
+# setup.sh from this same checkout gets run locally by
+# kibaos-winapps-firstrun later (see near kibaos-first-login below), so the
+# installed WinApps version is pinned to whatever was current at ISO build
+# time, not whatever's on main the day someone installs KibaOS.
+# ══════════════════════════════════════════════════════════════════════════
+WINAPPS_SRC="/opt/kibaos/winapps-src"
+rm -rf "${WINAPPS_SRC}"
+mkdir -p "$(dirname "${WINAPPS_SRC}")"
+git clone --depth 1 https://github.com/winapps-org/winapps.git "${WINAPPS_SRC}"
+chmod +x "${WINAPPS_SRC}/setup.sh" "${WINAPPS_SRC}/bin/"* 2>/dev/null || true
+echo "=== WinApps: vendored $(git -C "${WINAPPS_SRC}" rev-parse --short HEAD) ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# OFFICE SUITE — OnlyOffice, replacing Wine as the office/document story.
+# Not in the official Arch repos (AUR-only as onlyoffice-bin), so this
+# goes through Flatpak/Flathub instead of a source build -- flatpak and
+# xdg-desktop-portal are already package deps for the App Store, so this
+# rides on infrastructure that's already there rather than adding a new
+# dependency. Installed --system (not --user) and baked in at ISO build
+# time, same "don't make first boot depend on a fresh network fetch"
+# reasoning as vendoring WinApps above -- it should just be in the app
+# menu on first login, not something that downloads on demand.
+# ══════════════════════════════════════════════════════════════════════════
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install --system --noninteractive flathub org.onlyoffice.desktopeditors \
+  || echo "=== WARNING: OnlyOffice flatpak install failed, continuing build ===" >&2
+echo "=== OnlyOffice: installed via Flathub ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
@@ -9358,6 +9381,302 @@ NoDisplay=false
 X-GNOME-Autostart-enabled=true
 OEMAUTOCFG
 
+# ══════════════════════════════════════════════════════════════════════════
+# WINDOWS APP SUPPORT (WinApps) — file-manager integration + first-login
+# setup wizard. Package deps (docker, freerdp, dialog, zenity, pciutils,
+# etc.) are in packages.x86_64; the winapps-org/winapps repo itself is
+# vendored above at ${WINAPPS_SRC}. Both the disk installer
+# (kibaos-oobe-backend) and OEM-finish (kibaos-oem-finish.sh) always drop
+# /etc/kibaos/winapps-pending on completion — this is a listed, always-on
+# feature, not opt-in, so unlike the oem-pending marker it mirrors, nothing
+# ever leaves it unset. The marker's what triggers kibaos-winapps-setup on
+# first login (see kibaos-winapps-firstrun.desktop below); the user can
+# also launch it manually via "Set Up Windows Apps" in the app menu any
+# time, e.g. to retry after a failed first attempt.
+# ══════════════════════════════════════════════════════════════════════════
+
+# A KibaOS-branded icon for the exe-runner + app-menu entry, pulled from the
+# vendored repo's own installer art instead of drawing something new.
+install -Dm644 "${WINAPPS_SRC}/install/windows.svg" \
+  /usr/share/icons/hicolor/scalable/apps/kibaos-winapps.svg 2>/dev/null || true
+gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
+
+# ── The double-click handler ────────────────────────────────────────────
+# Registered as the default opener for .exe/.msi MIME types below. If
+# WinApps hasn't actually been set up yet, this politely says so instead
+# of just silently failing — the whole point is that double-clicking an
+# .exe should never dead-end without explanation.
+cat > /usr/local/bin/kibaos-run-exe << 'RUNEXE'
+#!/bin/bash
+# Launches a Windows .exe/.msi through WinApps, the same way double-
+# clicking any other file opens its normal app.
+TARGET="$1"
+if [ -z "${TARGET}" ]; then
+  zenity --error --title="Run with Windows" \
+    --text="No program was given to run." 2>/dev/null
+  exit 1
+fi
+
+if ! command -v winapps >/dev/null 2>&1; then
+  zenity --question --title="Windows Apps Aren't Set Up Yet" \
+    --text="This computer isn't set up to run Windows programs yet.\n\nWant to set it up now? It takes about 15–20 minutes." \
+    --ok-label="Set It Up" --cancel-label="Not Now" 2>/dev/null
+  if [ "$?" -eq 0 ]; then
+    exec /usr/local/bin/kibaos-winapps-setup --manual-launch
+  fi
+  exit 1
+fi
+
+exec winapps manual "${TARGET}"
+RUNEXE
+chmod +x /usr/local/bin/kibaos-run-exe
+
+cat > /usr/share/applications/kibaos-run-exe.desktop << 'RUNEXEDESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Run with Windows
+Comment=Open this program using KibaOS's Windows app support
+Icon=kibaos-winapps
+Exec=/usr/local/bin/kibaos-run-exe %f
+Terminal=false
+NoDisplay=true
+MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;
+RUNEXEDESKTOP
+
+# Make it the *default* handler for those MIME types so a plain double-
+# click (not "Open With") just works, matching Nemo's usual behaviour for
+# every other file type. Written into skel so it lands in every new
+# account, same as the rest of this section.
+mkdir -p "${SKEL}/.config"
+cat > "${SKEL}/.config/mimeapps.list" << 'MIMEAPPS'
+[Default Applications]
+application/x-ms-dos-executable=kibaos-run-exe.desktop
+application/x-msdownload=kibaos-run-exe.desktop
+application/vnd.microsoft.portable-executable=kibaos-run-exe.desktop
+application/x-msi=kibaos-run-exe.desktop
+MIMEAPPS
+
+# ── The setup wizard itself ─────────────────────────────────────────────
+# Written entirely in plain language on purpose — this is the one part of
+# KibaOS setup that talks about Docker, RDP ports, and VMs under the
+# hood, none of which the person running it should ever need to know.
+# Re-runnable: launching it again after a successful setup just re-opens
+# the "everything's already working" summary instead of redoing anything.
+cat > /usr/local/bin/kibaos-winapps-setup << 'WINAPPSSETUP'
+#!/bin/bash
+set -uo pipefail
+
+WINAPPS_SRC="/opt/kibaos/winapps-src"
+CONF_DIR="${HOME}/.config/winapps"
+COMPOSE_FILE="${CONF_DIR}/compose.yaml"
+MARKER="/etc/kibaos/winapps-pending"
+MANUAL_LAUNCH="${1:-}"
+
+notify() { zenity --info --title="Windows Apps" --text="$1" --width=420 2>/dev/null; }
+ask()    { zenity --question --title="Windows Apps" --text="$1" \
+             --ok-label="${2:-Yes}" --cancel-label="${3:-No}" --width=420 2>/dev/null; }
+err()    { zenity --error --title="Windows Apps" --text="$1" --width=420 2>/dev/null; }
+
+# Group membership in /etc/group only takes effect for *new* login
+# sessions, not the one you're already in -- and the OEM-finish flow in
+# particular can land someone straight into a desktop session for the
+# account that was *just* created, marker and all, with docker group
+# membership on disk but not yet in this session's token. Rather than
+# make the user log out and back in for what looks like a broken feature,
+# re-exec once under `sg docker` (no TTY required, unlike `newgrp`) if the
+# account is a docker-group member on disk but this shell doesn't have it
+# active yet. WINAPPS_REGROUPED guards against ever doing this twice.
+if [ -z "${WINAPPS_REGROUPED:-}" ] \
+   && id -nG "${USER:-$(id -un)}" 2>/dev/null | tr ' ' '\n' | grep -qx docker \
+   && ! groups 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
+  export WINAPPS_REGROUPED=1
+  exec sg docker -c "\"$0\" ${MANUAL_LAUNCH}"
+fi
+
+# Already fully set up? Just say so and offer a normal re-check.
+if command -v winapps >/dev/null 2>&1 && [ -f "${CONF_DIR}/winapps.conf" ]; then
+  notify "Windows app support is already set up on this computer.\n\nDouble-click any .exe file to run it, or find your installed Windows programs in the app menu."
+  rm -f "${MARKER}"
+  exit 0
+fi
+
+if [ "${MANUAL_LAUNCH}" != "--manual-launch" ]; then
+  ask "Want to set up Windows app support now? This lets you run Windows programs (like Office) right from KibaOS.\n\nIt downloads a Windows environment (about 5–10 GB) and takes roughly 15–20 minutes, most of which is just waiting. You'll need a spare 30+ GB of disk space." \
+    "Set Up Now" "Remind Me Later"
+  choice=$?
+  if [ "${choice}" -ne 0 ]; then
+    if ask "No problem. Should KibaOS stop asking about this?" "Don't Ask Again" "Ask Me Later"; then
+      rm -f "${MARKER}"
+    fi
+    exit 0
+  fi
+fi
+
+notify "Here's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing.\n\nIf you're curious, you can watch progress at http://127.0.0.1:8006 in your browser, but you don't need to do anything there."
+
+pkexec systemctl enable --now docker >/dev/null 2>&1
+if ! systemctl is-active --quiet docker; then
+  err "KibaOS couldn't start the background service Windows apps need (Docker). Check /var/log for details, or try again later from the app menu."
+  exit 1
+fi
+
+mkdir -p "${CONF_DIR}"
+if [ ! -f "${COMPOSE_FILE}" ]; then
+  cp "${WINAPPS_SRC}/compose.yaml" "${COMPOSE_FILE}"
+  # WinApps' docker backend (dockur/windows under the hood) installs
+  # Windows completely unattended using whatever USERNAME/PASSWORD is
+  # baked into compose.yaml at container creation -- there's no
+  # interactive "create your account" step like real Windows Setup, and
+  # changing these after the fact means tearing down and recreating the
+  # VM. Left at the upstream sample values (MyWindowsUser /
+  # MyWindowsPassword), that's a weak, publicly documented password --
+  # and per WinApps' own docs, an empty/default password can make Windows
+  # auto-login in a way that breaks the RDP handshake WinApps needs. So:
+  # generate real credentials before first boot instead of shipping the
+  # sample values.
+  WIN_USER="KibaUser"
+  WIN_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
+  sed -i "s/^\([[:space:]]*USERNAME:[[:space:]]*\).*/\1\"${WIN_USER}\"/" "${COMPOSE_FILE}"
+  sed -i "s/^\([[:space:]]*PASSWORD:[[:space:]]*\).*/\1\"${WIN_PASS}\"/" "${COMPOSE_FILE}"
+  chmod 600 "${COMPOSE_FILE}"
+fi
+
+# GPU passthrough, auto-detected -- no user prompt for this, it either
+# helps or it's a no-op. Only NVIDIA is handled: that's the only vendor
+# WinApps' docker/podman backend can pass through today (via the NVIDIA
+# Container Toolkit's CDI/legacy runtime), since it needs a driver stack
+# installed *inside* the Windows guest anyway, which only NVIDIA ships in
+# a form that works headless like this.
+#
+# Two separate checks, both required:
+#   1. lspci -- is there NVIDIA hardware at all.
+#   2. docker info -- is the "nvidia" container runtime actually
+#      registered, meaning the NVIDIA Container Toolkit is installed and
+#      the proprietary driver is loaded on the host.
+# Hardware alone isn't enough: plenty of machines have an NVIDIA card
+# sitting there on nouveau with no proprietary driver installed, and
+# requesting a device reservation docker can't satisfy makes the whole
+# "docker compose up" fail outright rather than just skip GPU passthrough.
+COMPOSE_ARGS=(--file "${COMPOSE_FILE}")
+GPU_DETECTED=0
+if lspci -nnk 2>/dev/null | grep -qi 'nvidia' \
+   && docker info 2>/dev/null | grep -qi 'nvidia'; then
+  OVERRIDE_FILE="${CONF_DIR}/compose.override.yaml"
+  cat > "${OVERRIDE_FILE}" << 'GPUOVERRIDE'
+services:
+  windows:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+GPUOVERRIDE
+  COMPOSE_ARGS+=(--file "${OVERRIDE_FILE}")
+  GPU_DETECTED=1
+fi
+
+( cd "${CONF_DIR}" && docker compose "${COMPOSE_ARGS[@]}" up -d ) || {
+  err "Something went wrong starting the Windows environment. Nothing was changed permanently — you can try again from the app menu ('Set Up Windows Apps')."
+  exit 1
+}
+
+xdg-open "http://127.0.0.1:8006" >/dev/null 2>&1 &
+
+# Source of truth for credentials from here on is compose.yaml itself,
+# not a fresh random generation -- keeps this idempotent if setup gets
+# re-run after a partial failure. The container (and whatever account is
+# actually inside it) may already exist from a prior attempt, and
+# regenerating a new password here would just desync from it.
+WIN_USER=$(grep -oP '^\s*USERNAME:\s*"\K[^"]+' "${COMPOSE_FILE}")
+WIN_PASS=$(grep -oP '^\s*PASSWORD:\s*"\K[^"]+' "${COMPOSE_FILE}")
+
+if [ -z "${WIN_USER}" ] || [ -z "${WIN_PASS}" ]; then
+  err "Couldn't read the Windows account details from the config. Run 'Set Up Windows Apps' again from the app menu, or check ${COMPOSE_FILE} manually."
+  exit 1
+fi
+
+cat > "${CONF_DIR}/winapps.conf" << CONF
+RDP_USER="${WIN_USER}"
+RDP_PASS="${WIN_PASS}"
+RDP_IP="127.0.0.1"
+RDP_PORT="3389"
+WAFLAVOR="docker"
+DEBUG="true"
+# /gfx:AVC444 switches FreeRDP onto the H.264 graphics pipeline instead of
+# the legacy bitmap codec -- this is the single biggest lag fix, especially
+# for anything Photoshop/video-editing-shaped. /network:lan tells FreeRDP
+# this is a fast local link (it is: loopback to a container) rather than
+# throttling itself as if it were a WAN connection. Baked in here rather
+# than left as a README tweak, since there's no real reason for a user to
+# ever want the slower defaults on a local install.
+RDP_FLAGS="/gfx:AVC444 /network:lan"
+CONF
+chmod 600 "${CONF_DIR}/winapps.conf"
+
+# Wait for the unattended install to actually finish -- this is a real
+# Windows install (download + setup), not a quick boot, so budget up to
+# ~35 minutes rather than the couple of minutes a already-installed VM
+# would need to just bring RDP up after a restart. An open RDP port is
+# used as the "Windows is ready" signal since there's no other clean
+# hook into dockur/windows' unattended install process from out here.
+RDP_UP=0
+for i in $(seq 1 420); do
+  nc -z 127.0.0.1 3389 >/dev/null 2>&1 && { RDP_UP=1; break; }
+  sleep 5
+done
+
+if [ "${RDP_UP}" -ne 1 ]; then
+  err "Windows is taking longer than expected to finish installing. Nothing's broken — it may just need more time on a slower connection. Check progress at http://127.0.0.1:8006, and re-run 'Set Up Windows Apps' from the app menu once it shows a desktop."
+  exit 1
+fi
+
+notify "Almost done — one more window will open to finish installing the app shortcuts (Word, Excel, whatever Windows found installed). It'll look technical for a minute; that's normal, just follow along."
+
+TERMINAL_CMD="gnome-console"
+command -v "${TERMINAL_CMD}" >/dev/null 2>&1 || TERMINAL_CMD="gnome-terminal"
+"${TERMINAL_CMD}" -- bash -lc "'${WINAPPS_SRC}/setup.sh'; echo; read -p 'Press Enter to close this window...'"
+
+xdg-mime default kibaos-run-exe.desktop application/x-ms-dos-executable \
+  application/x-msdownload application/vnd.microsoft.portable-executable application/x-msi
+
+rm -f "${MARKER}"
+if [ "${GPU_DETECTED}" -eq 1 ]; then
+  notify "All set! Double-click any .exe file to run it in Windows automatically, and any Windows programs WinApps found are now in your app menu.\n\nAn NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
+else
+  notify "All set! Double-click any .exe file to run it in Windows automatically, and any Windows programs WinApps found are now in your app menu."
+fi
+WINAPPSSETUP
+chmod +x /usr/local/bin/kibaos-winapps-setup
+
+# Menu entry so this is re-runnable any time, not just at first login
+# (e.g. if someone skips it initially, or wants to fix a broken setup).
+cat > /usr/share/applications/kibaos-winapps-setup.desktop << 'SETUPDESKTOP'
+[Desktop Entry]
+Type=Application
+Name=Set Up Windows Apps
+Comment=Run Windows programs like Word, Excel, or Photoshop right from KibaOS
+Icon=kibaos-winapps
+Exec=/usr/local/bin/kibaos-winapps-setup
+Terminal=false
+Categories=System;Settings;
+SETUPDESKTOP
+
+# First-login autostart: only actually shows anything if the marker from
+# kibaos-oobe-backend / kibaos-oem-finish.sh is present, which it always
+# is now (WinApps is a mandatory feature, not opt-in). Same gating style
+# as the OEM-finish entry above.
+cat > "${SKEL}/.config/autostart/kibaos-winapps-firstrun.desktop" << 'WINAPPSAUTOCFG'
+[Desktop Entry]
+Type=Application
+Name=Windows App Support Setup
+Exec=sh -c 'test -f /etc/kibaos/winapps-pending && exec /usr/local/bin/kibaos-winapps-setup'
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+WINAPPSAUTOCFG
+
 # ── Live-session autostart: launches the OOBE installer automatically on
 # the regular live boot (the 'liveuser' autologin session), so the person
 # lands straight in the installer instead of staring at an empty desktop.
@@ -9442,7 +9761,6 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CACHE_HOME="$HOME/.cache"
 export XDG_STATE_HOME="$HOME/.local/state"
-export WINEPREFIX="$XDG_DATA_HOME/wine"
 export HISTFILE="$XDG_STATE_HOME/bash/history"
 BASHRC
 
@@ -9969,7 +10287,6 @@ QT_STYLE_OVERRIDE=kvantum
 XCURSOR_THEME=Adwaita
 XCURSOR_SIZE=24
 MOZ_ENABLE_WAYLAND=1
-WINEDEBUG=-all
 ELECTRON_OZONE_PLATFORM_HINT=wayland
 CLUTTER_BACKEND=wayland
 SDL_VIDEODRIVER=wayland
