@@ -132,6 +132,16 @@ python
 pyalpm
 parted
 gptfdisk
+# memdiskfind (mkinitcpio's [memdisk] hook needs it at initramfs-build time,
+# for RAM-loading the live ISO) ships in this package -- NOT pulled in for
+# BIOS/isolinux boot itself, that's GRUB/UEFI-only and staying that way.
+# Easy to conflate the two: ${PROFILE}/syslinux (the isolinux config dir,
+# removed further down when BIOS boot got dropped) and this `syslinux`
+# pacman package are different things, and only the config dir should
+# have gone. Without this, mkinitcpio logs "ERROR: binary not found:
+# 'memdiskfind'" and ships an incomplete initramfs.
+syslinux
+pv
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
