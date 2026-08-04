@@ -524,23 +524,45 @@ pip install --break-system-packages --no-cache-dir pywayland cffi
 # ---- generate the wlr-foreign-toplevel-management-v1 protocol module ----
 # pywayland only ships bindings for core wayland.xml out of the box; wlr
 # protocol extensions (this one lives in the wlr-protocols repo, not
-# wayland-protocols) have to be scanned separately. Using the documented
-# Python scanner API (Protocol.parse_file / Protocol.output) rather than
-# guessing pywayland-scanner's CLI flag names, since that's the form
-# actually pinned down in pywayland's own docs.
+# wayland-protocols) have to be scanned separately.
+#
+# NOTE: an earlier revision of this step called
+# Protocol.output(out_dir, {}) — the two-line form shown in pywayland's own
+# docs. That only actually works for XML with zero cross-interface
+# references. method.imports() looks up module_imports[interface] using
+# the CURRENT interface's own name (not just the interfaces it references)
+# to decide same-module vs. cross-module imports, so an empty dict
+# KeyErrors the moment ANY interface in the file — including one defined
+# in the file itself, e.g. zwlr_foreign_toplevel_manager_v1's own
+# self/new_id references — isn't a registered key. This protocol also
+# references wl_output/wl_seat from core wayland.xml, which need the same
+# treatment. So module_imports has to be built for real: core wayland.xml
+# interfaces mapped to pywayland's own module, plus every interface
+# defined in THIS protocol self-mapped to its own output module — which is
+# what pywayland-scanner's actual CLI does internally, just done by hand
+# here since we're invoking the scanner API directly instead of shelling
+# out to pywayland-scanner with flags that aren't documented anywhere.
 WLR_FOREIGN_TOPLEVEL_XML="/tmp/wlr-foreign-toplevel-management-unstable-v1.xml"
 curl -fL --retry 5 --retry-delay 3 -o "${WLR_FOREIGN_TOPLEVEL_XML}" \
   "https://raw.githubusercontent.com/swaywm/wlr-protocols/master/unstable/wlr-foreign-toplevel-management-unstable-v1.xml"
 
-mkdir -p /usr/lib/kortex/kortexd/_protocols
-python3 - "${WLR_FOREIGN_TOPLEVEL_XML}" /usr/lib/kortex/kortexd/_protocols << 'PYWAYLAND_GEN_PY'
-import sys
-from pywayland.scanner import Protocol
+# Core wayland.xml ships with the "wayland" package (already pulled into
+# packages.x86_64 for the compositor itself), so it's on disk in the
+# build chroot at this standard location.
+WAYLAND_CORE_XML="/usr/share/wayland/wayland.xml"
 
-xml_path, out_dir = sys.argv[1], sys.argv[2]
-protocol = Protocol.parse_file(xml_path)
-protocol.output(out_dir, {})
-PYWAYLAND_GEN_PY
+mkdir -p /usr/lib/kortex/kortexd/_protocols
+# Use pywayland's own CLI scanner instead of hand-driving its internal
+# scanner API — it builds the interface->module import map itself (across
+# every XML file passed to -i), so there's no manually-maintained
+# module_imports dict here for someone to get wrong. It regenerates
+# core wl_output/wl_seat/wl_surface bindings locally alongside the wlr
+# protocol (relative-imported as ..wayland) rather than reusing
+# pywayland's own built-in pywayland.protocol.wayland module, which
+# keeps this self-contained and not dependent on pywayland's internal
+# package layout.
+pywayland-scanner -i "${WAYLAND_CORE_XML}" "${WLR_FOREIGN_TOPLEVEL_XML}" \
+  -o /usr/lib/kortex/kortexd/_protocols
 touch /usr/lib/kortex/kortexd/_protocols/__init__.py
 rm -f "${WLR_FOREIGN_TOPLEVEL_XML}"
 
