@@ -547,7 +547,7 @@ pip install --break-system-packages --no-cache-dir nuitka
 # above: python-pywayland is AUR-only, pip sidesteps that. Its cffi
 # extension builds against libwayland-client, whose headers already come
 # from the "wayland" package pulled in earlier for the compositor itself.
-pip install --break-system-packages --no-cache-dir pywayland cffi
+pip install --break-system-packages --no-cache-dir pywayland pywayland-scanner cffi
 
 # ---- generate the wlr-foreign-toplevel-management-v1 protocol module ----
 # pywayland only ships bindings for core wayland.xml out of the box; wlr
