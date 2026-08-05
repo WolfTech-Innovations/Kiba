@@ -3958,87 +3958,147 @@ public class KibaOOBE : Adw.Application {
 
         // Each row stores its SSID and whether it needs a password in widget data.
         // We use a simple parallel arrays approach since Vala/GTK4 has no
-        // set_data on widgets without GObject subclassing tricks.
-        string[] ssid_list    = {};
-        bool[]   secured_list = {};
+        // set_data on widgets without GObject subclassing tricks. Boxed
+        // (double-array) so refresh_networks() below can reassign the
+        // contents and have row_activated's closure (created once, further
+        // down) see the updated values on every rescan -- reassigning a
+        // plain unboxed local wouldn't be visible from a closure created
+        // before the reassignment.
+        string[][] ssid_box    = { {} };
+        bool[][]   secured_box = { {} };
 
-        string raw_nets = "";
-        if (dev_box[0] != "") {
-            try {
-                string scan_out = "";
-                GLib.Process.spawn_command_line_sync (
-                    "nmcli device wifi rescan ifname %s".printf (dev_box[0]), out scan_out);
-                // Colon-separated, one AP per line: SSID:SECURITY:SIGNAL
-                // (nmcli backslash-escapes literal colons inside the SSID field).
-                GLib.Process.spawn_command_line_sync (
-                    "nmcli -t -f SSID,SECURITY,SIGNAL device wifi list ifname %s".printf (dev_box[0]),
-                    out raw_nets);
-            } catch (GLib.SpawnError e) {}
+        // Set while a password dialog is open or a connection attempt is
+        // in flight, so the periodic rescan below doesn't yank the row
+        // list out from under someone mid-pick or mid-typing.
+        bool[] scan_paused_box = { false };
+
+        // Pulled out into its own function so the periodic timer further
+        // down can just call this again instead of duplicating the whole
+        // scan-and-render pass. Safe to call repeatedly: it fully rebuilds
+        // list_box's rows and ssid_box/secured_box each time rather than
+        // diffing, which is fine at Wi-Fi-scan-list sizes.
+        void refresh_networks () {
+            if (scan_paused_box[0]) return;
+
+            string raw_nets = "";
+            if (dev_box[0] != "") {
+                try {
+                    string scan_out = "";
+                    GLib.Process.spawn_command_line_sync (
+                        "nmcli device wifi rescan ifname %s".printf (dev_box[0]), out scan_out);
+                    // Colon-separated, one AP per line: SSID:SECURITY:SIGNAL
+                    // (nmcli backslash-escapes literal colons inside the SSID field).
+                    GLib.Process.spawn_command_line_sync (
+                        "nmcli -t -f SSID,SECURITY,SIGNAL device wifi list ifname %s".printf (dev_box[0]),
+                        out raw_nets);
+                } catch (GLib.SpawnError e) {}
+            }
+
+            // Clear whatever's there from the previous pass before
+            // repopulating -- including the "No networks found" placeholder
+            // row, if that's what's currently shown.
+            Gtk.Widget? child = list_box.get_first_child ();
+            while (child != null) {
+                var next = child.get_next_sibling ();
+                list_box.remove (child);
+                child = next;
+            }
+
+            string[] new_ssid_list    = {};
+            bool[]   new_secured_list = {};
+
+            var seen = new Gee.HashSet<string> ();
+            bool any = false;
+            foreach (var line in raw_nets.split ("\n")) {
+                var trimmed = line.strip ();
+                if (trimmed == "") continue;
+                // Split on unescaped colons only (nmcli escapes literal ':' in
+                // field values as '\:').
+                var cols = GLib.Regex.split_simple ("(?<!\\\\):", trimmed);
+                if (cols.length < 3) continue;
+                string ssid = cols[0].replace ("\\:", ":").strip ();
+                if (ssid == "" || seen.contains (ssid)) continue;
+                seen.add (ssid);
+                string security    = cols[1].strip ().down ();
+                string signal_str  = cols[2].strip ();
+                bool   secured     = security != "" && security != "--";
+                int    pct         = int.parse (signal_str);
+                string signal_pct  = "%d%%".printf (int.max (0, int.min (100, pct)));
+
+                // Choose a text signal-bar glyph based on nmcli's 0-100 signal
+                // percentage, instead of an icon-theme lookup.
+                string signal_bars;
+                if      (pct >= 80) signal_bars = "▂▄▆█";
+                else if (pct >= 55) signal_bars = "▂▄▆";
+                else if (pct >= 30) signal_bars = "▂▄";
+                else                signal_bars = "▂";
+
+                var row = new Adw.ActionRow () {
+                    title         = ssid,
+                    subtitle      = "%s\n%s".printf (signal_pct,
+                                        secured
+                                            ? t ("Secured", "Güvenli", "Zabezpieczona")
+                                            : t ("Open", "Açık", "Otwarta")),
+                    subtitle_lines = 2,
+                    activatable   = true
+                };
+                row.add_prefix (new Gtk.Label (signal_bars) { css_classes = { "oobe-signal-glyph" } });
+                list_box.append (row);
+
+                new_ssid_list    += ssid;
+                new_secured_list += secured;
+                any = true;
+            }
+            if (!any) {
+                var row = new Adw.ActionRow () {
+                    title = t ("No networks found nearby", "Yakında ağ bulunamadı", "Nie znaleziono pobliskich sieci")
+                };
+                list_box.append (row);
+            }
+
+            ssid_box[0]    = new_ssid_list;
+            secured_box[0] = new_secured_list;
         }
 
-        var seen = new Gee.HashSet<string> ();
-        bool any = false;
-        foreach (var line in raw_nets.split ("\n")) {
-            var trimmed = line.strip ();
-            if (trimmed == "") continue;
-            // Split on unescaped colons only (nmcli escapes literal ':' in
-            // field values as '\:').
-            var cols = GLib.Regex.split_simple ("(?<!\\\\):", trimmed);
-            if (cols.length < 3) continue;
-            string ssid = cols[0].replace ("\\:", ":").strip ();
-            if (ssid == "" || seen.contains (ssid)) continue;
-            seen.add (ssid);
-            string security    = cols[1].strip ().down ();
-            string signal_str  = cols[2].strip ();
-            bool   secured     = security != "" && security != "--";
-            int    pct         = int.parse (signal_str);
-            string signal_pct  = "%d%%".printf (int.max (0, int.min (100, pct)));
-
-            // Choose a text signal-bar glyph based on nmcli's 0-100 signal
-            // percentage, instead of an icon-theme lookup.
-            string signal_bars;
-            if      (pct >= 80) signal_bars = "▂▄▆█";
-            else if (pct >= 55) signal_bars = "▂▄▆";
-            else if (pct >= 30) signal_bars = "▂▄";
-            else                signal_bars = "▂";
-
-            var row = new Adw.ActionRow () {
-                title         = ssid,
-                subtitle      = "%s\n%s".printf (signal_pct,
-                                    secured
-                                        ? t ("Secured", "Güvenli", "Zabezpieczona")
-                                        : t ("Open", "Açık", "Otwarta")),
-                subtitle_lines = 2,
-                activatable   = true
-            };
-            row.add_prefix (new Gtk.Label (signal_bars) { css_classes = { "oobe-signal-glyph" } });
-            list_box.append (row);
-
-            ssid_list    += ssid;
-            secured_list += secured;
-            any = true;
-        }
-        if (!any) {
-            var row = new Adw.ActionRow () {
-                title = t ("No networks found nearby", "Yakında ağ bulunamadı", "Nie znaleziono pobliskich sieci")
-            };
-            list_box.append (row);
-        }
+        refresh_networks ();
 
         content.append (list_box);
         content.append (status_label);
 
+        // Periodic rescan so networks that come into/out of range while
+        // this page is up actually show up, instead of only ever
+        // reflecting a single scan taken the instant the page was built.
+        // Torn down via list_box.destroy so it stops firing (and touching
+        // a dead widget) once the user navigates past this page.
+        uint[] refresh_timer_box = { 0 };
+        refresh_timer_box[0] = GLib.Timeout.add_seconds (5, () => {
+            refresh_networks ();
+            return GLib.Source.CONTINUE;
+        });
+        list_box.destroy.connect (() => {
+            if (refresh_timer_box[0] != 0) {
+                GLib.Source.remove (refresh_timer_box[0]);
+                refresh_timer_box[0] = 0;
+            }
+        });
+
         // ── Row activation: password dialog → nmcli connect ──────────────
-        // Captures: dev_box, ssid_list, secured_list, status_label, window
+        // Captures: dev_box, ssid_box, secured_box, status_label, window,
+        // scan_paused_box
         list_box.row_activated.connect ((row) => {
             int idx = row.get_index ();
-            if (idx < 0 || idx >= ssid_list.length) return;
+            if (idx < 0 || idx >= ssid_box[0].length) return;
 
-            string ssid    = ssid_list[idx];
-            bool   secured = secured_list[idx];
+            string ssid    = ssid_box[0][idx];
+            bool   secured = secured_box[0][idx];
 
             if (secured) {
                 // ── Password dialog ───────────────────────────────────────
+                // Pause the 5s rescan for as long as this dialog (or the
+                // resulting connect attempt) is live -- a scan mid-typing
+                // would rebuild list_box's rows out from under the user.
+                scan_paused_box[0] = true;
+
                 var dialog = new Adw.MessageDialog (window,
                     t ("Enter Wi-Fi Password", "Wi-Fi Şifresini Girin", "Wprowadź hasło Wi-Fi"),
                     t ("""Enter the password for "%s".""",
@@ -4064,7 +4124,7 @@ public class KibaOOBE : Adw.Application {
                 });
 
                 dialog.response.connect ((resp) => {
-                    if (resp != "connect") { dialog.destroy (); return; }
+                    if (resp != "connect") { dialog.destroy (); scan_paused_box[0] = false; return; }
                     string password = pw_entry.get_text ();
                     dialog.destroy ();
 
@@ -4074,6 +4134,7 @@ public class KibaOOBE : Adw.Application {
                         status_label.label = t ("Password cannot be empty.",
                                                  "Şifre boş olamaz.",
                                                  "Hasło nie może być puste.");
+                        scan_paused_box[0] = false;
                         return;
                     }
 
@@ -4087,6 +4148,7 @@ public class KibaOOBE : Adw.Application {
 
             } else {
                 // ── Open network — connect directly ───────────────────────
+                scan_paused_box[0] = true;
                 status_label.label = t ("Connecting to %s…", "%s ağına bağlanıyor…", "Łączenie z %s…").printf (ssid);
                 do_connect_async (dev_box[0], ssid, null, status_label, connected_box);
             }
@@ -6919,6 +6981,31 @@ int kiba_install_create_user(const char *target_root, const char *username,
         }
     }
 
+    /* Pre-create ~/.local/bin, owned by the new account, on the just-
+     * installed target -- not the live session. WinApps' setup.sh --user
+     * (run later at first login, see kibaos-winapps-firstrun) installs
+     * the `winapps` binary itself by `cp`/`tee`-ing straight into
+     * ~/.local/bin, and neither of those commands create missing parent
+     * directories -- a bare install onto a fresh useradd -m home (which
+     * has no .local at all yet) fails outright with e.g. "cp: cannot
+     * create regular file '/home/user/.local/bin/winapps': No such file
+     * or directory", a documented failure mode upstream. useradd -m
+     * populates skel but never creates .local/bin, so this closes that
+     * gap once, here, rather than depending on WinApps' installer to
+     * handle its own missing directory (best-effort: a failure here
+     * shouldn't fail the whole install over a directory WinApps can
+     * still create for itself in the common case). */
+    {
+        char local_bin[1024];
+        snprintf(local_bin, sizeof(local_bin), "/home/%s/.local/bin", username);
+        char *mkdir_argv[] = {
+            (char *)"install", (char *)"-d", (char *)"-m", (char *)"755",
+            (char *)"-o", (char *)username, (char *)"-g", (char *)username,
+            local_bin, NULL
+        };
+        chroot_run(target_root, mkdir_argv); /* best-effort, see comment above */
+    }
+
     return 0;
 }
 
@@ -7821,6 +7908,15 @@ echo "=== WinApps: ip_tables/iptable_nat set to load at boot ==="
 
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
+# ══════════════════════════════════════════════════════════════════════════
+# JUNCTION — app/link chooser (re.sonny.Junction), pops up on open so the
+# user picks which installed app handles a given file/link instead of
+# silently locking to one default. Installed system-wide (--system) at
+# build time so it's present for every user account on first boot, not
+# just whichever account happens to run flatpak first.
+# ══════════════════════════════════════════════════════════════════════════
+flatpak install --system --noninteractive flathub re.sonny.Junction
+echo "=== Junction: installed via flatpak (re.sonny.Junction) ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
@@ -9585,7 +9681,22 @@ if [ -z "${TARGET}" ]; then
   exit 1
 fi
 
-if ! command -v winapps >/dev/null 2>&1; then
+# WinApps' own installer (setup.sh --user, run from kibaos-winapps-setup)
+# drops the `winapps` binary in ~/.local/bin, not a directory that's
+# guaranteed to be on PATH here. This script gets launched by the desktop
+# session (Nemo double-click / xdg mimeapps), which inherits its PATH from
+# the display manager's environment -- not from a login shell that sourced
+# .bashrc/.profile -- so ~/.local/bin can be genuinely missing from PATH
+# even though the binary is sitting right there. Check both before giving
+# up, so "not set up yet" only fires when it's actually true.
+WINAPPS_BIN=""
+if command -v winapps >/dev/null 2>&1; then
+  WINAPPS_BIN="winapps"
+elif [ -x "${HOME}/.local/bin/winapps" ]; then
+  WINAPPS_BIN="${HOME}/.local/bin/winapps"
+fi
+
+if [ -z "${WINAPPS_BIN}" ]; then
   zenity --question --title="Windows Apps Aren't Set Up Yet" \
     --text="This computer isn't set up to run Windows programs yet.\n\nWant to set it up now? It takes about 15–20 minutes." \
     --ok-label="Set It Up" --cancel-label="Not Now" 2>/dev/null
@@ -9595,7 +9706,7 @@ if ! command -v winapps >/dev/null 2>&1; then
   exit 1
 fi
 
-exec winapps manual "${TARGET}"
+exec "${WINAPPS_BIN}" manual "${TARGET}"
 RUNEXE
 chmod +x /usr/local/bin/kibaos-run-exe
 
@@ -9723,6 +9834,14 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   WIN_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
   sed -i "s/^\([[:space:]]*USERNAME:[[:space:]]*\).*/\1\"${WIN_USER}\"/" "${COMPOSE_FILE}"
   sed -i "s/^\([[:space:]]*PASSWORD:[[:space:]]*\).*/\1\"${WIN_PASS}\"/" "${COMPOSE_FILE}"
+  # Default to Tiny11 rather than stock Windows 11 -- this box's whole
+  # audience is "cheap/low-RAM laptop running KibaOS", and stock Win11
+  # inside dockur/windows wants noticeably more RAM/disk headroom than
+  # this hardware class tends to have to spare on top of the Linux host
+  # itself. Only rewrites VERSION if the line exists in upstream's
+  # compose.yaml as shipped -- if they ever restructure it, this just
+  # quietly no-ops instead of corrupting the file.
+  sed -i "s/^\([[:space:]]*VERSION:[[:space:]]*\).*/\1\"tiny11\"/" "${COMPOSE_FILE}"
   chmod 600 "${COMPOSE_FILE}"
 fi
 
@@ -9787,7 +9906,7 @@ if ! ( cd "${CONF_DIR}" && pkexec docker compose "${COMPOSE_ARGS[@]}" up -d ) > 
 fi
 rm -f "${COMPOSE_LOG}"
 
-xdg-open "localhost:8006" >/dev/null 2>&1 &
+chromium "http://localhost:8006" >/dev/null 2>&1 &
 
 # Source of truth for credentials from here on is compose.yaml itself,
 # not a fresh random generation -- keeps this idempotent if setup gets
@@ -9839,9 +9958,30 @@ fi
 
 notify "Almost done — one more window will open to finish installing the app shortcuts (Word, Excel, whatever Windows found installed). It'll look technical for a minute; that's normal, just follow along."
 
+# NOTE: deliberately not relying on a terminal emulator's "--wait" flag to
+# block until setup.sh finishes. gnome-console's --wait is a documented
+# no-op (upstream man page literally lists it as "(TODO)"), and even
+# gnome-terminal's --wait only helps if gnome-console isn't picked first.
+# So: run setup.sh directly in *this* process (a real, unambiguous
+# blocking call), log its output to a file, and just tail that log in a
+# terminal window purely for the user to watch -- the terminal is
+# cosmetic here, not something the script's control flow depends on.
+SETUP_LOG="$(mktemp)"
 TERMINAL_CMD="gnome-console"
 command -v "${TERMINAL_CMD}" >/dev/null 2>&1 || TERMINAL_CMD="gnome-terminal"
-"${TERMINAL_CMD}" -- bash -lc "'${WINAPPS_SRC}/setup.sh' --user --setupAllOfficiallySupportedApps; echo; read -p 'Press Enter to close this window...'"
+"${TERMINAL_CMD}" -- bash -lc "tail -n +1 -f '${SETUP_LOG}'" &
+TAIL_TERM_PID=$!
+
+"${WINAPPS_SRC}/setup.sh" --user --setupAllOfficiallySupportedApps > "${SETUP_LOG}" 2>&1
+SETUP_STATUS=$?
+
+kill "${TAIL_TERM_PID}" >/dev/null 2>&1
+
+if [ "${SETUP_STATUS}" -ne 0 ]; then
+  err "The Windows app shortcut installer hit a problem partway through (see ${SETUP_LOG} for details). Windows itself is still fine -- run 'Set Up Windows Apps' again from the app menu to retry just that step."
+  exit 1
+fi
+rm -f "${SETUP_LOG}"
 
 xdg-mime default kibaos-run-exe.desktop application/x-ms-dos-executable \
   application/x-msdownload application/vnd.microsoft.portable-executable application/x-msi
