@@ -6808,15 +6808,102 @@ int kiba_install_create_user(const char *target_root, const char *username,
         chroot_run(target_root, argv); /* ignore result intentionally */
     }
 
+    /* Only request supplementary groups that actually exist in the target
+     * root's /etc/group. useradd fails its ENTIRE invocation -- creating
+     * no user at all -- if even one -G group is missing, and `docker` is
+     * exactly that case by design: its group isn't meant to exist until
+     * after setup (created once systemd-sysusers actually runs against
+     * the installed system, not the image-capture snapshot), so trying
+     * to add it here at useradd time was never going to work. That
+     * failure used to get silently swallowed, so the account was never
+     * created at all, and the *next* step (chpasswd) failed instead with
+     * no indication the real problem was upstream. Filtering to groups
+     * that are confirmed present -- and separately remembering which
+     * ones got deferred, so a first-boot step can add them once they
+     * actually exist -- replaces the useradd crash with a proper
+     * catch-up instead of just permanently dropping `docker` membership. */
     {
+        static const char *const candidate_groups[] = {
+            "wheel", "audio", "video", "input", "network",
+            "storage", "power", "docker"
+        };
+        char group_list[256] = "";
+        char skipped_list[256] = "";
+        char group_line[128];
+        for (size_t gi = 0; gi < sizeof(candidate_groups) / sizeof(candidate_groups[0]); gi++) {
+            char group_path[1024];
+            snprintf(group_path, sizeof(group_path), "%s/etc/group", target_root);
+            FILE *gf = fopen(group_path, "r");
+            bool found = false;
+            if (gf) {
+                snprintf(group_line, sizeof(group_line), "%s:", candidate_groups[gi]);
+                size_t prefix_len = strlen(group_line);
+                char line[256];
+                while (fgets(line, sizeof(line), gf)) {
+                    if (strncmp(line, group_line, prefix_len) == 0) { found = true; break; }
+                }
+                fclose(gf);
+            }
+            if (found) {
+                if (group_list[0] != '\0') strncat(group_list, ",", sizeof(group_list) - strlen(group_list) - 1);
+                strncat(group_list, candidate_groups[gi], sizeof(group_list) - strlen(group_list) - 1);
+            } else {
+                if (skipped_list[0] != '\0') strncat(skipped_list, ",", sizeof(skipped_list) - strlen(skipped_list) - 1);
+                strncat(skipped_list, candidate_groups[gi], sizeof(skipped_list) - strlen(skipped_list) - 1);
+                /* Expected, not exceptional -- docker's group isn't meant
+                 * to exist until first boot, so no warning here. The
+                 * marker file below is how the first-boot service finds
+                 * out, not a log message. */
+            }
+        }
+
         char *argv[] = {
             (char *)"useradd", (char *)"-m",
-            (char *)"-G", (char *)"wheel,audio,video,input,network,storage,power,docker",
+            (char *)"-G", group_list,
             (char *)"-s", (char *)"/bin/bash",
             (char *)username, NULL
         };
-        if (chroot_run(target_root, argv) != 0) {
-            /* tolerate "already exists" the same way the old backend did */
+
+        /* Idempotent: if a prior install attempt got this far before
+         * failing later on, the user may already exist in target root's
+         * /etc/passwd. That's fine -- skip useradd rather than erroring,
+         * same intent as the old "tolerate already exists" comment, but
+         * checked explicitly instead of swallowing every possible
+         * useradd failure (including real ones) to get there. */
+        char passwd_path[1024];
+        snprintf(passwd_path, sizeof(passwd_path), "%s/etc/passwd", target_root);
+        bool user_exists = false;
+        FILE *pf = fopen(passwd_path, "r");
+        if (pf) {
+            char uline[256];
+            char prefix[128];
+            snprintf(prefix, sizeof(prefix), "%s:", username);
+            size_t prefix_len = strlen(prefix);
+            while (fgets(uline, sizeof(uline), pf)) {
+                if (strncmp(uline, prefix, prefix_len) == 0) { user_exists = true; break; }
+            }
+            fclose(pf);
+        }
+
+        if (!user_exists && chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "useradd failed for %s", username);
+            return -1;
+        }
+
+        /* Hand off any deferred groups (docker, etc.) to a first-boot
+         * service -- writes "username:group1,group2" so it knows who to
+         * catch up and with what, once those groups actually exist. */
+        if (skipped_list[0] != '\0') {
+            char kibaos_dir[1024];
+            snprintf(kibaos_dir, sizeof(kibaos_dir), "%s/etc/kibaos", target_root);
+            mkdir(kibaos_dir, 0755); /* fine if it already exists */
+            char marker_path[1024];
+            snprintf(marker_path, sizeof(marker_path), "%s/pending-user-groups", kibaos_dir);
+            FILE *mf = fopen(marker_path, "w");
+            if (mf) {
+                fprintf(mf, "%s:%s\n", username, skipped_list);
+                fclose(mf);
+            }
         }
     }
 
@@ -9188,6 +9275,73 @@ WantedBy=timers.target
 OTATIMER
 
 systemctl enable kibaos-ota.timer
+
+# ══════════════════════════════════════════════════════════════════════════
+# FIRST-BOOT GROUP CATCHUP
+# The installer defers any -G group that doesn't exist yet at install time
+# (docker is the known case: its group only shows up once systemd-sysusers
+# actually runs against the installed system, not the image-capture
+# snapshot) and records it in /etc/kibaos/pending-user-groups as
+# "username:group1,group2". This runs after sysusers on first boot, adds
+# the user to whatever's now available, and cleans up after itself so it's
+# a no-op on every boot after the first.
+# ══════════════════════════════════════════════════════════════════════════
+cat > /usr/local/bin/kibaos-firstboot-groups << 'FIRSTBOOTGROUPS'
+#!/usr/bin/env bash
+set -euo pipefail
+MARKER="/etc/kibaos/pending-user-groups"
+[ -f "$MARKER" ] || exit 0
+
+while IFS=: read -r username groups; do
+    [ -n "$username" ] || continue
+    IFS=',' read -ra group_arr <<< "$groups"
+    add_groups=()
+    for g in "${group_arr[@]}"; do
+        if getent group "$g" > /dev/null 2>&1; then
+            add_groups+=("$g")
+        else
+            echo "kibaos-firstboot-groups: '$g' still doesn't exist, leaving pending" >&2
+        fi
+    done
+    if [ "${#add_groups[@]}" -gt 0 ]; then
+        joined=$(IFS=,; echo "${add_groups[*]}")
+        usermod -aG "$joined" "$username" \
+            && echo "kibaos-firstboot-groups: added $username to $joined" \
+            || echo "kibaos-firstboot-groups: usermod failed for $username" >&2
+    fi
+done < "$MARKER"
+
+# Only remove the marker once every listed group actually got processed --
+# if getent still couldn't find something, leave the file so the next boot
+# retries it instead of silently dropping that membership forever.
+if ! grep -qE ':.*[a-zA-Z]' "$MARKER" 2>/dev/null || \
+   ! awk -F: '{print $2}' "$MARKER" | tr ',' '\n' | while read -r g; do
+       [ -n "$g" ] && ! getent group "$g" > /dev/null 2>&1 && exit 1
+   done; then
+    : # some group still missing -- keep retrying on future boots
+else
+    rm -f "$MARKER"
+fi
+FIRSTBOOTGROUPS
+chmod +x /usr/local/bin/kibaos-firstboot-groups
+
+cat > /etc/systemd/system/kibaos-firstboot-groups.service << 'FIRSTBOOTSVC'
+[Unit]
+Description=KibaOS first-boot group catch-up (docker, etc.)
+After=systemd-sysusers.service
+Wants=systemd-sysusers.service
+ConditionPathExists=/etc/kibaos/pending-user-groups
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kibaos-firstboot-groups
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target
+FIRSTBOOTSVC
+
+systemctl enable kibaos-firstboot-groups.service
 
 # ══════════════════════════════════════════════════════════════════════════
 # SKELETON
