@@ -394,6 +394,7 @@ touch /etc/machine-id
 # then polkitd faceplants on boot ("Could not activate remote peer
 # 'org.freedesktop.PolicyKit1': startup job failed"). so just run it
 # ourselves here instead of hoping pacman does it.
+rm /usr/lib/sysusers.d/basic.conf
 systemd-sysusers || true
 systemd-tmpfiles --create 2>/dev/null || true
 
@@ -7802,21 +7803,23 @@ git clone --depth 1 https://github.com/winapps-org/winapps.git "${WINAPPS_SRC}"
 chmod +x "${WINAPPS_SRC}/setup.sh" "${WINAPPS_SRC}/bin/"* 2>/dev/null || true
 echo "=== WinApps: vendored $(git -C "${WINAPPS_SRC}" rev-parse --short HEAD) ==="
 
+# dockur/windows (the container image WinApps' compose.yaml runs) NATs its
+# own tap network for the Windows guest and needs the netfilter NAT modules
+# loaded on the host to do it -- per winapps-org/winapps docs/docker.md,
+# without ip_tables/iptable_nat loaded, folder sharing (and the guest's
+# network setup in general) breaks. Baking this in at build time so it's
+# just working on first boot rather than a manual post-install step.
+mkdir -p /etc/modules-load.d
+cat > /etc/modules-load.d/kibaos-winapps.conf << 'IPTABLESMODS'
+ip_tables
+iptable_nat
+IPTABLESMODS
+echo "=== WinApps: ip_tables/iptable_nat set to load at boot ==="
+
 # ══════════════════════════════════════════════════════════════════════════
-# OFFICE SUITE — OnlyOffice, replacing Wine as the office/document story.
-# Not in the official Arch repos (AUR-only as onlyoffice-bin), so this
-# goes through Flatpak/Flathub instead of a source build -- flatpak and
-# xdg-desktop-portal are already package deps for the App Store, so this
-# rides on infrastructure that's already there rather than adding a new
-# dependency. Installed --system (not --user) and baked in at ISO build
-# time, same "don't make first boot depend on a fresh network fetch"
-# reasoning as vendoring WinApps above -- it should just be in the app
-# menu on first login, not something that downloads on demand.
-# ══════════════════════════════════════════════════════════════════════════
+
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install --system --noninteractive flathub org.onlyoffice.desktopeditors \
-  || echo "=== WARNING: OnlyOffice flatpak install failed, continuing build ===" >&2
-echo "=== OnlyOffice: installed via Flathub ==="
+
 
 # ══════════════════════════════════════════════════════════════════════════
 # TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
@@ -9665,7 +9668,7 @@ if command -v winapps >/dev/null 2>&1 && [ -f "${CONF_DIR}/winapps.conf" ]; then
 fi
 
 if [ "${MANUAL_LAUNCH}" != "--manual-launch" ]; then
-  ask "Want to set up Windows app support now? This lets you run Windows programs (like Office) right from KibaOS.\n\nIt downloads a Windows environment (about 5–10 GB) and takes roughly 15–20 minutes, most of which is just waiting. You'll need a spare 30+ GB of disk space." \
+  ask "Want to set up Windows app support now? This lets you run Windows programs (like Office) right from KibaOS.\n\nIt downloads a few files (about 5–10 GB) and takes roughly 15–20 minutes, most of which is just waiting. You'll need a spare 30+ GB of disk space." \
     "Set Up Now" "Remind Me Later"
   choice=$?
   if [ "${choice}" -ne 0 ]; then
@@ -9676,7 +9679,7 @@ if [ "${MANUAL_LAUNCH}" != "--manual-launch" ]; then
   fi
 fi
 
-notify "Here's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing.\n\nIf you're curious, you can watch progress at http://127.0.0.1:8006 in your browser, but you don't need to do anything there."
+notify "Here's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing.\n\nIf you're curious, you can watch progress at  localhost:8006 in your browser, but you don't need to do anything there."
 
 pkexec systemctl enable --now docker >/dev/null 2>&1
 if ! systemctl is-active --quiet docker; then
@@ -9687,6 +9690,13 @@ fi
 mkdir -p "${CONF_DIR}"
 if [ ! -f "${COMPOSE_FILE}" ]; then
   cp "${WINAPPS_SRC}/compose.yaml" "${COMPOSE_FILE}"
+  # compose.yaml references "./oem" as a relative bind-mount source (for
+  # post-install RDPApps.reg / install.bat execution inside the guest).
+  # That path resolves relative to the directory `docker compose` is run
+  # from -- CONF_DIR, not WINAPPS_SRC -- so the oem/ folder has to be
+  # copied alongside compose.yaml or the bind mount has nothing to point
+  # at and `docker compose up -d` fails before the container is created.
+  cp -r "${WINAPPS_SRC}/oem" "${CONF_DIR}/oem"
   # WinApps' docker backend (dockur/windows under the hood) installs
   # Windows completely unattended using whatever USERNAME/PASSWORD is
   # baked into compose.yaml at container creation -- there's no
@@ -9721,10 +9731,22 @@ fi
 # sitting there on nouveau with no proprietary driver installed, and
 # requesting a device reservation docker can't satisfy makes the whole
 # "docker compose up" fail outright rather than just skip GPU passthrough.
+#
+# `docker info` (and `docker compose` below) talk to the Docker daemon's
+# socket, which is root-owned. The `sg docker` re-exec earlier only fixes
+# up *this shell's* group token, and that's not enough on its own if group
+# membership isn't actually granting socket access -- plenty of reports of
+# a rootful Docker/Podman only being visible to root, group membership or
+# not. Elevate these two calls with pkexec rather than assume the group
+# path works. pkexec resets the environment, so $HOME (and therefore any
+# path derived from it, like CONF_DIR/COMPOSE_FILE) must NOT be re-derived
+# inside the elevated command -- it has to be the already-resolved
+# absolute path from this unprivileged part of the script, passed straight
+# through as an argument.
 COMPOSE_ARGS=(--file "${COMPOSE_FILE}")
 GPU_DETECTED=0
 if lspci -nnk 2>/dev/null | grep -qi 'nvidia' \
-   && docker info 2>/dev/null | grep -qi 'nvidia'; then
+   && pkexec docker info 2>/dev/null | grep -qi 'nvidia'; then
   OVERRIDE_FILE="${CONF_DIR}/compose.override.yaml"
   cat > "${OVERRIDE_FILE}" << 'GPUOVERRIDE'
 services:
@@ -9741,12 +9763,20 @@ GPUOVERRIDE
   GPU_DETECTED=1
 fi
 
-( cd "${CONF_DIR}" && docker compose "${COMPOSE_ARGS[@]}" up -d ) || {
-  err "Something went wrong starting the Windows environment. Nothing was changed permanently — you can try again from the app menu ('Set Up Windows Apps')."
+# cd happens *before* pkexec, not inside a command it elevates -- cwd is
+# inherited across fork/exec same as any other child process, so this
+# still lands docker compose in CONF_DIR (needed for the compose file's
+# relative "./oem" mount) without depending on $HOME surviving elevation.
+COMPOSE_LOG="$(mktemp)"
+if ! ( cd "${CONF_DIR}" && pkexec docker compose "${COMPOSE_ARGS[@]}" up -d ) > "${COMPOSE_LOG}" 2>&1; then
+  logger -t kibaos-winapps-setup "docker compose up -d failed: $(cat "${COMPOSE_LOG}")"
+  err "Something went wrong starting the Windows environment (see journalctl -t kibaos-winapps-setup for details). Nothing was changed permanently — you can try again from the app menu ('Set Up Windows Apps')."
+  rm -f "${COMPOSE_LOG}"
   exit 1
-}
+fi
+rm -f "${COMPOSE_LOG}"
 
-xdg-open "http://127.0.0.1:8006" >/dev/null 2>&1 &
+xdg-open "localhost:8006" >/dev/null 2>&1 &
 
 # Source of truth for credentials from here on is compose.yaml itself,
 # not a fresh random generation -- keeps this idempotent if setup gets
@@ -9800,7 +9830,7 @@ notify "Almost done — one more window will open to finish installing the app s
 
 TERMINAL_CMD="gnome-console"
 command -v "${TERMINAL_CMD}" >/dev/null 2>&1 || TERMINAL_CMD="gnome-terminal"
-"${TERMINAL_CMD}" -- bash -lc "'${WINAPPS_SRC}/setup.sh'; echo; read -p 'Press Enter to close this window...'"
+"${TERMINAL_CMD}" -- bash -lc "'${WINAPPS_SRC}/setup.sh' --user --setupAllOfficiallySupportedApps; echo; read -p 'Press Enter to close this window...'"
 
 xdg-mime default kibaos-run-exe.desktop application/x-ms-dos-executable \
   application/x-msdownload application/vnd.microsoft.portable-executable application/x-msi
