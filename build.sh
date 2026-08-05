@@ -395,6 +395,7 @@ touch /etc/machine-id
 # 'org.freedesktop.PolicyKit1': startup job failed"). so just run it
 # ourselves here instead of hoping pacman does it.
 rm /usr/lib/sysusers.d/basic.conf
+rm /usr/lib/sysusers.d/arch.conf
 systemd-sysusers || true
 systemd-tmpfiles --create 2>/dev/null || true
 
@@ -9650,14 +9651,24 @@ err()    { zenity --error --title="Windows Apps" --text="$1" --width=420 2>/dev/
 # account that was *just* created, marker and all, with docker group
 # membership on disk but not yet in this session's token. Rather than
 # make the user log out and back in for what looks like a broken feature,
-# re-exec once under `sg docker` (no TTY required, unlike `newgrp`) if the
-# account is a docker-group member on disk but this shell doesn't have it
-# active yet. WINAPPS_REGROUPED guards against ever doing this twice.
+# re-exec once with the docker group active (see below) if the account
+# is a docker-group member on disk but this shell doesn't have it active
+# yet. WINAPPS_REGROUPED guards against ever doing this twice.
 if [ -z "${WINAPPS_REGROUPED:-}" ] \
    && id -nG "${USER:-$(id -un)}" 2>/dev/null | tr ' ' '\n' | grep -qx docker \
    && ! groups 2>/dev/null | tr ' ' '\n' | grep -qx docker; then
   export WINAPPS_REGROUPED=1
-  exec sg docker -c "\"$0\" ${MANUAL_LAUNCH}"
+  # `sg` (which used to do this in one shot, no TTY required) no longer
+  # ships on Arch -- it's gone from both `shadow` and `util-linux` as of
+  # current package file lists, `newgrp` is util-linux's now. `newgrp`
+  # normally replaces the shell interactively, but feeding it a command
+  # over stdin (rather than a TTY) makes it run that command
+  # non-interactively in the new group and then exit, which is the
+  # standard script idiom for this. `exec` here still replaces this
+  # process rather than nesting another layer of shell.
+  exec newgrp docker <<NEWGRPCMD
+"$0" ${MANUAL_LAUNCH}
+NEWGRPCMD
 fi
 
 # Already fully set up? Just say so and offer a normal re-check.
