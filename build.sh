@@ -480,15 +480,10 @@ SYSCTL
 # NOTE: there used to be a binfmt_misc registration here
 # (/etc/binfmt.d/wine.conf, matching on the MZ header) that routed .exe
 # execution straight through Wine at the kernel level. That's gone now
-# along with Wine itself -- and removing it is actually a bugfix in its
-# own right: binfmt_misc intercepts execution before xdg-mime ever gets
-# consulted, so as long as that registration existed, double-clicking an
-# .exe in Nemo would run it via binfmt_misc/wine-silent regardless of
-# what kibaos-run-exe.desktop was set as the default handler for down in
-# the WinApps section below. Now that nothing claims the MZ magic at the
-# binfmt level, that mimeapps.list default is the only thing in play, so
-# .exe/.msi double-clicks go through kibaos-run-exe -> WinApps like they
-# were always supposed to.
+# along with Wine itself. Windows programs aren't launched by double-
+# clicking an .exe anymore either -- see the WinApps section below, which
+# now opens the whole Windows environment as one fullscreen workspace
+# instead of routing individual files through a mimeapps default.
 
 # ══════════════════════════════════════════════════════════════════════════
 # KORTEX — adaptive daemon (usage prediction, break reminders, layout
@@ -9668,38 +9663,24 @@ install -Dm644 "${WINAPPS_SRC}/install/windows.svg" \
   /usr/share/icons/hicolor/scalable/apps/kibaos-winapps.svg 2>/dev/null || true
 gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 
-# ── The double-click handler ────────────────────────────────────────────
-# Registered as the default opener for .exe/.msi MIME types below. If
-# WinApps hasn't actually been set up yet, this politely says so instead
-# of just silently failing — the whole point is that double-clicking an
-# .exe should never dead-end without explanation.
-cat > /usr/local/bin/kibaos-run-exe << 'RUNEXE'
+# ── The Windows workspace launcher ──────────────────────────────────────
+# Rather than routing individual .exe files through WinApps' RAIL
+# integration, this opens the whole Windows environment as one fullscreen
+# workspace via its noVNC web console -- simpler mental model for the
+# person (one window called "Windows", not per-app RDP plumbing) and
+# avoids RAIL edge cases with apps WinApps didn't detect/configure.
+cat > /usr/local/bin/kibaos-winapps-workspace << 'WORKSPACE'
 #!/bin/bash
-# Launches a Windows .exe/.msi through WinApps, the same way double-
-# clicking any other file opens its normal app.
-TARGET="$1"
-if [ -z "${TARGET}" ]; then
-  zenity --error --title="Run with Windows" \
-    --text="No program was given to run." 2>/dev/null
-  exit 1
-fi
+# Opens the Windows VM's noVNC console fullscreen. If setup hasn't run
+# yet, offers to run it first instead of just opening a browser tab to
+# nothing -- same "never dead-end without explanation" rule as before.
+CONF_DIR="${HOME}/.config/winapps"
+COMPOSE_FILE="${CONF_DIR}/compose.yaml"
+RC_XML="${HOME}/.config/labwc/rc.xml"
+RC_XML_BAK="${RC_XML}.winapps-workspace-bak"
+TEMPBIND_MARKER="kibaos-winapps-workspace-tempbind"
 
-# WinApps' own installer (setup.sh --user, run from kibaos-winapps-setup)
-# drops the `winapps` binary in ~/.local/bin, not a directory that's
-# guaranteed to be on PATH here. This script gets launched by the desktop
-# session (Nemo double-click / xdg mimeapps), which inherits its PATH from
-# the display manager's environment -- not from a login shell that sourced
-# .bashrc/.profile -- so ~/.local/bin can be genuinely missing from PATH
-# even though the binary is sitting right there. Check both before giving
-# up, so "not set up yet" only fires when it's actually true.
-WINAPPS_BIN=""
-if command -v winapps >/dev/null 2>&1; then
-  WINAPPS_BIN="winapps"
-elif [ -x "${HOME}/.local/bin/winapps" ]; then
-  WINAPPS_BIN="${HOME}/.local/bin/winapps"
-fi
-
-if [ -z "${WINAPPS_BIN}" ]; then
+if [ ! -f "${COMPOSE_FILE}" ]; then
   zenity --question --title="Windows Apps Aren't Set Up Yet" \
     --text="This computer isn't set up to run Windows programs yet.\n\nWant to set it up now? It takes about 15–20 minutes." \
     --ok-label="Set It Up" --cancel-label="Not Now" 2>/dev/null
@@ -9709,34 +9690,61 @@ if [ -z "${WINAPPS_BIN}" ]; then
   exit 1
 fi
 
-exec "${WINAPPS_BIN}" manual "${TARGET}"
-RUNEXE
-chmod +x /usr/local/bin/kibaos-run-exe
+# docker compose up is idempotent -- safe to run even if the container's
+# already up, and covers the case where it's stopped since last boot.
+( cd "${CONF_DIR}" && pkexec docker compose up -d ) >/dev/null 2>&1
 
-cat > /usr/share/applications/kibaos-run-exe.desktop << 'RUNEXEDESKTOP'
+reload_labwc() {
+  local pid
+  pid="$(pgrep -x labwc | head -n1)"
+  [ -n "${pid}" ] && kill -HUP "${pid}" 2>/dev/null || true
+}
+
+# Super+K minimizes the fullscreen Windows window back to the desktop --
+# bound only while this workspace is actually open, not a permanent
+# shortcut. Backs up rc.xml, patches a keybind in just before the closing
+# </keyboard> tag, and SIGHUPs labwc to pick it up live (same reload
+# mechanism Kortex's own placement rules use).
+KEYBIND_ADDED=0
+if [ -f "${RC_XML}" ] && ! grep -q "${TEMPBIND_MARKER}" "${RC_XML}"; then
+  cp "${RC_XML}" "${RC_XML_BAK}"
+  sed -i "s#</keyboard>#  <!-- ${TEMPBIND_MARKER} -->\n    <keybind key=\"W-k\">\n      <action name=\"Iconify\"/>\n    </keybind>\n  </keyboard>#" "${RC_XML}"
+  reload_labwc
+  KEYBIND_ADDED=1
+fi
+
+chromium --kiosk --app="http://localhost:8006" 2>/dev/null
+
+# Remove the temporary keybind once the workspace window is closed, so
+# Super+K goes back to doing nothing (or whatever it did before) outside
+# of an active Windows session.
+if [ "${KEYBIND_ADDED}" -eq 1 ] && [ -f "${RC_XML_BAK}" ]; then
+  mv "${RC_XML_BAK}" "${RC_XML}"
+  reload_labwc
+fi
+WORKSPACE
+chmod +x /usr/local/bin/kibaos-winapps-workspace
+
+cat > /usr/share/applications/kibaos-winapps-workspace.desktop << 'WORKSPACEDESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Run with Windows
-Comment=Open this program using KibaOS's Windows app support
+Name=Run Windows Workspace
+Comment=Open the Windows environment full-screen
 Icon=kibaos-winapps
-Exec=/usr/local/bin/kibaos-run-exe %f
+Exec=/usr/local/bin/kibaos-winapps-workspace
 Terminal=false
-NoDisplay=true
-MimeType=application/x-ms-dos-executable;application/x-msdownload;application/vnd.microsoft.portable-executable;application/x-msi;
-RUNEXEDESKTOP
+NoDisplay=false
+Categories=System;
+WORKSPACEDESKTOP
 
-# Make it the *default* handler for those MIME types so a plain double-
-# click (not "Open With") just works, matching Nemo's usual behaviour for
-# every other file type. Written into skel so it lands in every new
-# account, same as the rest of this section.
-mkdir -p "${SKEL}/.config"
-cat > "${SKEL}/.config/mimeapps.list" << 'MIMEAPPS'
-[Default Applications]
-application/x-ms-dos-executable=kibaos-run-exe.desktop
-application/x-msdownload=kibaos-run-exe.desktop
-application/vnd.microsoft.portable-executable=kibaos-run-exe.desktop
-application/x-msi=kibaos-run-exe.desktop
-MIMEAPPS
+# Also drop it as a desktop icon, not just an app-menu entry -- this is
+# meant to be the person's main "open Windows" door, so it should be
+# reachable without digging into the menu. Written into skel so it lands
+# on every new account's desktop, same as the rest of this section.
+mkdir -p "${SKEL}/Desktop"
+cp /usr/share/applications/kibaos-winapps-workspace.desktop \
+  "${SKEL}/Desktop/kibaos-winapps-workspace.desktop"
+chmod +x "${SKEL}/Desktop/kibaos-winapps-workspace.desktop"
 
 # ── The setup wizard itself ─────────────────────────────────────────────
 # Written entirely in plain language on purpose — this is the one part of
@@ -9787,7 +9795,7 @@ fi
 
 # Already fully set up? Just say so and offer a normal re-check.
 if command -v winapps >/dev/null 2>&1 && [ -f "${CONF_DIR}/winapps.conf" ]; then
-  notify "Windows app support is already set up on this computer.\n\nDouble-click any .exe file to run it, or find your installed Windows programs in the app menu."
+  notify "Windows app support is already set up on this computer.\n\nOpen 'Run Windows Workspace' from the app menu or desktop to use Windows full-screen, or find your installed Windows programs in the app menu."
   rm -f "${MARKER}"
   exit 0
 fi
@@ -9986,14 +9994,11 @@ if [ "${SETUP_STATUS}" -ne 0 ]; then
 fi
 rm -f "${SETUP_LOG}"
 
-xdg-mime default kibaos-run-exe.desktop application/x-ms-dos-executable \
-  application/x-msdownload application/vnd.microsoft.portable-executable application/x-msi
-
 rm -f "${MARKER}"
 if [ "${GPU_DETECTED}" -eq 1 ]; then
-  notify "All set! Double-click any .exe file to run it in Windows automatically, and any Windows programs WinApps found are now in your app menu.\n\nAn NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
+  notify "All set! Open 'Run Windows Workspace' from the app menu or desktop to use Windows full-screen, and any Windows programs WinApps found are now in your app menu.\n\nAn NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
 else
-  notify "All set! Double-click any .exe file to run it in Windows automatically, and any Windows programs WinApps found are now in your app menu."
+  notify "All set! Open 'Run Windows Workspace' from the app menu or desktop to use Windows full-screen, and any Windows programs WinApps found are now in your app menu."
 fi
 WINAPPSSETUP
 chmod +x /usr/local/bin/kibaos-winapps-setup
@@ -10004,7 +10009,7 @@ cat > /usr/share/applications/kibaos-winapps-setup.desktop << 'SETUPDESKTOP'
 [Desktop Entry]
 Type=Application
 Name=Set Up Windows Apps
-Comment=Run Windows programs like Word, Excel, or Photoshop right from KibaOS
+Comment=Set up Windows app support, including the full-screen Windows Workspace
 Icon=kibaos-winapps
 Exec=/usr/local/bin/kibaos-winapps-setup
 Terminal=false
