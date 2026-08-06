@@ -6979,6 +6979,37 @@ int kiba_install_create_user(const char *target_root, const char *username,
         }
     }
 
+    /* Stash the plaintext account password briefly, root-only, so the
+     * WinApps first-login setup (see WINDOWS APP SUPPORT further down)
+     * can reuse it as the Windows guest's login too, instead of a random
+     * string the person is never shown and can't log in with. This is
+     * the only point in the whole install where the password exists in
+     * plaintext outside of chpasswd's own stdin pipe, so it's written
+     * here and nowhere else. kibaos-winapps-setup reads it exactly once
+     * (via pkexec, since it's 0600 root:root) and deletes it immediately
+     * after, so it never outlives the single setup step it exists for. */
+    {
+        char kibaos_dir[1024];
+        snprintf(kibaos_dir, sizeof(kibaos_dir), "%s/etc/kibaos", target_root);
+        mkdir(kibaos_dir, 0755); /* fine if it already exists */
+        char pass_path[1024];
+        snprintf(pass_path, sizeof(pass_path), "%s/winapps-userpass", kibaos_dir);
+        int fd = open(pass_path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd >= 0) {
+            ssize_t len = (ssize_t)strlen(password);
+            ssize_t written = 0;
+            while (written < len) {
+                ssize_t w = write(fd, password + written, (size_t)(len - written));
+                if (w < 0) { if (errno == EINTR) continue; break; }
+                written += w;
+            }
+            close(fd);
+        }
+        /* Not fatal if this failed to write -- kibaos-winapps-setup
+         * falls back to asking the person for their password directly
+         * if the stash file isn't there. */
+    }
+
     /* Pre-create ~/.local/bin, owned by the new account, on the just-
      * installed target -- not the live session. WinApps' setup.sh --user
      * (run later at first login, see kibaos-winapps-firstrun) installs
@@ -7681,6 +7712,18 @@ progress 65 "Creating your account..."
 useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash "${USERNAME_VAL}" \
   || fail "useradd failed"
 echo "${USERNAME_VAL}:${PASSWORD_VAL}" | chpasswd || fail "chpasswd failed"
+
+# Stash the plaintext password briefly, root-only, so first-login WinApps
+# setup can reuse it as the Windows guest's login instead of a random
+# string nobody's ever shown (see kibaos-winapps-setup, which reads this
+# once via pkexec and deletes it right after). Mirrors what
+# kiba_install_create_user() does for the disk-install path -- this is
+# the OEM-finish equivalent of that same account-creation moment.
+mkdir -p /etc/kibaos
+umask 077
+printf '%s' "${PASSWORD_VAL}" > /etc/kibaos/winapps-userpass
+chmod 600 /etc/kibaos/winapps-userpass
+umask 022
 
 progress 85 "Cleaning up OEM account..."
 # Remove the temporary OEM account created by kibaos-oem-prepare, if present.
@@ -9679,6 +9722,7 @@ COMPOSE_FILE="${CONF_DIR}/compose.yaml"
 RC_XML="${HOME}/.config/labwc/rc.xml"
 RC_XML_BAK="${RC_XML}.winapps-workspace-bak"
 TEMPBIND_MARKER="kibaos-winapps-workspace-tempbind"
+HINT_MARKER="${HOME}/.config/kibaos/.winapps-workspace-hint-shown"
 
 if [ ! -f "${COMPOSE_FILE}" ]; then
   zenity --question --title="Windows Apps Aren't Set Up Yet" \
@@ -9690,38 +9734,93 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   exit 1
 fi
 
-# docker compose up is idempotent -- safe to run even if the container's
-# already up, and covers the case where it's stopped since last boot.
-( cd "${CONF_DIR}" && pkexec docker compose up -d ) >/dev/null 2>&1
-
 reload_labwc() {
   local pid
   pid="$(pgrep -x labwc | head -n1)"
   [ -n "${pid}" ] && kill -HUP "${pid}" 2>/dev/null || true
 }
 
-# Super+K minimizes the fullscreen Windows window back to the desktop --
-# bound only while this workspace is actually open, not a permanent
-# shortcut. Backs up rc.xml, patches a keybind in just before the closing
-# </keyboard> tag, and SIGHUPs labwc to pick it up live (same reload
-# mechanism Kortex's own placement rules use).
 KEYBIND_ADDED=0
-if [ -f "${RC_XML}" ] && ! grep -q "${TEMPBIND_MARKER}" "${RC_XML}"; then
-  cp "${RC_XML}" "${RC_XML_BAK}"
-  sed -i "s#</keyboard>#  <!-- ${TEMPBIND_MARKER} -->\n    <keybind key=\"W-k\">\n      <action name=\"Iconify\"/>\n    </keybind>\n  </keyboard>#" "${RC_XML}"
-  reload_labwc
-  KEYBIND_ADDED=1
+add_keybind() {
+  # Super+K minimizes the fullscreen Windows window back to the desktop --
+  # bound only while this workspace is actually open, not a permanent
+  # shortcut. Backs up rc.xml, patches a keybind in just before the
+  # closing </keyboard> tag, and SIGHUPs labwc to pick it up live (same
+  # reload mechanism Kortex's own placement rules use).
+  if [ -f "${RC_XML}" ] && ! grep -q "${TEMPBIND_MARKER}" "${RC_XML}"; then
+    cp "${RC_XML}" "${RC_XML_BAK}"
+    sed -i "s#</keyboard>#  <!-- ${TEMPBIND_MARKER} -->\n    <keybind key=\"W-k\">\n      <action name=\"Iconify\"/>\n    </keybind>\n  </keyboard>#" "${RC_XML}"
+    reload_labwc
+    KEYBIND_ADDED=1
+  fi
+}
+
+# Runs on ANY exit from this point on -- normal chromium close, the user
+# killing the window some other way, or this script itself dying. Without
+# a trap, only the "chromium closed normally" path put the keybind back,
+# so a killed session could permanently leave Super+K bound to Iconify.
+cleanup() {
+  if [ "${KEYBIND_ADDED}" -eq 1 ] && [ -f "${RC_XML_BAK}" ]; then
+    mv "${RC_XML_BAK}" "${RC_XML}"
+    reload_labwc
+  fi
+}
+trap cleanup EXIT
+
+# docker compose up is idempotent -- safe to run even if the container's
+# already up, and covers the case where it's stopped since last boot. Runs
+# in the background so the "starting up" dialog below can show right away
+# instead of the whole launch appearing to hang on the pkexec prompt.
+( cd "${CONF_DIR}" && pkexec docker compose up -d ) >/dev/null 2>&1 &
+COMPOSE_PID=$!
+
+# The container can take a few seconds (or longer, first boot after a
+# reboot) before noVNC is actually answering on 8006. Opening chromium
+# immediately used to race that -- landing the person on a browser
+# "connection refused" page with no explanation, which looks broken even
+# though nothing's actually wrong. Wait for the port with a visible,
+# cancellable progress dialog instead, so there's always something on
+# screen that makes sense.
+(
+  for i in $(seq 1 60); do
+    nc -z 127.0.0.1 8006 >/dev/null 2>&1 && break
+    sleep 1
+    echo "$((i * 100 / 60))"
+  done
+  echo "100"
+) | zenity --progress --title="Windows" --text="Starting your Windows workspace…" \
+    --pulsate --auto-close --no-cancel --width=360 2>/dev/null
+
+wait "${COMPOSE_PID}"
+COMPOSE_STATUS=$?
+
+if ! nc -z 127.0.0.1 8006 >/dev/null 2>&1; then
+  if [ "${COMPOSE_STATUS}" -ne 0 ]; then
+    zenity --error --title="Windows" --width=420 \
+      --text="Windows didn't start. Try again in a moment, or open 'Set Up Windows Apps' from the app menu if this keeps happening." 2>/dev/null
+  else
+    zenity --error --title="Windows" --width=420 \
+      --text="Windows is taking longer than usual to come up. Give it a bit and try 'Run Windows Workspace' again -- nothing's broken, it just needs more time." 2>/dev/null
+  fi
+  exit 1
+fi
+
+add_keybind
+
+# First time this workspace opens on this account, say what Super+K does
+# up front -- it's the only way out of a fullscreen kiosk window, and
+# nothing else on screen hints it exists.
+if [ "${KEYBIND_ADDED}" -eq 1 ] && [ ! -f "${HINT_MARKER}" ]; then
+  mkdir -p "$(dirname "${HINT_MARKER}")"
+  touch "${HINT_MARKER}"
+  notify-send -i kibaos-winapps "Windows Workspace" \
+    "Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null || \
+    zenity --info --title="Windows" --width=380 \
+      --text="Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null
 fi
 
 chromium --kiosk --app="http://localhost:8006" 2>/dev/null
-
-# Remove the temporary keybind once the workspace window is closed, so
-# Super+K goes back to doing nothing (or whatever it did before) outside
-# of an active Windows session.
-if [ "${KEYBIND_ADDED}" -eq 1 ] && [ -f "${RC_XML_BAK}" ]; then
-  mv "${RC_XML_BAK}" "${RC_XML}"
-  reload_labwc
-fi
+# cleanup() runs automatically via the EXIT trap above.
 WORKSPACE
 chmod +x /usr/local/bin/kibaos-winapps-workspace
 
@@ -9800,19 +9899,30 @@ if command -v winapps >/dev/null 2>&1 && [ -f "${CONF_DIR}/winapps.conf" ]; then
   exit 0
 fi
 
-if [ "${MANUAL_LAUNCH}" != "--manual-launch" ]; then
-  ask "Want to set up Windows app support now? This lets you run Windows programs (like Office) right from KibaOS.\n\nIt downloads a few files (about 5–10 GB) and takes roughly 15–20 minutes, most of which is just waiting. You'll need a spare 30+ GB of disk space." \
-    "Set Up Now" "Remind Me Later"
-  choice=$?
-  if [ "${choice}" -ne 0 ]; then
-    if ask "No problem. Should KibaOS stop asking about this?" "Don't Ask Again" "Ask Me Later"; then
-      rm -f "${MARKER}"
-    fi
-    exit 0
-  fi
+# Docker already installed and the Windows container already created from
+# a prior attempt (compose.yaml exists), just not finished (setup.sh
+# never completed, or the RDP wait timed out last time)? That means
+# someone already said yes to this once -- resume instead of asking the
+# "want to set this up" question all over again every time this runs.
+RESUMING=0
+if command -v docker >/dev/null 2>&1 && [ -f "${COMPOSE_FILE}" ]; then
+  RESUMING=1
 fi
 
-notify "Here's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing.\n\nIf you're curious, you can watch progress at  localhost:8006 in your browser, but you don't need to do anything there."
+# WinApps is a listed, always-on KibaOS feature, not an opt-in add-on
+# (see the WINDOWS APP SUPPORT header above) -- so first-login setup goes
+# straight ahead instead of asking permission for something that's not
+# actually optional. This still isn't silent: the notify below tells the
+# person what's happening and where to watch it, they just don't have to
+# click a button to agree to a feature that's already part of KibaOS.
+# Manually re-launching from "Run Windows Workspace" already implies
+# consent (that's an explicit, deliberate click), so there's nothing left
+# to ask there either.
+if [ "${RESUMING}" -eq 1 ]; then
+  notify "Picking up where Windows app setup left off. This window will let you know once it's ready -- you can also watch progress at localhost:8006 in your browser."
+else
+  notify "Setting up Windows app support now, so you can run Windows programs (like Office) right from KibaOS.\n\nHere's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing, and needs a spare 30+ GB of disk space.\n\nIf you're curious, you can watch progress at localhost:8006 in your browser, but you don't need to do anything there."
+fi
 
 pkexec systemctl enable --now docker >/dev/null 2>&1
 if ! systemctl is-active --quiet docker; then
@@ -9838,13 +9948,56 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   # VM. Left at the upstream sample values (MyWindowsUser /
   # MyWindowsPassword), that's a weak, publicly documented password --
   # and per WinApps' own docs, an empty/default password can make Windows
-  # auto-login in a way that breaks the RDP handshake WinApps needs. So:
-  # generate real credentials before first boot instead of shipping the
-  # sample values.
+  # auto-login in a way that breaks the RDP handshake WinApps needs.
+  #
+  # Rather than a random 24-char string the person is never shown (and
+  # so can never actually type in if they ever need to log into the
+  # Windows console directly -- e.g. after a UAC prompt or a session
+  # lock), reuse the same password they already log into KibaOS with.
+  # One password to remember, not two. kiba_install_create_user() (disk
+  # installs) and kibaos-oem-finish.sh (OEM-imaged devices) both stash it
+  # root-only and one-time-use, right after account creation, for
+  # exactly this. Read it via pkexec (it's 0600 root:root) and delete
+  # the stash the moment it's read, so it never sits around longer than
+  # this single read needs it to.
   WIN_USER="KibaUser"
-  WIN_PASS=$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 24)
-  sed -i "s/^\([[:space:]]*USERNAME:[[:space:]]*\).*/\1\"${WIN_USER}\"/" "${COMPOSE_FILE}"
-  sed -i "s/^\([[:space:]]*PASSWORD:[[:space:]]*\).*/\1\"${WIN_PASS}\"/" "${COMPOSE_FILE}"
+  WIN_PASS=""
+  STASH="/etc/kibaos/winapps-userpass"
+  if pkexec test -f "${STASH}" 2>/dev/null; then
+    WIN_PASS="$(pkexec cat "${STASH}" 2>/dev/null)"
+    pkexec rm -f "${STASH}" 2>/dev/null || true
+  fi
+  # Falls back to asking directly if the stash is missing (setup run long
+  # after install, e.g. the Linux password's since been changed) or too
+  # short for Windows' own unattended-install minimum. Looped so a too-
+  # short retry doesn't just silently continue with a rejected password.
+  while [ -z "${WIN_PASS}" ] || [ "${#WIN_PASS}" -lt 8 ]; do
+    WIN_PASS="$(zenity --password --title="Set a Windows Password" 2>/dev/null)"
+    if [ -z "${WIN_PASS}" ]; then
+      err "Windows app support needs a password to finish setting up. Try again from the app menu when you're ready."
+      exit 1
+    fi
+    if [ "${#WIN_PASS}" -lt 8 ]; then
+      notify "That password's a bit short -- Windows needs at least 8 characters. Try again."
+    fi
+  done
+  # Rewritten line-by-line rather than with sed/awk substitution -- the
+  # password can contain characters (/, &, \) that sed and awk both treat
+  # as special in a replacement string, which would silently corrupt the
+  # line for anyone whose Linux password has one. printf '%s' never
+  # reinterprets its argument, so this is the one substitution method
+  # that's actually safe for an arbitrary user-chosen password.
+  COMPOSE_TMP="$(mktemp)"
+  while IFS= read -r line; do
+    if [[ "${line}" =~ ^([[:space:]]*)USERNAME:[[:space:]]* ]]; then
+      printf '%sUSERNAME: "%s"\n' "${BASH_REMATCH[1]}" "${WIN_USER}"
+    elif [[ "${line}" =~ ^([[:space:]]*)PASSWORD:[[:space:]]* ]]; then
+      printf '%sPASSWORD: "%s"\n' "${BASH_REMATCH[1]}" "${WIN_PASS}"
+    else
+      printf '%s\n' "${line}"
+    fi
+  done < "${COMPOSE_FILE}" > "${COMPOSE_TMP}"
+  mv "${COMPOSE_TMP}" "${COMPOSE_FILE}"
   # Default to Tiny11 rather than stock Windows 11 -- this box's whole
   # audience is "cheap/low-RAM laptop running KibaOS", and stock Win11
   # inside dockur/windows wants noticeably more RAM/disk headroom than
@@ -10921,7 +11074,7 @@ if ls out/*.iso 1>/dev/null 2>&1; then
   echo "╔══════════════════════════════════════╗"
   echo "║  KibaOS build complete!       ║"
   echo "║  ${ISO}.iso            ║"
-  echo "╚══════════════════════════════════════╝"
+  echo "╚══Z════════════════════════════════════╝"
 else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
