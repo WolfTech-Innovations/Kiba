@@ -72,7 +72,7 @@ We're happy to tell you about our partners, **[ArkPC](https://arkpc.com.au)**, a
 - [System Requirements](#system-requirements)
 - [Everyday Use](#everyday-use)
   - [Managing Apps with kibapkg](#managing-apps-with-kibapkg)
-  - [Running Windows Programs](#running-windows-programs)
+  - [Running Windows Programs with LSW](#running-windows-programs-with-lsw)
   - [Automatic Updates](#automatic-updates)
 - [Building KibaOS Yourself](#building-kibaos-yourself)
 - [Project Structure](#project-structure)
@@ -95,7 +95,7 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 | **`kiba`, a friendly app manager** | Install, remove, and update software with plain-language commands instead of memorizing package-manager flags. See [Managing Apps with kibapkg](#managing-apps-with-kibapkg). |
 | **A guided setup experience** | KibaOS's own built-in installer (the OOBE app, short for "Out-Of-Box Experience") asks you one simple question at a time. |
 | **A calm, uncluttered live session** | The trial/install session never dims, locks, or falls asleep on you mid-setup, and stays free of raw system dialogs, developer tools, and other things you'd never need to see. |
-| **Windows program support** | Many simple Windows programs can be double-clicked and run directly — no extra setup needed. |
+| **LSW (Linux Subsystem for Windows)** | A real Windows environment runs alongside KibaOS and opens full-screen with one click — Office, Photoshop, and most other Windows programs work as they normally would. |
 | **Automatic background updates** | Small fixes download and apply on their own, without interrupting what you're doing. |
 
 > [!TIP]
@@ -203,12 +203,16 @@ kiba info    <app name>    # details about an app
 > [!TIP]
 > Most people won't need `kiba` day-to-day — the App Store handles installing and updating apps visually. `kiba` is there for when you'd rather type a command.
 
-### Running Windows Programs
+### Running Windows Programs with LSW
 
-KibaOS can run many Windows programs right out of the box. Just double-click the program's file, and it'll open and run — no extra setup needed.
+KibaOS includes **LSW (Linux Subsystem for Windows)** — the reverse of what its name implies: instead of Windows running a Linux environment inside it, KibaOS runs a real Windows environment inside itself. This lets you use Windows-only programs like Microsoft Office or Photoshop without leaving KibaOS or setting up a separate computer.
+
+The first time you open **"Run Windows Workspace"** from the app menu or desktop, KibaOS downloads and installs Windows automatically in the background — no product key or install disc needed, and nothing to click through. This takes 15–20 minutes and needs about 30 GB of free disk space, all done once.
+
+After that, opening **"Run Windows Workspace"** brings up the full Windows desktop, full-screen, in seconds. Press `Super+K` at any time to switch back to your KibaOS desktop without closing Windows — everything stays running in the background, ready when you switch back.
 
 > [!TIP]
-> Not every Windows program will work perfectly — this depends on the program itself, not on KibaOS. Simpler desktop applications tend to work best.
+> Not every Windows program will work perfectly — this depends on the program itself, not on KibaOS. LSW works best with at least 4 GB of RAM free for the Windows environment on top of what KibaOS itself is using.
 
 ### Automatic Updates
 
@@ -261,7 +265,7 @@ Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://
 
 ## License
 
-KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Budgie, Wine, Numix, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
+KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Budgie, Docker, Numix, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
