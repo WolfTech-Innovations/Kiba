@@ -3964,8 +3964,15 @@ public class KibaOOBE : Adw.Application {
         // down) see the updated values on every rescan -- reassigning a
         // plain unboxed local wouldn't be visible from a closure created
         // before the reassignment.
-        string[][] ssid_box    = { {} };
-        bool[][]   secured_box = { {} };
+        // NOTE: `string[][] x = { {} };` is NOT valid Vala -- "stacked
+        // array" literals like that aren't supported by the compiler
+        // (confirmed: valac 0.56.19 rejects it outright). Gee.ArrayList
+        // gives the same "closures see later mutations" property since
+        // it's a reference type -- refresh_networks() below just
+        // clear()/add()s into the same list object instead of reassigning
+        // a boxed array slot.
+        var ssid_box    = new Gee.ArrayList<string> ();
+        var secured_box = new Gee.ArrayList<bool> ();
 
         // Set while a password dialog is open or a connection attempt is
         // in flight, so the periodic rescan below doesn't yank the row
@@ -4003,9 +4010,8 @@ public class KibaOOBE : Adw.Application {
                 list_box.remove (child);
                 child = next;
             }
-
-            string[] new_ssid_list    = {};
-            bool[]   new_secured_list = {};
+            ssid_box.clear ();
+            secured_box.clear ();
 
             var seen = new Gee.HashSet<string> ();
             bool any = false;
@@ -4045,8 +4051,8 @@ public class KibaOOBE : Adw.Application {
                 row.add_prefix (new Gtk.Label (signal_bars) { css_classes = { "oobe-signal-glyph" } });
                 list_box.append (row);
 
-                new_ssid_list    += ssid;
-                new_secured_list += secured;
+                ssid_box.add (ssid);
+                secured_box.add (secured);
                 any = true;
             }
             if (!any) {
@@ -4055,9 +4061,6 @@ public class KibaOOBE : Adw.Application {
                 };
                 list_box.append (row);
             }
-
-            ssid_box[0]    = new_ssid_list;
-            secured_box[0] = new_secured_list;
         }
 
         refresh_networks ();
@@ -4087,10 +4090,10 @@ public class KibaOOBE : Adw.Application {
         // scan_paused_box
         list_box.row_activated.connect ((row) => {
             int idx = row.get_index ();
-            if (idx < 0 || idx >= ssid_box[0].length) return;
+            if (idx < 0 || idx >= ssid_box.size) return;
 
-            string ssid    = ssid_box[0][idx];
-            bool   secured = secured_box[0][idx];
+            string ssid    = ssid_box[idx];
+            bool   secured = secured_box[idx];
 
             if (secured) {
                 // ── Password dialog ───────────────────────────────────────
