@@ -52,18 +52,12 @@ KibaOS is built and maintained by **Kiba Labs**.
 
 > [!NOTE]
 > New to Linux? A "distribution" (or "distro") is just a complete, ready-to-install version of the Linux operating system, bundled with a desktop, apps, and settings. KibaOS is one such distribution.
-
-### Want KibaOS on real hardware?
-
-We're happy to tell you about our partners, **[ArkPC](https://arkpc.com.au)**, a builder of Linux-first desktops, workstations, and laptops. ArkPC is affiliated with KibaOS and plan to/may soon pre-install KibaOS on the machines they sell. If you're looking for hardware that's well-suited to running Linux in general, if you still want to install KibaOS yourself by following the steps below.
-
 ---
 
 ## Table of Contents
 
 - [What KibaOS Includes](#what-kibaos-includes)
 - [Design & Theming](#design--theming)
-- [Recommended Hardware: ArkPC](#want-kibaos-on-real-hardware)
 - [Getting Started](#getting-started)
   - [Step 1: Download the ISO](#step-1-download-the-iso)
   - [Step 2: Write It to a USB Drive](#step-2-write-it-to-a-usb-drive)
