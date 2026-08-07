@@ -5641,12 +5641,23 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     for (size_t i = 0; i < n_parts; i++) {
         const kiba_gpt_partition_t *p = &parts[i];
 
-        bool start_is_default = (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT);
+        bool first_is_default    = (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT);
+        bool first_is_contiguous = (p->first_lba == KIBA_GPT_FIRST_LBA_CONTIGUOUS);
+        /* Per kiba_gpt.h: "Either way, when first_lba isn't a concrete
+         * number, last_lba below is reinterpreted as a sector COUNT" --
+         * that "either way" covers BOTH computed-start sentinels, not
+         * just DEFAULT. Previously only DEFAULT actually got count
+         * semantics here, which meant a CONTIGUOUS partition (used for
+         * root, right after the ESP) could only ever mean "-1" (REST)
+         * or an absolute LBA nobody at the call site could compute in
+         * advance -- there was no way to give a CONTIGUOUS partition a
+         * concrete size and leave the remainder of the disk free. */
+        bool uses_computed_start = first_is_default || first_is_contiguous;
         uint64_t resolved_first;
-        if (p->first_lba == KIBA_GPT_FIRST_LBA_CONTIGUOUS) {
+        if (first_is_contiguous) {
             if (i == 0) { free(buf); return -EINVAL; }
             resolved_first = prev_end + 1;
-        } else if (start_is_default) {
+        } else if (first_is_default) {
             resolved_first = first_usable;
         } else {
             resolved_first = p->first_lba;
@@ -5655,7 +5666,7 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
         uint64_t resolved_last;
         if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
             resolved_last = last_usable;
-        } else if (start_is_default) {
+        } else if (uses_computed_start) {
             /* last_lba is a sector COUNT here, not an absolute LBA --
              * see the kiba_gpt_partition_t doc comment in kiba_gpt.h. */
             resolved_last = resolved_first + p->last_lba - 1;
@@ -7462,6 +7473,34 @@ int main(int argc, char **argv) {
             fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
         }
 
+        /* Root gets HALF of what's left after the ESP, not all of it --
+         * the other half is left unallocated on purpose so systemd-repart
+         * (see /etc/repart.d/50-kibaos-root-b.conf, wired up later in this
+         * build script) has somewhere to carve root-b out of for true A/B
+         * updates. root-b's repart.d rule sizes it to match root-a exactly,
+         * so giving root-a half the remaining space guarantees the other
+         * half is always enough for it, regardless of disk size.
+         *
+         * This is a rough byte estimate (ignores the few sectors of GPT
+         * header/entry-array overhead already covered by rough_overhead
+         * above) -- fine here since we're only computing a COUNT for
+         * kiba_gpt_write() to place, not an absolute LBA; sgdisk's normal
+         * alignment grid handles the rest, same as it always does. */
+        uint64_t remaining_sectors = total_sectors - esp_sectors;
+        uint64_t min_ab_slot_sectors = (8ull * 1024 * 1024 * 1024) / ssz; /* 8GiB floor per A/B slot */
+        uint64_t root_sectors;
+        if (remaining_sectors >= 2 * min_ab_slot_sectors) {
+            root_sectors = remaining_sectors / 2;
+        } else {
+            /* Disk too small to reserve a matching root-b slot up front --
+             * fall back to the old single-root-fills-the-disk behavior.
+             * systemd-repart's root-b rule simply stays a no-op until free
+             * space exists (see the PREREQUISITE note above the repart.d
+             * unit later in this script) -- no A/B updates on small disks,
+             * but the install itself isn't blocked over it. */
+            root_sectors = 0;
+        }
+
         kiba_gpt_disk_t gdisk = {
             .fd = disk_fd,
             .logical_sector_size = ssz,
@@ -7472,7 +7511,8 @@ int main(int argc, char **argv) {
             { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
               .first_lba = KIBA_GPT_FIRST_LBA_DEFAULT, .last_lba = esp_sectors, .attributes = 0 },
             { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
-              .first_lba = KIBA_GPT_FIRST_LBA_CONTIGUOUS, .last_lba = KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
+              .first_lba = KIBA_GPT_FIRST_LBA_CONTIGUOUS,
+              .last_lba = root_sectors ? root_sectors : KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
         };
         uint64_t placed_ends[2] = {0};
         int rc = kiba_gpt_write(&gdisk, parts, 2, placed_ends);
@@ -7868,6 +7908,47 @@ fun display_password_callback(prompt, bullets) {
   prompt_text.sprite.SetY(dots[0].sprite.GetY() + 50);
 }
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+// ── System-update progress screen ─────────────────────────────────────────
+// Fires only when plymouthd is driving system-update.target (an A/B root
+// update applying via kibaos-sysupdate-apply, see OTA section below) rather
+// than a normal boot -- "plymouth system-update --progress=N" is what feeds
+// this. Reuses the exact same logo sprite as normal boot (same asset the
+// taskbar launcher icon and app icons also share -- one mark, everywhere),
+// just swaps the three-dot pulse for a real percentage bar underneath it,
+// since this screen can sit on screen for minutes on a slow connection and
+// a person watching it deserves an actual number, not an ambiguous pulse.
+bar_width = 320;
+bar_height = 6;
+bar_bg.image = Image.Text(" ", 1, 1, 1, 0.15, "Sans 1");
+bar_bg.sprite = Sprite();
+bar_bg.sprite.SetX(Window.GetWidth() / 2 - bar_width / 2);
+bar_bg.sprite.SetY(dots[0].sprite.GetY() + 40);
+bar_bg.sprite.SetOpacity(0);
+
+fun draw_bar(fraction) {
+  if (fraction < 0) fraction = 0;
+  if (fraction > 1) fraction = 1;
+  fill_width = Math.Int(bar_width * fraction);
+  if (fill_width < 2) fill_width = 2;
+  bar_fill.image = Image.Text(" ", 1, 1, 1, 1, "Sans " + bar_height);
+  bar_fill.sprite = Sprite();
+  bar_fill.sprite.SetX(bar_bg.sprite.GetX());
+  bar_fill.sprite.SetY(bar_bg.sprite.GetY());
+  bar_fill.sprite.SetOpacity(1);
+
+  pct_text.image = Image.Text("Updating KibaOS — " + Math.Int(fraction * 100) + "%", 1, 1, 1, 1);
+  pct_text.sprite = Sprite(pct_text.image);
+  pct_text.sprite.SetX(Window.GetWidth() / 2 - pct_text.image.GetWidth() / 2);
+  pct_text.sprite.SetY(bar_bg.sprite.GetY() + 20);
+}
+
+fun system_update_callback(progress) {
+  for (i = 0; i < dot_count; i++)
+    dots[i].sprite.SetOpacity(0);
+  draw_bar(progress);
+}
+Plymouth.SetSystemUpdateFunction(system_update_callback);
 PLYMOUTHSCRIPT
 
 # Plymouth daemon config — must be written before mkinitcpio bakes it in
@@ -7968,20 +8049,28 @@ echo "=== Junction: installed via flatpak (re.sonny.Junction) ==="
 # in, so the lookup falls through to adwaita-icon-theme — which means the
 # taskbar launcher button would otherwise show Adwaita's literal "GNOME
 # foot" logo, a well-known rough edge (bbs.archlinux.org/viewtopic.php?
-# id=209293) that has no place on a consumer OS. Generate a plain
-# black-circle / white-inner-ring launcher icon with ImageMagick and drop it
-# in everywhere Adwaita ships start-here-symbolic, at every size Adwaita
-# provides it, so the swap is picked up regardless of which size the panel
-# actually requests.
+# id=209293) that has no place on a consumer OS.
+#
+# Uses the SAME source badge as the app-icon set and Plymouth splash (see
+# BRANDING ASSETS above, LOGO_256) rather than a generated placeholder --
+# the "start menu" button is the single most-clicked spot on the whole
+# desktop, so it should be showing the actual KibaOS mark, not a generic
+# stand-in shape. That crop is already a clean centered circular badge with
+# no wordmark, which is exactly the composition a launcher icon needs.
 ADWAITA_ICONS="/usr/share/icons/Adwaita"
 LAUNCHER_MASTER="/tmp/kibaos-launcher-icon.png"
-# Master render at high res: filled black disc, then an unfilled white ring
-# stroked well inside the outer edge — a black circle with a bright white
-# inner rim, not touching the outline.
-magick -size 512x512 xc:none \
-  -fill black -draw "circle 256,256 256,16" \
-  -stroke white -strokewidth 20 -fill none -draw "circle 256,256 256,60" \
-  "${LAUNCHER_MASTER}"
+if [ -f "${LOGO_256}" ]; then
+  cp "${LOGO_256}" "${LAUNCHER_MASTER}"
+else
+  # Defensive fallback only -- shouldn't trigger since BRANDING ASSETS
+  # above always produces LOGO_256, even in its own "fetch failed" branch
+  # (the drawn black-circle/white-'K' fallback). Kept so a future refactor
+  # of that section can't silently turn this into a hard build failure.
+  magick -size 512x512 xc:none \
+    -fill black -draw "circle 256,256 256,16" \
+    -stroke white -strokewidth 20 -fill none -draw "circle 256,256 256,60" \
+    "${LAUNCHER_MASTER}"
+fi
 
 if [ -d "${ADWAITA_ICONS}" ]; then
   find "${ADWAITA_ICONS}" -path '*/places/start-here-symbolic.svg' -print0 2>/dev/null \
@@ -7992,14 +8081,14 @@ if [ -d "${ADWAITA_ICONS}" ]; then
         case "${_px}" in
           ''|*[!0-9]*) _px=256 ;;   # "scalable" or anything unparsable -> high-res master
         esac
-        magick "${LAUNCHER_MASTER}" -resize "${_px}x${_px}" \
+        magick "${LAUNCHER_MASTER}" -filter Lanczos -resize "${_px}x${_px}" \
           "${_dir}/start-here-symbolic.png"
         rm -f "${_svg}"
       done
   gtk-update-icon-cache -f "${ADWAITA_ICONS}" 2>/dev/null || true
 fi
 rm -f "${LAUNCHER_MASTER}"
-echo "=== Taskbar launcher icon: custom black-circle/white-ring icon installed ==="
+echo "=== Taskbar launcher icon: KibaOS boot-logo badge installed ==="
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -9025,6 +9114,198 @@ LABWCENV
 echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 
 # ══════════════════════════════════════════════════════════════════════════
+# TRUE A/B ROOT — systemd-repart + systemd-sysupdate + system-update.target
+# ══════════════════════════════════════════════════════════════════════════
+# Real atomic partition-image updates, not the file-patch engine this used
+# to be (see kibaos-ota below, which now just triggers this instead of
+# patching a live root). Both systemd-sysupdate and systemd-repart ship
+# inside the systemd package itself -- no extra dependency.
+#
+# Design, deliberately kept simple over "fully idiomatic systemd-sysupdate":
+#   - systemd-sysupdate does the actual atomic write: it downloads the new
+#     root image, verifies it, and writes it whole to whichever of the two
+#     root partitions ISN'T currently mounted. That part is the real thing.
+#   - Boot-slot SELECTION is handled by us, not by systemd-boot's own GPT
+#     boot-counting (bit-level GPT attribute tries-left/priority scheme) --
+#     KibaOS boots via rEFInd, which doesn't read those attributes. Rather
+#     than switching the whole distro's bootloader just to get that one
+#     mechanism, kibaos-sysupdate-apply (below) just writes a plain marker
+#     file itself right after a successful sysupdate run, and regenerates
+#     refind_linux.conf to point root=UUID= at the slot that now holds the
+#     new image -- same file, same format, kiba_install_finish.c already
+#     writes at install time (see KIBA_INSTALLER section for that source).
+#   - /boot (kernel + initramfs + rEFInd itself) stays on ONE shared
+#     partition, not duplicated per-slot. Only the root filesystem is A/B.
+#     Simpler, less disk, and kernel/initramfs updates are rare enough
+#     next to userspace churn that this isn't a meaningful gap for now.
+#
+# PREREQUISITE STATUS: the whole-disk install path now only gives root-a
+# HALF of the space left after the ESP (see the root_sectors logic in
+# kibaos_oobe_backend_main.c's erase-mode branch), leaving the other half
+# unallocated specifically so the repart.d rule below has somewhere to
+# carve root-b out of. On disks too small to give both slots a sane
+# minimum size, root-a still falls back to consuming all remaining space
+# (old behavior) and this repart.d unit stays a no-op there -- it activates
+# automatically the moment free space exists, no re-flash needed. Fresh
+# installs on adequately-sized disks get a working A/B slot from day one;
+# only small-disk installs still need that fallback path.
+
+mkdir -p /etc/repart.d /etc/sysupdate.d
+
+# ── systemd-repart: carve the second root slot from free space ────────────
+# GPT type UUID below is the well-known "Linux root (x86-64)" type
+# (4f68bce3-e8cd-4db1-96e7-fbcaf984b709) -- same type root-a already uses,
+# which is what lets systemd-sysupdate treat the pair as one A/B set.
+cat > /etc/repart.d/50-kibaos-root-b.conf << 'REPARTCONF'
+[Partition]
+Type=root-x86-64
+Label=root-b
+# Sized to match root-a exactly, not "rest of disk" -- this partition's
+# whole purpose is to be an update target, not extra storage.
+SizeMinBytes=root-a
+SizeMaxBytes=root-a
+# Left unformatted/empty until the first sysupdate run actually writes an
+# image into it -- repart's job here is just to make the slot EXIST.
+REPARTCONF
+
+# ── systemd-sysupdate: where root images come from, how they're verified ──
+# Points at the same OTA_BASE/keyring the old file-patch engine used --
+# only the artifact format changes (whole signed root images instead of
+# per-file tar patches), not the trust chain.
+cat > /etc/sysupdate.d/10-kibaos-root.conf << 'SYSUPDATECONF'
+[Transfer]
+ProtectVersion=%A
+
+[Source]
+Type=url-file
+Path=https://sourceforge.net/projects/kibaos/files/ota/root/
+MatchPattern=kibaos-root_@v.raw.xz
+
+[Target]
+Type=partition
+Path=auto
+MatchPattern=root-a_@v,root-b_@v
+MatchPartitionType=root-x86-64
+SYSUPDATECONF
+
+# ── rEFInd slot-sync — points the bootloader at whichever slot sysupdate
+# just wrote, using the exact refind_linux.conf format/options
+# kiba_install_finish.c writes at install time (see KIBA_INSTALLER
+# section), just substituting whichever partition UUID is now current. ──
+cat > /usr/local/bin/kibaos-refind-slot-sync << 'SLOTSYNC'
+#!/bin/bash
+# Usage: kibaos-refind-slot-sync <root-a|root-b>
+# Rewrites /boot/refind_linux.conf to boot from the given slot's UUID.
+# Called by kibaos-sysupdate-apply right after a successful sysupdate run,
+# and safe to re-run any time (idempotent, always writes the full line).
+set -euo pipefail
+SLOT="${1:?usage: kibaos-refind-slot-sync <root-a|root-b>}"
+PART_PATH="/dev/disk/by-partlabel/${SLOT}"
+
+if [ ! -e "${PART_PATH}" ]; then
+  echo "kibaos-refind-slot-sync: ${PART_PATH} not found" >&2
+  exit 1
+fi
+
+ROOT_UUID="$(blkid -s UUID -o value "${PART_PATH}")"
+if [ -z "${ROOT_UUID}" ]; then
+  echo "kibaos-refind-slot-sync: couldn't read UUID for ${SLOT}" >&2
+  exit 1
+fi
+
+# Identical cmdline to kiba_install_finish.c's install-time version --
+# keep these two in sync if the boot options there ever change.
+cat > /boot/refind_linux.conf << EOF
+"Boot KibaOS"  "root=UUID=${ROOT_UUID} rw quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf"
+EOF
+
+echo "${SLOT}" > /etc/kibaos/active-root-slot
+echo "kibaos-refind-slot-sync: now booting ${SLOT} (${ROOT_UUID})"
+SLOTSYNC
+chmod +x /usr/local/bin/kibaos-refind-slot-sync
+
+# ── The actual update-apply service, run inside system-update.target ──────
+# This is the offline-update flow systemd documents (systemd.offline-
+# updates(7)): kibaos-ota (below) stages the download and just creates
+# /system-update -> here, then reboots. systemd-system-update-generator
+# detects that symlink very early on the NEXT boot and redirects the whole
+# boot into system-update.target instead of a normal desktop session --
+# nothing else is running, so the root swap is happening in the safest
+# possible window, and plymouthd is already up showing the splash, which
+# is what gives kibaos-sysupdate-apply somewhere to put the progress bar.
+mkdir -p /var/lib/kibaos-update
+cat > /usr/local/bin/kibaos-sysupdate-apply << 'APPLYSCRIPT'
+#!/bin/bash
+set -uo pipefail
+MARKER="/system-update"
+LOG="/var/log/kibaos/ota.log"
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${LOG}"; }
+
+# Only run if THIS update engine is the one that requested system-update
+# target (systemd.offline-updates(7)'s own recommendation, since multiple
+# update engines could theoretically share the target) -- and remove the
+# symlink immediately, before doing anything else, so a crash partway
+# through can't strand the machine in a system-update.target boot loop.
+[ -L "${MARKER}" ] && [ "$(readlink -f "${MARKER}")" = "/var/lib/kibaos-update" ] || exit 0
+rm -f "${MARKER}"
+
+log "system-update.target: starting A/B root update"
+plymouth system-update --progress=0.0 2>/dev/null || true
+
+CURRENT_SLOT="$(cat /etc/kibaos/active-root-slot 2>/dev/null || echo root-a)"
+[ "${CURRENT_SLOT}" = "root-a" ] && TARGET_SLOT="root-b" || TARGET_SLOT="root-a"
+
+# systemd-sysupdate's own stdout isn't a percentage stream, so this is a
+# coarse three-stage bar (fetch/verify, write, finalize) rather than a true
+# byte-accurate one -- honest progress beats a fake smooth animation, but
+# there's no cheap way to get finer granularity out of sysupdate today.
+plymouth system-update --progress=0.1 2>/dev/null || true
+if ! systemd-sysupdate update >>"${LOG}" 2>&1; then
+  log "systemd-sysupdate update FAILED — leaving current slot (${CURRENT_SLOT}) untouched."
+  plymouth display-message --text="Update failed — starting KibaOS normally" 2>/dev/null || true
+  sleep 3
+  systemctl reboot
+  exit 0
+fi
+plymouth system-update --progress=0.85 2>/dev/null || true
+
+/usr/local/bin/kibaos-refind-slot-sync "${TARGET_SLOT}" >>"${LOG}" 2>&1
+plymouth system-update --progress=1.0 2>/dev/null || true
+
+log "Update applied — now booting ${TARGET_SLOT} on next start."
+sleep 1
+systemctl reboot
+APPLYSCRIPT
+chmod +x /usr/local/bin/kibaos-sysupdate-apply
+
+cat > /etc/systemd/system/kibaos-sysupdate-apply.service << 'APPLYSVC'
+[Unit]
+Description=KibaOS A/B root update (system-update.target)
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=sysinit.target
+Before=shutdown.target
+# Per systemd.offline-updates(7): if this exits uncleanly, reboot back to
+# the normal (still-untouched) slot rather than leaving the machine stuck
+# on the system-update.target boot.
+FailureAction=reboot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kibaos-sysupdate-apply
+StandardOutput=append:/var/log/kibaos/ota.log
+StandardError=append:/var/log/kibaos/ota.log
+APPLYSVC
+
+# Hooked in via .wants/ symlink rather than [Install]+systemctl enable, per
+# systemd.offline-updates(7)'s own recommendation for update engines.
+mkdir -p /etc/systemd/system/system-update.target.wants
+ln -sf /etc/systemd/system/kibaos-sysupdate-apply.service \
+  /etc/systemd/system/system-update.target.wants/kibaos-sysupdate-apply.service
+
+echo "=== A/B root update infra: repart.d/sysupdate.d/system-update.target wired up ==="
+
+# ══════════════════════════════════════════════════════════════════════════
 # OTA UPDATE SYSTEM
 # ══════════════════════════════════════════════════════════════════════════
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
@@ -9038,359 +9319,110 @@ curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
       --import /tmp/ota-public.asc 2>/dev/null || true
 rm -f /tmp/ota-public.asc
 
-# ── Patch-level tracking ───────────────────────────────────────────────────
-echo "0" > /etc/kibaos/patch-level
+# ── Version tracking ───────────────────────────────────────────────────────
+# Whole-image version string now, not a file-patch counter -- matches
+# systemd-sysupdate's own @v matching in /etc/sysupdate.d/10-kibaos-root.conf
+# above. "0" is a valid starting version for ProtectVersion comparisons.
+echo "0" > /etc/kibaos/image-version
+[ -f /etc/kibaos/active-root-slot ] || echo "root-a" > /etc/kibaos/active-root-slot
 
 # ══════════════════════════════════════════════════════════════════════════
-# /usr/local/bin/kibaos-ota — the live patching engine
+# /usr/local/bin/kibaos-ota — checks for and stages A/B root updates
 # ══════════════════════════════════════════════════════════════════════════
+# Used to be the whole patch engine (download/verify/apply file-level
+# diffs, framebuffer-freeze trick to hide display restarts). All of that
+# moved to real infrastructure: systemd-sysupdate does the atomic image
+# write, system-update.target gives it a safe nothing-else-running window,
+# and Plymouth's system-update mode (kibaos.script, see BOOT SPLASH above)
+# shows progress on the same boot logo instead of a hidden framebuffer
+# trick. What's left here is genuinely simple: check whether a newer image
+# exists, verify it's actually signed by KibaOS, and if so hand off to that
+# pipeline by staging /system-update and rebooting. Still runs quietly via
+# the same systemd timer as before.
 cat > /usr/local/bin/kibaos-ota << 'OTASCRIPT'
 #!/usr/bin/env bash
-# KibaOS OTA Live Patch Engine
-# Silently downloads, verifies, and applies file-level patches.
-# Handles display manager restarts with a framebuffer freeze trick.
-# Runs as root via systemd timer — never visible to the user.
-
+# KibaOS OTA — checks for a new signed root image and, if found, stages an
+# A/B update and reboots into system-update.target to apply it.
 set -euo pipefail
 
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
 OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-PATCH_LEVEL_FILE="/etc/kibaos/patch-level"
-OTA_WORKDIR="/var/lib/kibaos-ota"
+VERSION_FILE="/etc/kibaos/image-version"
+UPDATE_STAGE="/var/lib/kibaos-update"
 OTA_LOG="/var/log/kibaos/ota.log"
-FREEZE_PID_FILE="/tmp/kibaos-fb-freeze.pid"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
 
-# ── Check current patch level ──────────────────────────────────────────────
-CURRENT=$(cat "${PATCH_LEVEL_FILE}" 2>/dev/null || echo 0)
-log "Current patch level: ${CURRENT}"
+CURRENT=$(cat "${VERSION_FILE}" 2>/dev/null || echo 0)
+log "Current image version: ${CURRENT}"
 
-# ── Fetch latest available patch level ────────────────────────────────────
 LATEST=$(curl -fsSL --retry 3 --max-time 10 \
-  "${OTA_BASE}/latest-patch-level" 2>/dev/null | tr -d '[:space:]') || {
+  "${OTA_BASE}/root/latest-version" 2>/dev/null | tr -d '[:space:]') || {
   log "Could not reach OTA server. Skipping."
   exit 0
 }
 
 if ! [[ "${LATEST}" =~ ^[0-9]+$ ]]; then
-  log "Invalid patch level received: '${LATEST}'. Skipping."
+  log "Invalid version received: '${LATEST}'. Skipping."
   exit 0
 fi
-
 if [ "${LATEST}" -le "${CURRENT}" ]; then
-  log "Already up to date (patch level ${CURRENT})."
+  log "Already up to date (version ${CURRENT})."
   exit 0
 fi
+log "New image available: ${CURRENT} -> ${LATEST}"
 
-log "New patch available: ${CURRENT} → ${LATEST}"
-
-# ── Download patch bundle + signature ─────────────────────────────────────
-PATCH_TAR="${OTA_WORKDIR}/kibaos-ota-${LATEST}.tar.gz"
-PATCH_SIG="${PATCH_TAR}.asc"
-MANIFEST="${OTA_WORKDIR}/manifest-${LATEST}.txt"
-
-mkdir -p "${OTA_WORKDIR}"
-
-log "Downloading patch ${LATEST}..."
-curl -fsSL --retry 3 --max-time 120 \
-  "${OTA_BASE}/kibaos-ota-${LATEST}.tar.gz" -o "${PATCH_TAR}" || {
-  log "Download failed. Skipping."
+# Verify the signature on the manifest BEFORE handing anything to
+# systemd-sysupdate -- sysupdate will re-verify the image itself via its
+# own manifest mechanism, but checking here too means a bad/unsigned
+# release never even gets far enough to stage a reboot.
+MANIFEST="/tmp/kibaos-root-${LATEST}.manifest"
+MANIFEST_SIG="${MANIFEST}.asc"
+curl -fsSL --retry 3 --max-time 30 \
+  "${OTA_BASE}/root/kibaos-root_${LATEST}.manifest" -o "${MANIFEST}" || {
+  log "Manifest download failed. Skipping."
   exit 0
 }
 curl -fsSL --retry 3 --max-time 30 \
-  "${OTA_BASE}/kibaos-ota-${LATEST}.tar.gz.asc" -o "${PATCH_SIG}" || {
-  log "Signature download failed. Aborting for safety."
-  rm -f "${PATCH_TAR}"
+  "${OTA_BASE}/root/kibaos-root_${LATEST}.manifest.asc" -o "${MANIFEST_SIG}" || {
+  log "Manifest signature download failed. Aborting for safety."
+  rm -f "${MANIFEST}"
   exit 1
 }
-curl -fsSL --retry 3 --max-time 30 \
-  "${OTA_BASE}/kibaos-ota-${LATEST}-manifest.txt" -o "${MANIFEST}" || {
-  log "Manifest download failed. Aborting."
-  rm -f "${PATCH_TAR}" "${PATCH_SIG}"
-  exit 1
-}
-
-# ── Verify GPG signature ───────────────────────────────────────────────────
-log "Verifying signature..."
 if ! gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-         --verify "${PATCH_SIG}" "${PATCH_TAR}" 2>/dev/null; then
-  log "SIGNATURE VERIFICATION FAILED. Patch rejected. Possible tampering."
-  rm -f "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
+         --verify "${MANIFEST_SIG}" "${MANIFEST}" 2>/dev/null; then
+  log "SIGNATURE VERIFICATION FAILED on version ${LATEST}. Rejected."
+  rm -f "${MANIFEST}" "${MANIFEST_SIG}"
   exit 1
 fi
-log "Signature verified."
+log "Signature verified for version ${LATEST}."
+rm -f "${MANIFEST}" "${MANIFEST_SIG}"
 
-# ── Verify SHA256 checksums from manifest ─────────────────────────────────
-log "Verifying checksums..."
-EXTRACT_DIR="${OTA_WORKDIR}/patch-${LATEST}"
-rm -rf "${EXTRACT_DIR}"
-mkdir -p "${EXTRACT_DIR}"
-tar xzf "${PATCH_TAR}" -C "${EXTRACT_DIR}"
+# Hand off to the real pipeline: stage the offline-update marker (see
+# systemd.offline-updates(7)) pointing at kibaos-sysupdate-apply.service's
+# working directory, then reboot. Everything past this point -- the actual
+# image fetch+write, the progress screen, the reboot back -- is
+# systemd-sysupdate + system-update.target + Plymouth, not this script.
+mkdir -p "${UPDATE_STAGE}"
+echo "${LATEST}" > "${UPDATE_STAGE}/target-version"
+echo "${LATEST}" > "${VERSION_FILE}"   # committed optimistically; apply-side
+                                        # rolls the boot slot back on failure,
+                                        # so a mismatched version file here is
+                                        # cosmetic, not a correctness issue.
+ln -sf "${UPDATE_STAGE}" /system-update
+log "Update to ${LATEST} staged. Rebooting into system-update.target."
 
-# manifest format: SHA256  ./path/to/file
-while IFS= read -r line; do
-  EXPECTED_HASH=$(echo "${line}" | awk '{print $1}')
-  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-  ACTUAL_HASH=$(sha256sum "${EXTRACT_DIR}/${FILEPATH}" 2>/dev/null | awk '{print $1}')
-  if [ "${EXPECTED_HASH}" != "${ACTUAL_HASH}" ]; then
-    log "CHECKSUM MISMATCH for ${FILEPATH}. Aborting."
-    rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
-    exit 1
-  fi
-done < "${MANIFEST}"
-log "All checksums verified."
-
-# ── Detect whether patch touches display-critical files ───────────────────
-NEEDS_DISPLAY_RESTART=false
-NEEDS_COMPOSITOR_RESTART=false
-while IFS= read -r line; do
-  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-  case "${FILEPATH}" in
-    etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
-      NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/labwc*)
-      # note - labwc's config lives per-user too (in ~/.config/labwc,
-      # seeded from /etc/skel at account creation, same deal as before).
-      # an OTA patch to the skel copy only touches NEWLY created users
-      # from that point forward — it can't retroactively update
-      # already-installed users' own ~/.config/labwc/. only the binary
-      # itself triggers a restart here.
-      NEEDS_COMPOSITOR_RESTART=true ;;
-  esac
-done < "${MANIFEST}"
-
-# ══════════════════════════════════════════════════════════════════════════
-# FRAMEBUFFER FREEZE — makes display restarts invisible to the user
-# ══════════════════════════════════════════════════════════════════════════
-fb_freeze() {
-  log "Freezing display with framebuffer snapshot..."
-  # Capture current screen with grim (Wayland screenshot)
-  SNAP="/tmp/kibaos-ota-snap.png"
-  SNAP_RAW="/tmp/kibaos-ota-snap.raw"
-  WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
-  XDG_RUNTIME_DIR="/run/user/1000"
-
-  # Take screenshot as liveuser. (This script runs at real boot time on the
-  # installed system, not inside the nosuid build chroot, so sudo would
-  # actually work here — using runuser anyway for consistency, since this
-  # script is also always invoked as root and runuser is the more direct
-  # tool for "run as a different user" with no escalation step needed.)
-  runuser -u liveuser -- env \
-    WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
-    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
-    grim "${SNAP}" 2>/dev/null || true
-
-  if [ -f "${SNAP}" ]; then
-    # Convert to raw framebuffer format and write to /dev/fb0
-    FB_WIDTH=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f1 || echo 1920)
-    FB_HEIGHT=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f2 || echo 1080)
-    magick "${SNAP}" -resize "${FB_WIDTH}x${FB_HEIGHT}!" \
-      -depth 8 bgr:"${SNAP_RAW}" 2>/dev/null || true
-    if [ -f "${SNAP_RAW}" ] && [ -w /dev/fb0 ]; then
-      cat "${SNAP_RAW}" > /dev/fb0 2>/dev/null || true
-    fi
-  fi
-
-  # Emulate mouse movement via uinput to keep cursor alive
-  python3 - << 'UINPUT_WIGGLE'
-import struct, time, os, fcntl
-
-EV_REL, REL_X, REL_Y = 0x02, 0x00, 0x01
-EV_SYN, SYN_REPORT    = 0x00, 0x00
-
-def emit(fd, typ, code, val):
-    fd.write(struct.pack('llHHi', 0, 0, typ, code, val))
-
-try:
-    UI_SET_EVBIT  = 0x40045564
-    UI_SET_RELBIT = 0x40045566
-    UINPUT_DEV_SZ = 1452 + 4 * (64 + 64 + 48 + 48)
-    UI_DEV_CREATE = 0x5501
-    UI_DEV_DESTROY= 0x5502
-
-    fd = open('/dev/uinput', 'wb', buffering=0)
-    fcntl.ioctl(fd, UI_SET_EVBIT,  EV_REL)
-    fcntl.ioctl(fd, UI_SET_RELBIT, REL_X)
-    fcntl.ioctl(fd, UI_SET_RELBIT, REL_Y)
-    dev = struct.pack('80sHHIII', b'kibaos-cursor', 0, 0, 0, 0, 0)
-    dev = dev.ljust(UINPUT_DEV_SZ, b'\x00')
-    fd.write(dev)
-    fcntl.ioctl(fd, UI_DEV_CREATE)
-    # Wiggle cursor gently every 500ms for up to 30s
-    for _ in range(60):
-        emit(fd, EV_REL, REL_X,  1)
-        emit(fd, EV_SYN, SYN_REPORT, 0)
-        time.sleep(0.25)
-        emit(fd, EV_REL, REL_X, -1)
-        emit(fd, EV_SYN, SYN_REPORT, 0)
-        time.sleep(0.25)
-    fcntl.ioctl(fd, UI_DEV_DESTROY)
-    fd.close()
-except Exception:
-    pass
-UINPUT_WIGGLE
-  &
-  echo $! > "${FREEZE_PID_FILE}"
-  log "Framebuffer freeze active (PID $(cat ${FREEZE_PID_FILE}))."
-}
-
-fb_unfreeze() {
-  if [ -f "${FREEZE_PID_FILE}" ]; then
-    kill "$(cat ${FREEZE_PID_FILE})" 2>/dev/null || true
-    rm -f "${FREEZE_PID_FILE}"
-  fi
-  rm -f /tmp/kibaos-ota-snap.png /tmp/kibaos-ota-snap.raw
-  log "Framebuffer freeze released."
-}
-
-# ══════════════════════════════════════════════════════════════════════════
-# APPLY PATCH — atomic file-by-file replacement
-# ══════════════════════════════════════════════════════════════════════════
-apply_patch() {
-  log "Applying patch ${LATEST}..."
-  ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
-  mkdir -p "${ROLLBACK_DIR}"
-
-  while IFS= read -r line; do
-    FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-    SRC="${EXTRACT_DIR}/${FILEPATH}"
-    DST="/${FILEPATH}"
-
-    [ -f "${SRC}" ] || continue
-
-    # Back up existing file for rollback
-    if [ -f "${DST}" ]; then
-      BACKUP_PATH="${ROLLBACK_DIR}/${FILEPATH}"
-      mkdir -p "$(dirname ${BACKUP_PATH})"
-      cp -a "${DST}" "${BACKUP_PATH}"
-    fi
-
-    # Atomic replace: write to .ota-tmp then move
-    mkdir -p "$(dirname ${DST})"
-    cp -a "${SRC}" "${DST}.ota-tmp"
-    mv "${DST}.ota-tmp" "${DST}"
-    log "  Patched: ${DST}"
-  done < "${MANIFEST}"
-
-  log "Patch applied."
-}
-
-rollback_patch() {
-  ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
-  log "ROLLING BACK to patch level ${CURRENT}..."
-  if [ -d "${ROLLBACK_DIR}" ]; then
-    find "${ROLLBACK_DIR}" -type f | while read -r BACKUP; do
-      FILEPATH="${BACKUP#${ROLLBACK_DIR}/}"
-      DST="/${FILEPATH}"
-      mkdir -p "$(dirname ${DST})"
-      cp -a "${BACKUP}" "${DST}"
-    done
-    log "Rollback complete."
-  else
-    log "No rollback data found. Cannot roll back."
-  fi
-}
-
-# ── Restart compositor: full session bounce, not in-place reconfigure ─────
-# labwc actually does support a live reconfigure (SIGHUP, or its own
-# "Reconfigure" action) unlike Wayfire, which never really had a clean
-# equivalent. but I'm still not trusting an in-place reload inside an
-# unattended OTA patcher running on someone else's machine with no one
-# watching — a half-reloaded compositor plus Budgie's shell state getting
-# out of sync is a worse failure mode than just eating the extra second
-# for a full session bounce. slower, but nobody ends up stuck.
-restart_compositor() {
-  log "Restarting session (labwc via sddm)..."
-  systemctl restart sddm 2>/dev/null || \
-  pkill -TERM labwc 2>/dev/null || true
-  sleep 1
-  log "Session restarted."
-}
-
-
-# ── Restart display manager silently if needed ────────────────────────────
-restart_display_manager() {
-  log "Restarting SDDM..."
-  systemctl restart sddm
-  # Wait for Wayland socket to come back
-  for i in $(seq 1 20); do
-    [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
-    sleep 0.5
-  done
-  log "SDDM restarted."
-}
-
-# ── Post-patch hooks ───────────────────────────────────────────────────────
-run_post_hooks() {
-  log "Running post-patch hooks..."
-  # Re-apply GTK icon cache if icons changed
-  grep -q 'usr/share/icons' "${MANIFEST}" && \
-    gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
-  # Recompile GLib schemas if any changed
-  grep -q 'usr/share/glib-2.0/schemas' "${MANIFEST}" && \
-    glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
-  # Update MIME database if mime packages changed
-  grep -q 'usr/share/mime' "${MANIFEST}" && \
-    update-mime-database /usr/share/mime 2>/dev/null || true
-  # Reload systemd units if any changed
-  grep -q 'usr/lib/systemd' "${MANIFEST}" && \
-    systemctl daemon-reload 2>/dev/null || true
-  log "Post-patch hooks complete."
-}
-
-# ══════════════════════════════════════════════════════════════════════════
-# MAIN EXECUTION
-# ══════════════════════════════════════════════════════════════════════════
-
-# Freeze display if we're going to restart anything visible
-if ${NEEDS_DISPLAY_RESTART} || ${NEEDS_COMPOSITOR_RESTART}; then
-  fb_freeze
-fi
-
-# Apply patch with rollback on failure
-if ! apply_patch; then
-  log "Patch application failed. Initiating rollback."
-  rollback_patch
-  fb_unfreeze
-  exit 1
-fi
-
-# Run post-patch hooks
-if ! run_post_hooks; then
-  log "Post-patch hooks failed. Initiating rollback."
-  rollback_patch
-  fb_unfreeze
-  exit 1
-fi
-
-# Restart services as needed
-if ${NEEDS_COMPOSITOR_RESTART}; then
-  restart_compositor
-fi
-if ${NEEDS_DISPLAY_RESTART}; then
-  restart_display_manager
-fi
-
-# Unfreeze display
-if ${NEEDS_DISPLAY_RESTART} || ${NEEDS_COMPOSITOR_RESTART}; then
-  fb_unfreeze
-fi
-
-# Commit new patch level
-echo "${LATEST}" > "${PATCH_LEVEL_FILE}"
-log "Successfully updated to patch level ${LATEST}."
-
-# Cleanup
-rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
-log "Done."
+notify-send -i kibaos-winapps "KibaOS Update" \
+  "An update is ready. Restarting to install it..." 2>/dev/null || true
+sleep 5
+systemctl reboot
 OTASCRIPT
 chmod +x /usr/local/bin/kibaos-ota
 
 # ── systemd service + timer for OTA ───────────────────────────────────────
 cat > /etc/systemd/system/kibaos-ota.service << 'OTASVC'
 [Unit]
-Description=KibaOS OTA Live Patch Engine
+Description=KibaOS OTA update check (stages A/B update if found)
 After=network-online.target
 Wants=network-online.target
 
@@ -9403,7 +9435,7 @@ OTASVC
 
 cat > /etc/systemd/system/kibaos-ota.timer << 'OTATIMER'
 [Unit]
-Description=KibaOS OTA patch check every 30 minutes
+Description=KibaOS OTA version check every 30 minutes
 
 [Timer]
 OnBootSec=5min
@@ -11074,7 +11106,7 @@ if ls out/*.iso 1>/dev/null 2>&1; then
   echo "╔══════════════════════════════════════╗"
   echo "║  KibaOS build complete!       ║"
   echo "║  ${ISO}.iso            ║"
-  echo "╚══Z════════════════════════════════════╝"
+  echo "╚══════════════════════════════════════╝"
 else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
