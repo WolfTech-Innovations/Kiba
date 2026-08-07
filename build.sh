@@ -218,6 +218,7 @@ chromium
 ntfs-3g
 exfatprogs
 polkit
+fuse3
 udisks2
 upower
 scrot
@@ -3237,6 +3238,325 @@ mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
 ln -sf /usr/lib/systemd/user/kortex-authd.service \
   /etc/skel/.config/systemd/user/graphical-session.target.wants/kortex-authd.service
 echo "=== kortex-authd installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# KIBA IDENTITY MASK — brand the OS name reported to userspace software
+# ══════════════════════════════════════════════════════════════════════════
+# Honest scope note up front, same spirit as the A/B repart prerequisite
+# note earlier in this script: this rebrand the *sysname* string
+# (Linux -> KibaOS) that libc's uname(2) wrapper hands to any dynamically
+# linked process, since that's the field software actually surfaces to
+# users ("uname -a", Python's platform.system(), Node's os.type(), etc).
+# It deliberately leaves release/version/machine untouched -- those are
+# the fields real software parses for kernel feature detection (Docker,
+# some drivers, some game anti-cheat, etc), and lying about them doesn't
+# hide anything, it just breaks things. This is branding, not a security
+# boundary: statically linked binaries and anything issuing the raw
+# uname(2) syscall directly (rare, but e.g. Go binaries with CGO
+# disabled) bypass it entirely, and any process is free to unset
+# LD_PRELOAD or export KIBAOS_REAL_UNAME=1 to see the real value. If
+# that matters for a given workload (kernel version probing in a
+# container build, driver installers, etc), that's what the escape
+# hatch is for.
+echo "=== Building kiba-identity (uname sysname rebrand, LD_PRELOAD) ==="
+mkdir -p /usr/lib/kibaos/src
+cat > /usr/lib/kibaos/src/kiba_identity.c << 'KIBA_IDENTITY_C'
+/* kiba_identity.c — LD_PRELOAD shim rebranding uname(2)'s sysname field
+ * from "Linux" to "KibaOS" for any dynamically linked process that
+ * loads it. See the build-script comment above this heredoc for the
+ * full scope note (what this does and deliberately does not cover).
+ */
+#define _GNU_SOURCE
+#include <sys/utsname.h>
+#include <dlfcn.h>
+#include <string.h>
+#include <stdlib.h>
+
+typedef int (*real_uname_fn)(struct utsname *);
+
+int uname(struct utsname *buf) {
+    static real_uname_fn real_uname = NULL;
+    if (!real_uname) real_uname = (real_uname_fn)dlsym(RTLD_NEXT, "uname");
+    int rc = real_uname(buf);
+    /* KIBAOS_REAL_UNAME is the documented escape hatch -- any process
+     * that actually needs the real kernel-reported sysname (rare, but
+     * real) can set it rather than fight LD_PRELOAD. */
+    if (rc == 0 && !getenv("KIBAOS_REAL_UNAME")) {
+        strncpy(buf->sysname, "KibaOS", sizeof(buf->sysname) - 1);
+        buf->sysname[sizeof(buf->sysname) - 1] = '\0';
+    }
+    return rc;
+}
+KIBA_IDENTITY_C
+
+gcc -shared -fPIC -O2 -Wall /usr/lib/kibaos/src/kiba_identity.c \
+    -o /usr/lib/kibaos/libkibaidentity.so -ldl \
+  || { echo "FATAL: kiba_identity.c failed to compile" >&2; exit 1; }
+rm -rf /usr/lib/kibaos/src
+chown root:root /usr/lib/kibaos/libkibaidentity.so
+chmod 755 /usr/lib/kibaos/libkibaidentity.so
+
+# System-wide activation. /etc/ld.so.preload is honored by the dynamic
+# linker for every dynamically linked process on the system (not just
+# graphical-session ones, unlike kortex-authd above) -- that's the
+# whole point here, since the goal is "uname just says KibaOS" without
+# every individual app needing to opt in.
+echo "/usr/lib/kibaos/libkibaidentity.so" > /etc/ld.so.preload
+chmod 644 /etc/ld.so.preload
+echo "=== kiba-identity installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# KIBA VIEW — a per-session translated filesystem view over XDG user dirs
+# ══════════════════════════════════════════════════════════════════════════
+# Honest scope note: this is a real FUSE read/write passthrough (getattr,
+# readdir, open/create, read, write, truncate, mkdir, unlink, rmdir,
+# rename -- tested against exactly this operation set during development),
+# not a symlink farm. A symlink farm is trivially seen through with a
+# single `ls -la` (every entry shows its real target); a passthrough FUSE
+# mount doesn't expose the backing path to callers at all through any of
+# the operations it implements. It is NOT a security boundary and doesn't
+# try to be one -- the real ~/Documents etc. still exist at their real
+# paths, still owned by the same user, still readable by that user or
+# root through the real path exactly as before. What this actually does
+# is give the desktop (Nemo's sidebar/bookmarks, see the desktop-config
+# section) somewhere friendly-looking to point at instead of the FHS-y
+# real path, for the same "the user never needs to see /home/username"
+# reason the KibaOS branding work elsewhere in this file exists. Runs
+# per-user via a systemd --user unit (below), not system-wide -- root
+# and other users are unaffected.
+echo "=== Building kiba-view (translated per-user FUSE filesystem) ==="
+mkdir -p /usr/lib/kibaos/src
+cat > /usr/lib/kibaos/src/kiba_view_fs.c << 'KIBA_VIEW_FS_C'
+/* kiba_view_fs.c — FUSE3 read/write passthrough presenting a curated
+ * top-level layout (Documents/Downloads/Pictures/Music/Videos/Desktop)
+ * mapped onto the real $HOME's XDG user dirs, resolved once at startup
+ * via xdg-user-dir(1) rather than hardcoded -- respects whatever
+ * localized/relocated directories the user (or KibaOS's OOBE locale
+ * step) actually configured. See kv_ops at the bottom for the exact
+ * operation set implemented; anything not listed there (symlinks,
+ * xattrs, hardlinks, special files) isn't supported by this passthrough
+ * and will surface ENOSYS/ENOTSUP to the caller rather than silently
+ * doing the wrong thing.
+ */
+#define FUSE_USE_VERSION 31
+#include <fuse3/fuse.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <limits.h>
+#include <stdbool.h>
+
+#define N_ROOTS 6
+static const char *ROOT_NAMES[N_ROOTS]   = { "Documents", "Downloads", "Pictures", "Music", "Videos", "Desktop" };
+static const char *XDG_KEYS[N_ROOTS]     = { "DOCUMENTS", "DOWNLOAD",  "PICTURES", "MUSIC", "VIDEOS",  "DESKTOP" };
+static char root_backing[N_ROOTS][PATH_MAX];
+
+/* Resolves each translated root's real path once at startup by shelling
+ * out to xdg-user-dir(1) -- the same source of truth the rest of the
+ * desktop (file manager, portals, xdg-user-dirs.service) already uses,
+ * so this view never drifts out of sync with wherever those actually
+ * point. Falls back to $HOME/<name> if xdg-user-dir isn't available or
+ * a given dir hasn't been configured yet. */
+static void resolve_roots(void) {
+    const char *home = getenv("HOME");
+    if (!home) home = "/tmp";
+    for (int i = 0; i < N_ROOTS; i++) {
+        char cmd[256];
+        snprintf(cmd, sizeof(cmd), "xdg-user-dir %s 2>/dev/null", XDG_KEYS[i]);
+        FILE *fp = popen(cmd, "r");
+        bool got = false;
+        if (fp) {
+            if (fgets(root_backing[i], sizeof(root_backing[i]), fp)) {
+                size_t len = strlen(root_backing[i]);
+                if (len > 0 && root_backing[i][len - 1] == '\n') root_backing[i][len - 1] = '\0';
+                if (root_backing[i][0] == '/') got = true;
+            }
+            pclose(fp);
+        }
+        if (!got) snprintf(root_backing[i], sizeof(root_backing[i]), "%s/%s", home, ROOT_NAMES[i]);
+        mkdir(root_backing[i], 0755); /* no-op if it already exists */
+    }
+}
+
+static int resolve(const char *path, char *out, size_t outsz) {
+    if (strcmp(path, "/") == 0) return -1;
+    for (int i = 0; i < N_ROOTS; i++) {
+        size_t nlen = strlen(ROOT_NAMES[i]);
+        if (strncmp(path + 1, ROOT_NAMES[i], nlen) == 0 &&
+            (path[1 + nlen] == '\0' || path[1 + nlen] == '/')) {
+            snprintf(out, outsz, "%s%s", root_backing[i], path + 1 + nlen);
+            return 0;
+        }
+    }
+    return -2;
+}
+
+static int kv_getattr(const char *path, struct stat *st, struct fuse_file_info *fi) {
+    (void)fi;
+    memset(st, 0, sizeof(*st));
+    if (strcmp(path, "/") == 0) { st->st_mode = S_IFDIR | 0755; st->st_nlink = 2; return 0; }
+    char real[PATH_MAX];
+    int r = resolve(path, real, sizeof(real));
+    if (r == -1) { st->st_mode = S_IFDIR | 0755; st->st_nlink = 2; return 0; }
+    if (r == -2) return -ENOENT;
+    if (lstat(real, st) != 0) return -errno;
+    return 0;
+}
+
+static int kv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+                       off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
+    (void)offset; (void)fi; (void)flags;
+    filler(buf, ".", NULL, 0, 0);
+    filler(buf, "..", NULL, 0, 0);
+    if (strcmp(path, "/") == 0) {
+        for (int i = 0; i < N_ROOTS; i++) filler(buf, ROOT_NAMES[i], NULL, 0, 0);
+        return 0;
+    }
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    DIR *d = opendir(real);
+    if (!d) return -errno;
+    struct dirent *e;
+    while ((e = readdir(d))) filler(buf, e->d_name, NULL, 0, 0);
+    closedir(d);
+    return 0;
+}
+
+static int kv_open(const char *path, struct fuse_file_info *fi) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    int fd = open(real, fi->flags);
+    if (fd < 0) return -errno;
+    fi->fh = fd;
+    return 0;
+}
+
+static int kv_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    int fd = open(real, fi->flags | O_CREAT, mode);
+    if (fd < 0) return -errno;
+    fi->fh = fd;
+    return 0;
+}
+
+static int kv_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void)path;
+    ssize_t r = pread(fi->fh, buf, size, offset);
+    return r < 0 ? -errno : (int)r;
+}
+
+static int kv_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void)path;
+    ssize_t r = pwrite(fi->fh, buf, size, offset);
+    return r < 0 ? -errno : (int)r;
+}
+
+static int kv_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
+    if (fi) return ftruncate(fi->fh, size) == 0 ? 0 : -errno;
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return truncate(real, size) == 0 ? 0 : -errno;
+}
+
+static int kv_release(const char *path, struct fuse_file_info *fi) { (void)path; close(fi->fh); return 0; }
+
+static int kv_mkdir(const char *path, mode_t mode) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return mkdir(real, mode) == 0 ? 0 : -errno;
+}
+
+static int kv_unlink(const char *path) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return unlink(real) == 0 ? 0 : -errno;
+}
+
+static int kv_rmdir(const char *path) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return rmdir(real) == 0 ? 0 : -errno;
+}
+
+static int kv_rename(const char *from, const char *to, unsigned int flags) {
+    (void)flags;
+    char rfrom[PATH_MAX], rto[PATH_MAX];
+    if (resolve(from, rfrom, sizeof(rfrom)) != 0) return -ENOENT;
+    /* Cross-root renames (Documents/x -> Downloads/x) aren't supported
+     * by this prototype-derived passthrough -- each translated root maps
+     * to a different real XDG directory, and silently doing a copy+
+     * unlink instead of an atomic rename would be a correctness
+     * footgun for anything relying on rename's atomicity. Surfacing
+     * EXDEV (the same errno a real cross-filesystem rename gives) lets
+     * the file manager fall back to its own copy+delete UI flow instead. */
+    if (resolve(to, rto, sizeof(rto)) != 0) return -ENOENT;
+    char from_root[64], to_root[64];
+    sscanf(from + 1, "%63[^/]", from_root);
+    sscanf(to + 1, "%63[^/]", to_root);
+    if (strcmp(from_root, to_root) != 0) return -EXDEV;
+    return rename(rfrom, rto) == 0 ? 0 : -errno;
+}
+
+static const struct fuse_operations kv_ops = {
+    .getattr  = kv_getattr,
+    .readdir  = kv_readdir,
+    .open     = kv_open,
+    .create   = kv_create,
+    .read     = kv_read,
+    .write    = kv_write,
+    .truncate = kv_truncate,
+    .release  = kv_release,
+    .mkdir    = kv_mkdir,
+    .unlink   = kv_unlink,
+    .rmdir    = kv_rmdir,
+    .rename   = kv_rename,
+};
+
+int main(int argc, char *argv[]) {
+    resolve_roots();
+    return fuse_main(argc, argv, &kv_ops, NULL);
+}
+KIBA_VIEW_FS_C
+
+gcc -O2 -Wall $(pkg-config --cflags fuse3) /usr/lib/kibaos/src/kiba_view_fs.c \
+    -o /usr/lib/kibaos/kiba-view-fs $(pkg-config --libs fuse3) \
+  || { echo "FATAL: kiba_view_fs.c failed to compile/link" >&2; exit 1; }
+rm -rf /usr/lib/kibaos/src
+chown root:root /usr/lib/kibaos/kiba-view-fs
+chmod 755 /usr/lib/kibaos/kiba-view-fs
+
+# Per-user session unit: mounts at ~/KibaOS right before the desktop
+# comes up, unmounts on session teardown. "-o auto_unmount" means an
+# unclean session death (crash, kill -9) still gets fusermount'd rather
+# than leaving a stale mountpoint behind next login.
+cat > /usr/lib/systemd/user/kiba-view.service << 'KIBA_VIEW_SERVICE'
+[Unit]
+Description=KibaOS translated file view (~/KibaOS)
+After=graphical-session-pre.target
+Before=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/mkdir -p %h/KibaOS
+ExecStart=/usr/lib/kibaos/kiba-view-fs -f -o auto_unmount %h/KibaOS
+ExecStop=/usr/bin/fusermount3 -u %h/KibaOS
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target
+KIBA_VIEW_SERVICE
+
+mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
+ln -sf /usr/lib/systemd/user/kiba-view.service \
+  /etc/skel/.config/systemd/user/graphical-session.target.wants/kiba-view.service
+echo "=== kiba-view installed ==="
 
 
 pacman-key --init
