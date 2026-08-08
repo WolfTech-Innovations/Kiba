@@ -88,8 +88,16 @@ else
   printf '\nprepare() {\n  cd "$srcdir/${_srcname}"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n}\n' >> PKGBUILD
 fi
 
+# Install build deps as root first -- makepkg -s would try to do this
+# itself via sudo once we drop to `nobody` below, but nobody has no tty
+# and no passwordless sudo in CI, so that just fails with "a password is
+# required". Preinstalling here and dropping -s sidesteps that entirely.
+pacman -S --noconfirm --needed \
+  base-devel bc pahole rust rust-bindgen graphviz \
+  python-sphinx python-yaml texlive-latexextra
+
 chown -R nobody:nobody "${KBUILD_DIR}"   # makepkg refuses to run as root
-runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"'/src && makepkg -s --noconfirm --skippgpcheck'
+runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"'/src && makepkg --noconfirm --skippgpcheck'
 
 cp "${KBUILD_DIR}"/src/*.pkg.tar.zst "${KIBA_REPO_DIR}/"
 repo-add "${KIBA_REPO_DIR}/kiba-repo.db.tar.gz" "${KIBA_REPO_DIR}"/*.pkg.tar.zst
