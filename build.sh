@@ -76,16 +76,25 @@ sed -i "s/^pkgbase=.*/pkgbase=linux-kiba/" PKGBUILD
 # `scripts/config --set-str CONFIG_LOCALVERSION ""` before olddefconfig
 # to blank out whatever the kernel tree's own Makefile would otherwise
 # guess; this appends one more call right after it so ours is what
-# actually sticks. Falls back to appending at the end of prepare() if
-# the anchor line's wording has since changed upstream, so the build
-# doesn't just silently keep the stock "-arch1" tag.
+# actually sticks. Falls back to inserting right after prepare()'s own
+# opening brace if the anchor line's wording has since changed upstream --
+# NOT to appending a whole second prepare() function, since bash lets a
+# later function definition silently shadow an earlier one, which would
+# skip olddefconfig/patches entirely and produce a bogus .config (this is
+# exactly what caused a missing-BTF build failure once already).
 if grep -q 'CONFIG_LOCALVERSION ""' PKGBUILD; then
-  sed -i '/CONFIG_LOCALVERSION ""/a\  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"' PKGBUILD
-else
+  sed -i '/CONFIG_LOCALVERSION ""/a\  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
+elif grep -q '^prepare()[[:space:]]*{' PKGBUILD; then
   echo "WARNING: couldn't find the expected CONFIG_LOCALVERSION anchor in" \
-       "Arch's linux PKGBUILD -- appending to prepare() as a fallback," \
-       "but this needs a manual check." >&2
-  printf '\nprepare() {\n  cd "$srcdir/${_srcname}"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n}\n' >> PKGBUILD
+       "Arch's linux PKGBUILD -- inserting into the existing prepare()" \
+       "instead, but this needs a manual check." >&2
+  sed -i '/^prepare()[[:space:]]*{/a\  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
+else
+  echo "ERROR: no CONFIG_LOCALVERSION anchor AND no prepare() function" \
+       "found in Arch's linux PKGBUILD -- refusing to guess, since a" \
+       "blind append here can silently shadow the real prepare() and" \
+       "produce a kernel with a broken .config (e.g. missing BTF)." >&2
+  exit 1
 fi
 
 # Install build deps as root first -- makepkg -s would try to do this
