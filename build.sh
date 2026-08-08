@@ -100,7 +100,7 @@ mkinitcpio-archiso
 earlyoom
 fakeroot
 efibootmgr
-refind
+systemd-ukify
 bluez
 sudo
 bash
@@ -218,6 +218,7 @@ chromium
 ntfs-3g
 exfatprogs
 polkit
+fuse3
 udisks2
 upower
 scrot
@@ -3238,6 +3239,385 @@ ln -sf /usr/lib/systemd/user/kortex-authd.service \
   /etc/skel/.config/systemd/user/graphical-session.target.wants/kortex-authd.service
 echo "=== kortex-authd installed ==="
 
+# ══════════════════════════════════════════════════════════════════════════
+# KIBA IDENTITY MASK — brand the OS name reported to userspace software
+# ══════════════════════════════════════════════════════════════════════════
+# Honest scope note up front, same spirit as the A/B repart prerequisite
+# note earlier in this script: this rebrand the *sysname* string
+# (Linux -> KibaOS) that libc's uname(2) wrapper hands to any dynamically
+# linked process, since that's the field software actually surfaces to
+# users ("uname -a", Python's platform.system(), Node's os.type(), etc).
+# It deliberately leaves release/version/machine untouched -- those are
+# the fields real software parses for kernel feature detection (Docker,
+# some drivers, some game anti-cheat, etc), and lying about them doesn't
+# hide anything, it just breaks things. This is branding, not a security
+# boundary: statically linked binaries and anything issuing the raw
+# uname(2) syscall directly (rare, but e.g. Go binaries with CGO
+# disabled) bypass it entirely, and any process is free to unset
+# LD_PRELOAD or export KIBAOS_REAL_UNAME=1 to see the real value. If
+# that matters for a given workload (kernel version probing in a
+# container build, driver installers, etc), that's what the escape
+# hatch is for.
+echo "=== Building kiba-identity (uname sysname rebrand, LD_PRELOAD) ==="
+mkdir -p /usr/lib/kibaos/src
+cat > /usr/lib/kibaos/src/kiba_identity.c << 'KIBA_IDENTITY_C'
+/* kiba_identity.c — LD_PRELOAD shim rebranding uname(2)'s sysname field
+ * from "Linux" to "KibaOS" for any dynamically linked process that
+ * loads it. See the build-script comment above this heredoc for the
+ * full scope note (what this does and deliberately does not cover).
+ */
+#define _GNU_SOURCE
+#include <sys/utsname.h>
+#include <dlfcn.h>
+#include <string.h>
+#include <stdlib.h>
+
+typedef int (*real_uname_fn)(struct utsname *);
+
+int uname(struct utsname *buf) {
+    static real_uname_fn real_uname = NULL;
+    if (!real_uname) real_uname = (real_uname_fn)dlsym(RTLD_NEXT, "uname");
+    int rc = real_uname(buf);
+    /* KIBAOS_REAL_UNAME is the documented escape hatch -- any process
+     * that actually needs the real kernel-reported sysname (rare, but
+     * real) can set it rather than fight LD_PRELOAD. */
+    if (rc == 0 && !getenv("KIBAOS_REAL_UNAME")) {
+        strncpy(buf->sysname, "KibaOS", sizeof(buf->sysname) - 1);
+        buf->sysname[sizeof(buf->sysname) - 1] = '\0';
+    }
+    return rc;
+}
+KIBA_IDENTITY_C
+
+gcc -shared -fPIC -O2 -Wall /usr/lib/kibaos/src/kiba_identity.c \
+    -o /usr/lib/kibaos/libkibaidentity.so -ldl \
+  || { echo "FATAL: kiba_identity.c failed to compile" >&2; exit 1; }
+rm -rf /usr/lib/kibaos/src
+chown root:root /usr/lib/kibaos/libkibaidentity.so
+chmod 755 /usr/lib/kibaos/libkibaidentity.so
+
+# System-wide activation. /etc/ld.so.preload is honored by the dynamic
+# linker for every dynamically linked process on the system (not just
+# graphical-session ones, unlike kortex-authd above) -- that's the
+# whole point here, since the goal is "uname just says KibaOS" without
+# every individual app needing to opt in.
+echo "/usr/lib/kibaos/libkibaidentity.so" > /etc/ld.so.preload
+chmod 644 /etc/ld.so.preload
+echo "=== kiba-identity installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# KIBA VIEW — a per-session translated filesystem view over XDG user dirs
+# ══════════════════════════════════════════════════════════════════════════
+# Honest scope note: this is a real FUSE read/write passthrough (getattr,
+# readdir, open/create, read, write, truncate, mkdir, unlink, rmdir,
+# rename -- tested against exactly this operation set during development),
+# not a symlink farm. A symlink farm is trivially seen through with a
+# single `ls -la` (every entry shows its real target); a passthrough FUSE
+# mount doesn't expose the backing path to callers at all through any of
+# the operations it implements. It is NOT a security boundary and doesn't
+# try to be one -- the real ~/Documents etc. still exist at their real
+# paths, still owned by the same user, still readable by that user or
+# root through the real path exactly as before. What this actually does
+# is give the desktop (Nemo's sidebar/bookmarks, see the desktop-config
+# section) somewhere friendly-looking to point at instead of the FHS-y
+# real path, for the same "the user never needs to see /home/username"
+# reason the KibaOS branding work elsewhere in this file exists. Runs
+# per-user via a systemd --user unit (below), not system-wide -- root
+# and other users are unaffected.
+#
+# Coverage: this used to only translate the six curated XDG roots, which
+# meant anything else living under $HOME (a stray project folder, a
+# manually-created directory) simply wasn't reachable through the view
+# at all -- not hidden, just absent. There's now a seventh catch-all
+# root, "Other Files", that passes through the rest of $HOME so nothing
+# a user has actually put there goes missing. Dotfiles/dot-directories
+# (.config, .cache, .local, .var, etc. -- our AppData-equivalent) are
+# filtered out of every directory listing this filesystem serves, the
+# same "hidden by convention" treatment they already got everywhere
+# else. That, plus pointing the desktop's default file-manager location
+# and sidebar bookmarks at this mount instead of raw $HOME (see the
+# desktop-config and first-login sections below), makes ~/KibaOS the
+# only filesystem view a user browsing files graphically ever lands on
+# -- the ChromeOS Files-app idea, just backed by a real POSIX overlay
+# instead of a sandboxed Downloads folder. This is still additive, not
+# a takeover: the mount lives at ~/KibaOS, a directory alongside the
+# real $HOME rather than over top of it, so anything that legitimately
+# wants a regular file path -- a terminal, an editor, dev tooling, the
+# package manager, systemd itself -- keeps using real $HOME exactly as
+# before and is completely unaffected by any of this.
+echo "=== Building kiba-view (translated per-user FUSE filesystem) ==="
+mkdir -p /usr/lib/kibaos/src
+cat > /usr/lib/kibaos/src/kiba_view_fs.c << 'KIBA_VIEW_FS_C'
+/* kiba_view_fs.c — FUSE3 read/write passthrough presenting a curated
+ * top-level layout (Documents/Downloads/Pictures/Music/Videos/Desktop)
+ * mapped onto the real $HOME's XDG user dirs, resolved once at startup
+ * via xdg-user-dir(1) rather than hardcoded -- respects whatever
+ * localized/relocated directories the user (or KibaOS's OOBE locale
+ * step) actually configured. See kv_ops at the bottom for the exact
+ * operation set implemented; anything not listed there (symlinks,
+ * xattrs, hardlinks, special files) isn't supported by this passthrough
+ * and will surface ENOSYS/ENOTSUP to the caller rather than silently
+ * doing the wrong thing.
+ */
+#define FUSE_USE_VERSION 31
+#include <fuse3/fuse.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <dirent.h>
+#include <limits.h>
+#include <stdbool.h>
+
+/* The first 6 are the curated XDG roots, resolved via xdg-user-dir(1)
+ * below. The 7th, "Other Files", is a catch-all passthrough straight to
+ * $HOME itself -- see the coverage note above the build step that emits
+ * this file for why it exists. It has no XDG key (index kept in sync
+ * with OTHER_IDX, not looked up via xdg-user-dir). */
+#define N_CURATED_ROOTS 6
+#define N_ROOTS (N_CURATED_ROOTS + 1)
+#define OTHER_IDX (N_ROOTS - 1)
+static const char *ROOT_NAMES[N_ROOTS] = {
+    "Documents", "Downloads", "Pictures", "Music", "Videos", "Desktop",
+    "Other Files"
+};
+static const char *XDG_KEYS[N_CURATED_ROOTS] = {
+    "DOCUMENTS", "DOWNLOAD", "PICTURES", "MUSIC", "VIDEOS", "DESKTOP"
+};
+static char root_backing[N_ROOTS][PATH_MAX];
+
+/* Resolves each translated root's real path once at startup by shelling
+ * out to xdg-user-dir(1) -- the same source of truth the rest of the
+ * desktop (file manager, portals, xdg-user-dirs.service) already uses,
+ * so this view never drifts out of sync with wherever those actually
+ * point. Falls back to $HOME/<name> if xdg-user-dir isn't available or
+ * a given dir hasn't been configured yet. "Other Files" backs directly
+ * onto $HOME with no xdg-user-dir lookup and no mkdir (it always
+ * exists -- it's the home directory). */
+static void resolve_roots(void) {
+    const char *home = getenv("HOME");
+    if (!home) home = "/tmp";
+    for (int i = 0; i < N_CURATED_ROOTS; i++) {
+        char cmd[256];
+        snprintf(cmd, sizeof(cmd), "xdg-user-dir %s 2>/dev/null", XDG_KEYS[i]);
+        FILE *fp = popen(cmd, "r");
+        bool got = false;
+        if (fp) {
+            if (fgets(root_backing[i], sizeof(root_backing[i]), fp)) {
+                size_t len = strlen(root_backing[i]);
+                if (len > 0 && root_backing[i][len - 1] == '\n') root_backing[i][len - 1] = '\0';
+                if (root_backing[i][0] == '/') got = true;
+            }
+            pclose(fp);
+        }
+        if (!got) snprintf(root_backing[i], sizeof(root_backing[i]), "%s/%s", home, ROOT_NAMES[i]);
+        mkdir(root_backing[i], 0755); /* no-op if it already exists */
+    }
+    snprintf(root_backing[OTHER_IDX], sizeof(root_backing[OTHER_IDX]), "%s", home);
+}
+
+static int resolve(const char *path, char *out, size_t outsz) {
+    if (strcmp(path, "/") == 0) return -1;
+    for (int i = 0; i < N_ROOTS; i++) {
+        size_t nlen = strlen(ROOT_NAMES[i]);
+        if (strncmp(path + 1, ROOT_NAMES[i], nlen) == 0 &&
+            (path[1 + nlen] == '\0' || path[1 + nlen] == '/')) {
+            snprintf(out, outsz, "%s%s", root_backing[i], path + 1 + nlen);
+            return 0;
+        }
+    }
+    return -2;
+}
+
+static int kv_getattr(const char *path, struct stat *st, struct fuse_file_info *fi) {
+    (void)fi;
+    memset(st, 0, sizeof(*st));
+    if (strcmp(path, "/") == 0) { st->st_mode = S_IFDIR | 0755; st->st_nlink = 2; return 0; }
+    char real[PATH_MAX];
+    int r = resolve(path, real, sizeof(real));
+    if (r == -1) { st->st_mode = S_IFDIR | 0755; st->st_nlink = 2; return 0; }
+    if (r == -2) return -ENOENT;
+    if (lstat(real, st) != 0) return -errno;
+    return 0;
+}
+
+static int kv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
+                       off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
+    (void)offset; (void)fi; (void)flags;
+    filler(buf, ".", NULL, 0, 0);
+    filler(buf, "..", NULL, 0, 0);
+    if (strcmp(path, "/") == 0) {
+        for (int i = 0; i < N_ROOTS; i++) filler(buf, ROOT_NAMES[i], NULL, 0, 0);
+        return 0;
+    }
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    DIR *d = opendir(real);
+    if (!d) return -errno;
+    /* Top level of the "Other Files" catch-all is the one place that can
+     * legitimately show the same real entries the curated roots already
+     * show elsewhere in this view (Documents, Downloads, ... all live
+     * directly under $HOME on disk). Skip those names there so they
+     * don't appear twice under two different names in the same view. */
+    bool at_other_top = (strcmp(path, "/") != 0 &&
+                          strcmp(path + 1, ROOT_NAMES[OTHER_IDX]) == 0);
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        /* Hide dotfiles/dot-directories everywhere this filesystem is
+         * browsed -- our AppData-equivalent (.config, .cache, .local,
+         * .var, ...) shouldn't clutter a view meant to be the tidy,
+         * ChromeOS-style "this is all your stuff" surface. They're
+         * still real files at their real path for anything that opens
+         * them directly by name (e.g. an app reading its own config)
+         * -- this only affects what shows up in a directory listing. */
+        if (e->d_name[0] == '.') continue;
+        if (at_other_top) {
+            bool is_curated_dup = false;
+            for (int i = 0; i < N_CURATED_ROOTS; i++) {
+                if (strcmp(e->d_name, ROOT_NAMES[i]) == 0) { is_curated_dup = true; break; }
+            }
+            if (is_curated_dup) continue;
+        }
+        filler(buf, e->d_name, NULL, 0, 0);
+    }
+    closedir(d);
+    return 0;
+}
+
+static int kv_open(const char *path, struct fuse_file_info *fi) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    int fd = open(real, fi->flags);
+    if (fd < 0) return -errno;
+    fi->fh = fd;
+    return 0;
+}
+
+static int kv_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    int fd = open(real, fi->flags | O_CREAT, mode);
+    if (fd < 0) return -errno;
+    fi->fh = fd;
+    return 0;
+}
+
+static int kv_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void)path;
+    ssize_t r = pread(fi->fh, buf, size, offset);
+    return r < 0 ? -errno : (int)r;
+}
+
+static int kv_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
+    (void)path;
+    ssize_t r = pwrite(fi->fh, buf, size, offset);
+    return r < 0 ? -errno : (int)r;
+}
+
+static int kv_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
+    if (fi) return ftruncate(fi->fh, size) == 0 ? 0 : -errno;
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return truncate(real, size) == 0 ? 0 : -errno;
+}
+
+static int kv_release(const char *path, struct fuse_file_info *fi) { (void)path; close(fi->fh); return 0; }
+
+static int kv_mkdir(const char *path, mode_t mode) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return mkdir(real, mode) == 0 ? 0 : -errno;
+}
+
+static int kv_unlink(const char *path) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return unlink(real) == 0 ? 0 : -errno;
+}
+
+static int kv_rmdir(const char *path) {
+    char real[PATH_MAX];
+    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
+    return rmdir(real) == 0 ? 0 : -errno;
+}
+
+static int kv_rename(const char *from, const char *to, unsigned int flags) {
+    (void)flags;
+    char rfrom[PATH_MAX], rto[PATH_MAX];
+    if (resolve(from, rfrom, sizeof(rfrom)) != 0) return -ENOENT;
+    /* Cross-root renames (Documents/x -> Downloads/x) aren't supported
+     * by this prototype-derived passthrough -- each translated root maps
+     * to a different real XDG directory, and silently doing a copy+
+     * unlink instead of an atomic rename would be a correctness
+     * footgun for anything relying on rename's atomicity. Surfacing
+     * EXDEV (the same errno a real cross-filesystem rename gives) lets
+     * the file manager fall back to its own copy+delete UI flow instead. */
+    if (resolve(to, rto, sizeof(rto)) != 0) return -ENOENT;
+    char from_root[64], to_root[64];
+    sscanf(from + 1, "%63[^/]", from_root);
+    sscanf(to + 1, "%63[^/]", to_root);
+    if (strcmp(from_root, to_root) != 0) return -EXDEV;
+    return rename(rfrom, rto) == 0 ? 0 : -errno;
+}
+
+static const struct fuse_operations kv_ops = {
+    .getattr  = kv_getattr,
+    .readdir  = kv_readdir,
+    .open     = kv_open,
+    .create   = kv_create,
+    .read     = kv_read,
+    .write    = kv_write,
+    .truncate = kv_truncate,
+    .release  = kv_release,
+    .mkdir    = kv_mkdir,
+    .unlink   = kv_unlink,
+    .rmdir    = kv_rmdir,
+    .rename   = kv_rename,
+};
+
+int main(int argc, char *argv[]) {
+    resolve_roots();
+    return fuse_main(argc, argv, &kv_ops, NULL);
+}
+KIBA_VIEW_FS_C
+
+gcc -O2 -Wall $(pkg-config --cflags fuse3) /usr/lib/kibaos/src/kiba_view_fs.c \
+    -o /usr/lib/kibaos/kiba-view-fs $(pkg-config --libs fuse3) \
+  || { echo "FATAL: kiba_view_fs.c failed to compile/link" >&2; exit 1; }
+rm -rf /usr/lib/kibaos/src
+chown root:root /usr/lib/kibaos/kiba-view-fs
+chmod 755 /usr/lib/kibaos/kiba-view-fs
+
+# Per-user session unit: mounts at ~/KibaOS right before the desktop
+# comes up, unmounts on session teardown. "-o auto_unmount" means an
+# unclean session death (crash, kill -9) still gets fusermount'd rather
+# than leaving a stale mountpoint behind next login.
+cat > /usr/lib/systemd/user/kiba-view.service << 'KIBA_VIEW_SERVICE'
+[Unit]
+Description=KibaOS translated file view (~/KibaOS)
+After=graphical-session-pre.target
+Before=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/mkdir -p %h/KibaOS
+ExecStart=/usr/lib/kibaos/kiba-view-fs -f -o auto_unmount %h/KibaOS
+ExecStop=/usr/bin/fusermount3 -u %h/KibaOS
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=graphical-session.target
+KIBA_VIEW_SERVICE
+
+mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
+ln -sf /usr/lib/systemd/user/kiba-view.service \
+  /etc/skel/.config/systemd/user/graphical-session.target.wants/kiba-view.service
+echo "=== kiba-view installed ==="
+
 
 pacman-key --init
 pacman-key --populate archlinux
@@ -5641,12 +6021,23 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     for (size_t i = 0; i < n_parts; i++) {
         const kiba_gpt_partition_t *p = &parts[i];
 
-        bool start_is_default = (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT);
+        bool first_is_default    = (p->first_lba == KIBA_GPT_FIRST_LBA_DEFAULT);
+        bool first_is_contiguous = (p->first_lba == KIBA_GPT_FIRST_LBA_CONTIGUOUS);
+        /* Per kiba_gpt.h: "Either way, when first_lba isn't a concrete
+         * number, last_lba below is reinterpreted as a sector COUNT" --
+         * that "either way" covers BOTH computed-start sentinels, not
+         * just DEFAULT. Previously only DEFAULT actually got count
+         * semantics here, which meant a CONTIGUOUS partition (used for
+         * root, right after the ESP) could only ever mean "-1" (REST)
+         * or an absolute LBA nobody at the call site could compute in
+         * advance -- there was no way to give a CONTIGUOUS partition a
+         * concrete size and leave the remainder of the disk free. */
+        bool uses_computed_start = first_is_default || first_is_contiguous;
         uint64_t resolved_first;
-        if (p->first_lba == KIBA_GPT_FIRST_LBA_CONTIGUOUS) {
+        if (first_is_contiguous) {
             if (i == 0) { free(buf); return -EINVAL; }
             resolved_first = prev_end + 1;
-        } else if (start_is_default) {
+        } else if (first_is_default) {
             resolved_first = first_usable;
         } else {
             resolved_first = p->first_lba;
@@ -5655,7 +6046,7 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
         uint64_t resolved_last;
         if (p->last_lba == KIBA_GPT_LAST_LBA_REST) {
             resolved_last = last_usable;
-        } else if (start_is_default) {
+        } else if (uses_computed_start) {
             /* last_lba is a sector COUNT here, not an absolute LBA --
              * see the kiba_gpt_partition_t doc comment in kiba_gpt.h. */
             resolved_last = resolved_first + p->last_lba - 1;
@@ -6082,8 +6473,11 @@ cat > kiba_udev.h << 'KIBA_SRC_END_UDEVH'
 #include <stdbool.h>
 #include <stddef.h>
 
-/* Polls (no subprocess) until `path` (e.g. "/dev/vda1") exists and is
- * openable, or `timeout_ms` elapses. Returns true if it appeared. */
+/* Polls (no subprocess) until `path` (e.g. "/dev/vda1") exists AND
+ * reports a stable, non-zero size (via BLKGETSIZE64 for block devices,
+ * st_size otherwise), or `timeout_ms` elapses. Node existence alone is
+ * not sufficient -- see kiba_udev.c for why. Returns true once the
+ * device is both present and settled. */
 bool kiba_wait_for_device(const char *path, int timeout_ms);
 
 /* Polls blkid-equivalent state by repeatedly attempting to read the
@@ -6107,6 +6501,24 @@ bool kiba_wait_for_disk_tag(const char *part_path, const char *tag_dir_name,
 bool kiba_read_partuuid_direct(const char *disk_path, int partno,
                                 char *out_value, size_t out_len);
 
+/* Forces the kernel to re-emit a "change" uevent for a partition device
+ * by writing to its sysfs uevent file, which is what actually causes
+ * udev to (re-)run its blkid probe and update /dev/disk/by-uuid,
+ * /dev/disk/by-label, etc. This is the missing half of the story the
+ * rest of this header solves: BLKPG/BLKRRPART at partition-table-write
+ * time tells the kernel about a partition's existence, but writing an
+ * actual filesystem into that partition afterward (mkfs.ext4, mkfs.fat)
+ * doesn't itself trigger any uevent -- so without calling this right
+ * after formatting, kiba_wait_for_disk_tag() below can end up polling a
+ * by-uuid symlink that either never appears, or (on a disk that's been
+ * formatted before) resolves to a stale UUID left over from whatever
+ * filesystem used to be there. Call this once per partition immediately
+ * after kiba_fs_format() succeeds, before reading its UUID back.
+ * Returns true if the uevent was written; false just means the sysfs
+ * node couldn't be opened (caller should treat that as "couldn't
+ * confirm the retrigger", not necessarily fatal on its own). */
+bool kiba_trigger_uevent(const char *part_path);
+
 #endif
 KIBA_SRC_END_UDEVH
 
@@ -6122,21 +6534,67 @@ cat > kiba_udev.c << 'KIBA_SRC_END_UDEVC'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <linux/fs.h> /* BLKGETSIZE64 */
 
 static void sleep_ms(int ms) {
     struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (long)(ms % 1000) * 1000000L };
     nanosleep(&ts, NULL);
 }
 
+/* Node existence alone isn't enough: udev can materialize the dentry for
+ * a freshly-created partition device node microseconds before the
+ * kernel's block layer has finished wiring up that partition's actual
+ * size -- BLKGETSIZE64 still reads 0 (or the node is openable but
+ * "there" in name only) for a brief window right after the mknod. A
+ * caller that proceeds the instant stat() succeeds can race ahead of
+ * that and format/write against a device the kernel doesn't consider
+ * fully live yet -- the same class of race kiba_gpt.c's BLKPG comment
+ * describes, just one layer further down the stack. So this now polls
+ * the actual reported size (via BLKGETSIZE64 for block devices, or
+ * st_size for anything else, e.g. a loopback-backed regular file in a
+ * test harness) and requires two consecutive non-zero reads of the
+ * *same* size before calling the device ready -- a single non-zero
+ * read could still be mid-transition on some drivers, so we want it to
+ * have settled, not just briefly been non-zero once. */
 bool kiba_wait_for_device(const char *path, int timeout_ms) {
     struct stat st;
     int waited = 0;
     const int step_ms = 100;
+    uint64_t last_size = 0;
+    int stable_reads = 0;
+
     while (waited <= timeout_ms) {
-        if (stat(path, &st) == 0) return true;
+        if (stat(path, &st) == 0) {
+            uint64_t size = 0;
+            bool have_size = false;
+
+            if (S_ISBLK(st.st_mode)) {
+                int fd = open(path, O_RDONLY | O_CLOEXEC);
+                if (fd >= 0) {
+                    have_size = (ioctl(fd, BLKGETSIZE64, &size) == 0);
+                    close(fd);
+                }
+            } else {
+                size = (uint64_t)st.st_size;
+                have_size = true;
+            }
+
+            if (have_size && size > 0) {
+                if (size == last_size) {
+                    if (++stable_reads >= 2) return true;
+                } else {
+                    last_size = size;
+                    stable_reads = 1;
+                }
+            } else {
+                stable_reads = 0;
+                last_size = 0;
+            }
+        }
         sleep_ms(step_ms);
         waited += step_ms;
     }
@@ -6239,6 +6697,32 @@ bool kiba_read_partuuid_direct(const char *disk_path, int partno,
              g[8], g[9],
              g[10], g[11], g[12], g[13], g[14], g[15]);
     return true;
+}
+
+bool kiba_trigger_uevent(const char *part_path) {
+    /* Partition device paths are always a flat basename directly under
+     * /dev (e.g. "/dev/vda1", "/dev/nvme0n1p1", "/dev/sda1") -- the
+     * kernel exposes a matching flat entry for every block device
+     * (whole-disk or partition) directly under /sys/class/block/ by
+     * that same basename, no need to walk /sys/block/<disk>/<part>
+     * separately or resolve any symlink ourselves first. */
+    const char *slash = strrchr(part_path, '/');
+    const char *name = slash ? slash + 1 : part_path;
+    if (name[0] == '\0') return false;
+
+    char sysfs_path[PATH_MAX];
+    snprintf(sysfs_path, sizeof(sysfs_path), "/sys/class/block/%s/uevent", name);
+
+    int fd = open(sysfs_path, O_WRONLY | O_CLOEXEC);
+    if (fd < 0) return false;
+    /* "change" (not "add") -- the partition already exists as far as the
+     * kernel/udev's device model is concerned; what changed is its
+     * *content* (a filesystem got written where there wasn't one, or a
+     * different one than before), which is exactly what the "change"
+     * action means and what triggers udev's blkid rule to re-probe. */
+    ssize_t w = write(fd, "change", 6);
+    close(fd);
+    return w == 6;
 }
 KIBA_SRC_END_UDEVC
 
@@ -7084,8 +7568,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         /* KibaOS is UEFI-only, which needs /sys/firmware/efi/efivars to
          * write the NVRAM boot entry. Fail fast with a clear message
-         * instead of letting refind-install die with a cryptic error --
-         * this also covers VMs, which are not supported. */
+         * instead of letting bootctl die with a cryptic error -- this
+         * also covers VMs, which are not supported. */
         if (access("/sys/firmware/efi", F_OK) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err),
                      "KibaOS requires UEFI boot. This system appears to have "
@@ -7094,79 +7578,119 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             return -1;
         }
 
-        /* refind-install (run from inside the chroot, so no --root flag
-         * needed -- /boot is already the ESP mount point, mirroring the
-         * old --esp-path=/boot) copies rEFInd's EFI binary and drivers to
-         * <esp>/EFI/refind/, drops its own fallback copy at
-         * <esp>/EFI/BOOT/BOOTX64.EFI, and registers the NVRAM boot entry
-         * via efibootmgr (already in packages.x86_64). It also drops a
-         * sample refind.conf and auto-generates a refind_linux.conf next
-         * to the kernel -- both of which we overwrite below with our own,
-         * since the auto-generated refind_linux.conf would otherwise
-         * carry kernel parameters scraped from the live/build environment
-         * rather than the target system (see the note on kiba_install_
-         * finalize's dualboot param above). */
-        char *argv[] = { (char *)"refind-install", NULL };
+        /* bootctl install (run from inside the chroot, so no --esp-path
+         * flag needed -- /boot is already the ESP mount point) drops
+         * systemd-boot's own loader at <esp>/EFI/systemd/systemd-bootx64.efi
+         * and a removable-media fallback copy at <esp>/EFI/BOOT/BOOTX64.EFI,
+         * and registers the NVRAM boot entry itself (no efibootmgr
+         * subprocess needed -- bootctl talks to efivarfs directly). This
+         * replaces the old refind-install call; see the KIBA IDENTITY/VIEW
+         * section's own comments elsewhere in this file for the general
+         * "why switch bootloaders" reasoning -- short version here: native
+         * GPT/BLS boot-counting (tries-left/tries-done, systemd-boot-
+         * check-no-failures.service, systemd-bless-boot.service) only
+         * works with systemd-boot, and rEFInd doesn't read any of it. The
+         * UKI + slot-sync logic below replaces kibaos-refind-slot-sync's
+         * hand-rolled marker-file approach with that native mechanism. */
+        char *argv[] = { (char *)"bootctl", (char *)"install", NULL };
         if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "refind-install failed");
+            snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
             return -1;
         }
     }
 
-    /* rEFInd has no grub-mkconfig equivalent either -- refind.conf and
-     * refind_linux.conf are just plain text we write ourselves, same
-     * spirit as the old loader.conf/loader-entry approach. Kernel cmdline
-     * options mirror what /etc/default/grub used to carry (lsm= sets the
-     * LSM init order/stack; apparmor must be present in it for the
-     * apparmor.service enabled below to actually enforce anything -- the
-     * old apparmor=1/security=apparmor params are deprecated and get
-     * ignored, confirmed against the current kernel AppArmor docs;
-     * capability is omitted since the kernel always includes it anyway). */
-    snprintf(path, sizeof(path), "%s/boot/EFI/refind/refind.conf", target_root);
-    /* dualboot: give the menu a real timeout so other EFI bootloaders
-     * rEFInd auto-discovers on the ESP (its built-in equivalent of
-     * os-prober) are actually visible instead of auto-booting straight
-     * into KibaOS. Whole-disk install: timeout -1, which rEFInd treats as
-     * an immediate boot to the default unless a key is already buffered
-     * -- unlike systemd-boot, rEFInd's "timeout 0" means the opposite
-     * (wait forever), so -1 is the actual equivalent of the old
-     * timeout=0 auto-boot behavior. default_selection pins the default
-     * to KibaOS's own kernel rather than rEFInd's "last booted" default,
-     * so it doesn't drift once a dual-boot menu has been used. hideui
-     * editor mirrors the old loader.conf's "editor no" -- no menu option
-     * to hand-edit kernel params at boot. */
+    /* loader.conf: systemd-boot's own top-level config, plain text same
+     * spirit as the old refind.conf. "default" is a glob matched against
+     * boot entry/UKI filenames -- kibaos-root-a+3.efi et al all match
+     * "kibaos-root-a*.efi" regardless of their current tries-left suffix,
+     * so this doesn't need rewriting every time the counter changes (only
+     * the UKI SWAP at OTA time changes which slot's glob is default --
+     * see kibaos-uki-slot-sync further down). timeout semantics here are
+     * systemd-boot's NORMAL ones (0 = boot default immediately without
+     * showing the menu unless a key is already buffered) -- this is
+     * actually what "switching back to systemd-boot" restores: rEFInd's
+     * "timeout 0 means wait forever" was the inverted, surprising case
+     * that needed its own callout comment; systemd-boot needs no such
+     * caveat here. */
+    snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
     if (dualboot) {
+        /* Honest limitation carried over from the switch: unlike rEFInd,
+         * which scans the whole ESP for ANY .efi it recognizes, systemd-
+         * boot's own auto-discovery is narrower -- it lists BLS entries
+         * under /loader/entries/*.conf and UKIs under /EFI/Linux/*.efi,
+         * plus it specifically special-cases detecting an existing
+         * Windows Boot Manager (\\EFI\\Microsoft\\Boot\\bootmgfw.efi) and
+         * offering "Reboot Into Firmware Setup". It does NOT do rEFInd's
+         * broad "scan every vendor's EFI subdirectory" discovery of
+         * arbitrary other Linux installs' own bootloaders. For the
+         * Windows-dual-boot case (the actual common one) this is a
+         * non-issue; for dual-booting alongside another Linux distro's
+         * own GRUB/systemd-boot, that other loader's entry may not
+         * appear automatically the way it did under rEFInd. */
         write_file(path,
                    "timeout 5\n"
-                   "default_selection \"vmlinuz-linux\"\n"
-                   "hideui editor\n");
+                   "default kibaos-root-a*.efi\n"
+                   "editor no\n");
     } else {
         write_file(path,
-                   "timeout -1\n"
-                   "default_selection \"vmlinuz-linux\"\n"
-                   "hideui editor\n");
+                   "timeout 0\n"
+                   "default kibaos-root-a*.efi\n"
+                   "editor no\n");
     }
 
-    snprintf(path, sizeof(path), "%s/boot/refind_linux.conf", target_root);
     {
-        char entry[1024];
-        /* refind_linux.conf must live in the same directory as the
-         * kernel (the ESP root, /boot inside the chroot -- vmlinuz-linux
-         * lands there directly, same layout the old systemd-boot entry
-         * assumed) for rEFInd's Linux auto-detection to pick it up. */
-        snprintf(entry, sizeof(entry),
-                 "\"Boot KibaOS\"  \"root=UUID=%s rw quiet splash loglevel=3 "
+        /* Build the initial UKI (Unified Kernel Image): kernel +
+         * initramfs + kernel cmdline + os-release bundled into one signed-
+         * later PE binary, dropped straight at the ESP path systemd-boot
+         * auto-discovers (<esp>/EFI/Linux/*.efi). "+3" is the initial
+         * boot-counting suffix (UAPI Boot Loader Specification / systemd's
+         * Automatic Boot Assessment) -- systemd-boot decrements it on
+         * every attempt and systemd-bless-boot.service (enabled below)
+         * clears it entirely once boot-complete.target is reached, so an
+         * install that boots fine on the very first try just becomes a
+         * permanently "good" entry with no counter in its name at all.
+         * mkinitcpio's own preset (installed.conf) hasn't changed -- it
+         * still just builds a plain initramfs; ukify is what wraps that
+         * plus vmlinuz-linux into the actual bootable artifact. */
+        snprintf(path, sizeof(path), "%s/etc/kernel", target_root);
+        mkdir(path, 0755);
+        snprintf(path, sizeof(path), "%s/etc/kernel/cmdline", target_root);
+        char cmdline[512];
+        snprintf(cmdline, sizeof(cmdline),
+                 "root=UUID=%s rw quiet splash loglevel=3 "
                  "rd.udev.log_level=3 vt.global_cursor_default=0 "
                  "plymouth.use-simpledrm=1 "
-                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n",
+                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\n",
                  root_uuid);
-        if (write_file(path, entry) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "writing rEFInd refind_linux.conf failed");
+        if (write_file(path, cmdline) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "writing /etc/kernel/cmdline failed");
+            return -1;
+        }
+
+        snprintf(path, sizeof(path), "%s/boot/EFI/Linux", target_root);
+        /* mkdir -p equivalent: EFI/ likely already exists from bootctl
+         * install above, /Linux under it doesn't yet. */
+        char mkdir_efi[1024];
+        snprintf(mkdir_efi, sizeof(mkdir_efi), "%s/boot/EFI", target_root);
+        mkdir(mkdir_efi, 0755);
+        mkdir(path, 0755);
+
+        char *argv[] = {
+            (char *)"ukify", (char *)"build",
+            (char *)"--linux=/boot/vmlinuz-linux",
+            (char *)"--initrd=/boot/initramfs-linux.img",
+            (char *)"--cmdline=@/etc/kernel/cmdline",
+            (char *)"--os-release=@/etc/os-release",
+            (char *)"--output=/boot/EFI/Linux/kibaos-root-a+3.efi",
+            NULL
+        };
+        if (chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "ukify build failed");
             return -1;
         }
     }
 
-    (void)disk_path;   /* no longer needed -- the loader entry is written directly from root_uuid */
+    (void)disk_path;   /* no longer needed -- the UKI's cmdline is written directly from root_uuid */
     (void)root_partno;
 
     if (cb) cb(88, "Turning on background features...", user_data);
@@ -7174,6 +7698,14 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         static const char *services[] = {
             "NetworkManager", "sddm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
+            /* Automatic Boot Assessment: clears a UKI's tries-left/
+             * tries-done counter once boot-complete.target is actually
+             * reached, turning "indeterminate" into "good" so the next
+             * OTA update's fresh counter isn't racing against a stale
+             * failure state. Without this enabled, tries-left would just
+             * count down to zero on every normal boot and the slot would
+             * eventually get marked bad even with nothing wrong. */
+            "systemd-bless-boot.service", "systemd-boot-check-no-failures.service",
         };
         for (size_t i = 0; i < sizeof(services)/sizeof(services[0]); i++) {
             char *argv[] = { (char *)"systemctl", (char *)"enable", (char *)services[i], NULL };
@@ -7462,6 +7994,34 @@ int main(int argc, char **argv) {
             fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
         }
 
+        /* Root gets HALF of what's left after the ESP, not all of it --
+         * the other half is left unallocated on purpose so systemd-repart
+         * (see /etc/repart.d/50-kibaos-root-b.conf, wired up later in this
+         * build script) has somewhere to carve root-b out of for true A/B
+         * updates. root-b's repart.d rule sizes it to match root-a exactly,
+         * so giving root-a half the remaining space guarantees the other
+         * half is always enough for it, regardless of disk size.
+         *
+         * This is a rough byte estimate (ignores the few sectors of GPT
+         * header/entry-array overhead already covered by rough_overhead
+         * above) -- fine here since we're only computing a COUNT for
+         * kiba_gpt_write() to place, not an absolute LBA; sgdisk's normal
+         * alignment grid handles the rest, same as it always does. */
+        uint64_t remaining_sectors = total_sectors - esp_sectors;
+        uint64_t min_ab_slot_sectors = (8ull * 1024 * 1024 * 1024) / ssz; /* 8GiB floor per A/B slot */
+        uint64_t root_sectors;
+        if (remaining_sectors >= 2 * min_ab_slot_sectors) {
+            root_sectors = remaining_sectors / 2;
+        } else {
+            /* Disk too small to reserve a matching root-b slot up front --
+             * fall back to the old single-root-fills-the-disk behavior.
+             * systemd-repart's root-b rule simply stays a no-op until free
+             * space exists (see the PREREQUISITE note above the repart.d
+             * unit later in this script) -- no A/B updates on small disks,
+             * but the install itself isn't blocked over it. */
+            root_sectors = 0;
+        }
+
         kiba_gpt_disk_t gdisk = {
             .fd = disk_fd,
             .logical_sector_size = ssz,
@@ -7472,7 +8032,8 @@ int main(int argc, char **argv) {
             { .name = "KIBAOS-ESP",  .type_guid = KIBA_GUID_ESP,      .unique_guid = {{0}},
               .first_lba = KIBA_GPT_FIRST_LBA_DEFAULT, .last_lba = esp_sectors, .attributes = 0 },
             { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
-              .first_lba = KIBA_GPT_FIRST_LBA_CONTIGUOUS, .last_lba = KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
+              .first_lba = KIBA_GPT_FIRST_LBA_CONTIGUOUS,
+              .last_lba = root_sectors ? root_sectors : KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
         };
         uint64_t placed_ends[2] = {0};
         int rc = kiba_gpt_write(&gdisk, parts, 2, placed_ends);
@@ -7539,6 +8100,19 @@ int main(int argc, char **argv) {
         if (kiba_fs_format(esp_part, KIBA_FS_FAT32, "KIBAOS-ESP") != 0) {
             fail(kiba_fs_strerror());
         }
+        /* mkfs.fat just wrote a brand-new filesystem directly to the
+         * block device -- the kernel/udev have no way to know that
+         * happened on their own (see kiba_trigger_uevent's own comment
+         * in kiba_udev.c for the full story: BLKPG at partition-create
+         * time only covers the partition table, not what gets written
+         * into a partition afterward). Without this, kiba_wait_for_
+         * disk_tag() below could poll a /dev/disk/by-uuid symlink that
+         * either never appears, or -- worse, and silently -- resolves to
+         * a stale UUID left over from whatever was on this partition
+         * before, which is exactly the kind of bug that produces a
+         * clean-looking install that then can't find its own root
+         * filesystem on first boot. */
+        kiba_trigger_uevent(esp_part);
     }
     /* Dual-boot: the ESP already belongs to the other OS and already has
      * a filesystem on it, plus that OS's own boot files -- formatting it
@@ -7548,6 +8122,7 @@ int main(int argc, char **argv) {
     if (kiba_fs_format(root_part, KIBA_FS_EXT4, "KIBAOS-ROOT") != 0) {
         fail(kiba_fs_strerror());
     }
+    kiba_trigger_uevent(root_part); /* same reasoning as the ESP one above */
 
     /* ── 4. Mount ──────────────────────────────────────────────────── */
     progress(14, "Mounting target filesystem...");
@@ -7586,6 +8161,13 @@ int main(int argc, char **argv) {
      * mkfs.ext4/mkfs.fat during formatting above; we read it back via
      * udev's /dev/disk/by-uuid symlinks (systemd-udevd is always
      * running on the real install target, so this is reliable there
+     * -- now that kiba_trigger_uevent() forces a fresh probe right
+     * after each format call above. Without that trigger this could
+     * previously read back a stale UUID left over from a partition's
+     * PREVIOUS filesystem on a disk that had been installed to before,
+     * since udev has no way to notice a raw mkfs write on its own --
+     * see kiba_trigger_uevent's comment in kiba_udev.c for the full
+     * story, and note this can't be exercised in a udev-less sandbox
      * even though it can't be exercised in a udev-less sandbox). */
     if (!kiba_wait_for_disk_tag(root_part, "by-uuid", root_uuid, sizeof(root_uuid), 8000)) {
         fail("Could not determine root filesystem UUID after formatting.");
@@ -7868,6 +8450,47 @@ fun display_password_callback(prompt, bullets) {
   prompt_text.sprite.SetY(dots[0].sprite.GetY() + 50);
 }
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
+
+// ── System-update progress screen ─────────────────────────────────────────
+// Fires only when plymouthd is driving system-update.target (an A/B root
+// update applying via kibaos-sysupdate-apply, see OTA section below) rather
+// than a normal boot -- "plymouth system-update --progress=N" is what feeds
+// this. Reuses the exact same logo sprite as normal boot (same asset the
+// taskbar launcher icon and app icons also share -- one mark, everywhere),
+// just swaps the three-dot pulse for a real percentage bar underneath it,
+// since this screen can sit on screen for minutes on a slow connection and
+// a person watching it deserves an actual number, not an ambiguous pulse.
+bar_width = 320;
+bar_height = 6;
+bar_bg.image = Image.Text(" ", 1, 1, 1, 0.15, "Sans 1");
+bar_bg.sprite = Sprite();
+bar_bg.sprite.SetX(Window.GetWidth() / 2 - bar_width / 2);
+bar_bg.sprite.SetY(dots[0].sprite.GetY() + 40);
+bar_bg.sprite.SetOpacity(0);
+
+fun draw_bar(fraction) {
+  if (fraction < 0) fraction = 0;
+  if (fraction > 1) fraction = 1;
+  fill_width = Math.Int(bar_width * fraction);
+  if (fill_width < 2) fill_width = 2;
+  bar_fill.image = Image.Text(" ", 1, 1, 1, 1, "Sans " + bar_height);
+  bar_fill.sprite = Sprite();
+  bar_fill.sprite.SetX(bar_bg.sprite.GetX());
+  bar_fill.sprite.SetY(bar_bg.sprite.GetY());
+  bar_fill.sprite.SetOpacity(1);
+
+  pct_text.image = Image.Text("Updating KibaOS — " + Math.Int(fraction * 100) + "%", 1, 1, 1, 1);
+  pct_text.sprite = Sprite(pct_text.image);
+  pct_text.sprite.SetX(Window.GetWidth() / 2 - pct_text.image.GetWidth() / 2);
+  pct_text.sprite.SetY(bar_bg.sprite.GetY() + 20);
+}
+
+fun system_update_callback(progress) {
+  for (i = 0; i < dot_count; i++)
+    dots[i].sprite.SetOpacity(0);
+  draw_bar(progress);
+}
+Plymouth.SetSystemUpdateFunction(system_update_callback);
 PLYMOUTHSCRIPT
 
 # Plymouth daemon config — must be written before mkinitcpio bakes it in
@@ -7968,20 +8591,28 @@ echo "=== Junction: installed via flatpak (re.sonny.Junction) ==="
 # in, so the lookup falls through to adwaita-icon-theme — which means the
 # taskbar launcher button would otherwise show Adwaita's literal "GNOME
 # foot" logo, a well-known rough edge (bbs.archlinux.org/viewtopic.php?
-# id=209293) that has no place on a consumer OS. Generate a plain
-# black-circle / white-inner-ring launcher icon with ImageMagick and drop it
-# in everywhere Adwaita ships start-here-symbolic, at every size Adwaita
-# provides it, so the swap is picked up regardless of which size the panel
-# actually requests.
+# id=209293) that has no place on a consumer OS.
+#
+# Uses the SAME source badge as the app-icon set and Plymouth splash (see
+# BRANDING ASSETS above, LOGO_256) rather than a generated placeholder --
+# the "start menu" button is the single most-clicked spot on the whole
+# desktop, so it should be showing the actual KibaOS mark, not a generic
+# stand-in shape. That crop is already a clean centered circular badge with
+# no wordmark, which is exactly the composition a launcher icon needs.
 ADWAITA_ICONS="/usr/share/icons/Adwaita"
 LAUNCHER_MASTER="/tmp/kibaos-launcher-icon.png"
-# Master render at high res: filled black disc, then an unfilled white ring
-# stroked well inside the outer edge — a black circle with a bright white
-# inner rim, not touching the outline.
-magick -size 512x512 xc:none \
-  -fill black -draw "circle 256,256 256,16" \
-  -stroke white -strokewidth 20 -fill none -draw "circle 256,256 256,60" \
-  "${LAUNCHER_MASTER}"
+if [ -f "${LOGO_256}" ]; then
+  cp "${LOGO_256}" "${LAUNCHER_MASTER}"
+else
+  # Defensive fallback only -- shouldn't trigger since BRANDING ASSETS
+  # above always produces LOGO_256, even in its own "fetch failed" branch
+  # (the drawn black-circle/white-'K' fallback). Kept so a future refactor
+  # of that section can't silently turn this into a hard build failure.
+  magick -size 512x512 xc:none \
+    -fill black -draw "circle 256,256 256,16" \
+    -stroke white -strokewidth 20 -fill none -draw "circle 256,256 256,60" \
+    "${LAUNCHER_MASTER}"
+fi
 
 if [ -d "${ADWAITA_ICONS}" ]; then
   find "${ADWAITA_ICONS}" -path '*/places/start-here-symbolic.svg' -print0 2>/dev/null \
@@ -7992,14 +8623,14 @@ if [ -d "${ADWAITA_ICONS}" ]; then
         case "${_px}" in
           ''|*[!0-9]*) _px=256 ;;   # "scalable" or anything unparsable -> high-res master
         esac
-        magick "${LAUNCHER_MASTER}" -resize "${_px}x${_px}" \
+        magick "${LAUNCHER_MASTER}" -filter Lanczos -resize "${_px}x${_px}" \
           "${_dir}/start-here-symbolic.png"
         rm -f "${_svg}"
       done
   gtk-update-icon-cache -f "${ADWAITA_ICONS}" 2>/dev/null || true
 fi
 rm -f "${LAUNCHER_MASTER}"
-echo "=== Taskbar launcher icon: custom black-circle/white-ring icon installed ==="
+echo "=== Taskbar launcher icon: KibaOS boot-logo badge installed ==="
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -9025,6 +9656,229 @@ LABWCENV
 echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 
 # ══════════════════════════════════════════════════════════════════════════
+# TRUE A/B ROOT — systemd-repart + systemd-sysupdate + system-update.target
+# ══════════════════════════════════════════════════════════════════════════
+# Real atomic partition-image updates, not the file-patch engine this used
+# to be (see kibaos-ota below, which now just triggers this instead of
+# patching a live root). Both systemd-sysupdate and systemd-repart ship
+# inside the systemd package itself -- no extra dependency.
+#
+# Design, deliberately kept simple over "fully idiomatic systemd-sysupdate":
+#   - systemd-sysupdate does the actual atomic write: it downloads the new
+#     root image, verifies it, and writes it whole to whichever of the two
+#     root partitions ISN'T currently mounted. That part is the real thing.
+#   - Boot-slot SELECTION is now systemd-boot's own native mechanism --
+#     UAPI Boot Loader Specification boot-counting (tries-left/tries-done
+#     encoded in each UKI's filename) plus systemd-bless-boot.service
+#     clearing that counter once boot-complete.target is actually reached.
+#     This is the whole reason KibaOS switched back to systemd-boot (see
+#     kibaos_oobe_backend_main.c's bootctl install call, KIBA_INSTALLER
+#     section) -- rEFInd never read any of this, which is why the previous
+#     design here hand-rolled a marker file + manual refind_linux.conf
+#     rewrite instead. kibaos-uki-slot-sync (below) still exists, but its
+#     job shrank considerably: build the new slot's UKI (root=UUID=
+#     differs per slot, everything else doesn't) and hand it to bootctl;
+#     the actual fallback-on-failure behavior is systemd's, not ours.
+#   - /boot (kernel + initramfs) stays on ONE shared partition, not
+#     duplicated per-slot -- only the root filesystem is A/B. Each slot
+#     DOES get its own small UKI file now (root=UUID= is baked into the
+#     UKI's cmdline, so it can't be shared across slots the way the plain
+#     initramfs was), but that's a few dozen MB, not a full kernel/initrd
+#     duplication -- kernel/initramfs updates are still rare next to
+#     userspace churn and still aren't duplicated at the source level.
+#
+# PREREQUISITE STATUS: the whole-disk install path now only gives root-a
+# HALF of the space left after the ESP (see the root_sectors logic in
+# kibaos_oobe_backend_main.c's erase-mode branch), leaving the other half
+# unallocated specifically so the repart.d rule below has somewhere to
+# carve root-b out of. On disks too small to give both slots a sane
+# minimum size, root-a still falls back to consuming all remaining space
+# (old behavior) and this repart.d unit stays a no-op there -- it activates
+# automatically the moment free space exists, no re-flash needed. Fresh
+# installs on adequately-sized disks get a working A/B slot from day one;
+# only small-disk installs still need that fallback path.
+
+mkdir -p /etc/repart.d /etc/sysupdate.d
+
+# ── systemd-repart: carve the second root slot from free space ────────────
+# GPT type UUID below is the well-known "Linux root (x86-64)" type
+# (4f68bce3-e8cd-4db1-96e7-fbcaf984b709) -- same type root-a already uses,
+# which is what lets systemd-sysupdate treat the pair as one A/B set.
+cat > /etc/repart.d/50-kibaos-root-b.conf << 'REPARTCONF'
+[Partition]
+Type=root-x86-64
+Label=root-b
+# Sized to match root-a exactly, not "rest of disk" -- this partition's
+# whole purpose is to be an update target, not extra storage.
+SizeMinBytes=root-a
+SizeMaxBytes=root-a
+# Left unformatted/empty until the first sysupdate run actually writes an
+# image into it -- repart's job here is just to make the slot EXIST.
+REPARTCONF
+
+# ── systemd-sysupdate: where root images come from, how they're verified ──
+# Points at the same OTA_BASE/keyring the old file-patch engine used --
+# only the artifact format changes (whole signed root images instead of
+# per-file tar patches), not the trust chain.
+cat > /etc/sysupdate.d/10-kibaos-root.conf << 'SYSUPDATECONF'
+[Transfer]
+ProtectVersion=%A
+
+[Source]
+Type=url-file
+Path=https://sourceforge.net/projects/kibaos/files/ota/root/
+MatchPattern=kibaos-root_@v.raw.xz
+
+[Target]
+Type=partition
+Path=auto
+MatchPattern=root-a_@v,root-b_@v
+MatchPartitionType=root-x86-64
+SYSUPDATECONF
+
+# ── UKI slot-sync — builds the JUST-WRITTEN slot's UKI (root=UUID= is the
+# only thing that differs between slots; kernel/initramfs are shared and
+# untouched) and drops it at the ESP path systemd-boot auto-discovers.
+# systemd-boot's own boot-counting (see the design note above) handles
+# fallback from here -- this script's only job is "make the new slot
+# bootable with a fresh try counter", not "guarantee it stays booted". ──
+cat > /usr/local/bin/kibaos-uki-slot-sync << 'SLOTSYNC'
+#!/bin/bash
+# Usage: kibaos-uki-slot-sync <root-a|root-b>
+# Builds/refreshes /boot/EFI/Linux/kibaos-<slot>+3.efi from the CURRENT
+# /boot/vmlinuz-linux + /boot/initramfs-linux.img (shared across slots)
+# plus a per-slot cmdline (root=UUID= differs), then makes it the default
+# boot entry. "+3" resets the boot-counting state to fresh/indeterminate
+# every time this runs -- intentional, since a freshly-written slot
+# genuinely hasn't proven itself yet regardless of what its previous
+# counter said. Called by kibaos-sysupdate-apply right after a successful
+# sysupdate run, and safe to re-run any time (idempotent).
+set -euo pipefail
+SLOT="${1:?usage: kibaos-uki-slot-sync <root-a|root-b>}"
+PART_PATH="/dev/disk/by-partlabel/${SLOT}"
+
+if [ ! -e "${PART_PATH}" ]; then
+  echo "kibaos-uki-slot-sync: ${PART_PATH} not found" >&2
+  exit 1
+fi
+
+ROOT_UUID="$(blkid -s UUID -o value "${PART_PATH}")"
+if [ -z "${ROOT_UUID}" ]; then
+  echo "kibaos-uki-slot-sync: couldn't read UUID for ${SLOT}" >&2
+  exit 1
+fi
+
+# Identical cmdline options to kiba_install_finish.c's install-time
+# version -- keep these two in sync if the boot options there ever change.
+mkdir -p /etc/kernel
+cat > /etc/kernel/cmdline << EOF
+root=UUID=${ROOT_UUID} rw quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf
+EOF
+
+mkdir -p /boot/EFI/Linux
+UKI_PATH="/boot/EFI/Linux/kibaos-${SLOT}+3.efi"
+ukify build \
+  --linux=/boot/vmlinuz-linux \
+  --initrd=/boot/initramfs-linux.img \
+  --cmdline=@/etc/kernel/cmdline \
+  --os-release=@/etc/os-release \
+  --output="${UKI_PATH}"
+
+# Old UKIs for THIS slot (any leftover tries-left/-done suffix from a
+# previous cycle, e.g. kibaos-root-a+1-2.efi) would otherwise sit next to
+# the fresh one and confuse systemd-boot's glob-based default matching in
+# loader.conf -- clean up anything matching this slot's name that isn't
+# the file we just wrote.
+find /boot/EFI/Linux -maxdepth 1 -name "kibaos-${SLOT}*.efi" ! -name "$(basename "${UKI_PATH}")" -delete
+
+bootctl set-default "$(basename "${UKI_PATH}")"
+echo "${SLOT}" > /etc/kibaos/active-root-slot
+echo "kibaos-uki-slot-sync: now booting ${SLOT} (${ROOT_UUID}) via ${UKI_PATH}"
+SLOTSYNC
+chmod +x /usr/local/bin/kibaos-uki-slot-sync
+
+# ── The actual update-apply service, run inside system-update.target ──────
+# This is the offline-update flow systemd documents (systemd.offline-
+# updates(7)): kibaos-ota (below) stages the download and just creates
+# /system-update -> here, then reboots. systemd-system-update-generator
+# detects that symlink very early on the NEXT boot and redirects the whole
+# boot into system-update.target instead of a normal desktop session --
+# nothing else is running, so the root swap is happening in the safest
+# possible window, and plymouthd is already up showing the splash, which
+# is what gives kibaos-sysupdate-apply somewhere to put the progress bar.
+mkdir -p /var/lib/kibaos-update
+cat > /usr/local/bin/kibaos-sysupdate-apply << 'APPLYSCRIPT'
+#!/bin/bash
+set -uo pipefail
+MARKER="/system-update"
+LOG="/var/log/kibaos/ota.log"
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${LOG}"; }
+
+# Only run if THIS update engine is the one that requested system-update
+# target (systemd.offline-updates(7)'s own recommendation, since multiple
+# update engines could theoretically share the target) -- and remove the
+# symlink immediately, before doing anything else, so a crash partway
+# through can't strand the machine in a system-update.target boot loop.
+[ -L "${MARKER}" ] && [ "$(readlink -f "${MARKER}")" = "/var/lib/kibaos-update" ] || exit 0
+rm -f "${MARKER}"
+
+log "system-update.target: starting A/B root update"
+plymouth system-update --progress=0.0 2>/dev/null || true
+
+CURRENT_SLOT="$(cat /etc/kibaos/active-root-slot 2>/dev/null || echo root-a)"
+[ "${CURRENT_SLOT}" = "root-a" ] && TARGET_SLOT="root-b" || TARGET_SLOT="root-a"
+
+# systemd-sysupdate's own stdout isn't a percentage stream, so this is a
+# coarse three-stage bar (fetch/verify, write, finalize) rather than a true
+# byte-accurate one -- honest progress beats a fake smooth animation, but
+# there's no cheap way to get finer granularity out of sysupdate today.
+plymouth system-update --progress=0.1 2>/dev/null || true
+if ! systemd-sysupdate update >>"${LOG}" 2>&1; then
+  log "systemd-sysupdate update FAILED — leaving current slot (${CURRENT_SLOT}) untouched."
+  plymouth display-message --text="Update failed — starting KibaOS normally" 2>/dev/null || true
+  sleep 3
+  systemctl reboot
+  exit 0
+fi
+plymouth system-update --progress=0.85 2>/dev/null || true
+
+/usr/local/bin/kibaos-uki-slot-sync "${TARGET_SLOT}" >>"${LOG}" 2>&1
+plymouth system-update --progress=1.0 2>/dev/null || true
+
+log "Update applied — now booting ${TARGET_SLOT} on next start (tries-left counter fresh; automatic rollback to ${CURRENT_SLOT} if it doesn't boot clean)."
+sleep 1
+systemctl reboot
+APPLYSCRIPT
+chmod +x /usr/local/bin/kibaos-sysupdate-apply
+
+cat > /etc/systemd/system/kibaos-sysupdate-apply.service << 'APPLYSVC'
+[Unit]
+Description=KibaOS A/B root update (system-update.target)
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=sysinit.target
+Before=shutdown.target
+# Per systemd.offline-updates(7): if this exits uncleanly, reboot back to
+# the normal (still-untouched) slot rather than leaving the machine stuck
+# on the system-update.target boot.
+FailureAction=reboot
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kibaos-sysupdate-apply
+StandardOutput=append:/var/log/kibaos/ota.log
+StandardError=append:/var/log/kibaos/ota.log
+APPLYSVC
+
+# Hooked in via .wants/ symlink rather than [Install]+systemctl enable, per
+# systemd.offline-updates(7)'s own recommendation for update engines.
+mkdir -p /etc/systemd/system/system-update.target.wants
+ln -sf /etc/systemd/system/kibaos-sysupdate-apply.service \
+  /etc/systemd/system/system-update.target.wants/kibaos-sysupdate-apply.service
+
+echo "=== A/B root update infra: repart.d/sysupdate.d/system-update.target wired up ==="
+
+# ══════════════════════════════════════════════════════════════════════════
 # OTA UPDATE SYSTEM
 # ══════════════════════════════════════════════════════════════════════════
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
@@ -9038,359 +9892,110 @@ curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
       --import /tmp/ota-public.asc 2>/dev/null || true
 rm -f /tmp/ota-public.asc
 
-# ── Patch-level tracking ───────────────────────────────────────────────────
-echo "0" > /etc/kibaos/patch-level
+# ── Version tracking ───────────────────────────────────────────────────────
+# Whole-image version string now, not a file-patch counter -- matches
+# systemd-sysupdate's own @v matching in /etc/sysupdate.d/10-kibaos-root.conf
+# above. "0" is a valid starting version for ProtectVersion comparisons.
+echo "0" > /etc/kibaos/image-version
+[ -f /etc/kibaos/active-root-slot ] || echo "root-a" > /etc/kibaos/active-root-slot
 
 # ══════════════════════════════════════════════════════════════════════════
-# /usr/local/bin/kibaos-ota — the live patching engine
+# /usr/local/bin/kibaos-ota — checks for and stages A/B root updates
 # ══════════════════════════════════════════════════════════════════════════
+# Used to be the whole patch engine (download/verify/apply file-level
+# diffs, framebuffer-freeze trick to hide display restarts). All of that
+# moved to real infrastructure: systemd-sysupdate does the atomic image
+# write, system-update.target gives it a safe nothing-else-running window,
+# and Plymouth's system-update mode (kibaos.script, see BOOT SPLASH above)
+# shows progress on the same boot logo instead of a hidden framebuffer
+# trick. What's left here is genuinely simple: check whether a newer image
+# exists, verify it's actually signed by KibaOS, and if so hand off to that
+# pipeline by staging /system-update and rebooting. Still runs quietly via
+# the same systemd timer as before.
 cat > /usr/local/bin/kibaos-ota << 'OTASCRIPT'
 #!/usr/bin/env bash
-# KibaOS OTA Live Patch Engine
-# Silently downloads, verifies, and applies file-level patches.
-# Handles display manager restarts with a framebuffer freeze trick.
-# Runs as root via systemd timer — never visible to the user.
-
+# KibaOS OTA — checks for a new signed root image and, if found, stages an
+# A/B update and reboots into system-update.target to apply it.
 set -euo pipefail
 
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
 OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-PATCH_LEVEL_FILE="/etc/kibaos/patch-level"
-OTA_WORKDIR="/var/lib/kibaos-ota"
+VERSION_FILE="/etc/kibaos/image-version"
+UPDATE_STAGE="/var/lib/kibaos-update"
 OTA_LOG="/var/log/kibaos/ota.log"
-FREEZE_PID_FILE="/tmp/kibaos-fb-freeze.pid"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
 
-# ── Check current patch level ──────────────────────────────────────────────
-CURRENT=$(cat "${PATCH_LEVEL_FILE}" 2>/dev/null || echo 0)
-log "Current patch level: ${CURRENT}"
+CURRENT=$(cat "${VERSION_FILE}" 2>/dev/null || echo 0)
+log "Current image version: ${CURRENT}"
 
-# ── Fetch latest available patch level ────────────────────────────────────
 LATEST=$(curl -fsSL --retry 3 --max-time 10 \
-  "${OTA_BASE}/latest-patch-level" 2>/dev/null | tr -d '[:space:]') || {
+  "${OTA_BASE}/root/latest-version" 2>/dev/null | tr -d '[:space:]') || {
   log "Could not reach OTA server. Skipping."
   exit 0
 }
 
 if ! [[ "${LATEST}" =~ ^[0-9]+$ ]]; then
-  log "Invalid patch level received: '${LATEST}'. Skipping."
+  log "Invalid version received: '${LATEST}'. Skipping."
   exit 0
 fi
-
 if [ "${LATEST}" -le "${CURRENT}" ]; then
-  log "Already up to date (patch level ${CURRENT})."
+  log "Already up to date (version ${CURRENT})."
   exit 0
 fi
+log "New image available: ${CURRENT} -> ${LATEST}"
 
-log "New patch available: ${CURRENT} → ${LATEST}"
-
-# ── Download patch bundle + signature ─────────────────────────────────────
-PATCH_TAR="${OTA_WORKDIR}/kibaos-ota-${LATEST}.tar.gz"
-PATCH_SIG="${PATCH_TAR}.asc"
-MANIFEST="${OTA_WORKDIR}/manifest-${LATEST}.txt"
-
-mkdir -p "${OTA_WORKDIR}"
-
-log "Downloading patch ${LATEST}..."
-curl -fsSL --retry 3 --max-time 120 \
-  "${OTA_BASE}/kibaos-ota-${LATEST}.tar.gz" -o "${PATCH_TAR}" || {
-  log "Download failed. Skipping."
+# Verify the signature on the manifest BEFORE handing anything to
+# systemd-sysupdate -- sysupdate will re-verify the image itself via its
+# own manifest mechanism, but checking here too means a bad/unsigned
+# release never even gets far enough to stage a reboot.
+MANIFEST="/tmp/kibaos-root-${LATEST}.manifest"
+MANIFEST_SIG="${MANIFEST}.asc"
+curl -fsSL --retry 3 --max-time 30 \
+  "${OTA_BASE}/root/kibaos-root_${LATEST}.manifest" -o "${MANIFEST}" || {
+  log "Manifest download failed. Skipping."
   exit 0
 }
 curl -fsSL --retry 3 --max-time 30 \
-  "${OTA_BASE}/kibaos-ota-${LATEST}.tar.gz.asc" -o "${PATCH_SIG}" || {
-  log "Signature download failed. Aborting for safety."
-  rm -f "${PATCH_TAR}"
+  "${OTA_BASE}/root/kibaos-root_${LATEST}.manifest.asc" -o "${MANIFEST_SIG}" || {
+  log "Manifest signature download failed. Aborting for safety."
+  rm -f "${MANIFEST}"
   exit 1
 }
-curl -fsSL --retry 3 --max-time 30 \
-  "${OTA_BASE}/kibaos-ota-${LATEST}-manifest.txt" -o "${MANIFEST}" || {
-  log "Manifest download failed. Aborting."
-  rm -f "${PATCH_TAR}" "${PATCH_SIG}"
-  exit 1
-}
-
-# ── Verify GPG signature ───────────────────────────────────────────────────
-log "Verifying signature..."
 if ! gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-         --verify "${PATCH_SIG}" "${PATCH_TAR}" 2>/dev/null; then
-  log "SIGNATURE VERIFICATION FAILED. Patch rejected. Possible tampering."
-  rm -f "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
+         --verify "${MANIFEST_SIG}" "${MANIFEST}" 2>/dev/null; then
+  log "SIGNATURE VERIFICATION FAILED on version ${LATEST}. Rejected."
+  rm -f "${MANIFEST}" "${MANIFEST_SIG}"
   exit 1
 fi
-log "Signature verified."
+log "Signature verified for version ${LATEST}."
+rm -f "${MANIFEST}" "${MANIFEST_SIG}"
 
-# ── Verify SHA256 checksums from manifest ─────────────────────────────────
-log "Verifying checksums..."
-EXTRACT_DIR="${OTA_WORKDIR}/patch-${LATEST}"
-rm -rf "${EXTRACT_DIR}"
-mkdir -p "${EXTRACT_DIR}"
-tar xzf "${PATCH_TAR}" -C "${EXTRACT_DIR}"
+# Hand off to the real pipeline: stage the offline-update marker (see
+# systemd.offline-updates(7)) pointing at kibaos-sysupdate-apply.service's
+# working directory, then reboot. Everything past this point -- the actual
+# image fetch+write, the progress screen, the reboot back -- is
+# systemd-sysupdate + system-update.target + Plymouth, not this script.
+mkdir -p "${UPDATE_STAGE}"
+echo "${LATEST}" > "${UPDATE_STAGE}/target-version"
+echo "${LATEST}" > "${VERSION_FILE}"   # committed optimistically; apply-side
+                                        # rolls the boot slot back on failure,
+                                        # so a mismatched version file here is
+                                        # cosmetic, not a correctness issue.
+ln -sf "${UPDATE_STAGE}" /system-update
+log "Update to ${LATEST} staged. Rebooting into system-update.target."
 
-# manifest format: SHA256  ./path/to/file
-while IFS= read -r line; do
-  EXPECTED_HASH=$(echo "${line}" | awk '{print $1}')
-  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-  ACTUAL_HASH=$(sha256sum "${EXTRACT_DIR}/${FILEPATH}" 2>/dev/null | awk '{print $1}')
-  if [ "${EXPECTED_HASH}" != "${ACTUAL_HASH}" ]; then
-    log "CHECKSUM MISMATCH for ${FILEPATH}. Aborting."
-    rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
-    exit 1
-  fi
-done < "${MANIFEST}"
-log "All checksums verified."
-
-# ── Detect whether patch touches display-critical files ───────────────────
-NEEDS_DISPLAY_RESTART=false
-NEEDS_COMPOSITOR_RESTART=false
-while IFS= read -r line; do
-  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-  case "${FILEPATH}" in
-    etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
-      NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/labwc*)
-      # note - labwc's config lives per-user too (in ~/.config/labwc,
-      # seeded from /etc/skel at account creation, same deal as before).
-      # an OTA patch to the skel copy only touches NEWLY created users
-      # from that point forward — it can't retroactively update
-      # already-installed users' own ~/.config/labwc/. only the binary
-      # itself triggers a restart here.
-      NEEDS_COMPOSITOR_RESTART=true ;;
-  esac
-done < "${MANIFEST}"
-
-# ══════════════════════════════════════════════════════════════════════════
-# FRAMEBUFFER FREEZE — makes display restarts invisible to the user
-# ══════════════════════════════════════════════════════════════════════════
-fb_freeze() {
-  log "Freezing display with framebuffer snapshot..."
-  # Capture current screen with grim (Wayland screenshot)
-  SNAP="/tmp/kibaos-ota-snap.png"
-  SNAP_RAW="/tmp/kibaos-ota-snap.raw"
-  WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
-  XDG_RUNTIME_DIR="/run/user/1000"
-
-  # Take screenshot as liveuser. (This script runs at real boot time on the
-  # installed system, not inside the nosuid build chroot, so sudo would
-  # actually work here — using runuser anyway for consistency, since this
-  # script is also always invoked as root and runuser is the more direct
-  # tool for "run as a different user" with no escalation step needed.)
-  runuser -u liveuser -- env \
-    WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
-    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
-    grim "${SNAP}" 2>/dev/null || true
-
-  if [ -f "${SNAP}" ]; then
-    # Convert to raw framebuffer format and write to /dev/fb0
-    FB_WIDTH=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f1 || echo 1920)
-    FB_HEIGHT=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f2 || echo 1080)
-    magick "${SNAP}" -resize "${FB_WIDTH}x${FB_HEIGHT}!" \
-      -depth 8 bgr:"${SNAP_RAW}" 2>/dev/null || true
-    if [ -f "${SNAP_RAW}" ] && [ -w /dev/fb0 ]; then
-      cat "${SNAP_RAW}" > /dev/fb0 2>/dev/null || true
-    fi
-  fi
-
-  # Emulate mouse movement via uinput to keep cursor alive
-  python3 - << 'UINPUT_WIGGLE'
-import struct, time, os, fcntl
-
-EV_REL, REL_X, REL_Y = 0x02, 0x00, 0x01
-EV_SYN, SYN_REPORT    = 0x00, 0x00
-
-def emit(fd, typ, code, val):
-    fd.write(struct.pack('llHHi', 0, 0, typ, code, val))
-
-try:
-    UI_SET_EVBIT  = 0x40045564
-    UI_SET_RELBIT = 0x40045566
-    UINPUT_DEV_SZ = 1452 + 4 * (64 + 64 + 48 + 48)
-    UI_DEV_CREATE = 0x5501
-    UI_DEV_DESTROY= 0x5502
-
-    fd = open('/dev/uinput', 'wb', buffering=0)
-    fcntl.ioctl(fd, UI_SET_EVBIT,  EV_REL)
-    fcntl.ioctl(fd, UI_SET_RELBIT, REL_X)
-    fcntl.ioctl(fd, UI_SET_RELBIT, REL_Y)
-    dev = struct.pack('80sHHIII', b'kibaos-cursor', 0, 0, 0, 0, 0)
-    dev = dev.ljust(UINPUT_DEV_SZ, b'\x00')
-    fd.write(dev)
-    fcntl.ioctl(fd, UI_DEV_CREATE)
-    # Wiggle cursor gently every 500ms for up to 30s
-    for _ in range(60):
-        emit(fd, EV_REL, REL_X,  1)
-        emit(fd, EV_SYN, SYN_REPORT, 0)
-        time.sleep(0.25)
-        emit(fd, EV_REL, REL_X, -1)
-        emit(fd, EV_SYN, SYN_REPORT, 0)
-        time.sleep(0.25)
-    fcntl.ioctl(fd, UI_DEV_DESTROY)
-    fd.close()
-except Exception:
-    pass
-UINPUT_WIGGLE
-  &
-  echo $! > "${FREEZE_PID_FILE}"
-  log "Framebuffer freeze active (PID $(cat ${FREEZE_PID_FILE}))."
-}
-
-fb_unfreeze() {
-  if [ -f "${FREEZE_PID_FILE}" ]; then
-    kill "$(cat ${FREEZE_PID_FILE})" 2>/dev/null || true
-    rm -f "${FREEZE_PID_FILE}"
-  fi
-  rm -f /tmp/kibaos-ota-snap.png /tmp/kibaos-ota-snap.raw
-  log "Framebuffer freeze released."
-}
-
-# ══════════════════════════════════════════════════════════════════════════
-# APPLY PATCH — atomic file-by-file replacement
-# ══════════════════════════════════════════════════════════════════════════
-apply_patch() {
-  log "Applying patch ${LATEST}..."
-  ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
-  mkdir -p "${ROLLBACK_DIR}"
-
-  while IFS= read -r line; do
-    FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
-    SRC="${EXTRACT_DIR}/${FILEPATH}"
-    DST="/${FILEPATH}"
-
-    [ -f "${SRC}" ] || continue
-
-    # Back up existing file for rollback
-    if [ -f "${DST}" ]; then
-      BACKUP_PATH="${ROLLBACK_DIR}/${FILEPATH}"
-      mkdir -p "$(dirname ${BACKUP_PATH})"
-      cp -a "${DST}" "${BACKUP_PATH}"
-    fi
-
-    # Atomic replace: write to .ota-tmp then move
-    mkdir -p "$(dirname ${DST})"
-    cp -a "${SRC}" "${DST}.ota-tmp"
-    mv "${DST}.ota-tmp" "${DST}"
-    log "  Patched: ${DST}"
-  done < "${MANIFEST}"
-
-  log "Patch applied."
-}
-
-rollback_patch() {
-  ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
-  log "ROLLING BACK to patch level ${CURRENT}..."
-  if [ -d "${ROLLBACK_DIR}" ]; then
-    find "${ROLLBACK_DIR}" -type f | while read -r BACKUP; do
-      FILEPATH="${BACKUP#${ROLLBACK_DIR}/}"
-      DST="/${FILEPATH}"
-      mkdir -p "$(dirname ${DST})"
-      cp -a "${BACKUP}" "${DST}"
-    done
-    log "Rollback complete."
-  else
-    log "No rollback data found. Cannot roll back."
-  fi
-}
-
-# ── Restart compositor: full session bounce, not in-place reconfigure ─────
-# labwc actually does support a live reconfigure (SIGHUP, or its own
-# "Reconfigure" action) unlike Wayfire, which never really had a clean
-# equivalent. but I'm still not trusting an in-place reload inside an
-# unattended OTA patcher running on someone else's machine with no one
-# watching — a half-reloaded compositor plus Budgie's shell state getting
-# out of sync is a worse failure mode than just eating the extra second
-# for a full session bounce. slower, but nobody ends up stuck.
-restart_compositor() {
-  log "Restarting session (labwc via sddm)..."
-  systemctl restart sddm 2>/dev/null || \
-  pkill -TERM labwc 2>/dev/null || true
-  sleep 1
-  log "Session restarted."
-}
-
-
-# ── Restart display manager silently if needed ────────────────────────────
-restart_display_manager() {
-  log "Restarting SDDM..."
-  systemctl restart sddm
-  # Wait for Wayland socket to come back
-  for i in $(seq 1 20); do
-    [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
-    sleep 0.5
-  done
-  log "SDDM restarted."
-}
-
-# ── Post-patch hooks ───────────────────────────────────────────────────────
-run_post_hooks() {
-  log "Running post-patch hooks..."
-  # Re-apply GTK icon cache if icons changed
-  grep -q 'usr/share/icons' "${MANIFEST}" && \
-    gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
-  # Recompile GLib schemas if any changed
-  grep -q 'usr/share/glib-2.0/schemas' "${MANIFEST}" && \
-    glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
-  # Update MIME database if mime packages changed
-  grep -q 'usr/share/mime' "${MANIFEST}" && \
-    update-mime-database /usr/share/mime 2>/dev/null || true
-  # Reload systemd units if any changed
-  grep -q 'usr/lib/systemd' "${MANIFEST}" && \
-    systemctl daemon-reload 2>/dev/null || true
-  log "Post-patch hooks complete."
-}
-
-# ══════════════════════════════════════════════════════════════════════════
-# MAIN EXECUTION
-# ══════════════════════════════════════════════════════════════════════════
-
-# Freeze display if we're going to restart anything visible
-if ${NEEDS_DISPLAY_RESTART} || ${NEEDS_COMPOSITOR_RESTART}; then
-  fb_freeze
-fi
-
-# Apply patch with rollback on failure
-if ! apply_patch; then
-  log "Patch application failed. Initiating rollback."
-  rollback_patch
-  fb_unfreeze
-  exit 1
-fi
-
-# Run post-patch hooks
-if ! run_post_hooks; then
-  log "Post-patch hooks failed. Initiating rollback."
-  rollback_patch
-  fb_unfreeze
-  exit 1
-fi
-
-# Restart services as needed
-if ${NEEDS_COMPOSITOR_RESTART}; then
-  restart_compositor
-fi
-if ${NEEDS_DISPLAY_RESTART}; then
-  restart_display_manager
-fi
-
-# Unfreeze display
-if ${NEEDS_DISPLAY_RESTART} || ${NEEDS_COMPOSITOR_RESTART}; then
-  fb_unfreeze
-fi
-
-# Commit new patch level
-echo "${LATEST}" > "${PATCH_LEVEL_FILE}"
-log "Successfully updated to patch level ${LATEST}."
-
-# Cleanup
-rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
-log "Done."
+notify-send -i kibaos-winapps "KibaOS Update" \
+  "An update is ready. Restarting to install it..." 2>/dev/null || true
+sleep 5
+systemctl reboot
 OTASCRIPT
 chmod +x /usr/local/bin/kibaos-ota
 
 # ── systemd service + timer for OTA ───────────────────────────────────────
 cat > /etc/systemd/system/kibaos-ota.service << 'OTASVC'
 [Unit]
-Description=KibaOS OTA Live Patch Engine
+Description=KibaOS OTA update check (stages A/B update if found)
 After=network-online.target
 Wants=network-online.target
 
@@ -9403,7 +10008,7 @@ OTASVC
 
 cat > /etc/systemd/system/kibaos-ota.timer << 'OTATIMER'
 [Unit]
-Description=KibaOS OTA patch check every 30 minutes
+Description=KibaOS OTA version check every 30 minutes
 
 [Timer]
 OnBootSec=5min
@@ -9612,7 +10217,7 @@ find_desktop_id() {
 }
 DOCK_LAUNCHERS=()
 for ids in \
-  "nemo.desktop" \
+  "kibaos-files.desktop nemo.desktop" \
   "org.gnome.Calendar.desktop gnome-calendar.desktop" \
   "org.gnome.Notes.desktop bijiben.desktop gnome-notes.desktop" \
   "org.gnome.eog.desktop eog.desktop" \
@@ -9723,6 +10328,7 @@ RC_XML="${HOME}/.config/labwc/rc.xml"
 RC_XML_BAK="${RC_XML}.winapps-workspace-bak"
 TEMPBIND_MARKER="kibaos-winapps-workspace-tempbind"
 HINT_MARKER="${HOME}/.config/kibaos/.winapps-workspace-hint-shown"
+WIN_URL="http://localhost:8006"
 
 if [ ! -f "${COMPOSE_FILE}" ]; then
   zenity --question --title="Windows Apps Aren't Set Up Yet" \
@@ -9732,6 +10338,27 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
     exec /usr/local/bin/kibaos-winapps-setup --manual-launch
   fi
   exit 1
+fi
+
+# ── Single-instance guard ────────────────────────────────────────────────
+# Clicking the desktop icon a second time while the workspace is already
+# open used to spin up a second chromium --kiosk window and re-run
+# `docker compose up` (harmless, but pointless and slow) instead of just
+# getting the person back to the window they already have. xdotool is
+# already vendored for Kortex's placement rules, so this reuses it rather
+# than adding a new dependency: search for a window whose class matches
+# chromium's --app= kiosk instance, and if one exists, just raise/focus
+# it and exit immediately -- no compose, no pkexec, no wait, no chromium
+# relaunch.
+EXISTING_WIN="$(xdotool search --class "^chromium.*8006$|^Chromium.*8006$" 2>/dev/null | head -n1)"
+if [ -z "${EXISTING_WIN}" ]; then
+  # --app= windows aren't always classed by URL depending on chromium
+  # version -- fall back to matching by window name instead.
+  EXISTING_WIN="$(xdotool search --name "localhost:8006" 2>/dev/null | head -n1)"
+fi
+if [ -n "${EXISTING_WIN}" ]; then
+  xdotool windowactivate "${EXISTING_WIN}" 2>/dev/null
+  exit 0
 fi
 
 reload_labwc() {
@@ -9767,42 +10394,65 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# docker compose up is idempotent -- safe to run even if the container's
-# already up, and covers the case where it's stopped since last boot. Runs
-# in the background so the "starting up" dialog below can show right away
-# instead of the whole launch appearing to hang on the pkexec prompt.
-( cd "${CONF_DIR}" && pkexec docker compose up -d ) >/dev/null 2>&1 &
-COMPOSE_PID=$!
+# ── Skip the auth prompt when it's already running ─────────────────────
+# `pkexec docker compose up -d` used to run unconditionally on every
+# launch -- idempotent, sure, but that still means a polkit password
+# prompt every single time someone reopens the workspace, even when the
+# container's been sitting there running the whole time (e.g. they
+# minimized with Super+K, closed the window some other way, then clicked
+# the icon again a minute later). Checking whether noVNC is already
+# answering first means the extremely common "it's already up" case
+# skips pkexec, docker compose, and the progress dialog entirely and
+# goes straight to reopening chromium.
+ALREADY_UP=0
+if curl -fsS -o /dev/null --max-time 2 "${WIN_URL}" 2>/dev/null; then
+  ALREADY_UP=1
+fi
 
-# The container can take a few seconds (or longer, first boot after a
-# reboot) before noVNC is actually answering on 8006. Opening chromium
-# immediately used to race that -- landing the person on a browser
-# "connection refused" page with no explanation, which looks broken even
-# though nothing's actually wrong. Wait for the port with a visible,
-# cancellable progress dialog instead, so there's always something on
-# screen that makes sense.
-(
-  for i in $(seq 1 60); do
-    nc -z 127.0.0.1 8006 >/dev/null 2>&1 && break
-    sleep 1
-    echo "$((i * 100 / 60))"
-  done
-  echo "100"
-) | zenity --progress --title="Windows" --text="Starting your Windows workspace…" \
-    --pulsate --auto-close --no-cancel --width=360 2>/dev/null
+if [ "${ALREADY_UP}" -eq 0 ]; then
+  # docker compose up is idempotent -- safe to run even if the container's
+  # already up (e.g. the curl check above raced a container that was
+  # still finishing its own startup), and covers the case where it's
+  # stopped since last boot. Runs in the background so the "starting up"
+  # dialog below can show right away instead of the whole launch
+  # appearing to hang on the pkexec prompt.
+  ( cd "${CONF_DIR}" && pkexec docker compose up -d ) >/dev/null 2>&1 &
+  COMPOSE_PID=$!
 
-wait "${COMPOSE_PID}"
-COMPOSE_STATUS=$?
+  # The container can take a few seconds (or longer, first boot after a
+  # reboot) before noVNC is actually answering on 8006. Opening chromium
+  # immediately used to race that -- landing the person on a browser
+  # "connection refused" page with no explanation, which looks broken even
+  # though nothing's actually wrong. Wait for a real HTTP response rather
+  # than just the TCP port accepting a connection -- noVNC's port can
+  # start accepting TCP connections slightly before it's actually serving
+  # the console page, which was still enough to show a half-loaded blank
+  # page for a moment. A visible, cancellable progress dialog stays on
+  # screen the whole time either way, so there's always something on
+  # screen that makes sense.
+  (
+    for i in $(seq 1 60); do
+      curl -fsS -o /dev/null --max-time 1 "${WIN_URL}" 2>/dev/null && break
+      sleep 1
+      echo "$((i * 100 / 60))"
+    done
+    echo "100"
+  ) | zenity --progress --title="Windows" --text="Starting your Windows workspace…" \
+      --pulsate --auto-close --no-cancel --width=360 2>/dev/null
 
-if ! nc -z 127.0.0.1 8006 >/dev/null 2>&1; then
-  if [ "${COMPOSE_STATUS}" -ne 0 ]; then
-    zenity --error --title="Windows" --width=420 \
-      --text="Windows didn't start. Try again in a moment, or open 'Set Up Windows Apps' from the app menu if this keeps happening." 2>/dev/null
-  else
-    zenity --error --title="Windows" --width=420 \
-      --text="Windows is taking longer than usual to come up. Give it a bit and try 'Run Windows Workspace' again -- nothing's broken, it just needs more time." 2>/dev/null
+  wait "${COMPOSE_PID}"
+  COMPOSE_STATUS=$?
+
+  if ! curl -fsS -o /dev/null --max-time 2 "${WIN_URL}" 2>/dev/null; then
+    if [ "${COMPOSE_STATUS}" -ne 0 ]; then
+      zenity --error --title="Windows" --width=420 \
+        --text="Windows didn't start. Try again in a moment, or open 'Set Up Windows Apps' from the app menu if this keeps happening." 2>/dev/null
+    else
+      zenity --error --title="Windows" --width=420 \
+        --text="Windows is taking longer than usual to come up. Give it a bit and try 'Run Windows Workspace' again -- nothing's broken, it just needs more time." 2>/dev/null
+    fi
+    exit 1
   fi
-  exit 1
 fi
 
 add_keybind
@@ -9819,7 +10469,7 @@ if [ "${KEYBIND_ADDED}" -eq 1 ] && [ ! -f "${HINT_MARKER}" ]; then
       --text="Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null
 fi
 
-chromium --kiosk --app="http://localhost:8006" 2>/dev/null
+chromium --kiosk --app="${WIN_URL}" 2>/dev/null
 # cleanup() runs automatically via the EXIT trap above.
 WORKSPACE
 chmod +x /usr/local/bin/kibaos-winapps-workspace
@@ -10331,6 +10981,39 @@ XDG_MUSIC_DIR="$HOME/Music"
 XDG_VIDEOS_DIR="$HOME/Videos"
 USERDIRS
 
+# ── "Files" launcher: opens Nemo straight into the kiba-view overlay ───────
+# Plain `nemo` with no path argument opens raw $HOME, which is exactly the
+# FHS-y view kiba-view exists to keep users away from (see the KIBA VIEW
+# section earlier in this file). Nemo's own .desktop entry can't be edited
+# in place without fighting future package updates, so this ships a
+# separate launcher that's used everywhere a "Files" icon is needed instead
+# (pinned dock slot, app menu) -- Exec= field codes don't expand $HOME, so
+# it's a one-line wrapper script rather than a raw Exec= path.
+cat > /usr/local/bin/kibaos-files << 'FILESWRAP'
+#!/bin/bash
+# kiba-view.service should already have this mounted by the time any
+# graphical app can launch (see Before=graphical-session.target on that
+# unit) -- this check is just a last-resort fallback in case the mount
+# ever fails or is still coming up, so "Files" degrades to raw $HOME
+# instead of opening an empty/missing directory.
+target="$HOME/KibaOS"
+mountpoint -q "$target" 2>/dev/null || target="$HOME"
+exec nemo "$target"
+FILESWRAP
+chmod +x /usr/local/bin/kibaos-files
+
+cat > /usr/share/applications/kibaos-files.desktop << 'FILESDESK'
+[Desktop Entry]
+Type=Application
+Name=Files
+Comment=Browse your documents, downloads, and other files
+Icon=nemo
+Exec=/usr/local/bin/kibaos-files
+Terminal=false
+NoDisplay=false
+Categories=System;FileTools;FileManager;
+FILESDESK
+
 # ── Nemo/GTK sidebar bookmarks: a clean "quick access" list ────────────────
 # Windows' C:\Users\<name> feels tidy because Explorer's nav pane only
 # ever shows Desktop/Documents/Downloads/Pictures/Music/Videos plus the
@@ -10340,6 +11023,16 @@ USERDIRS
 # same short, fixed list into Nemo's sidebar on first login, nothing
 # more — no stray "Other Locations"/raw filesystem browsing sitting front
 # and center.
+#
+# These now point into the kiba-view overlay (~/KibaOS/...) rather than
+# straight at $HOME/... -- that overlay is what "Files" (above) opens
+# into, and is meant to be the only filesystem surface a user browsing
+# graphically ever lands on. Content is identical either way (kiba-view
+# is a passthrough onto these same real directories), this just keeps
+# every door into "my stuff" -- the dock icon, the sidebar, the sidebar's
+# own bookmarks -- consistently leading through the same friendly view
+# instead of half pointing at the overlay and half at raw $HOME. An
+# "Other Files" bookmark is added too, for the overlay's catch-all root.
 #
 # heads up: this can't just be a static /etc/skel file — GTK bookmark
 # files are plain file:// URIs with zero variable expansion, and skel
@@ -10354,12 +11047,13 @@ MARKER="$HOME/.config/.kibaos-first-login-done"
 [ -f "$MARKER" ] && exit 0
 mkdir -p "$HOME/.config/gtk-3.0"
 cat > "$HOME/.config/gtk-3.0/bookmarks" << BOOKMARKS
-file://$HOME/Desktop Desktop
-file://$HOME/Documents Documents
-file://$HOME/Downloads Downloads
-file://$HOME/Pictures Pictures
-file://$HOME/Music Music
-file://$HOME/Videos Videos
+file://$HOME/KibaOS/Desktop Desktop
+file://$HOME/KibaOS/Documents Documents
+file://$HOME/KibaOS/Downloads Downloads
+file://$HOME/KibaOS/Pictures Pictures
+file://$HOME/KibaOS/Music Music
+file://$HOME/KibaOS/Videos Videos
+file://$HOME/KibaOS/Other%20Files Other Files
 BOOKMARKS
 mkdir -p "$HOME/.config"
 touch "$MARKER"
@@ -10960,8 +11654,9 @@ systemctl enable systemd-tmpfiles-clean.timer
 # SECURITY — AppArmor, Firejail, Secure Boot (sbctl)
 # ══════════════════════════════════════════════════════════════════════════
 # AppArmor: the LSM itself is only live if apparmor is in the kernel's
-# lsm= boot param (set above in rEFInd's refind_linux.conf for installed
-# systems; see kiba_install_finish.c's kiba_install_finalize()).
+# lsm= boot param (baked into /etc/kernel/cmdline and bundled into the
+# UKI for installed systems; see kiba_install_finish.c's
+# kiba_install_finalize()).
 # Enabling the service here
 # just makes it load whatever profiles ship in /etc/apparmor.d/ at boot
 # once that param is active -- profile enforcement (aa-enforce/aa-complain
@@ -10993,10 +11688,14 @@ cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
 #!/usr/bin/env bash
 # Run this AFTER installing KibaOS, on the real target machine, with
 # Secure Boot's Setup Mode enabled in firmware settings. It creates and
-# enrolls your own Secure Boot keys, then signs the kernel and rEFInd's
-# own EFI binary (both copies refind-install drops -- the primary loader
-# under EFI/refind/ and the removable fallback path firmware falls back
-# to on some boards).
+# enrolls your own Secure Boot keys, then signs systemd-boot's own EFI
+# binary (both copies bootctl install drops -- the primary loader under
+# EFI/systemd/ and the removable fallback path firmware falls back to on
+# some boards) plus every UKI currently in EFI/Linux/ (one per A/B root
+# slot that's actually been built so far -- a fresh install only has
+# root-a's; root-b's gets signed automatically by sbctl's own pacman hook
+# once kibaos-uki-slot-sync builds it during the first OTA update, same
+# as how sbctl re-signs on any future kernel update).
 set -e
 echo "This will create and enroll new Secure Boot keys on THIS machine"
 echo "and is not easily reversible. Only continue if you understand what"
@@ -11007,9 +11706,11 @@ read -rp "Continue? [y/N] " _confirm
 sudo sbctl status
 sudo sbctl create-keys
 sudo sbctl enroll-keys -m
-sudo sbctl sign -s /boot/vmlinuz-linux
-sudo sbctl sign -s /boot/EFI/refind/refind_x64.efi
+sudo sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi
 sudo sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
+for uki in /boot/EFI/Linux/kibaos-*.efi; do
+  [ -e "${uki}" ] && sudo sbctl sign -s "${uki}"
+done
 sudo sbctl verify
 echo "Done. Reboot and re-enable Secure Boot in firmware settings."
 SBCTLSETUP
@@ -11074,7 +11775,7 @@ if ls out/*.iso 1>/dev/null 2>&1; then
   echo "╔══════════════════════════════════════╗"
   echo "║  KibaOS build complete!       ║"
   echo "║  ${ISO}.iso            ║"
-  echo "╚══Z════════════════════════════════════╝"
+  echo "╚══════════════════════════════════════╝"
 else
   echo "ERROR: ISO file not found after mkarchiso!"
   exit 1
