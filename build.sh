@@ -93,7 +93,7 @@ fi
 # and no passwordless sudo in CI, so that just fails with "a password is
 # required". Preinstalling here and dropping -s sidesteps that entirely.
 pacman -S --noconfirm --needed \
-  base-devel bc pahole rust rust-bindgen graphviz \
+  base-devel bc pahole rust rust-bindgen rust-src graphviz \
   python-sphinx python-yaml texlive-latexextra
 
 chown -R nobody:nobody "${KBUILD_DIR}"   # makepkg refuses to run as root
