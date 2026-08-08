@@ -3848,12 +3848,14 @@ public class KibaOOBE : Adw.Application {
         else window.remove_css_class ("dark");
     }
 
-    // ── VM guard ──────────────────────────────────────────────────────
-    // never got installing onto virtual disks (VDI/VMDK/qcow2) reliable
-    // enough to actually ship — GPT/ESP handling on those virtual disk
-    // formats kept breaking in ways real hardware just never does. so
-    // instead of letting someone click through the whole wizard and eat
-    // a failure right at the end, just refuse up front and tell them why.
+    // ── VM detection ──────────────────────────────────────────────────
+    // No longer used to block installation (VDI/VMDK/qcow2 handling has
+    // been solid enough in practice that the original blanket refusal
+    // wasn't buying anything except friction for people testing/running
+    // KibaOS in a VM) -- still used below for OEM-mode detection, since
+    // a VM's virtual disk can spuriously look like "already on the
+    // computer" the same way a real OEM-preloaded disk does, and we
+    // don't want that misfiring in a test VM.
     private bool is_running_in_vm () {
         string out_str = "", err_str = "";
         int status = 0;
@@ -3928,33 +3930,8 @@ public class KibaOOBE : Adw.Application {
         nav_view = new Adw.NavigationView ();
         window.set_content (nav_view);
         load_css ();
-        nav_view.push (in_vm ? build_vm_blocked_page ()
-                       : is_oem_mode ? build_locale_page () : build_welcome_page ());
+        nav_view.push (is_oem_mode ? build_locale_page () : build_welcome_page ());
         window.present ();
-    }
-
-    // ══════════════════════════════════════════════════════════════════
-    // VM guard page — installation is refused entirely inside a VM.
-    // ══════════════════════════════════════════════════════════════════
-    private Adw.NavigationPage build_vm_blocked_page () {
-        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 20);
-
-        content.append (oobe_heading (
-            t ("Installation isn't available in a virtual machine",
-               "Sanal makinede kurulum kullanılamaz",
-               "Instalacja nie jest dostępna w maszynie wirtualnej"),
-            t ("KibaOS can't be installed onto a virtual disk yet — VDI/VMDK/qcow2 " +
-               "support isn't reliable enough to ship. You're welcome to explore the " +
-               "live desktop, or boot this image on real hardware to install.",
-               "KibaOS henüz sanal bir diske kurulamıyor — VDI/VMDK/qcow2 desteği " +
-               "yayınlanacak kadar güvenilir değil. Canlı masaüstünü keşfedebilir " +
-               "ya da kurulum için bu imajı gerçek bir donanımda başlatabilirsiniz.",
-               "KibaOS nie można jeszcze zainstalować na dysku wirtualnym — obsługa VDI/VMDK/qcow2 nie jest wystarczająco niezawodna, by ją udostępnić. Możesz swobodnie poznać system na żywo albo uruchomić ten obraz na prawdziwym sprzęcie, aby przeprowadzić instalację.")));
-
-        return make_page (t ("Virtual Machine Detected", "Sanal Makine Algılandı", "Wykryto maszynę wirtualną"),
-            content, t ("Explore Live Desktop", "Canlı Masaüstünü Keşfet", "Poznaj system na żywo"), () => {
-                this.quit ();
-            }, true);
     }
 
     private void load_css () {
@@ -4117,9 +4094,6 @@ public class KibaOOBE : Adw.Application {
             case "Account":          rebuild = build_account_page; break;
             case "Confirm":          rebuild = build_confirm_page; break;
             case "Done":             rebuild = build_done_page; break;
-            case "Virtual Machine Detected":
-            case "Sanal Makine Algılandı":
-                                     rebuild = build_vm_blocked_page; break;
             default: return; // Storage / Install Mode / Installing carry
                               // per-instance state that isn't worth
                               // reconstructing from scratch mid-flow.
@@ -7568,13 +7542,21 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         /* KibaOS is UEFI-only, which needs /sys/firmware/efi/efivars to
          * write the NVRAM boot entry. Fail fast with a clear message
-         * instead of letting bootctl die with a cryptic error -- this
-         * also covers VMs, which are not supported. */
+         * instead of letting bootctl die with a cryptic error. This is
+         * a firmware requirement, not a VM restriction -- a VM booted
+         * in UEFI mode passes this check exactly like real hardware
+         * does; it's specifically legacy/BIOS boot mode that trips it,
+         * which happens to be a VM's *default* in a lot of hypervisors
+         * (VirtualBox, QEMU without OVMF, etc.) unless UEFI firmware is
+         * explicitly selected for that VM. */
         if (access("/sys/firmware/efi", F_OK) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err),
-                     "KibaOS requires UEFI boot. This system appears to have "
-                     "booted in BIOS/legacy mode. Virtual machines are not "
-                     "supported -- please install on real UEFI hardware.");
+                     "KibaOS requires UEFI boot, and this system appears to "
+                     "have booted in BIOS/legacy mode. If you're installing "
+                     "in a VM, check that its firmware type is set to UEFI "
+                     "(not BIOS/legacy) in the hypervisor's settings, then "
+                     "boot the installer again -- otherwise, this system's "
+                     "firmware doesn't support UEFI at all.");
             return -1;
         }
 
@@ -7897,17 +7879,10 @@ static void fail(const char *msg) {
     exit(1);
 }
 
-/* Defense-in-depth: the Vala frontend already refuses to offer install at
- * all inside a VM, but this backend can be invoked directly via sudo, so
- * it re-checks. Virtual disk (VDI/VMDK/qcow2) handling was never made
- * reliable enough to ship, so we refuse outright rather than risk leaving
- * a half-written disk behind. */
-static bool running_in_vm(void) {
-    int rc = system("systemd-detect-virt -q");
-    if (rc == -1) return false;   /* couldn't run the check -- don't block */
-    if (!WIFEXITED(rc)) return false;
-    return WEXITSTATUS(rc) == 0;  /* exit 0 = virtualized, 1 = bare metal */
-}
+/* VM detection is no longer used to refuse installation here (see the
+ * matching change in the Vala frontend's is_running_in_vm() comment) --
+ * virtual disk handling has been solid enough in practice that the
+ * original blanket refusal was pure friction, not a real safeguard. */
 
 /* Builds the device path for partition number `n` of `disk` into `buf`.
  * Real rule (confirmed against ArchWiki's device-naming page): if the
@@ -7928,11 +7903,6 @@ static void partition_path(const char *disk, int n, char *buf, size_t buf_len) {
 
 int main(int argc, char **argv) {
     log_init();
-    if (running_in_vm()) {
-        fail("KibaOS installation is not supported inside a virtual machine "
-             "(virtual disk handling isn't reliable enough yet). "
-             "Please install on real hardware.");
-    }
     if (argc != 8) {
         fprintf(stderr,
             "usage: %s <disk> <mode: erase|alongside> <locale> <keymap> <hostname> <username> <password>\n",
