@@ -83,12 +83,12 @@ sed -i "s/^pkgbase=.*/pkgbase=linux-kiba/" PKGBUILD
 # skip olddefconfig/patches entirely and produce a bogus .config (this is
 # exactly what caused a missing-BTF build failure once already).
 if grep -q 'CONFIG_LOCALVERSION ""' PKGBUILD; then
-  sed -i '/CONFIG_LOCALVERSION ""/a\  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
+  sed -i '/CONFIG_LOCALVERSION ""/a\  cd "$srcdir/$_srcname"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
 elif grep -q '^prepare()[[:space:]]*{' PKGBUILD; then
   echo "WARNING: couldn't find the expected CONFIG_LOCALVERSION anchor in" \
        "Arch's linux PKGBUILD -- inserting into the existing prepare()" \
        "instead, but this needs a manual check." >&2
-  sed -i '/^prepare()[[:space:]]*{/a\  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
+  sed -i '/^prepare()[[:space:]]*{/a\  cd "$srcdir/$_srcname"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
 else
   echo "ERROR: no CONFIG_LOCALVERSION anchor AND no prepare() function" \
        "found in Arch's linux PKGBUILD -- refusing to guess, since a" \
