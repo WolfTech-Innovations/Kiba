@@ -4,3 +4,6 @@
 # Force bash scripts to have LF and be treated as shell
 scripts/*.sh text eol=lf
 .github/workflows/*.yml text eol=lf
+
+# Allow Github's linguist to detect Markdown
+*.md linguist-detectable
