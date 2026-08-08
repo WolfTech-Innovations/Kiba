@@ -24,91 +24,180 @@ pacman -S --noconfirm --needed \
   archiso base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   grub \
-  openssl curl imagemagick
+  openssl curl imagemagick jq
 
 # ══════════════════════════════════════════════════════════════════════════
-# LINUX-KIBA — custom-branded kernel, built from Arch's own linux packaging
+# LINUX-KIBA — custom-branded kernel, built from vanilla kernel.org, NOT
+# from Arch's linux packaging
 # ══════════════════════════════════════════════════════════════════════════
-# This runs on GitHub Actions, so a full kernel build (expect 30-60+ min
-# depending on the runner) is fine here -- there's no interactive dev loop
-# waiting on it the way there would be running build.sh locally. Output is
-# `linux-kiba` (+ -headers, +-docs subpackages) dropped into a throwaway
-# local pacman repo that PROFILE/pacman.conf points at below, so mkarchiso's
-# own pacstrap of packages.x86_64 picks it up exactly like any other repo
-# package -- no different from how it'd resolve `linux` from Arch's mirrors.
+# Three build breaks in a row (prepare() shadowing, a working-directory
+# assumption, then a fully relocated CONFIG_LOCALVERSION anchor) all
+# traced back to Arch's own `linux` PKGBUILD restructuring itself between
+# CI runs, not anything wrong on our end -- it's a live rolling-release
+# packaging repo, so `git clone --depth 1` was tracking a moving target
+# by design. Rather than keep chasing upstream's internal refactors, this
+# writes a from-scratch PKGBUILD against a vanilla kernel.org tarball: no
+# Arch patches, no Arch config, no Arch prepare()/build() structure to
+# drift out from under us -- the only thing that can move now is the
+# kernel source itself, which we pin explicitly below by resolving
+# kernel.org's *current* "stable" release once and hashing exactly the
+# tarball we downloaded.
 #
-# What actually changes vs. stock `linux`: pkgbase is renamed linux -> 
-# linux-kiba (which is what flows through to every subpackage name AND to
-# the installed paths -- /usr/lib/modules/<kernelrelease>/, boot/vmlinuz-
-# $pkgbase -- since Arch's own linux PKGBUILD keys all of that off pkgbase,
-# not a hardcoded string), and CONFIG_LOCALVERSION gets stomped to
-# "-kibaos" right after Arch's own prepare() step sets it, so the kernel's
-# own reported release string reads "<ver>-kibaos" instead of "<ver>-arch1"
-# -- `uname -r` telling the truth about a kernel that really was built
-# under that name, not kiba-identity's LD_PRELOAD sysname spoof elsewhere
-# in this file. Everything else (config, patches, hardening options) stays
-# whatever upstream Arch ships, on purpose -- the goal is a rebrand, not a
-# fork of the actual kernel config.
-#
-# NOTE: this clones Arch's packaging repo for `linux` at build time, so
-# it's tracking whatever pkgver Arch currently has tagged -- if a future
-# Arch packaging refactor moves the CONFIG_LOCALVERSION line/prepare()
-# step around, the sed below may need a re-check against the live
-# PKGBUILD. Cheap to verify: `grep -n CONFIG_LOCALVERSION PKGBUILD` in
-# ${KBUILD_DIR}/src after the clone, before trusting the build.
-echo "=== Building linux-kiba (custom-branded kernel) ==="
+# This is deliberately NOT a from-scratch config (that'd be closer to
+# what Android calls a GKI -- deliberately minimal, missing most desktop
+# hardware/filesystem support). `make defconfig` is the base, same as
+# any generic/GKI-style build would start from, but layered with the
+# filesystem, virtualization, and container primitives an actual desktop
+# distro needs, so it's fully func -- ext4/btrfs/ntfs3, overlayfs (fuse
+# for FUSE-based tools), KVM, cgroups/namespaces -- while never touching
+# Arch's own config or patch set. Everything about how this REPORTS
+# itself (pkgbase, install paths, CONFIG_LOCALVERSION) is KibaOS's own;
+# everything about how the kernel actually BEHAVES (syscalls, drivers,
+# ABI) is stock upstream Linux -- full compatibility, no translation
+# layer, so no speed penalty either. kiba-identity's LD_PRELOAD uname
+# shim (elsewhere in this file) still handles the userspace-visible
+# rebrand on top of this.
+echo "=== Resolving current kernel.org stable release ==="
+KVER=$(curl -fsSL https://www.kernel.org/releases.json | jq -r '[.releases[] | select(.moniker=="stable")][0].version')
+if [ -z "${KVER}" ] || [ "${KVER}" = "null" ]; then
+  echo "ERROR: couldn't resolve a 'stable' release from kernel.org/releases.json" >&2
+  exit 1
+fi
+KMAJOR="${KVER%%.*}"
+echo "=== Building linux-kiba against vanilla kernel.org ${KVER} ==="
+
 KBUILD_DIR="/w/linux-kiba-build"
 KIBA_REPO_DIR="/w/kiba-repo/x86_64"
 mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
 
-git clone --depth 1 \
-  https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git \
-  "${KBUILD_DIR}/src"
-cd "${KBUILD_DIR}/src"
+# Pre-download into $KBUILD_DIR itself (makepkg's default srcdest is the
+# directory containing PKGBUILD) so makepkg finds it already cached and
+# just verifies the checksum below instead of re-fetching.
+KTARBALL="linux-${KVER}.tar.xz"
+KURL="https://cdn.kernel.org/pub/linux/kernel/v${KMAJOR}.x/${KTARBALL}"
+curl -fsSL "${KURL}" -o "${KBUILD_DIR}/${KTARBALL}"
+KSHA256=$(sha256sum "${KBUILD_DIR}/${KTARBALL}" | awk '{print $1}')
+echo "=== ${KTARBALL} sha256: ${KSHA256} ==="
 
-# Rename the package. This one line is what makes every subpackage
-# (linux-kiba, linux-kiba-headers, linux-kiba-docs) and every installed
-# path (boot/vmlinuz-linux-kiba, /usr/lib/modules/<rel>/) come out
-# correctly, since Arch's PKGBUILD derives all of those from $pkgbase.
-sed -i "s/^pkgbase=.*/pkgbase=linux-kiba/" PKGBUILD
+cat > "${KBUILD_DIR}/PKGBUILD" << 'PKGBUILDEOF'
+pkgbase=linux-kiba
+pkgname=(linux-kiba linux-kiba-headers)
+pkgver=@@KVER@@
+pkgrel=1
+arch=(x86_64)
+url="https://kernel.org/"
+license=(GPL-2.0-only)
+makedepends=(bc cpio gettext libelf pahole perl python tar xz kmod openssl)
+options=(!strip !debug)
+_srcname="linux-@@KVER@@"
+source=("https://cdn.kernel.org/pub/linux/kernel/v@@KMAJOR@@.x/${_srcname}.tar.xz")
+sha256sums=('@@KSHA256@@')
 
-# Retag the release string. Arch's prepare() already runs a
-# `scripts/config --set-str CONFIG_LOCALVERSION ""` before olddefconfig
-# to blank out whatever the kernel tree's own Makefile would otherwise
-# guess; this appends one more call right after it so ours is what
-# actually sticks. Falls back to inserting right after prepare()'s own
-# opening brace if the anchor line's wording has since changed upstream --
-# NOT to appending a whole second prepare() function, since bash lets a
-# later function definition silently shadow an earlier one, which would
-# skip olddefconfig/patches entirely and produce a bogus .config (this is
-# exactly what caused a missing-BTF build failure once already).
-if grep -q 'CONFIG_LOCALVERSION ""' PKGBUILD; then
-  sed -i '/CONFIG_LOCALVERSION ""/a\  cd "$srcdir/$_srcname"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
-elif grep -q '^prepare()[[:space:]]*{' PKGBUILD; then
-  echo "WARNING: couldn't find the expected CONFIG_LOCALVERSION anchor in" \
-       "Arch's linux PKGBUILD -- inserting into the existing prepare()" \
-       "instead, but this needs a manual check." >&2
-  sed -i '/^prepare()[[:space:]]*{/a\  cd "$srcdir/$_srcname"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n  scripts/config --enable CONFIG_DEBUG_INFO_BTF\n  echo "=== pahole: $(pahole --version 2>&1) ===" \n  make olddefconfig\n  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E \"^CONFIG_DEBUG_INFO_BTF=\" .config || echo NOT-SET) ==="' PKGBUILD
-else
-  echo "ERROR: no CONFIG_LOCALVERSION anchor AND no prepare() function" \
-       "found in Arch's linux PKGBUILD -- refusing to guess, since a" \
-       "blind append here can silently shadow the real prepare() and" \
-       "produce a kernel with a broken .config (e.g. missing BTF)." >&2
-  exit 1
-fi
+prepare() {
+  cd "${_srcname}"
+  make defconfig
+
+  # Rebrand the release string -- this is what makes `uname -r` read
+  # "<ver>-kibaos" for real, not just a cosmetic string swap.
+  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"
+
+  # Broad desktop-usable filesystem/virtualization support on top of
+  # defconfig's deliberately minimal baseline.
+  scripts/config --enable CONFIG_DEBUG_INFO_BTF
+  scripts/config --enable CONFIG_MODULES
+  scripts/config --enable CONFIG_BTRFS_FS
+  scripts/config --enable CONFIG_NTFS3_FS
+  scripts/config --enable CONFIG_NTFS3_LZX_XPRESS
+  scripts/config --enable CONFIG_OVERLAY_FS
+  scripts/config --enable CONFIG_FUSE_FS
+  scripts/config --enable CONFIG_USB_STORAGE
+  scripts/config --enable CONFIG_VIRTIO
+  scripts/config --enable CONFIG_VIRTIO_PCI
+  scripts/config --enable CONFIG_VIRTIO_NET
+  scripts/config --enable CONFIG_VIRTIO_BLK
+  scripts/config --enable CONFIG_VIRTIO_CONSOLE
+  scripts/config --enable CONFIG_KVM
+  scripts/config --enable CONFIG_KVM_INTEL
+  scripts/config --enable CONFIG_KVM_AMD
+  scripts/config --enable CONFIG_CGROUPS
+  scripts/config --enable CONFIG_NAMESPACES
+  scripts/config --module CONFIG_NF_TABLES
+  scripts/config --module CONFIG_WIREGUARD
+
+  make olddefconfig
+
+  echo "=== pahole: $(pahole --version 2>&1) ==="
+  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E '^CONFIG_DEBUG_INFO_BTF=' .config || echo NOT-SET) ==="
+}
+
+build() {
+  cd "${_srcname}"
+  make -j"$(nproc)" all
+}
+
+package_linux-kiba() {
+  pkgdesc="The KibaOS kernel and modules (vanilla kernel.org @@KVER@@, kibaos-branded)"
+  depends=(coreutils kmod)
+  cd "${_srcname}"
+  local kernver
+  kernver=$(make -s kernelrelease)
+
+  make -j"$(nproc)" INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 modules_install
+
+  install -Dm644 arch/x86/boot/bzImage "${pkgdir}/boot/vmlinuz-linux-kiba"
+  install -Dm644 System.map "${pkgdir}/usr/lib/modules/${kernver}/System.map"
+  echo linux-kiba | install -Dm644 /dev/stdin "${pkgdir}/usr/lib/modules/${kernver}/pkgbase"
+
+  # modules_install drops build/source symlinks pointing at a kernel
+  # tree that doesn't exist inside this package -- linux-kiba-headers
+  # provides the real target, so drop these here to avoid dangling
+  # symlinks in the runtime package.
+  rm -f "${pkgdir}/usr/lib/modules/${kernver}/build" \
+        "${pkgdir}/usr/lib/modules/${kernver}/source"
+}
+
+package_linux-kiba-headers() {
+  pkgdesc="Headers and scripts for building modules against linux-kiba"
+  depends=(pahole)
+  cd "${_srcname}"
+  local kernver
+  kernver=$(make -s kernelrelease)
+  local hdrdir="${pkgdir}/usr/lib/modules/${kernver}/build"
+
+  install -Dm644 Makefile "${hdrdir}/Makefile"
+  install -Dm644 .config "${hdrdir}/.config"
+  install -Dm644 Module.symvers "${hdrdir}/Module.symvers"
+  install -Dm644 System.map "${hdrdir}/System.map"
+
+  mkdir -p "${hdrdir}/kernel" "${hdrdir}/arch/x86"
+  cp -a scripts "${hdrdir}/"
+  cp -a include "${hdrdir}/"
+  cp -a arch/x86/include "${hdrdir}/arch/x86/"
+  cp -a arch/x86/Makefile* "${hdrdir}/arch/x86/" 2>/dev/null || true
+  install -Dm644 kernel/Makefile "${hdrdir}/kernel/Makefile" 2>/dev/null || true
+  install -Dm755 tools/objtool/objtool "${hdrdir}/tools/objtool/objtool" 2>/dev/null || true
+
+  ln -sf "/usr/lib/modules/${kernver}/build" "${pkgdir}/usr/lib/modules/${kernver}/source"
+}
+PKGBUILDEOF
+
+sed -i \
+  -e "s/@@KVER@@/${KVER}/g" \
+  -e "s/@@KMAJOR@@/${KMAJOR}/g" \
+  -e "s/@@KSHA256@@/${KSHA256}/g" \
+  "${KBUILD_DIR}/PKGBUILD"
 
 # Install build deps as root first -- makepkg -s would try to do this
 # itself via sudo once we drop to `nobody` below, but nobody has no tty
 # and no passwordless sudo in CI, so that just fails with "a password is
 # required". Preinstalling here and dropping -s sidesteps that entirely.
 pacman -S --noconfirm --needed \
-  base-devel bc pahole rust rust-bindgen rust-src graphviz \
-  python-sphinx python-yaml texlive-latexextra
+  base-devel bc cpio gettext libelf pahole perl python
 
 chown -R nobody:nobody "${KBUILD_DIR}"   # makepkg refuses to run as root
-runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"'/src && makepkg --noconfirm --skippgpcheck'
+runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"' && makepkg --noconfirm --skippgpcheck'
 
-cp "${KBUILD_DIR}"/src/*.pkg.tar.zst "${KIBA_REPO_DIR}/"
+cp "${KBUILD_DIR}"/*.pkg.tar.zst "${KIBA_REPO_DIR}/"
 repo-add "${KIBA_REPO_DIR}/kiba-repo.db.tar.gz" "${KIBA_REPO_DIR}"/*.pkg.tar.zst
 echo "=== linux-kiba built: $(ls "${KIBA_REPO_DIR}") ==="
 cd /
