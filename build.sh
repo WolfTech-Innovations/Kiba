@@ -26,6 +26,76 @@ pacman -S --noconfirm --needed \
   grub \
   openssl curl imagemagick
 
+# ══════════════════════════════════════════════════════════════════════════
+# LINUX-KIBA — custom-branded kernel, built from Arch's own linux packaging
+# ══════════════════════════════════════════════════════════════════════════
+# This runs on GitHub Actions, so a full kernel build (expect 30-60+ min
+# depending on the runner) is fine here -- there's no interactive dev loop
+# waiting on it the way there would be running build.sh locally. Output is
+# `linux-kiba` (+ -headers, +-docs subpackages) dropped into a throwaway
+# local pacman repo that PROFILE/pacman.conf points at below, so mkarchiso's
+# own pacstrap of packages.x86_64 picks it up exactly like any other repo
+# package -- no different from how it'd resolve `linux` from Arch's mirrors.
+#
+# What actually changes vs. stock `linux`: pkgbase is renamed linux -> 
+# linux-kiba (which is what flows through to every subpackage name AND to
+# the installed paths -- /usr/lib/modules/<kernelrelease>/, boot/vmlinuz-
+# $pkgbase -- since Arch's own linux PKGBUILD keys all of that off pkgbase,
+# not a hardcoded string), and CONFIG_LOCALVERSION gets stomped to
+# "-kibaos" right after Arch's own prepare() step sets it, so the kernel's
+# own reported release string reads "<ver>-kibaos" instead of "<ver>-arch1"
+# -- `uname -r` telling the truth about a kernel that really was built
+# under that name, not kiba-identity's LD_PRELOAD sysname spoof elsewhere
+# in this file. Everything else (config, patches, hardening options) stays
+# whatever upstream Arch ships, on purpose -- the goal is a rebrand, not a
+# fork of the actual kernel config.
+#
+# NOTE: this clones Arch's packaging repo for `linux` at build time, so
+# it's tracking whatever pkgver Arch currently has tagged -- if a future
+# Arch packaging refactor moves the CONFIG_LOCALVERSION line/prepare()
+# step around, the sed below may need a re-check against the live
+# PKGBUILD. Cheap to verify: `grep -n CONFIG_LOCALVERSION PKGBUILD` in
+# ${KBUILD_DIR}/src after the clone, before trusting the build.
+echo "=== Building linux-kiba (custom-branded kernel) ==="
+KBUILD_DIR="/w/linux-kiba-build"
+KIBA_REPO_DIR="/w/kiba-repo/x86_64"
+mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
+
+git clone --depth 1 \
+  https://gitlab.archlinux.org/archlinux/packaging/packages/linux.git \
+  "${KBUILD_DIR}/src"
+cd "${KBUILD_DIR}/src"
+
+# Rename the package. This one line is what makes every subpackage
+# (linux-kiba, linux-kiba-headers, linux-kiba-docs) and every installed
+# path (boot/vmlinuz-linux-kiba, /usr/lib/modules/<rel>/) come out
+# correctly, since Arch's PKGBUILD derives all of those from $pkgbase.
+sed -i "s/^pkgbase=.*/pkgbase=linux-kiba/" PKGBUILD
+
+# Retag the release string. Arch's prepare() already runs a
+# `scripts/config --set-str CONFIG_LOCALVERSION ""` before olddefconfig
+# to blank out whatever the kernel tree's own Makefile would otherwise
+# guess; this appends one more call right after it so ours is what
+# actually sticks. Falls back to appending at the end of prepare() if
+# the anchor line's wording has since changed upstream, so the build
+# doesn't just silently keep the stock "-arch1" tag.
+if grep -q 'CONFIG_LOCALVERSION ""' PKGBUILD; then
+  sed -i '/CONFIG_LOCALVERSION ""/a\  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"' PKGBUILD
+else
+  echo "WARNING: couldn't find the expected CONFIG_LOCALVERSION anchor in" \
+       "Arch's linux PKGBUILD -- appending to prepare() as a fallback," \
+       "but this needs a manual check." >&2
+  printf '\nprepare() {\n  cd "$srcdir/${_srcname}"\n  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"\n}\n' >> PKGBUILD
+fi
+
+chown -R nobody:nobody "${KBUILD_DIR}"   # makepkg refuses to run as root
+runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"'/src && makepkg -s --noconfirm --skippgpcheck'
+
+cp "${KBUILD_DIR}"/src/*.pkg.tar.zst "${KIBA_REPO_DIR}/"
+repo-add "${KIBA_REPO_DIR}/kiba-repo.db.tar.gz" "${KIBA_REPO_DIR}"/*.pkg.tar.zst
+echo "=== linux-kiba built: $(ls "${KIBA_REPO_DIR}") ==="
+cd /
+
 # ── Paths ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
 ISO="kibaos-v${RUN_NUM}"
@@ -38,6 +108,20 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+
+# kiba-repo: the throwaway local repo linux-kiba was just built into,
+# above. Name doesn't collide with anything on Arch's actual mirrors --
+# linux-kiba doesn't exist upstream -- so append-at-the-end is fine,
+# no need to fight pacman.conf's include ordering for a priority that
+# doesn't matter here. SigLevel Never because this is a same-build-run
+# local repo, not something fetched over the network: there's nothing
+# in it that wasn't just produced by this exact CI job.
+cat >> "${PROFILE}/pacman.conf" << 'KIBAREPOCONF'
+
+[kiba-repo]
+SigLevel = Never
+Server = file:///w/kiba-repo/x86_64
+KIBAREPOCONF
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -93,7 +177,8 @@ os-prober
 dosfstools
 mtools
 base
-linux
+linux-kiba
+linux-kiba-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -292,12 +377,20 @@ cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
 HOOKS=(base udev kms plymouth autodetect modconf block keyboard keymap filesystems fsck)
 INSTALLED_HOOKS
 
+# Filename here has to stay "linux.preset" -- that's the specific path
+# mkarchiso's own initramfs-build step looks for, regardless of what the
+# actual kernel package is named. linux-kiba's own pacman hook would
+# normally auto-generate a linux-kiba.preset of its own on a real install,
+# but mkarchiso never touches that one; it only ever runs this hand-
+# written file. Its CONTENTS do need to point at linux-kiba's actual
+# installed filenames though, since ALL_kver/archiso_image are real paths,
+# not package-name-agnostic.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux'
+ALL_kver='/boot/vmlinuz-linux-kiba'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux.img'
+archiso_image='/boot/initramfs-linux-kiba.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -326,13 +419,13 @@ terminal_output gfxterm
 search --no-floppy --set=root --label %ARCHISO_LABEL%
 
 menuentry "KibaOS" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
-    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux-kiba archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux-kiba.img
 }
 
 menuentry "KibaOS (safe mode)" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
-    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux-kiba archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux-kiba.img
 }
 
 if [ "${grub_platform}" == "efi" ]; then
@@ -1227,12 +1320,12 @@ def act_fallback_driver(ev: FailureEvent):
 
 
 def act_rollback_config(ev: FailureEvent):
-    # The A/B root/OTA infrastructure this used to call into (see
-    # rollback_config in kortex-helper) has been removed -- this action
-    # now always reports unavailable rather than doing anything. Left in
-    # ACTIONS/the repair table (below) rather than deleted so a
-    # misclassified failure signature that maps here fails informatively
-    # instead of hitting a KeyError.
+    # Calls into kibaos-ota's file-level rollback (see rollback_config in
+    # kortex-helper) -- restores whatever the most recent OTA patch
+    # overwrote, from the backup kibaos-ota kept at patch time. This is
+    # NOT the old A/B root-swap design (that's gone for good, see the
+    # installer's single-root layout); it only undoes the last live
+    # patch, so it's a no-op if no OTA patch has ever landed yet.
     return _run_privileged("rollback_config", {"reason": f"kortex:{ev.signature}"})
 
 
@@ -1476,12 +1569,10 @@ def fallback_driver(params):
 
 
 def rollback_config(params):
-    # kibaos-ota (and the A/B root/OTA update infrastructure it was part
-    # of) has been removed -- there's no longer anything for this to
-    # call. Kept as a named, explicit "not available" rather than
-    # deleting the DISPATCH entry outright, so a caller gets a clear
-    # answer instead of an "unknown action" that looks like a typo.
-    return False, "rollback is unavailable: A/B root/OTA infrastructure was removed"
+    reason = params.get("reason", "kortex:unknown")
+    if not SAFE_REASON.match(reason):
+        reason = "kortex:unspecified"
+    return _run(["kibaos-ota", "rollback", "--reason", reason])
 
 
 DISPATCH = {
@@ -6919,7 +7010,7 @@ int kiba_install_extract_image(const char *image_path, const char *target_root,
                                 kiba_progress_cb cb, void *user_data);
 
 /* mkarchiso's _cleanup_pacstrap_dir() deletes everything under
- * pacstrap_dir/boot (including vmlinuz-linux and initramfs-linux.img)
+ * pacstrap_dir/boot (including vmlinuz-linux-kiba and initramfs-linux-kiba.img)
  * *before* the airootfs image is built, so the kernel is never actually
  * inside the squashfs/erofs image kiba_install_extract_image just
  * extracted -- it only exists on the boot medium, copied there
@@ -7231,10 +7322,10 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     /* work is now ".../<install_dir>" */
 
     char vmlinuz_src[600], initrd_src[600], vmlinuz_dst[600], initrd_dst[600];
-    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-linux", work);
-    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-linux.img", work);
-    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-linux", target_root);
-    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-linux.img", target_root);
+    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-linux-kiba", work);
+    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-linux-kiba.img", work);
+    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-linux-kiba", target_root);
+    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-linux-kiba.img", target_root);
 
     struct stat st;
     if (stat(vmlinuz_src, &st) != 0) {
@@ -7246,9 +7337,9 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     char *argv[] = { (char *)"cp", (char *)"-a", vmlinuz_src, vmlinuz_dst, NULL };
     if (run_argv(argv) != 0) return -1;
 
-    /* initramfs-linux.img gets rebuilt from scratch a few steps later in
-     * kiba_install_finalize (mkinitcpio -g), so this copy isn't load-
-     * bearing the way vmlinuz-linux is -- but it means the target isn't
+    /* initramfs-linux-kiba.img gets rebuilt from scratch a few steps later
+     * in kiba_install_finalize (mkinitcpio -g), so this copy isn't load-
+     * bearing the way vmlinuz-linux-kiba is -- but it means the target isn't
      * momentarily without any initrd at all if that later step fails
      * partway through, so still worth doing and still best-effort. */
     char *argv2[] = { (char *)"cp", (char *)"-a", initrd_src, initrd_dst, NULL };
@@ -7806,7 +7897,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
          * permanently "good" entry with no counter in its name at all.
          * mkinitcpio's own preset (installed.conf) hasn't changed -- it
          * still just builds a plain initramfs; ukify is what wraps that
-         * plus vmlinuz-linux into the actual bootable artifact. */
+         * plus vmlinuz-linux-kiba into the actual bootable artifact. */
         snprintf(path, sizeof(path), "%s/etc/kernel", target_root);
         mkdir(path, 0755);
         snprintf(path, sizeof(path), "%s/etc/kernel/cmdline", target_root);
@@ -7832,8 +7923,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
         char *argv[] = {
             (char *)"ukify", (char *)"build",
-            (char *)"--linux=/boot/vmlinuz-linux",
-            (char *)"--initrd=/boot/initramfs-linux.img",
+            (char *)"--linux=/boot/vmlinuz-linux-kiba",
+            (char *)"--initrd=/boot/initramfs-linux-kiba.img",
             (char *)"--cmdline=@/etc/kernel/cmdline",
             (char *)"--os-release=@/etc/os-release",
             (char *)"--output=/boot/EFI/Linux/kibaos+3.efi",
@@ -7954,7 +8045,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         char *argv[] = {
             (char *)"mkinitcpio", (char *)"-c", (char *)"/etc/mkinitcpio.conf.d/installed.conf",
-            (char *)"-g", (char *)"/boot/initramfs-linux.img", NULL
+            (char *)"-g", (char *)"/boot/initramfs-linux-kiba.img", NULL
         };
         if (chroot_run(target_root, argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "mkinitcpio failed");
@@ -8267,7 +8358,7 @@ int main(int argc, char **argv) {
         fail(kiba_install_strerror());
     }
 
-    /* mkarchiso strips vmlinuz-linux/initramfs-linux.img out of the
+    /* mkarchiso strips vmlinuz-linux-kiba/initramfs-linux-kiba.img out of the
      * airootfs before building the image extracted above -- pull them
      * back in from the boot medium or the install has no kernel. */
     progress(70, "Copying kernel to target system...");
@@ -8588,7 +8679,7 @@ PLYMOUTHD
 # Set the theme now so it's in place before mkarchiso runs its own
 # mkinitcpio pass over linux.preset (archiso_config=archiso.conf, set above
 # with the plymouth/kms hooks already added). We do NOT manually re-run
-# mkinitcpio here: mkarchiso always rebuilds /boot/initramfs-linux.img from
+# mkinitcpio here: mkarchiso always rebuilds /boot/initramfs-linux-kiba.img from
 # linux.preset right after customize_airootfs.sh finishes, so any manual
 # rebuild in here just gets overwritten — and running it against the wrong
 # config (installed.conf, which is for the INSTALLED system, not this live
@@ -9739,20 +9830,451 @@ LABWCENV
 echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# A/B ROOT + OTA UPDATE INFRASTRUCTURE — removed
+# A/B ROOT + SYSUPDATE INFRASTRUCTURE — stays removed; OTA is back, but
+# as a file-level live patcher, not a root-image swap
 # ══════════════════════════════════════════════════════════════════════════
 # Used to live here: a systemd-repart rule carving a second root-b
 # partition out of space the installer reserved for it, systemd-sysupdate
 # config pointing at signed root images, kibaos-uki-slot-sync building a
-# per-slot UKI, kibaos-sysupdate-apply running inside system-update.target
-# to do the actual atomic write, and kibaos-ota checking for/staging
-# updates on a timer. All of it is gone -- the installer now gives root
-# all the space on the disk (see the root_sectors comment in
+# per-slot UKI, and kibaos-sysupdate-apply running inside
+# system-update.target to do the atomic root-b write + slot flip. That
+# whole design is still gone -- the installer gives root all the space
+# on the disk (see the root_sectors comment in
 # kibaos_oobe_backend_main.c's erase-mode branch), there's no root-b to
-# repart into existence, no per-slot UKI naming (just plain
-# kibaos+3.efi now), and nothing runs at boot checking for or applying a
-# slot swap. If OTA updates come back later, they'll need a design that
-# doesn't duplicate the whole root filesystem for it.
+# repart into existence, and no per-slot UKI naming (just plain
+# kibaos+3.efi now).
+#
+# What's back below is the older, simpler kibaos-ota: it doesn't touch
+# partitions or UKIs at all -- it downloads a signed tarball of changed
+# files, verifies it, and replaces them on the live root one at a time,
+# keeping a backup of whatever it overwrote so kortex's rollback_config
+# action (see kortex-helper) can undo the last patch on request. No
+# slot to flip, no second root to keep in sync -- just files going in
+# and a copy of the old ones sitting in /var/lib/kibaos-ota if something
+# needs to come back.
+OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
+OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
+OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
+mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
+
+# ── Import OTA public key into dedicated keyring ───────────────────────────
+curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
+  gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
+      --import /tmp/ota-public.asc 2>/dev/null || true
+rm -f /tmp/ota-public.asc
+
+# ── Patch-level tracking ───────────────────────────────────────────────────
+echo "0" > /etc/kibaos/patch-level
+
+# ══════════════════════════════════════════════════════════════════════════
+# /usr/local/bin/kibaos-ota — the live patching engine
+# ══════════════════════════════════════════════════════════════════════════
+cat > /usr/local/bin/kibaos-ota << 'OTASCRIPT'
+#!/usr/bin/env bash
+# KibaOS OTA Live Patch Engine
+# Silently downloads, verifies, and applies file-level patches.
+# Handles display manager restarts with a framebuffer freeze trick.
+# Runs as root via systemd timer — never visible to the user. Also
+# callable directly as `kibaos-ota rollback --reason "..."` by kortex's
+# kortex-helper (see rollback_config) to undo the most recent patch.
+
+set -euo pipefail
+
+OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
+OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
+PATCH_LEVEL_FILE="/etc/kibaos/patch-level"
+OTA_WORKDIR="/var/lib/kibaos-ota"
+OTA_LOG="/var/log/kibaos/ota.log"
+FREEZE_PID_FILE="/tmp/kibaos-fb-freeze.pid"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
+
+# ══════════════════════════════════════════════════════════════════════════
+# FRAMEBUFFER FREEZE — makes display restarts invisible to the user
+# ══════════════════════════════════════════════════════════════════════════
+fb_freeze() {
+  log "Freezing display with framebuffer snapshot..."
+  # Capture current screen with grim (Wayland screenshot)
+  SNAP="/tmp/kibaos-ota-snap.png"
+  SNAP_RAW="/tmp/kibaos-ota-snap.raw"
+  WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+  XDG_RUNTIME_DIR="/run/user/1000"
+
+  # Take screenshot as liveuser. (This script runs at real boot time on the
+  # installed system, not inside the nosuid build chroot, so sudo would
+  # actually work here — using runuser anyway for consistency, since this
+  # script is also always invoked as root and runuser is the more direct
+  # tool for "run as a different user" with no escalation step needed.)
+  runuser -u liveuser -- env \
+    WAYLAND_DISPLAY="${WAYLAND_DISPLAY}" \
+    XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR}" \
+    grim "${SNAP}" 2>/dev/null || true
+
+  if [ -f "${SNAP}" ]; then
+    # Convert to raw framebuffer format and write to /dev/fb0
+    FB_WIDTH=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f1 || echo 1920)
+    FB_HEIGHT=$(cat /sys/class/graphics/fb0/virtual_size 2>/dev/null | cut -d',' -f2 || echo 1080)
+    magick "${SNAP}" -resize "${FB_WIDTH}x${FB_HEIGHT}!" \
+      -depth 8 bgr:"${SNAP_RAW}" 2>/dev/null || true
+    if [ -f "${SNAP_RAW}" ] && [ -w /dev/fb0 ]; then
+      cat "${SNAP_RAW}" > /dev/fb0 2>/dev/null || true
+    fi
+  fi
+
+  # Emulate mouse movement via uinput to keep cursor alive
+  python3 - << 'UINPUT_WIGGLE'
+import struct, time, os, fcntl
+
+EV_REL, REL_X, REL_Y = 0x02, 0x00, 0x01
+EV_SYN, SYN_REPORT    = 0x00, 0x00
+
+def emit(fd, typ, code, val):
+    fd.write(struct.pack('llHHi', 0, 0, typ, code, val))
+
+try:
+    UI_SET_EVBIT  = 0x40045564
+    UI_SET_RELBIT = 0x40045566
+    UINPUT_DEV_SZ = 1452 + 4 * (64 + 64 + 48 + 48)
+    UI_DEV_CREATE = 0x5501
+    UI_DEV_DESTROY= 0x5502
+
+    fd = open('/dev/uinput', 'wb', buffering=0)
+    fcntl.ioctl(fd, UI_SET_EVBIT,  EV_REL)
+    fcntl.ioctl(fd, UI_SET_RELBIT, REL_X)
+    fcntl.ioctl(fd, UI_SET_RELBIT, REL_Y)
+    dev = struct.pack('80sHHIII', b'kibaos-cursor', 0, 0, 0, 0, 0)
+    dev = dev.ljust(UINPUT_DEV_SZ, b'\x00')
+    fd.write(dev)
+    fcntl.ioctl(fd, UI_DEV_CREATE)
+    # Wiggle cursor gently every 500ms for up to 30s
+    for _ in range(60):
+        emit(fd, EV_REL, REL_X,  1)
+        emit(fd, EV_SYN, SYN_REPORT, 0)
+        time.sleep(0.25)
+        emit(fd, EV_REL, REL_X, -1)
+        emit(fd, EV_SYN, SYN_REPORT, 0)
+        time.sleep(0.25)
+    fcntl.ioctl(fd, UI_DEV_DESTROY)
+    fd.close()
+except Exception:
+    pass
+UINPUT_WIGGLE
+  &
+  echo $! > "${FREEZE_PID_FILE}"
+  log "Framebuffer freeze active (PID $(cat ${FREEZE_PID_FILE}))."
+}
+
+fb_unfreeze() {
+  if [ -f "${FREEZE_PID_FILE}" ]; then
+    kill "$(cat ${FREEZE_PID_FILE})" 2>/dev/null || true
+    rm -f "${FREEZE_PID_FILE}"
+  fi
+  rm -f /tmp/kibaos-ota-snap.png /tmp/kibaos-ota-snap.raw
+  log "Framebuffer freeze released."
+}
+
+# ══════════════════════════════════════════════════════════════════════════
+# APPLY PATCH — atomic file-by-file replacement
+# ══════════════════════════════════════════════════════════════════════════
+apply_patch() {
+  log "Applying patch ${LATEST}..."
+  ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
+  mkdir -p "${ROLLBACK_DIR}"
+
+  while IFS= read -r line; do
+    FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
+    SRC="${EXTRACT_DIR}/${FILEPATH}"
+    DST="/${FILEPATH}"
+
+    [ -f "${SRC}" ] || continue
+
+    # Back up existing file for rollback
+    if [ -f "${DST}" ]; then
+      BACKUP_PATH="${ROLLBACK_DIR}/${FILEPATH}"
+      mkdir -p "$(dirname ${BACKUP_PATH})"
+      cp -a "${DST}" "${BACKUP_PATH}"
+    fi
+
+    # Atomic replace: write to .ota-tmp then move
+    mkdir -p "$(dirname ${DST})"
+    cp -a "${SRC}" "${DST}.ota-tmp"
+    mv "${DST}.ota-tmp" "${DST}"
+    log "  Patched: ${DST}"
+  done < "${MANIFEST}"
+
+  log "Patch applied."
+}
+
+rollback_patch() {
+  ROLLBACK_DIR="${OTA_WORKDIR}/rollback-${CURRENT}"
+  log "ROLLING BACK to patch level ${CURRENT}..."
+  if [ -d "${ROLLBACK_DIR}" ]; then
+    find "${ROLLBACK_DIR}" -type f | while read -r BACKUP; do
+      FILEPATH="${BACKUP#${ROLLBACK_DIR}/}"
+      DST="/${FILEPATH}"
+      mkdir -p "$(dirname ${DST})"
+      cp -a "${BACKUP}" "${DST}"
+    done
+    log "Rollback complete."
+  else
+    log "No rollback data found. Cannot roll back."
+  fi
+}
+
+# ── Restart compositor: full session bounce, not in-place reconfigure ─────
+# labwc has no documented "reconfigure" signal we can rely on across every
+# plugin/config combination, so — same call the Wayfire build used to make
+# for the same reason — this restarts the whole greeter/session rather than
+# gambling on an in-place reload inside an unattended OTA patcher. Slower,
+# but it won't leave the user stuck on a half-reloaded compositor.
+restart_compositor() {
+  log "Restarting session..."
+  systemctl restart sddm 2>/dev/null || \
+  pkill -TERM labwc 2>/dev/null || true
+  sleep 1
+  log "Session restarted."
+}
+
+
+# ── Restart display manager silently if needed ────────────────────────────
+restart_display_manager() {
+  log "Restarting SDDM..."
+  systemctl restart sddm
+  # Wait for Wayland socket to come back
+  for i in $(seq 1 20); do
+    [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
+    sleep 0.5
+  done
+  log "SDDM restarted."
+}
+
+# ── Post-patch hooks ───────────────────────────────────────────────────────
+run_post_hooks() {
+  log "Running post-patch hooks..."
+  # Re-apply GTK icon cache if icons changed
+  grep -q 'usr/share/icons' "${MANIFEST}" && \
+    gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
+  # Recompile GLib schemas if any changed
+  grep -q 'usr/share/glib-2.0/schemas' "${MANIFEST}" && \
+    glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
+  # Update MIME database if mime packages changed
+  grep -q 'usr/share/mime' "${MANIFEST}" && \
+    update-mime-database /usr/share/mime 2>/dev/null || true
+  # Reload systemd units if any changed
+  grep -q 'usr/lib/systemd' "${MANIFEST}" && \
+    systemctl daemon-reload 2>/dev/null || true
+  log "Post-patch hooks complete."
+}
+
+# ══════════════════════════════════════════════════════════════════════════
+# CLI ROLLBACK — `kibaos-ota rollback --reason "..."`
+# ══════════════════════════════════════════════════════════════════════════
+# This is the path kortex's rollback_config action (kortex-helper) shells
+# out to. It's independent of the unattended timer flow below: the timer
+# always invokes this script bare, with no arguments, and never hits this
+# branch. Restores whatever the most recent applied patch overwrote, from
+# the backup apply_patch() kept alongside it — there's nothing to undo if
+# no patch has landed yet, so that's reported rather than silently no-op'd.
+if [ "${1:-}" = "rollback" ]; then
+  shift || true
+  REASON="kortex:unspecified"
+  while [ $# -gt 0 ]; do
+    case "${1:-}" in
+      --reason) REASON="${2:-${REASON}}"; shift 2 || break ;;
+      *) shift ;;
+    esac
+  done
+  CURRENT=$(cat "${PATCH_LEVEL_FILE}" 2>/dev/null || echo 0)
+  log "Manual rollback requested (reason: ${REASON})"
+  if [ -d "${OTA_WORKDIR}/rollback-${CURRENT}" ]; then
+    fb_freeze
+    rollback_patch
+    restart_compositor
+    restart_display_manager
+    fb_unfreeze
+    log "Manual rollback finished."
+    exit 0
+  else
+    log "No rollback data available for patch level ${CURRENT}. Nothing to roll back."
+    exit 1
+  fi
+fi
+
+# ── Check current patch level ──────────────────────────────────────────────
+CURRENT=$(cat "${PATCH_LEVEL_FILE}" 2>/dev/null || echo 0)
+log "Current patch level: ${CURRENT}"
+
+# ── Fetch latest available patch level ────────────────────────────────────
+LATEST=$(curl -fsSL --retry 3 --max-time 10 \
+  "${OTA_BASE}/latest-patch-level" 2>/dev/null | tr -d '[:space:]') || {
+  log "Could not reach OTA server. Skipping."
+  exit 0
+}
+
+if ! [[ "${LATEST}" =~ ^[0-9]+$ ]]; then
+  log "Invalid patch level received: '${LATEST}'. Skipping."
+  exit 0
+fi
+
+if [ "${LATEST}" -le "${CURRENT}" ]; then
+  log "Already up to date (patch level ${CURRENT})."
+  exit 0
+fi
+
+log "New patch available: ${CURRENT} → ${LATEST}"
+
+# ── Download patch bundle + signature ─────────────────────────────────────
+PATCH_TAR="${OTA_WORKDIR}/kibaos-ota-${LATEST}.tar.gz"
+PATCH_SIG="${PATCH_TAR}.asc"
+MANIFEST="${OTA_WORKDIR}/manifest-${LATEST}.txt"
+
+mkdir -p "${OTA_WORKDIR}"
+
+log "Downloading patch ${LATEST}..."
+curl -fsSL --retry 3 --max-time 120 \
+  "${OTA_BASE}/kibaos-ota-${LATEST}.tar.gz" -o "${PATCH_TAR}" || {
+  log "Download failed. Skipping."
+  exit 0
+}
+curl -fsSL --retry 3 --max-time 30 \
+  "${OTA_BASE}/kibaos-ota-${LATEST}.tar.gz.asc" -o "${PATCH_SIG}" || {
+  log "Signature download failed. Aborting for safety."
+  rm -f "${PATCH_TAR}"
+  exit 1
+}
+curl -fsSL --retry 3 --max-time 30 \
+  "${OTA_BASE}/kibaos-ota-${LATEST}-manifest.txt" -o "${MANIFEST}" || {
+  log "Manifest download failed. Aborting."
+  rm -f "${PATCH_TAR}" "${PATCH_SIG}"
+  exit 1
+}
+
+# ── Verify GPG signature ───────────────────────────────────────────────────
+log "Verifying signature..."
+if ! gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
+         --verify "${PATCH_SIG}" "${PATCH_TAR}" 2>/dev/null; then
+  log "SIGNATURE VERIFICATION FAILED. Patch rejected. Possible tampering."
+  rm -f "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
+  exit 1
+fi
+log "Signature verified."
+
+# ── Verify SHA256 checksums from manifest ─────────────────────────────────
+log "Verifying checksums..."
+EXTRACT_DIR="${OTA_WORKDIR}/patch-${LATEST}"
+rm -rf "${EXTRACT_DIR}"
+mkdir -p "${EXTRACT_DIR}"
+tar xzf "${PATCH_TAR}" -C "${EXTRACT_DIR}"
+
+# manifest format: SHA256  ./path/to/file
+while IFS= read -r line; do
+  EXPECTED_HASH=$(echo "${line}" | awk '{print $1}')
+  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
+  ACTUAL_HASH=$(sha256sum "${EXTRACT_DIR}/${FILEPATH}" 2>/dev/null | awk '{print $1}')
+  if [ "${EXPECTED_HASH}" != "${ACTUAL_HASH}" ]; then
+    log "CHECKSUM MISMATCH for ${FILEPATH}. Aborting."
+    rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
+    exit 1
+  fi
+done < "${MANIFEST}"
+log "All checksums verified."
+
+# ── Detect whether patch touches display-critical files ───────────────────
+NEEDS_DISPLAY_RESTART=false
+NEEDS_COMPOSITOR_RESTART=false
+while IFS= read -r line; do
+  FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
+  case "${FILEPATH}" in
+    etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
+      NEEDS_DISPLAY_RESTART=true ;;
+    usr/bin/labwc*)
+      # labwc.ini/rc.xml/autostart all live per-user under ~/.config/labwc,
+      # seeded from /etc/skel at account creation, same story Wayfire's
+      # wayfire.ini used to have. An OTA patch to the skel copy only
+      # affects NEWLY created users from that point on -- it can't
+      # retroactively update already-installed users' own configs. Only
+      # the labwc binary itself triggers a restart here.
+      NEEDS_COMPOSITOR_RESTART=true ;;
+  esac
+done < "${MANIFEST}"
+
+# ══════════════════════════════════════════════════════════════════════════
+# MAIN EXECUTION
+# ══════════════════════════════════════════════════════════════════════════
+
+# Freeze display if we're going to restart anything visible
+if ${NEEDS_DISPLAY_RESTART} || ${NEEDS_COMPOSITOR_RESTART}; then
+  fb_freeze
+fi
+
+# Apply patch with rollback on failure
+if ! apply_patch; then
+  log "Patch application failed. Initiating rollback."
+  rollback_patch
+  fb_unfreeze
+  exit 1
+fi
+
+# Run post-patch hooks
+if ! run_post_hooks; then
+  log "Post-patch hooks failed. Initiating rollback."
+  rollback_patch
+  fb_unfreeze
+  exit 1
+fi
+
+# Restart services as needed
+if ${NEEDS_COMPOSITOR_RESTART}; then
+  restart_compositor
+fi
+if ${NEEDS_DISPLAY_RESTART}; then
+  restart_display_manager
+fi
+
+# Unfreeze display
+if ${NEEDS_DISPLAY_RESTART} || ${NEEDS_COMPOSITOR_RESTART}; then
+  fb_unfreeze
+fi
+
+# Commit new patch level
+echo "${LATEST}" > "${PATCH_LEVEL_FILE}"
+log "Successfully updated to patch level ${LATEST}."
+
+# Cleanup
+rm -rf "${EXTRACT_DIR}" "${PATCH_TAR}" "${PATCH_SIG}" "${MANIFEST}"
+log "Done."
+OTASCRIPT
+chmod +x /usr/local/bin/kibaos-ota
+
+# ── systemd service + timer for OTA ───────────────────────────────────────
+cat > /etc/systemd/system/kibaos-ota.service << 'OTASVC'
+[Unit]
+Description=KibaOS OTA Live Patch Engine
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/kibaos-ota
+StandardOutput=append:/var/log/kibaos/ota.log
+StandardError=append:/var/log/kibaos/ota.log
+OTASVC
+
+cat > /etc/systemd/system/kibaos-ota.timer << 'OTATIMER'
+[Unit]
+Description=KibaOS OTA patch check every 30 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=30min
+RandomizedDelaySec=3min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+OTATIMER
+
+systemctl enable kibaos-ota.timer
 
 # ══════════════════════════════════════════════════════════════════════════
 # FIRST-BOOT GROUP CATCHUP
@@ -10643,7 +11165,7 @@ alias ls='ls --color=auto'
 alias ll='ls -lah --color=auto'
 alias grep='grep --color=auto'
 alias install='io.kibaos.oobe'
-alias update='sudo pacman -Syu'
+alias update='sudo kiba update'
 fastfetch 2>/dev/null || true
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
@@ -11003,6 +11525,89 @@ KIBAPKG
 chmod +x /usr/share/kibapkg/kibapkg.py
 ln -sf /usr/share/kibapkg/kibapkg.py /usr/local/bin/kiba
 ln -sf /usr/share/kibapkg/kibapkg.py /usr/local/bin/kibapkg
+
+# ══════════════════════════════════════════════════════════════════════════
+# PACMAN SHIM — `pacman` becomes a thin dispatcher in front of kiba
+# ══════════════════════════════════════════════════════════════════════════
+# The real pacman binary gets moved aside (NOT removed -- libalpm itself
+# isn't touched, and kibapkg already never called the pacman binary
+# anyway, it's pyalpm straight to libalpm) and /usr/bin/pacman becomes a
+# small dispatcher script instead.
+#
+# What it does NOT do: try to reimplement pacman's CLI. That's a losing
+# game -- makepkg, DKMS's pacman hooks, kortex, and any AUR helper all
+# shell out to pacman with exact flag combinations and, in some cases,
+# parse its stdout for specific fields. Silently rewriting any of that
+# output format would break real tooling for a cosmetic win, which isn't
+# a trade worth making.
+#
+# So the dispatcher only intercepts when BOTH are true:
+#   1. stdout is a real terminal (a human is sitting at it, not a script
+#      capturing output through a pipe or the DKMS/makepkg machinery)
+#   2. the arguments exactly match one of a short list of common,
+#      simple, interactively-typed invocations (pacman -S foo, -Syu,
+#      -Ss term, etc.)
+# Anything else -- any flag combo not on the list, any non-interactive
+# invocation, `-U` for local package files, `-T` dependency checks,
+# `--asdeps`, multiple mixed flags, whatever makepkg/DKMS actually use --
+# execs the real binary with the ORIGINAL argv, completely unmodified.
+# The net effect: someone typing `pacman -S firefox` out of habit gets
+# kiba's plain-language output; every script, hook, and build tool on the
+# system keeps talking to the genuine pacman/libalpm exactly as before,
+# because from their side nothing changed.
+echo "=== Installing pacman shim (real pacman -> /usr/lib/kibaos/pacman-real) ==="
+mkdir -p /usr/lib/kibaos
+if [ -f /usr/bin/pacman ] && [ ! -f /usr/lib/kibaos/pacman-real ]; then
+  mv /usr/bin/pacman /usr/lib/kibaos/pacman-real
+fi
+
+cat > /usr/bin/pacman << 'PACMANSHIM'
+#!/usr/bin/env bash
+# pacman shim -- see the build-script comment above this heredoc for the
+# full design rationale (tty check, exact-match allowlist, fallback).
+# KIBAOS_REAL_PACMAN=1 is the documented escape hatch, same pattern as
+# kiba-identity's KIBAOS_REAL_UNAME: set it to always get the genuine
+# binary regardless of how this is invoked.
+REAL=/usr/lib/kibaos/pacman-real
+
+if [ -n "${KIBAOS_REAL_PACMAN:-}" ] || [ ! -t 1 ]; then
+  exec "${REAL}" "$@"
+fi
+
+# Bail to the real binary the instant anything looks like more than a
+# bare "flag + plain package names/terms" -- any additional flag anywhere
+# (--noconfirm, --asdeps, --needed, whatever) means this came from a
+# script, not someone typing at a prompt, so don't touch it.
+rest=("$@"); rest=("${rest[@]:1}")
+for a in "${rest[@]}"; do
+  case "${a}" in -*) exec "${REAL}" "$@" ;; esac
+done
+
+case "$1" in
+  -S|--sync)
+    [ "${#rest[@]}" -ge 1 ] || exec "${REAL}" "$@"
+    exec kiba install "${rest[@]}" ;;
+  -R|--remove)
+    [ "${#rest[@]}" -ge 1 ] || exec "${REAL}" "$@"
+    exec kiba remove "${rest[@]}" ;;
+  -Syu|-Syyu)
+    [ "${#rest[@]}" -eq 0 ] || exec "${REAL}" "$@"
+    exec kiba update ;;
+  -Ss|--search)
+    [ "${#rest[@]}" -ge 1 ] || exec "${REAL}" "$@"
+    exec kiba search "${rest[@]}" ;;
+  -Qi)
+    [ "${#rest[@]}" -eq 1 ] || exec "${REAL}" "$@"
+    exec kiba info "${rest[0]}" ;;
+  -Q|--query)
+    [ "${#rest[@]}" -eq 0 ] || exec "${REAL}" "$@"
+    exec kiba list ;;
+  *)
+    exec "${REAL}" "$@" ;;
+esac
+PACMANSHIM
+chmod +x /usr/bin/pacman
+echo "=== pacman shim installed ==="
 
 cat > /usr/share/applications/kibaos-install.desktop << 'INSTDESK'
 [Desktop Entry]
