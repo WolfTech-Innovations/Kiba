@@ -1174,7 +1174,7 @@ def _run(cmd, timeout=15):
 # Privilege boundary: kortexd runs as an unprivileged per-user systemd
 # service (see graphical-session.target.wants), but every action below needs
 # root (modprobe, systemctl restart of a *system* unit, udevadm, sysfs
-# writes, kibaos-ota). Rather than granting kortexd itself any privilege, it
+# writes). Rather than granting kortexd itself any privilege, it
 # hands off to /usr/lib/kortex/kortex-helper via pkexec — a separate root
 # process that re-validates every parameter against the same whitelist
 # before touching anything. kortexd never runs privileged commands directly.
@@ -1227,7 +1227,12 @@ def act_fallback_driver(ev: FailureEvent):
 
 
 def act_rollback_config(ev: FailureEvent):
-    # Reuses KibaOS's existing OTA snapshot infra rather than reinventing it.
+    # The A/B root/OTA infrastructure this used to call into (see
+    # rollback_config in kortex-helper) has been removed -- this action
+    # now always reports unavailable rather than doing anything. Left in
+    # ACTIONS/the repair table (below) rather than deleted so a
+    # misclassified failure signature that maps here fails informatively
+    # instead of hitting a KeyError.
     return _run_privileged("rollback_config", {"reason": f"kortex:{ev.signature}"})
 
 
@@ -1369,7 +1374,7 @@ KORTEX_REPAIR_PY
 # KORTEX-HELPER — root-side executor for the repair action table.
 #
 # kortexd (above) runs unprivileged as a per-user systemd service. It never
-# runs modprobe/systemctl/udevadm/sysfs-writes/kibaos-ota itself — it asks
+# runs modprobe/systemctl/udevadm/sysfs-writes itself — it asks
 # this helper to, via pkexec. The helper re-validates every parameter
 # against the same whitelist independently: it does not trust kortexd's
 # extraction of the module/service/USB-port name, because that text
@@ -1471,10 +1476,12 @@ def fallback_driver(params):
 
 
 def rollback_config(params):
-    reason = params.get("reason", "kortex:unknown")
-    if not SAFE_REASON.match(reason):
-        reason = "kortex:unspecified"
-    return _run(["kibaos-ota", "rollback", "--reason", reason])
+    # kibaos-ota (and the A/B root/OTA update infrastructure it was part
+    # of) has been removed -- there's no longer anything for this to
+    # call. Kept as a named, explicit "not available" rather than
+    # deleting the DISPATCH entry outright, so a caller gets a clear
+    # answer instead of an "unknown action" that looks like a typo.
+    return False, "rollback is unavailable: A/B root/OTA infrastructure was removed"
 
 
 DISPATCH = {
@@ -3242,8 +3249,7 @@ echo "=== kortex-authd installed ==="
 # ══════════════════════════════════════════════════════════════════════════
 # KIBA IDENTITY MASK — brand the OS name reported to userspace software
 # ══════════════════════════════════════════════════════════════════════════
-# Honest scope note up front, same spirit as the A/B repart prerequisite
-# note earlier in this script: this rebrand the *sysname* string
+# Honest scope note up front: this rebrand the *sysname* string
 # (Linux -> KibaOS) that libc's uname(2) wrapper hands to any dynamically
 # linked process, since that's the field software actually surfaces to
 # users ("uname -a", Python's platform.system(), Node's os.type(), etc).
@@ -7742,9 +7748,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
          * "why switch bootloaders" reasoning -- short version here: native
          * GPT/BLS boot-counting (tries-left/tries-done, systemd-boot-
          * check-no-failures.service, systemd-bless-boot.service) only
-         * works with systemd-boot, and rEFInd doesn't read any of it. The
-         * UKI + slot-sync logic below replaces kibaos-refind-slot-sync's
-         * hand-rolled marker-file approach with that native mechanism. */
+         * works with systemd-boot, and rEFInd doesn't read any of it. */
         char *argv[] = { (char *)"bootctl", (char *)"install", NULL };
         if (chroot_run(target_root, argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
@@ -7754,17 +7758,15 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     /* loader.conf: systemd-boot's own top-level config, plain text same
      * spirit as the old refind.conf. "default" is a glob matched against
-     * boot entry/UKI filenames -- kibaos-root-a+3.efi et al all match
-     * "kibaos-root-a*.efi" regardless of their current tries-left suffix,
-     * so this doesn't need rewriting every time the counter changes (only
-     * the UKI SWAP at OTA time changes which slot's glob is default --
-     * see kibaos-uki-slot-sync further down). timeout semantics here are
-     * systemd-boot's NORMAL ones (0 = boot default immediately without
-     * showing the menu unless a key is already buffered) -- this is
-     * actually what "switching back to systemd-boot" restores: rEFInd's
-     * "timeout 0 means wait forever" was the inverted, surprising case
-     * that needed its own callout comment; systemd-boot needs no such
-     * caveat here. */
+     * the boot entry/UKI filename -- kibaos+3.efi matches "kibaos*.efi"
+     * regardless of its current tries-left suffix, so this doesn't need
+     * rewriting every time the counter changes. timeout semantics here
+     * are systemd-boot's NORMAL ones (0 = boot default immediately
+     * without showing the menu unless a key is already buffered) -- this
+     * is actually what "switching back to systemd-boot" restores:
+     * rEFInd's "timeout 0 means wait forever" was the inverted,
+     * surprising case that needed its own callout comment; systemd-boot
+     * needs no such caveat here. */
     snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
     if (dualboot) {
         /* Honest limitation carried over from the switch: unlike rEFInd,
@@ -7782,12 +7784,12 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
          * appear automatically the way it did under rEFInd. */
         write_file(path,
                    "timeout 5\n"
-                   "default kibaos-root-a*.efi\n"
+                   "default kibaos*.efi\n"
                    "editor no\n");
     } else {
         write_file(path,
                    "timeout 0\n"
-                   "default kibaos-root-a*.efi\n"
+                   "default kibaos*.efi\n"
                    "editor no\n");
     }
 
@@ -7834,7 +7836,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             (char *)"--initrd=/boot/initramfs-linux.img",
             (char *)"--cmdline=@/etc/kernel/cmdline",
             (char *)"--os-release=@/etc/os-release",
-            (char *)"--output=/boot/EFI/Linux/kibaos-root-a+3.efi",
+            (char *)"--output=/boot/EFI/Linux/kibaos+3.efi",
             NULL
         };
         if (chroot_run(target_root, argv) != 0) {
@@ -7853,9 +7855,9 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             "systemd-timesyncd", "systemd-time-wait-sync",
             /* Automatic Boot Assessment: clears a UKI's tries-left/
              * tries-done counter once boot-complete.target is actually
-             * reached, turning "indeterminate" into "good" so the next
-             * OTA update's fresh counter isn't racing against a stale
-             * failure state. Without this enabled, tries-left would just
+             * reached, turning "indeterminate" into "good" so a later
+             * boot attempt isn't racing against a stale failure state.
+             * Without this enabled, tries-left would just
              * count down to zero on every normal boot and the slot would
              * eventually get marked bad even with nothing wrong. */
             "systemd-bless-boot.service", "systemd-boot-check-no-failures.service",
@@ -8135,33 +8137,14 @@ int main(int argc, char **argv) {
             fail("Disk is too small for KibaOS (need at least ~1.5GB usable after the EFI partition).");
         }
 
-        /* Root gets HALF of what's left after the ESP, not all of it --
-         * the other half is left unallocated on purpose so systemd-repart
-         * (see /etc/repart.d/50-kibaos-root-b.conf, wired up later in this
-         * build script) has somewhere to carve root-b out of for true A/B
-         * updates. root-b's repart.d rule sizes it to match root-a exactly,
-         * so giving root-a half the remaining space guarantees the other
-         * half is always enough for it, regardless of disk size.
-         *
-         * This is a rough byte estimate (ignores the few sectors of GPT
-         * header/entry-array overhead already covered by rough_overhead
-         * above) -- fine here since we're only computing a COUNT for
-         * kiba_gpt_write() to place, not an absolute LBA; sgdisk's normal
-         * alignment grid handles the rest, same as it always does. */
-        uint64_t remaining_sectors = total_sectors - esp_sectors;
-        uint64_t min_ab_slot_sectors = (8ull * 1024 * 1024 * 1024) / ssz; /* 8GiB floor per A/B slot */
-        uint64_t root_sectors;
-        if (remaining_sectors >= 2 * min_ab_slot_sectors) {
-            root_sectors = remaining_sectors / 2;
-        } else {
-            /* Disk too small to reserve a matching root-b slot up front --
-             * fall back to the old single-root-fills-the-disk behavior.
-             * systemd-repart's root-b rule simply stays a no-op until free
-             * space exists (see the PREREQUISITE note above the repart.d
-             * unit later in this script) -- no A/B updates on small disks,
-             * but the install itself isn't blocked over it. */
-            root_sectors = 0;
-        }
+        /* Root now gets everything left after the ESP -- the previous
+         * "give root-a only half, leave the rest free for systemd-repart
+         * to carve out root-b" A/B scheme has been removed entirely (see
+         * the TRUE A/B ROOT section, which used to live further down in
+         * this build script and no longer does). KIBA_GPT_LAST_LBA_REST
+         * just fills the rest of the disk -- exactly the "disk too small
+         * for two slots" fallback this code already had, now the only
+         * path, so there's no root_sectors variable left to compute. */
 
         kiba_gpt_disk_t gdisk = {
             .fd = disk_fd,
@@ -8174,7 +8157,7 @@ int main(int argc, char **argv) {
               .first_lba = KIBA_GPT_FIRST_LBA_DEFAULT, .last_lba = esp_sectors, .attributes = 0 },
             { .name = "KIBAOS-ROOT", .type_guid = KIBA_GUID_LINUX_FS, .unique_guid = {{0}},
               .first_lba = KIBA_GPT_FIRST_LBA_CONTIGUOUS,
-              .last_lba = root_sectors ? root_sectors : KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
+              .last_lba = KIBA_GPT_LAST_LBA_REST, .attributes = 0 },
         };
         uint64_t placed_ends[2] = {0};
         int rc = kiba_gpt_write(&gdisk, parts, 2, placed_ends);
@@ -8591,47 +8574,6 @@ fun display_password_callback(prompt, bullets) {
   prompt_text.sprite.SetY(dots[0].sprite.GetY() + 50);
 }
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
-
-// ── System-update progress screen ─────────────────────────────────────────
-// Fires only when plymouthd is driving system-update.target (an A/B root
-// update applying via kibaos-sysupdate-apply, see OTA section below) rather
-// than a normal boot -- "plymouth system-update --progress=N" is what feeds
-// this. Reuses the exact same logo sprite as normal boot (same asset the
-// taskbar launcher icon and app icons also share -- one mark, everywhere),
-// just swaps the three-dot pulse for a real percentage bar underneath it,
-// since this screen can sit on screen for minutes on a slow connection and
-// a person watching it deserves an actual number, not an ambiguous pulse.
-bar_width = 320;
-bar_height = 6;
-bar_bg.image = Image.Text(" ", 1, 1, 1, 0.15, "Sans 1");
-bar_bg.sprite = Sprite();
-bar_bg.sprite.SetX(Window.GetWidth() / 2 - bar_width / 2);
-bar_bg.sprite.SetY(dots[0].sprite.GetY() + 40);
-bar_bg.sprite.SetOpacity(0);
-
-fun draw_bar(fraction) {
-  if (fraction < 0) fraction = 0;
-  if (fraction > 1) fraction = 1;
-  fill_width = Math.Int(bar_width * fraction);
-  if (fill_width < 2) fill_width = 2;
-  bar_fill.image = Image.Text(" ", 1, 1, 1, 1, "Sans " + bar_height);
-  bar_fill.sprite = Sprite();
-  bar_fill.sprite.SetX(bar_bg.sprite.GetX());
-  bar_fill.sprite.SetY(bar_bg.sprite.GetY());
-  bar_fill.sprite.SetOpacity(1);
-
-  pct_text.image = Image.Text("Updating KibaOS — " + Math.Int(fraction * 100) + "%", 1, 1, 1, 1);
-  pct_text.sprite = Sprite(pct_text.image);
-  pct_text.sprite.SetX(Window.GetWidth() / 2 - pct_text.image.GetWidth() / 2);
-  pct_text.sprite.SetY(bar_bg.sprite.GetY() + 20);
-}
-
-fun system_update_callback(progress) {
-  for (i = 0; i < dot_count; i++)
-    dots[i].sprite.SetOpacity(0);
-  draw_bar(progress);
-}
-Plymouth.SetSystemUpdateFunction(system_update_callback);
 PLYMOUTHSCRIPT
 
 # Plymouth daemon config — must be written before mkinitcpio bakes it in
@@ -9797,371 +9739,20 @@ LABWCENV
 echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# TRUE A/B ROOT — systemd-repart + systemd-sysupdate + system-update.target
+# A/B ROOT + OTA UPDATE INFRASTRUCTURE — removed
 # ══════════════════════════════════════════════════════════════════════════
-# Real atomic partition-image updates, not the file-patch engine this used
-# to be (see kibaos-ota below, which now just triggers this instead of
-# patching a live root). Both systemd-sysupdate and systemd-repart ship
-# inside the systemd package itself -- no extra dependency.
-#
-# Design, deliberately kept simple over "fully idiomatic systemd-sysupdate":
-#   - systemd-sysupdate does the actual atomic write: it downloads the new
-#     root image, verifies it, and writes it whole to whichever of the two
-#     root partitions ISN'T currently mounted. That part is the real thing.
-#   - Boot-slot SELECTION is now systemd-boot's own native mechanism --
-#     UAPI Boot Loader Specification boot-counting (tries-left/tries-done
-#     encoded in each UKI's filename) plus systemd-bless-boot.service
-#     clearing that counter once boot-complete.target is actually reached.
-#     This is the whole reason KibaOS switched back to systemd-boot (see
-#     kibaos_oobe_backend_main.c's bootctl install call, KIBA_INSTALLER
-#     section) -- rEFInd never read any of this, which is why the previous
-#     design here hand-rolled a marker file + manual refind_linux.conf
-#     rewrite instead. kibaos-uki-slot-sync (below) still exists, but its
-#     job shrank considerably: build the new slot's UKI (root=UUID=
-#     differs per slot, everything else doesn't) and hand it to bootctl;
-#     the actual fallback-on-failure behavior is systemd's, not ours.
-#   - /boot (kernel + initramfs) stays on ONE shared partition, not
-#     duplicated per-slot -- only the root filesystem is A/B. Each slot
-#     DOES get its own small UKI file now (root=UUID= is baked into the
-#     UKI's cmdline, so it can't be shared across slots the way the plain
-#     initramfs was), but that's a few dozen MB, not a full kernel/initrd
-#     duplication -- kernel/initramfs updates are still rare next to
-#     userspace churn and still aren't duplicated at the source level.
-#
-# PREREQUISITE STATUS: the whole-disk install path now only gives root-a
-# HALF of the space left after the ESP (see the root_sectors logic in
-# kibaos_oobe_backend_main.c's erase-mode branch), leaving the other half
-# unallocated specifically so the repart.d rule below has somewhere to
-# carve root-b out of. On disks too small to give both slots a sane
-# minimum size, root-a still falls back to consuming all remaining space
-# (old behavior) and this repart.d unit stays a no-op there -- it activates
-# automatically the moment free space exists, no re-flash needed. Fresh
-# installs on adequately-sized disks get a working A/B slot from day one;
-# only small-disk installs still need that fallback path.
-
-mkdir -p /etc/repart.d /etc/sysupdate.d
-
-# ── systemd-repart: carve the second root slot from free space ────────────
-# GPT type UUID below is the well-known "Linux root (x86-64)" type
-# (4f68bce3-e8cd-4db1-96e7-fbcaf984b709) -- same type root-a already uses,
-# which is what lets systemd-sysupdate treat the pair as one A/B set.
-cat > /etc/repart.d/50-kibaos-root-b.conf << 'REPARTCONF'
-[Partition]
-Type=root-x86-64
-Label=root-b
-# Sized to match root-a exactly, not "rest of disk" -- this partition's
-# whole purpose is to be an update target, not extra storage.
-SizeMinBytes=root-a
-SizeMaxBytes=root-a
-# Left unformatted/empty until the first sysupdate run actually writes an
-# image into it -- repart's job here is just to make the slot EXIST.
-REPARTCONF
-
-# ── systemd-sysupdate: where root images come from, how they're verified ──
-# Points at the same OTA_BASE/keyring the old file-patch engine used --
-# only the artifact format changes (whole signed root images instead of
-# per-file tar patches), not the trust chain.
-cat > /etc/sysupdate.d/10-kibaos-root.conf << 'SYSUPDATECONF'
-[Transfer]
-ProtectVersion=%A
-
-[Source]
-Type=url-file
-Path=https://sourceforge.net/projects/kibaos/files/ota/root/
-MatchPattern=kibaos-root_@v.raw.xz
-
-[Target]
-Type=partition
-Path=auto
-MatchPattern=root-a_@v,root-b_@v
-MatchPartitionType=root-x86-64
-SYSUPDATECONF
-
-# ── UKI slot-sync — builds the JUST-WRITTEN slot's UKI (root=UUID= is the
-# only thing that differs between slots; kernel/initramfs are shared and
-# untouched) and drops it at the ESP path systemd-boot auto-discovers.
-# systemd-boot's own boot-counting (see the design note above) handles
-# fallback from here -- this script's only job is "make the new slot
-# bootable with a fresh try counter", not "guarantee it stays booted". ──
-cat > /usr/local/bin/kibaos-uki-slot-sync << 'SLOTSYNC'
-#!/bin/bash
-# Usage: kibaos-uki-slot-sync <root-a|root-b>
-# Builds/refreshes /boot/EFI/Linux/kibaos-<slot>+3.efi from the CURRENT
-# /boot/vmlinuz-linux + /boot/initramfs-linux.img (shared across slots)
-# plus a per-slot cmdline (root=UUID= differs), then makes it the default
-# boot entry. "+3" resets the boot-counting state to fresh/indeterminate
-# every time this runs -- intentional, since a freshly-written slot
-# genuinely hasn't proven itself yet regardless of what its previous
-# counter said. Called by kibaos-sysupdate-apply right after a successful
-# sysupdate run, and safe to re-run any time (idempotent).
-set -euo pipefail
-SLOT="${1:?usage: kibaos-uki-slot-sync <root-a|root-b>}"
-PART_PATH="/dev/disk/by-partlabel/${SLOT}"
-
-if [ ! -e "${PART_PATH}" ]; then
-  echo "kibaos-uki-slot-sync: ${PART_PATH} not found" >&2
-  exit 1
-fi
-
-ROOT_UUID="$(blkid -s UUID -o value "${PART_PATH}")"
-if [ -z "${ROOT_UUID}" ]; then
-  echo "kibaos-uki-slot-sync: couldn't read UUID for ${SLOT}" >&2
-  exit 1
-fi
-
-# Identical cmdline options to kiba_install_finish.c's install-time
-# version -- keep these two in sync if the boot options there ever change.
-mkdir -p /etc/kernel
-cat > /etc/kernel/cmdline << EOF
-root=UUID=${ROOT_UUID} rw quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1 lsm=landlock,lockdown,yama,integrity,apparmor,bpf
-EOF
-
-mkdir -p /boot/EFI/Linux
-UKI_PATH="/boot/EFI/Linux/kibaos-${SLOT}+3.efi"
-ukify build \
-  --linux=/boot/vmlinuz-linux \
-  --initrd=/boot/initramfs-linux.img \
-  --cmdline=@/etc/kernel/cmdline \
-  --os-release=@/etc/os-release \
-  --output="${UKI_PATH}"
-
-# Old UKIs for THIS slot (any leftover tries-left/-done suffix from a
-# previous cycle, e.g. kibaos-root-a+1-2.efi) would otherwise sit next to
-# the fresh one and confuse systemd-boot's glob-based default matching in
-# loader.conf -- clean up anything matching this slot's name that isn't
-# the file we just wrote.
-find /boot/EFI/Linux -maxdepth 1 -name "kibaos-${SLOT}*.efi" ! -name "$(basename "${UKI_PATH}")" -delete
-
-bootctl set-default "$(basename "${UKI_PATH}")"
-echo "${SLOT}" > /etc/kibaos/active-root-slot
-echo "kibaos-uki-slot-sync: now booting ${SLOT} (${ROOT_UUID}) via ${UKI_PATH}"
-SLOTSYNC
-chmod +x /usr/local/bin/kibaos-uki-slot-sync
-
-# ── The actual update-apply service, run inside system-update.target ──────
-# This is the offline-update flow systemd documents (systemd.offline-
-# updates(7)): kibaos-ota (below) stages the download and just creates
-# /system-update -> here, then reboots. systemd-system-update-generator
-# detects that symlink very early on the NEXT boot and redirects the whole
-# boot into system-update.target instead of a normal desktop session --
-# nothing else is running, so the root swap is happening in the safest
-# possible window, and plymouthd is already up showing the splash, which
-# is what gives kibaos-sysupdate-apply somewhere to put the progress bar.
-mkdir -p /var/lib/kibaos-update
-cat > /usr/local/bin/kibaos-sysupdate-apply << 'APPLYSCRIPT'
-#!/bin/bash
-set -uo pipefail
-MARKER="/system-update"
-LOG="/var/log/kibaos/ota.log"
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${LOG}"; }
-
-# Only run if THIS update engine is the one that requested system-update
-# target (systemd.offline-updates(7)'s own recommendation, since multiple
-# update engines could theoretically share the target) -- and remove the
-# symlink immediately, before doing anything else, so a crash partway
-# through can't strand the machine in a system-update.target boot loop.
-[ -L "${MARKER}" ] && [ "$(readlink -f "${MARKER}")" = "/var/lib/kibaos-update" ] || exit 0
-rm -f "${MARKER}"
-
-log "system-update.target: starting A/B root update"
-plymouth system-update --progress=0.0 2>/dev/null || true
-
-CURRENT_SLOT="$(cat /etc/kibaos/active-root-slot 2>/dev/null || echo root-a)"
-[ "${CURRENT_SLOT}" = "root-a" ] && TARGET_SLOT="root-b" || TARGET_SLOT="root-a"
-
-# systemd-sysupdate's own stdout isn't a percentage stream, so this is a
-# coarse three-stage bar (fetch/verify, write, finalize) rather than a true
-# byte-accurate one -- honest progress beats a fake smooth animation, but
-# there's no cheap way to get finer granularity out of sysupdate today.
-plymouth system-update --progress=0.1 2>/dev/null || true
-if ! systemd-sysupdate update >>"${LOG}" 2>&1; then
-  log "systemd-sysupdate update FAILED — leaving current slot (${CURRENT_SLOT}) untouched."
-  plymouth display-message --text="Update failed — starting KibaOS normally" 2>/dev/null || true
-  sleep 3
-  systemctl reboot
-  exit 0
-fi
-plymouth system-update --progress=0.85 2>/dev/null || true
-
-/usr/local/bin/kibaos-uki-slot-sync "${TARGET_SLOT}" >>"${LOG}" 2>&1
-plymouth system-update --progress=1.0 2>/dev/null || true
-
-log "Update applied — now booting ${TARGET_SLOT} on next start (tries-left counter fresh; automatic rollback to ${CURRENT_SLOT} if it doesn't boot clean)."
-sleep 1
-systemctl reboot
-APPLYSCRIPT
-chmod +x /usr/local/bin/kibaos-sysupdate-apply
-
-cat > /etc/systemd/system/kibaos-sysupdate-apply.service << 'APPLYSVC'
-[Unit]
-Description=KibaOS A/B root update (system-update.target)
-DefaultDependencies=no
-Conflicts=shutdown.target
-After=sysinit.target
-Before=shutdown.target
-# Per systemd.offline-updates(7): if this exits uncleanly, reboot back to
-# the normal (still-untouched) slot rather than leaving the machine stuck
-# on the system-update.target boot.
-FailureAction=reboot
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/kibaos-sysupdate-apply
-StandardOutput=append:/var/log/kibaos/ota.log
-StandardError=append:/var/log/kibaos/ota.log
-APPLYSVC
-
-# Hooked in via .wants/ symlink rather than [Install]+systemctl enable, per
-# systemd.offline-updates(7)'s own recommendation for update engines.
-mkdir -p /etc/systemd/system/system-update.target.wants
-ln -sf /etc/systemd/system/kibaos-sysupdate-apply.service \
-  /etc/systemd/system/system-update.target.wants/kibaos-sysupdate-apply.service
-
-echo "=== A/B root update infra: repart.d/sysupdate.d/system-update.target wired up ==="
-
-# ══════════════════════════════════════════════════════════════════════════
-# OTA UPDATE SYSTEM
-# ══════════════════════════════════════════════════════════════════════════
-OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
-OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
-OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-mkdir -p /etc/kibaos /var/lib/kibaos-ota /var/log/kibaos
-
-# ── Import OTA public key into dedicated keyring ───────────────────────────
-curl -fsSL --retry 3 "${OTA_PUBKEY_URL}" -o /tmp/ota-public.asc 2>/dev/null && \
-  gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-      --import /tmp/ota-public.asc 2>/dev/null || true
-rm -f /tmp/ota-public.asc
-
-# ── Version tracking ───────────────────────────────────────────────────────
-# Whole-image version string now, not a file-patch counter -- matches
-# systemd-sysupdate's own @v matching in /etc/sysupdate.d/10-kibaos-root.conf
-# above. "0" is a valid starting version for ProtectVersion comparisons.
-echo "0" > /etc/kibaos/image-version
-[ -f /etc/kibaos/active-root-slot ] || echo "root-a" > /etc/kibaos/active-root-slot
-
-# ══════════════════════════════════════════════════════════════════════════
-# /usr/local/bin/kibaos-ota — checks for and stages A/B root updates
-# ══════════════════════════════════════════════════════════════════════════
-# Used to be the whole patch engine (download/verify/apply file-level
-# diffs, framebuffer-freeze trick to hide display restarts). All of that
-# moved to real infrastructure: systemd-sysupdate does the atomic image
-# write, system-update.target gives it a safe nothing-else-running window,
-# and Plymouth's system-update mode (kibaos.script, see BOOT SPLASH above)
-# shows progress on the same boot logo instead of a hidden framebuffer
-# trick. What's left here is genuinely simple: check whether a newer image
-# exists, verify it's actually signed by KibaOS, and if so hand off to that
-# pipeline by staging /system-update and rebooting. Still runs quietly via
-# the same systemd timer as before.
-cat > /usr/local/bin/kibaos-ota << 'OTASCRIPT'
-#!/usr/bin/env bash
-# KibaOS OTA — checks for a new signed root image and, if found, stages an
-# A/B update and reboots into system-update.target to apply it.
-set -euo pipefail
-
-OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
-OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
-VERSION_FILE="/etc/kibaos/image-version"
-UPDATE_STAGE="/var/lib/kibaos-update"
-OTA_LOG="/var/log/kibaos/ota.log"
-
-log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "${OTA_LOG}"; }
-
-CURRENT=$(cat "${VERSION_FILE}" 2>/dev/null || echo 0)
-log "Current image version: ${CURRENT}"
-
-LATEST=$(curl -fsSL --retry 3 --max-time 10 \
-  "${OTA_BASE}/root/latest-version" 2>/dev/null | tr -d '[:space:]') || {
-  log "Could not reach OTA server. Skipping."
-  exit 0
-}
-
-if ! [[ "${LATEST}" =~ ^[0-9]+$ ]]; then
-  log "Invalid version received: '${LATEST}'. Skipping."
-  exit 0
-fi
-if [ "${LATEST}" -le "${CURRENT}" ]; then
-  log "Already up to date (version ${CURRENT})."
-  exit 0
-fi
-log "New image available: ${CURRENT} -> ${LATEST}"
-
-# Verify the signature on the manifest BEFORE handing anything to
-# systemd-sysupdate -- sysupdate will re-verify the image itself via its
-# own manifest mechanism, but checking here too means a bad/unsigned
-# release never even gets far enough to stage a reboot.
-MANIFEST="/tmp/kibaos-root-${LATEST}.manifest"
-MANIFEST_SIG="${MANIFEST}.asc"
-curl -fsSL --retry 3 --max-time 30 \
-  "${OTA_BASE}/root/kibaos-root_${LATEST}.manifest" -o "${MANIFEST}" || {
-  log "Manifest download failed. Skipping."
-  exit 0
-}
-curl -fsSL --retry 3 --max-time 30 \
-  "${OTA_BASE}/root/kibaos-root_${LATEST}.manifest.asc" -o "${MANIFEST_SIG}" || {
-  log "Manifest signature download failed. Aborting for safety."
-  rm -f "${MANIFEST}"
-  exit 1
-}
-if ! gpg --no-default-keyring --keyring "${OTA_KEYRING}" \
-         --verify "${MANIFEST_SIG}" "${MANIFEST}" 2>/dev/null; then
-  log "SIGNATURE VERIFICATION FAILED on version ${LATEST}. Rejected."
-  rm -f "${MANIFEST}" "${MANIFEST_SIG}"
-  exit 1
-fi
-log "Signature verified for version ${LATEST}."
-rm -f "${MANIFEST}" "${MANIFEST_SIG}"
-
-# Hand off to the real pipeline: stage the offline-update marker (see
-# systemd.offline-updates(7)) pointing at kibaos-sysupdate-apply.service's
-# working directory, then reboot. Everything past this point -- the actual
-# image fetch+write, the progress screen, the reboot back -- is
-# systemd-sysupdate + system-update.target + Plymouth, not this script.
-mkdir -p "${UPDATE_STAGE}"
-echo "${LATEST}" > "${UPDATE_STAGE}/target-version"
-echo "${LATEST}" > "${VERSION_FILE}"   # committed optimistically; apply-side
-                                        # rolls the boot slot back on failure,
-                                        # so a mismatched version file here is
-                                        # cosmetic, not a correctness issue.
-ln -sf "${UPDATE_STAGE}" /system-update
-log "Update to ${LATEST} staged. Rebooting into system-update.target."
-
-notify-send -i kibaos-winapps "KibaOS Update" \
-  "An update is ready. Restarting to install it..." 2>/dev/null || true
-sleep 5
-systemctl reboot
-OTASCRIPT
-chmod +x /usr/local/bin/kibaos-ota
-
-# ── systemd service + timer for OTA ───────────────────────────────────────
-cat > /etc/systemd/system/kibaos-ota.service << 'OTASVC'
-[Unit]
-Description=KibaOS OTA update check (stages A/B update if found)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/kibaos-ota
-StandardOutput=append:/var/log/kibaos/ota.log
-StandardError=append:/var/log/kibaos/ota.log
-OTASVC
-
-cat > /etc/systemd/system/kibaos-ota.timer << 'OTATIMER'
-[Unit]
-Description=KibaOS OTA version check every 30 minutes
-
-[Timer]
-OnBootSec=5min
-OnUnitActiveSec=30min
-RandomizedDelaySec=3min
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-OTATIMER
-
-systemctl enable kibaos-ota.timer
+# Used to live here: a systemd-repart rule carving a second root-b
+# partition out of space the installer reserved for it, systemd-sysupdate
+# config pointing at signed root images, kibaos-uki-slot-sync building a
+# per-slot UKI, kibaos-sysupdate-apply running inside system-update.target
+# to do the actual atomic write, and kibaos-ota checking for/staging
+# updates on a timer. All of it is gone -- the installer now gives root
+# all the space on the disk (see the root_sectors comment in
+# kibaos_oobe_backend_main.c's erase-mode branch), there's no root-b to
+# repart into existence, no per-slot UKI naming (just plain
+# kibaos+3.efi now), and nothing runs at boot checking for or applying a
+# slot swap. If OTA updates come back later, they'll need a design that
+# doesn't duplicate the whole root filesystem for it.
 
 # ══════════════════════════════════════════════════════════════════════════
 # FIRST-BOOT GROUP CATCHUP
@@ -11832,11 +11423,9 @@ cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
 # enrolls your own Secure Boot keys, then signs systemd-boot's own EFI
 # binary (both copies bootctl install drops -- the primary loader under
 # EFI/systemd/ and the removable fallback path firmware falls back to on
-# some boards) plus every UKI currently in EFI/Linux/ (one per A/B root
-# slot that's actually been built so far -- a fresh install only has
-# root-a's; root-b's gets signed automatically by sbctl's own pacman hook
-# once kibaos-uki-slot-sync builds it during the first OTA update, same
-# as how sbctl re-signs on any future kernel update).
+# some boards) plus the UKI in EFI/Linux/ (sbctl's own pacman hook
+# re-signs it automatically on any future kernel update, same as the
+# bootloader binaries above).
 set -e
 echo "This will create and enroll new Secure Boot keys on THIS machine"
 echo "and is not easily reversible. Only continue if you understand what"
@@ -11849,7 +11438,7 @@ sudo sbctl create-keys
 sudo sbctl enroll-keys -m
 sudo sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi
 sudo sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
-for uki in /boot/EFI/Linux/kibaos-*.efi; do
+for uki in /boot/EFI/Linux/kibaos*.efi; do
   [ -e "${uki}" ] && sudo sbctl sign -s "${uki}"
 done
 sudo sbctl verify
