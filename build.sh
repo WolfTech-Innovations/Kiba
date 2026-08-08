@@ -3605,6 +3605,17 @@ PartOf=graphical-session.target
 Type=simple
 ExecStartPre=/usr/bin/mkdir -p %h/KibaOS
 ExecStart=/usr/lib/kibaos/kiba-view-fs -f -o auto_unmount %h/KibaOS
+# Type=simple only means "the process was forked" -- it says nothing
+# about whether the FUSE handshake with the kernel has actually
+# finished, i.e. whether %h/KibaOS is really mountable yet. The labwc
+# wrapper (kibaos-session-userview, see the SESSION-SCOPED HOME VIEW
+# section) needs a real "yes, it's live" signal before it dares
+# bind-mount this over $HOME for the whole session, so poll for the
+# mountpoint to actually come up (bounded, half a second max) and only
+# then touch the ready marker it waits on. Cleaned up on the way down so
+# a crashed/stopped session can never be mistaken for a ready one.
+ExecStartPost=/bin/sh -c 'for i in $(seq 1 50); do mountpoint -q %h/KibaOS && { touch %t/kiba-view-ready; exit 0; }; sleep 0.01; done; exit 1'
+ExecStopPost=/usr/bin/rm -f %t/kiba-view-ready
 ExecStop=/usr/bin/fusermount3 -u %h/KibaOS
 Restart=on-failure
 RestartSec=3
@@ -3617,6 +3628,149 @@ mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
 ln -sf /usr/lib/systemd/user/kiba-view.service \
   /etc/skel/.config/systemd/user/graphical-session.target.wants/kiba-view.service
 echo "=== kiba-view installed ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# SESSION-SCOPED HOME VIEW — the other half of KIBA VIEW
+# ══════════════════════════════════════════════════════════════════════════
+# Everything above gives kiba-view its own separate mountpoint at
+# ~/KibaOS, alongside real $HOME, which apps only see if something
+# (Nemo's sidebar, the Files launcher) specifically points them there.
+# This section goes further: it makes ~/KibaOS what $HOME itself
+# *resolves to* for the graphical session, so every GUI app -- not just
+# the ones explicitly wired to it -- gets the curated view by default,
+# while everything outside the graphical session (SSH logins, systemd
+# services, cron, and -- deliberately carved back out below -- a
+# terminal opened from inside the session) keeps seeing the real thing.
+#
+# The mechanism is a private Linux mount namespace (unshare(CLONE_NEWNS)),
+# NOT a symlink or a bind mount at the filesystem level everyone shares --
+# see https://zameermanji.com/blog/2022/8/5/using-fuse-without-root-on-linux/
+# for the background this leans on: an unprivileged user can create a new
+# user+mount namespace via `unshare --user --mount` and mount/bind-mount
+# freely inside it, and -- critically -- nothing done inside that
+# namespace is visible from outside it, not even by bind-mounting the
+# mountpoint back out. That second property is exactly what "the user
+# sees X, programs still see real $HOME" needs: it's not a permissions
+# trick or a filter, it's two genuinely different views of the
+# filesystem that can't leak into each other by accident.
+#
+# `--map-current-user` (added to util-linux's unshare specifically for
+# this kind of use case) rather than the more commonly-seen
+# `--map-root-user`: it identity-maps the real UID/GID into the new user
+# namespace instead of remapping to 0. That matters here because the
+# Wayland socket, the D-Bus session bus, and XDG_RUNTIME_DIR are all
+# permission-checked by numeric UID -- remapping to root would make
+# every one of those checks see a different "user" than the one that
+# actually owns them and break the session outright. Identity mapping
+# sidesteps that: as far as any ownership check anywhere on the system
+# is concerned, this is still exactly the same user it always was, just
+# with a private view of the mount table.
+#
+# Where the substitution happens: PATH-shadowing /usr/bin/labwc with a
+# wrapper of the same name in /usr/local/bin (which sits earlier in
+# PATH), rather than editing Budgie's own packaged wayland-sessions
+# .desktop file or adding a competing one. That keeps this update-safe
+# -- a `pacman -Syu` to budgie-desktop can't clobber or conflict with a
+# file it doesn't know exists -- and self-contained to one script.
+#
+# Known limitation, stated plainly rather than glossed over: this relies
+# on GUI apps being launched as actual descendants of this process tree
+# (which is how Budgie's panel/dock launch things -- direct fork, not
+# GNOME Shell's systemd-scope-per-app model). An app launched via
+# `systemd-run --user --scope` instead of a direct fork would be
+# reparented under systemd --user itself and would NOT inherit this
+# namespace, since it was never a child of it in the first place. If
+# KibaOS ever moves to that launch model, this needs revisiting -- it
+# would silently stop taking effect for newly-launched apps rather than
+# fail loudly, which is worth knowing going in.
+cat > /usr/local/bin/labwc << 'LABWC_WRAPPER'
+#!/bin/bash
+# PATH-shadowed wrapper for the real labwc (/usr/bin/labwc) -- see the
+# SESSION-SCOPED HOME VIEW comment block in the build script for the
+# full design. Fails open at every step: a broken/missing unshare, an
+# old kernel with unprivileged user namespaces disabled, kiba-view.service
+# never coming up in time -- none of it may ever block login. Worst case
+# is just "no view substitution this session," never "can't log in."
+REAL_LABWC="/usr/bin/labwc"
+REAL_HOME_MARK="${XDG_RUNTIME_DIR:-/tmp}/kibaos-real-home"
+READY_MARK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kiba-view-ready"
+
+can_userns() {
+  command -v unshare >/dev/null 2>&1 && \
+    unshare --user --map-current-user --mount true 2>/dev/null
+}
+
+wait_for_kiba_view() {
+  # kiba-view.service is what actually populates ~/KibaOS -- it's
+  # started as part of reaching graphical-session.target, which is
+  # usually pulled in from labwc's own autostart, i.e. *after* this
+  # wrapper's exec happens. Poll its readiness marker for a few seconds
+  # rather than assume any particular ordering -- if it never shows up
+  # (service failed, disabled, whatever), fail open and skip the
+  # substitution entirely instead of hanging the session waiting for it.
+  for _ in $(seq 1 100); do
+    [ -f "${READY_MARK}" ] && return 0
+    sleep 0.1
+  done
+  return 1
+}
+
+if can_userns && wait_for_kiba_view; then
+  exec unshare --user --map-current-user --mount --propagation private -- \
+    bash -c 'mkdir -p "$0" 2>/dev/null
+             mount --bind "$HOME" "$0" 2>/dev/null &&
+             mount --bind "$HOME/KibaOS" "$HOME" 2>/dev/null
+             exec "$1" "${@:2}"' \
+    "${REAL_HOME_MARK}" "${REAL_LABWC}" "$@"
+fi
+
+exec "${REAL_LABWC}" "$@"
+LABWC_WRAPPER
+chmod +x /usr/local/bin/labwc
+
+# ── The terminal's escape hatch back to the real $HOME ──────────────────
+# Without this, a terminal opened from inside the substituted session
+# would inherit the overlay too -- meaning dev tools, git, the package
+# manager, and anything else run from a shell would be working against
+# ~/KibaOS instead of real $HOME, which is exactly the "programs still
+# see real $HOME" half of this feature. Same PATH-shadow trick, this
+# time against kgx (GNOME Console's actual binary name -- see the
+# "GNOME Console (kgx)" note elsewhere in this file for why it's the
+# one that matters; gnome-terminal is hidden from the app menu entirely
+# and only used internally by the WinApps setup flow, and its D-Bus
+# single-instance-server architecture means a simple exec-time wrapper
+# like this one can't reliably reach it anyway -- not attempting to
+# solve that here).
+#
+# Nested unshare, not just "undo the parent's mount": this needs its own
+# fresh private mount namespace to safely re-bind $HOME without
+# disturbing every other window/app still running in the session's
+# substituted view -- mount namespaces nest cleanly (a child namespace
+# starts as a copy of the parent's table and diverges from there), so
+# this only changes what *this terminal and its own children* see.
+cat > /usr/local/bin/kgx << 'KGX_WRAPPER'
+#!/bin/bash
+REAL_KGX="/usr/bin/kgx"
+REAL_HOME_MARK="${XDG_RUNTIME_DIR:-/tmp}/kibaos-real-home"
+
+if [ -d "${REAL_HOME_MARK}" ] && command -v unshare >/dev/null 2>&1 && \
+   unshare --user --map-current-user --mount true 2>/dev/null
+then
+  exec unshare --user --map-current-user --mount --propagation private -- \
+    bash -c 'mount --bind "$0" "$HOME" 2>/dev/null
+             exec "$1" "${@:2}"' \
+    "${REAL_HOME_MARK}" "${REAL_KGX}" "$@"
+fi
+
+# REAL_HOME_MARK missing means this terminal isn't actually running
+# inside a substituted session (e.g. the labwc wrapper above never got
+# a chance to set it up) -- there's nothing to undo, just run kgx as
+# normal rather than fail or loop.
+exec "${REAL_KGX}" "$@"
+KGX_WRAPPER
+chmod +x /usr/local/bin/kgx
+
+echo "=== session-scoped home view installed ==="
 
 
 pacman-key --init
@@ -3666,7 +3820,6 @@ systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 
 # BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
 WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
-INSTALLER_LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/1419ece4c5c2dbfaa9c0b65f0055b6d70e6b4dbd/branding/installer.png?raw=true"
 # One shared source image now backs both the app-icon set (kibaos.png /
 # hicolor icons) and the Plymouth boot splash -- previously LOGO_URL
 # ("boot.png") and BOOT_SPLASH_URL were two separate fetches of two
@@ -3675,7 +3828,11 @@ INSTALLER_LOGO_URL="https://github.com/WolfTech-Innovations/Kiba/blob/1419ece4c5
 # icon like the old boot.png was, so it can't just be resized straight into
 # square icon sizes without letterboxing and dragging the wordmark along.
 # Icon generation below crops out just the circular badge first; the boot
-# splash uses the full lockup (wordmark included) unmodified.
+# splash uses the full lockup (wordmark included) unmodified. The OOBE
+# installer logo further below now reuses this same processed boot splash
+# image directly too -- previously its own separate installer.png fetch,
+# which meant two brand assets that had to be kept in sync by hand for no
+# real benefit, since they're meant to be the same mark anyway.
 BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.jpg"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
@@ -3733,13 +3890,15 @@ cp "${LOGO_48}"  /usr/share/icons/hicolor/48x48/apps/kibaos.png
 cp "${LOGO_32}"  /usr/share/icons/hicolor/32x32/apps/kibaos.png
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 
-# ── OOBE installer logo, keeping this art separate from the generic distro logo above ──
-curl -fL --retry 5 --retry-delay 3 -o "${INSTALLER_LOGO}.raw" "${INSTALLER_LOGO_URL}" || true
-if [ -f "${INSTALLER_LOGO}.raw" ] && file "${INSTALLER_LOGO}.raw" | grep -qi 'image'; then
-  magick "${INSTALLER_LOGO}.raw" -filter Lanczos -resize 256x256 "${INSTALLER_LOGO}"
-  rm -f "${INSTALLER_LOGO}.raw"
+# ── OOBE installer logo — same image as the boot splash ─────────────────
+# Reuses the already-processed BOOT_SPLASH file directly (full lockup:
+# badge + "KibaOS" wordmark) instead of fetching/maintaining a second,
+# separate installer.png brand asset. Falls back to the generic cropped-
+# badge logo only if the boot splash itself never downloaded (offline
+# build, URL moved, etc.) -- same fallback behavior as before.
+if [ -f "${BOOT_SPLASH}" ]; then
+  cp "${BOOT_SPLASH}" "${INSTALLER_LOGO}"
 else
-  rm -f "${INSTALLER_LOGO}.raw"
   cp "${LOGO_256}" "${INSTALLER_LOGO}"   # fallback: reuse the generic logo
 fi
 
@@ -3841,7 +4000,7 @@ public class KibaOOBE : Adw.Application {
     }
 
     // ── Dark mode ─────────────────────────────────────────────────────
-    private bool is_dark = false;
+    private bool is_dark = true;
 
     private void apply_dark_mode () {
         if (is_dark) window.add_css_class ("dark");
@@ -3922,10 +4081,10 @@ public class KibaOOBE : Adw.Application {
         window.notify["fullscreened"].connect (() => {
             if (!window.fullscreened) window.fullscreen ();
         });
-        // Default to light mode; the toggle on every page still lets the
-        // user switch to dark from there.
-        Adw.StyleManager.get_default ().color_scheme = Adw.ColorScheme.FORCE_LIGHT;
-        is_dark = false;
+        // Default to dark mode; the toggle on every page still lets the
+        // user switch to light from there.
+        Adw.StyleManager.get_default ().color_scheme = Adw.ColorScheme.FORCE_DARK;
+        is_dark = true;
         apply_dark_mode ();
         nav_view = new Adw.NavigationView ();
         window.set_content (nav_view);
@@ -5977,18 +6136,30 @@ int kiba_gpt_write(kiba_gpt_disk_t *disk,
     char disk_guid_str[37];
     if (have_disk_guid) guid_to_str(&disk->disk_guid, disk_guid_str);
 
-    /* Upper bound: sgdisk, -Z, [-U guid], (per part: -n v -t v [-c v] [-u v]), path, NULL */
-    char *argv[6 + n_parts * 8 + 2];
+    /* Upper bound: sgdisk, -Z, -a, 1, [-U guid], (per part: -n v -t v [-c v] [-u v]), path, NULL */
+    char *argv[8 + n_parts * 8 + 2];
     size_t ai = 0;
     argv[ai++] = "sgdisk";
     argv[ai++] = "-Z";                       /* wipe any existing MBR/GPT, start clean */
-    /* No -a override here -- sgdisk uses its normal 2048-sector (1MiB)
-     * alignment grid and will snap any explicit numeric start we pass
-     * via -n up to that grid. That means resolved_first/resolved_last
-     * computed below are the LBAs we *requested*, not necessarily the
-     * LBAs sgdisk actually writes when a start isn't already grid-
-     * aligned -- out_last_lba can therefore disagree with the real
-     * on-disk layout in that case. */
+    /* -a 1: keep our LBAs exact. Without this, sgdisk uses its normal
+     * 2048-sector (1MiB) alignment grid and silently snaps any explicit
+     * numeric start passed via -n up to that grid -- and first_usable
+     * above (LBA 34 for a standard 512-byte-sector 128-entry table) is
+     * NOT itself a multiple of that grid. That meant partition 1's
+     * *real* on-disk start could land ~2014 sectors later than the
+     * first_usable value this function's own resolved_first/resolved_last
+     * math was built on, while every partition after it was still placed
+     * using the unsnapped numbers -- a genuine positional mismatch
+     * between what we told the kernel and what sgdisk actually wrote,
+     * not just a cosmetic rounding difference. That class of drift is
+     * exactly what produces the kernel's in-core partition table
+     * disagreeing with what's really on disk, which is what makes
+     * mke2fs report a device size of zero right after formatting even
+     * though the partition is right there. kiba_gpt_add_partition()
+     * below already does this for exactly the same reason -- this just
+     * brings kiba_gpt_write() in line with it, so out_last_lba is
+     * always the truth, not merely what we asked for. */
+    argv[ai++] = "-a"; argv[ai++] = "1";
     if (have_disk_guid) { argv[ai++] = "-U"; argv[ai++] = disk_guid_str; }
 
     uint64_t prev_end = 0;
