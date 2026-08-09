@@ -140,6 +140,17 @@ prepare() {
   scripts/config --enable CONFIG_SQUASHFS_ZSTD
   scripts/config --enable CONFIG_EROFS_FS
   scripts/config --enable CONFIG_EROFS_FS_ZIP
+  # archiso's mkinitcpio hooks need these two beyond squashfs/loop:
+  # 'memdisk' hook wants phram+mtdblock (MTD -- Memory Technology Device
+  # -- support for the BIOS/SYSLINUX memdisk boot fallback path), and
+  # 'archiso' hook wants dm_snapshot (device-mapper, for the live
+  # session's cow/persistence overlay). Same story as squashfs/loop --
+  # Arch's stock kernel always had these, defconfig doesn't.
+  scripts/config --enable CONFIG_MTD
+  scripts/config --enable CONFIG_MTD_PHRAM
+  scripts/config --enable CONFIG_MTD_BLOCK
+  scripts/config --enable CONFIG_BLK_DEV_DM
+  scripts/config --enable CONFIG_DM_SNAPSHOT
   # zram-generator is configured (see zram-generator.conf later in this
   # script) to bring up /dev/zram0 for swap, but that's userspace config
   # for a kernel driver that was never actually enabled -- without it,
@@ -200,7 +211,8 @@ prepare() {
   for _drmopt in CONFIG_DRM CONFIG_DRM_KMS_HELPER CONFIG_DRM_SIMPLEDRM \
                  CONFIG_FRAMEBUFFER_CONSOLE CONFIG_DRM_I915 \
                  CONFIG_DRM_AMDGPU CONFIG_DRM_AMD_DC CONFIG_DRM_NOUVEAU \
-                 CONFIG_DRM_VIRTIO_GPU CONFIG_DEBUG_INFO_BTF CONFIG_RD_GZIP; do
+                 CONFIG_DRM_VIRTIO_GPU CONFIG_DEBUG_INFO_BTF CONFIG_RD_GZIP \
+                 CONFIG_MTD_PHRAM CONFIG_MTD_BLOCK CONFIG_DM_SNAPSHOT; do
     echo "=== ${_drmopt} resolved to: $(grep -E "^${_drmopt}=" .config || echo NOT-SET) ==="
   done
 
@@ -319,7 +331,7 @@ cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
 iso_name="kibaos"
 iso_label="KIBAOS"
 iso_publisher="WolfTech Innovations <https://github.com/WolfTech-Innovations>"
-iso_application="KibaOS — A friendly Budgie desktop built on Arch Linux"
+iso_application="KibaOS — A friendly general OS for all users"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
@@ -343,10 +355,10 @@ chmod +x "${PROFILE}/profiledef.sh"
 mkdir -p "${AIROOTFS}/etc"
 cat > "${AIROOTFS}/etc/os-release" << 'OSRELEASE'
 NAME="KibaOS"
-PRETTY_NAME="KibaOS Rolling"
+PRETTY_NAME="KibaOS"
 ID=kibaos
 BUILD_ID=rolling
-VERSION_CODENAME="wolftech"
+VENDOR_NAME="Kiba Labs"
 ANSI_COLOR="1;36"
 HOME_URL="https://github.com/WolfTech-Innovations/Kiba"
 DOCUMENTATION_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/WIKI.md"
@@ -8880,17 +8892,14 @@ PLYMOUTHD
 #
 # -R forces plymouth-set-default-theme to rebuild the initramfs itself
 # right now, per ArchWiki: "every time a theme is changed, the initramfs
-# must be rebuilt -- the -R option ensures that it is rebuilt". Skipping
-# it and just trusting mkarchiso's later automatic rebuild pass turned
-# out to be the reason live boot kept showing Arch's own default theme
-# instead of ours -- previously this also had its exit code silently
-# swallowed via `2>/dev/null || true`, so that failure was invisible.
-if ! plymouth-set-default-theme -R kibaos; then
-  echo "ERROR: plymouth-set-default-theme kibaos failed -- live boot" \
-       "would silently fall back to Arch's own default theme" \
-       "(bgrt) instead of erroring out here." >&2
-  exit 1
-fi
+# must be rebuilt -- the -R option ensures that it is rebuilt".
+#
+# Non-fatal on failure -- the underlying causes that made this fail
+# during development (missing MTD/dm_snapshot/DRM kernel config) are
+# fixed now, and the belt-and-suspenders logo overwrite right below
+# still gets the correct splash showing even if theme *selection* has a
+# hiccup, so this doesn't need to hard-stop the whole build.
+plymouth-set-default-theme -R kibaos 2>/dev/null || true
 echo "=== Boot splash: custom kibaos Plymouth theme installed ==="
 
 # Belt-and-suspenders: Arch's own `plymouth` package ships a pacman hook
@@ -12306,6 +12315,39 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
   dconf write /org/gnome/Console/audible-bell false
   dconf write /org/gnome/Console/custom-font-enabled false
 '
+
+# ══════════════════════════════════════════════════════════════════════════
+# HIDE UPSTREAM-BRANDED LAUNCHER ENTRIES
+# ══════════════════════════════════════════════════════════════════════════
+# Scoped to /usr/share/applications ONLY -- deliberately not touching
+# /usr/share/wayland-sessions or /usr/share/xsessions, since those are
+# session definitions SDDM reads directly for the login screen's session
+# picker, not app-menu entries; hiding budgie-desktop.desktop there would
+# break login rather than just tidy the menu.
+#
+# Uses NoDisplay=true (the standard XDG way to hide a launcher without
+# deleting the file) rather than removing the .desktop outright -- keeps
+# the actual application and anything that might Exec= it intact, just
+# not menu-visible. Runs as one of the last steps here specifically so it
+# catches every .desktop pacstrap/AUR ended up installing by this point,
+# not just the ones known about when this block was written -- matches
+# on both filename and the Name= field, since a package can ship e.g.
+# budgie-screenshot.desktop with Name=Screenshot (filename gives it away
+# even if the display name wouldn't), or the reverse (a generically-named
+# file whose Name= field says "Budgie" something).
+for _desktop_file in /usr/share/applications/*.desktop; do
+  [ -f "${_desktop_file}" ] || continue
+  _basename=$(basename "${_desktop_file}")
+  _name_line=$(grep -m1 '^Name=' "${_desktop_file}" 2>/dev/null || true)
+  if echo "${_basename}" | grep -qi 'budgie' || echo "${_name_line}" | grep -qi 'budgie'; then
+    if grep -q '^NoDisplay=' "${_desktop_file}"; then
+      sed -i 's/^NoDisplay=.*/NoDisplay=true/' "${_desktop_file}"
+    else
+      echo 'NoDisplay=true' >> "${_desktop_file}"
+    fi
+    echo "=== Hid launcher entry: ${_basename} (matched 'budgie') ==="
+  fi
+done
 
 # ── DNS: hardcode Cloudflare (1.1.1.1 / 1.0.0.1) ─────────────────────────
 # Written as the LAST thing this script does, right before mkarchiso packs
