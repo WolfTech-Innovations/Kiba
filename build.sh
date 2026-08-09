@@ -380,6 +380,15 @@ base
 kiba-kernel
 kiba-kernel-headers
 linux-firmware
+# linux-firmware split the Intel GuC/HuC blobs (i915/*_guc_*.bin,
+# i915/*_huc_*.bin) out into their own package. kiba-kernel is built
+# straight from a freshly-resolved kernel.org tarball rather than
+# Arch's own `linux`, so the DRM/i915 module is fine, but without this
+# it has no GuC firmware to fetch -- i915 loads, modesets simpledrm's
+# fbdev fine, but GuC init fails and wlroots/labwc can never get a
+# working renderer: compositor reports "loaded" (it genuinely is), but
+# the display stays black since there's no accelerated render node.
+linux-firmware-intel
 mkinitcpio
 mkinitcpio-archiso
 earlyoom
