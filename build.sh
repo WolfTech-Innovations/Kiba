@@ -128,6 +128,18 @@ prepare() {
   scripts/config --enable CONFIG_NTFS3_FS
   scripts/config --enable CONFIG_NTFS3_LZX_XPRESS
   scripts/config --enable CONFIG_OVERLAY_FS
+  # archiso's live boot loop-mounts airootfs.sfs/.erofs (see the
+  # archiso mkinitcpio hook + /run/archiso/bootmnt paths elsewhere in
+  # this script) -- without these, /dev/loop0 either doesn't exist or
+  # has nothing that can actually read what's mounted on it. Arch's
+  # stock kernel always had this built in by default, so it was never
+  # something we had to think about until moving to our own config.
+  scripts/config --enable CONFIG_BLK_DEV_LOOP
+  scripts/config --enable CONFIG_SQUASHFS
+  scripts/config --enable CONFIG_SQUASHFS_XZ
+  scripts/config --enable CONFIG_SQUASHFS_ZSTD
+  scripts/config --enable CONFIG_EROFS_FS
+  scripts/config --enable CONFIG_EROFS_FS_ZIP
   scripts/config --enable CONFIG_FUSE_FS
   scripts/config --enable CONFIG_USB_STORAGE
   scripts/config --enable CONFIG_VIRTIO
