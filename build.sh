@@ -163,6 +163,58 @@ prepare() {
   scripts/config --enable CONFIG_CRYPTO_ZSTD
   scripts/config --enable CONFIG_FUSE_FS
   scripts/config --enable CONFIG_USB_STORAGE
+  # USB tethering (phone-as-modem over USB) -- CONFIG_USB_STORAGE above
+  # covers USB mass-storage, but that's a completely separate driver
+  # class from USB *networking*; nothing here was pulling in the
+  # actual netdev drivers a tethered phone enumerates as. USB core
+  # (CONFIG_USB, xhci_hcd) is already on via defconfig -- that's why
+  # the device itself shows up in dmesg/lsusb -- but with no matching
+  # driver to bind, it just sits there as a USB device with no network
+  # interface ever created for it.
+  scripts/config --module CONFIG_USB_USBNET
+  scripts/config --module CONFIG_USB_NET_CDCETHER
+  scripts/config --module CONFIG_USB_NET_CDC_NCM
+  scripts/config --module CONFIG_USB_NET_RNDIS_HOST
+  # RNDIS's control channel rides on CDC-ACM-style command/response --
+  # USB_NET_RNDIS_HOST depends on this being present too.
+  scripts/config --module CONFIG_USB_NET_CDC_SUBSET
+
+  # WLAN -- same gap as USB tethering: the firmware allowlist further
+  # down this script (find /usr/lib/firmware ... ! -name 'iwlwifi*'
+  # ! -name 'ath*' ! -name 'rtw88' ! -name 'rtw89' etc.) already assumes
+  # these drivers exist and keeps their blobs, but nothing here ever
+  # actually enabled the drivers themselves -- so on real hardware wifi
+  # would be exactly as dead as USB tethering was, just nobody's hit it
+  # yet. cfg80211/mac80211 are the shared stack every wifi driver needs.
+  scripts/config --enable CONFIG_WLAN
+  scripts/config --module CONFIG_CFG80211
+  scripts/config --module CONFIG_MAC80211
+  # Intel (iwlwifi) -- iwlmvm is the modern firmware-driven op-mode
+  # every card since ~2012 needs; without it iwlwifi loads but no card
+  # actually associates.
+  scripts/config --module CONFIG_IWLWIFI
+  scripts/config --module CONFIG_IWLMVM
+  # Atheros/Qualcomm
+  scripts/config --module CONFIG_ATH9K
+  scripts/config --module CONFIG_ATH10K
+  scripts/config --module CONFIG_ATH10K_PCI
+  scripts/config --module CONFIG_ATH11K
+  scripts/config --module CONFIG_ATH11K_PCI
+  # Realtek -- rtlwifi covers the older PCIe/USB chips (8188ee/8192ee/
+  # 8723ae/etc.), rtw88/rtw89 cover the newer ones (8822ce/8852ae/etc.
+  # -- rtw88_8822ce is literally the example already sitting in
+  # KNOWN_FALLBACKS in kortexd further down this file), rtl8xxxu covers
+  # the common USB dongles.
+  scripts/config --module CONFIG_RTLWIFI
+  scripts/config --module CONFIG_RTL8192CE
+  scripts/config --module CONFIG_RTL8188EE
+  scripts/config --module CONFIG_RTL8723AE
+  scripts/config --module CONFIG_RTW88
+  scripts/config --module CONFIG_RTW88_8822CE
+  scripts/config --module CONFIG_RTW88_8821CE
+  scripts/config --module CONFIG_RTW89
+  scripts/config --module CONFIG_RTW89_8852AE
+  scripts/config --module CONFIG_RTL8XXXU
   scripts/config --enable CONFIG_VIRTIO
   scripts/config --enable CONFIG_VIRTIO_PCI
   scripts/config --enable CONFIG_VIRTIO_NET
@@ -226,7 +278,13 @@ prepare() {
                  CONFIG_DRM_AMDGPU CONFIG_DRM_AMD_DC CONFIG_DRM_NOUVEAU \
                  CONFIG_DRM_VIRTIO_GPU CONFIG_DEBUG_INFO_BTF CONFIG_RD_GZIP \
                  CONFIG_MTD_PHRAM CONFIG_MTD_BLOCK CONFIG_DM_SNAPSHOT \
-                 CONFIG_SECURITY CONFIG_SECURITY_LANDLOCK; do
+                 CONFIG_SECURITY CONFIG_SECURITY_LANDLOCK \
+                 CONFIG_USB_USBNET CONFIG_USB_NET_CDCETHER \
+                 CONFIG_USB_NET_CDC_NCM CONFIG_USB_NET_RNDIS_HOST \
+                 CONFIG_WLAN CONFIG_CFG80211 CONFIG_MAC80211 \
+                 CONFIG_IWLWIFI CONFIG_IWLMVM CONFIG_ATH9K CONFIG_ATH10K \
+                 CONFIG_ATH11K CONFIG_RTLWIFI CONFIG_RTW88 CONFIG_RTW89 \
+                 CONFIG_RTL8XXXU; do
     echo "=== ${_drmopt} resolved to: $(grep -E "^${_drmopt}=" .config || echo NOT-SET) ==="
   done
 
@@ -12096,7 +12154,7 @@ cat > /etc/issue << 'ISSUE'
   ██║  ██╗██║██████╔╝██║  ██║╚██████╔╝███████║
   ╚═╝  ╚═╝╚═╝╚═════╝ ╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 
-  KibaOS Rolling — Budgie 10.10 Wayland Edition — WolfTech Innovations
+  KibaOS by Kiba Labs
   Live session: user=liveuser  password=live
   Install: click the desktop icon or run  install
 
