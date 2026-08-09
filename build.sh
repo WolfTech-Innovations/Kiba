@@ -140,6 +140,16 @@ prepare() {
   scripts/config --enable CONFIG_SQUASHFS_ZSTD
   scripts/config --enable CONFIG_EROFS_FS
   scripts/config --enable CONFIG_EROFS_FS_ZIP
+  # zram-generator is configured (see zram-generator.conf later in this
+  # script) to bring up /dev/zram0 for swap, but that's userspace config
+  # for a kernel driver that was never actually enabled -- without it,
+  # systemd-zram-setup@zram0.service waits out a full device timeout
+  # before giving up, adding real boot delay for a feature that silently
+  # never worked.
+  scripts/config --enable CONFIG_ZRAM
+  scripts/config --enable CONFIG_ZSMALLOC
+  scripts/config --enable CONFIG_CRYPTO_LZO
+  scripts/config --enable CONFIG_CRYPTO_ZSTD
   scripts/config --enable CONFIG_FUSE_FS
   scripts/config --enable CONFIG_USB_STORAGE
   scripts/config --enable CONFIG_VIRTIO
