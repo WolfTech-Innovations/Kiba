@@ -64,9 +64,9 @@ if [ -z "${KVER}" ] || [ "${KVER}" = "null" ]; then
   exit 1
 fi
 KMAJOR="${KVER%%.*}"
-echo "=== Building linux-kiba against vanilla kernel.org ${KVER} ==="
+echo "=== Building kiba-kernel against vanilla kernel.org ${KVER} ==="
 
-KBUILD_DIR="/w/linux-kiba-build"
+KBUILD_DIR="/w/kiba-kernel-build"
 KIBA_REPO_DIR="/w/kiba-repo/x86_64"
 mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
 
@@ -80,8 +80,8 @@ KSHA256=$(sha256sum "${KBUILD_DIR}/${KTARBALL}" | awk '{print $1}')
 echo "=== ${KTARBALL} sha256: ${KSHA256} ==="
 
 cat > "${KBUILD_DIR}/PKGBUILD" << 'PKGBUILDEOF'
-pkgbase=linux-kiba
-pkgname=(linux-kiba linux-kiba-headers)
+pkgbase=kiba-kernel
+pkgname=(kiba-kernel kiba-kernel-headers)
 pkgver=@@KVER@@
 pkgrel=1
 arch=(x86_64)
@@ -95,11 +95,30 @@ sha256sums=('@@KSHA256@@')
 
 prepare() {
   cd "${_srcname}"
+
+  # UTS_SYSNAME is the literal string the raw uname(2) syscall hands
+  # back, straight from the kernel, before libc/kiba-identity's shim
+  # ever gets a chance to run -- also what shows up in dmesg's boot
+  # banner ("Linux version ...") and /proc/sys/kernel/ostype. Patching
+  # it here means the rebrand holds even for statically-linked binaries
+  # and anything making raw syscalls, no escape hatch, fully committed.
+  sed -i 's/#define UTS_SYSNAME "Linux"/#define UTS_SYSNAME "KibaOS"/' include/linux/uts.h
+
   make defconfig
 
   # Rebrand the release string -- this is what makes `uname -r` read
   # "<ver>-kibaos" for real, not just a cosmetic string swap.
   scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"
+  # LOCALVERSION_AUTO would append a "-gxxxxxxxx" git-hash suffix if it
+  # ever detects a git tree -- shouldn't trigger from a plain tarball,
+  # but disabling it explicitly guarantees a clean, deterministic
+  # "-kibaos" with no chance of stray noise appended.
+  scripts/config --disable CONFIG_LOCALVERSION_AUTO
+  # Hostname baked into the kernel itself, shown before userspace/DHCP
+  # ever sets a real one -- otherwise defaults to the generic "(none)".
+  scripts/config --set-str CONFIG_DEFAULT_HOSTNAME "kibaos"
+  # Purely cosmetic, folds into the kernel's build-ID.
+  scripts/config --set-str CONFIG_BUILD_SALT "kibaos"
 
   # Broad desktop-usable filesystem/virtualization support on top of
   # defconfig's deliberately minimal baseline.
@@ -124,6 +143,22 @@ prepare() {
   scripts/config --module CONFIG_NF_TABLES
   scripts/config --module CONFIG_WIREGUARD
 
+  # Graphics/KMS -- without these, Plymouth (via mkinitcpio's kms hook)
+  # has no framebuffer to draw to at all, which is exactly what produces
+  # a black screen that hangs forever instead of erroring out: kms waits
+  # for a DRM device to appear, and none ever does. defconfig alone
+  # doesn't reliably include these.
+  scripts/config --enable CONFIG_DRM
+  scripts/config --enable CONFIG_DRM_FBDEV_EMULATION
+  scripts/config --enable CONFIG_FB
+  scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE
+  scripts/config --enable CONFIG_SYSFB_SIMPLEFB
+  scripts/config --enable CONFIG_DRM_SIMPLEDRM
+  scripts/config --module CONFIG_DRM_I915
+  scripts/config --module CONFIG_DRM_AMDGPU
+  scripts/config --module CONFIG_DRM_NOUVEAU
+  scripts/config --module CONFIG_DRM_VIRTIO_GPU
+
   make olddefconfig
 
   echo "=== pahole: $(pahole --version 2>&1) ==="
@@ -132,10 +167,15 @@ prepare() {
 
 build() {
   cd "${_srcname}"
+  # Without these, /proc/version and `uname -v` bake in whoever actually
+  # ran the compile -- on CI that's the runner's real username@hostname,
+  # leaking straight into every install. Override explicitly.
+  export KBUILD_BUILD_USER=kiba
+  export KBUILD_BUILD_HOST=kibaos
   make -j"$(nproc)" all
 }
 
-package_linux-kiba() {
+package_kiba-kernel() {
   pkgdesc="The KibaOS kernel and modules (vanilla kernel.org @@KVER@@, kibaos-branded)"
   depends=(coreutils kmod)
   cd "${_srcname}"
@@ -144,20 +184,20 @@ package_linux-kiba() {
 
   make -j"$(nproc)" INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 modules_install
 
-  install -Dm644 arch/x86/boot/bzImage "${pkgdir}/boot/vmlinuz-linux-kiba"
+  install -Dm644 arch/x86/boot/bzImage "${pkgdir}/boot/vmlinuz-kiba-kernel"
   install -Dm644 System.map "${pkgdir}/usr/lib/modules/${kernver}/System.map"
-  echo linux-kiba | install -Dm644 /dev/stdin "${pkgdir}/usr/lib/modules/${kernver}/pkgbase"
+  echo kiba-kernel | install -Dm644 /dev/stdin "${pkgdir}/usr/lib/modules/${kernver}/pkgbase"
 
   # modules_install drops build/source symlinks pointing at a kernel
-  # tree that doesn't exist inside this package -- linux-kiba-headers
+  # tree that doesn't exist inside this package -- kiba-kernel-headers
   # provides the real target, so drop these here to avoid dangling
   # symlinks in the runtime package.
   rm -f "${pkgdir}/usr/lib/modules/${kernver}/build" \
         "${pkgdir}/usr/lib/modules/${kernver}/source"
 }
 
-package_linux-kiba-headers() {
-  pkgdesc="Headers and scripts for building modules against linux-kiba"
+package_kiba-kernel-headers() {
+  pkgdesc="Headers and scripts for building modules against kiba-kernel"
   depends=(pahole)
   cd "${_srcname}"
   local kernver
@@ -199,7 +239,7 @@ runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"' && makepkg --noconfirm --skip
 
 cp "${KBUILD_DIR}"/*.pkg.tar.zst "${KIBA_REPO_DIR}/"
 repo-add "${KIBA_REPO_DIR}/kiba-repo.db.tar.gz" "${KIBA_REPO_DIR}"/*.pkg.tar.zst
-echo "=== linux-kiba built: $(ls "${KIBA_REPO_DIR}") ==="
+echo "=== kiba-kernel built: $(ls "${KIBA_REPO_DIR}") ==="
 cd /
 
 # ── Paths ─────────────────────────────────────────────────────────────────
@@ -215,9 +255,9 @@ sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
 
-# kiba-repo: the throwaway local repo linux-kiba was just built into,
+# kiba-repo: the throwaway local repo kiba-kernel was just built into,
 # above. Name doesn't collide with anything on Arch's actual mirrors --
-# linux-kiba doesn't exist upstream -- so append-at-the-end is fine,
+# kiba-kernel doesn't exist upstream -- so append-at-the-end is fine,
 # no need to fight pacman.conf's include ordering for a priority that
 # doesn't matter here. SigLevel Never because this is a same-build-run
 # local repo, not something fetched over the network: there's nothing
@@ -283,8 +323,8 @@ os-prober
 dosfstools
 mtools
 base
-linux-kiba
-linux-kiba-headers
+kiba-kernel
+kiba-kernel-headers
 linux-firmware
 mkinitcpio
 mkinitcpio-archiso
@@ -485,18 +525,18 @@ INSTALLED_HOOKS
 
 # Filename here has to stay "linux.preset" -- that's the specific path
 # mkarchiso's own initramfs-build step looks for, regardless of what the
-# actual kernel package is named. linux-kiba's own pacman hook would
-# normally auto-generate a linux-kiba.preset of its own on a real install,
+# actual kernel package is named. kiba-kernel's own pacman hook would
+# normally auto-generate a kiba-kernel.preset of its own on a real install,
 # but mkarchiso never touches that one; it only ever runs this hand-
-# written file. Its CONTENTS do need to point at linux-kiba's actual
+# written file. Its CONTENTS do need to point at kiba-kernel's actual
 # installed filenames though, since ALL_kver/archiso_image are real paths,
 # not package-name-agnostic.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-linux-kiba'
+ALL_kver='/boot/vmlinuz-kiba-kernel'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-linux-kiba.img'
+archiso_image='/boot/initramfs-kiba-kernel.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -525,13 +565,13 @@ terminal_output gfxterm
 search --no-floppy --set=root --label %ARCHISO_LABEL%
 
 menuentry "KibaOS" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux-kiba archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
-    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux-kiba.img
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-kiba-kernel archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-kiba-kernel.img
 }
 
 menuentry "KibaOS (safe mode)" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux-kiba archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
-    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux-kiba.img
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-kiba-kernel archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-kiba-kernel.img
 }
 
 if [ "${grub_platform}" == "efi" ]; then
@@ -7116,7 +7156,7 @@ int kiba_install_extract_image(const char *image_path, const char *target_root,
                                 kiba_progress_cb cb, void *user_data);
 
 /* mkarchiso's _cleanup_pacstrap_dir() deletes everything under
- * pacstrap_dir/boot (including vmlinuz-linux-kiba and initramfs-linux-kiba.img)
+ * pacstrap_dir/boot (including vmlinuz-kiba-kernel and initramfs-kiba-kernel.img)
  * *before* the airootfs image is built, so the kernel is never actually
  * inside the squashfs/erofs image kiba_install_extract_image just
  * extracted -- it only exists on the boot medium, copied there
@@ -7428,10 +7468,10 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     /* work is now ".../<install_dir>" */
 
     char vmlinuz_src[600], initrd_src[600], vmlinuz_dst[600], initrd_dst[600];
-    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-linux-kiba", work);
-    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-linux-kiba.img", work);
-    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-linux-kiba", target_root);
-    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-linux-kiba.img", target_root);
+    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-kiba-kernel", work);
+    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-kiba-kernel.img", work);
+    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-kiba-kernel", target_root);
+    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-kiba-kernel.img", target_root);
 
     struct stat st;
     if (stat(vmlinuz_src, &st) != 0) {
@@ -7443,9 +7483,9 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     char *argv[] = { (char *)"cp", (char *)"-a", vmlinuz_src, vmlinuz_dst, NULL };
     if (run_argv(argv) != 0) return -1;
 
-    /* initramfs-linux-kiba.img gets rebuilt from scratch a few steps later
+    /* initramfs-kiba-kernel.img gets rebuilt from scratch a few steps later
      * in kiba_install_finalize (mkinitcpio -g), so this copy isn't load-
-     * bearing the way vmlinuz-linux-kiba is -- but it means the target isn't
+     * bearing the way vmlinuz-kiba-kernel is -- but it means the target isn't
      * momentarily without any initrd at all if that later step fails
      * partway through, so still worth doing and still best-effort. */
     char *argv2[] = { (char *)"cp", (char *)"-a", initrd_src, initrd_dst, NULL };
@@ -8003,7 +8043,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
          * permanently "good" entry with no counter in its name at all.
          * mkinitcpio's own preset (installed.conf) hasn't changed -- it
          * still just builds a plain initramfs; ukify is what wraps that
-         * plus vmlinuz-linux-kiba into the actual bootable artifact. */
+         * plus vmlinuz-kiba-kernel into the actual bootable artifact. */
         snprintf(path, sizeof(path), "%s/etc/kernel", target_root);
         mkdir(path, 0755);
         snprintf(path, sizeof(path), "%s/etc/kernel/cmdline", target_root);
@@ -8029,8 +8069,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
         char *argv[] = {
             (char *)"ukify", (char *)"build",
-            (char *)"--linux=/boot/vmlinuz-linux-kiba",
-            (char *)"--initrd=/boot/initramfs-linux-kiba.img",
+            (char *)"--linux=/boot/vmlinuz-kiba-kernel",
+            (char *)"--initrd=/boot/initramfs-kiba-kernel.img",
             (char *)"--cmdline=@/etc/kernel/cmdline",
             (char *)"--os-release=@/etc/os-release",
             (char *)"--output=/boot/EFI/Linux/kibaos+3.efi",
@@ -8151,7 +8191,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         char *argv[] = {
             (char *)"mkinitcpio", (char *)"-c", (char *)"/etc/mkinitcpio.conf.d/installed.conf",
-            (char *)"-g", (char *)"/boot/initramfs-linux-kiba.img", NULL
+            (char *)"-g", (char *)"/boot/initramfs-kiba-kernel.img", NULL
         };
         if (chroot_run(target_root, argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "mkinitcpio failed");
@@ -8464,7 +8504,7 @@ int main(int argc, char **argv) {
         fail(kiba_install_strerror());
     }
 
-    /* mkarchiso strips vmlinuz-linux-kiba/initramfs-linux-kiba.img out of the
+    /* mkarchiso strips vmlinuz-kiba-kernel/initramfs-kiba-kernel.img out of the
      * airootfs before building the image extracted above -- pull them
      * back in from the boot medium or the install has no kernel. */
     progress(70, "Copying kernel to target system...");
@@ -8785,7 +8825,7 @@ PLYMOUTHD
 # Set the theme now so it's in place before mkarchiso runs its own
 # mkinitcpio pass over linux.preset (archiso_config=archiso.conf, set above
 # with the plymouth/kms hooks already added). We do NOT manually re-run
-# mkinitcpio here: mkarchiso always rebuilds /boot/initramfs-linux-kiba.img from
+# mkinitcpio here: mkarchiso always rebuilds /boot/initramfs-kiba-kernel.img from
 # linux.preset right after customize_airootfs.sh finishes, so any manual
 # rebuild in here just gets overwritten — and running it against the wrong
 # config (installed.conf, which is for the INSTALLED system, not this live
