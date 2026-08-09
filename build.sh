@@ -171,20 +171,40 @@ prepare() {
   # for a DRM device to appear, and none ever does. defconfig alone
   # doesn't reliably include these.
   scripts/config --enable CONFIG_DRM
+  scripts/config --enable CONFIG_DRM_KMS_HELPER
   scripts/config --enable CONFIG_DRM_FBDEV_EMULATION
   scripts/config --enable CONFIG_FB
   scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE
   scripts/config --enable CONFIG_SYSFB_SIMPLEFB
   scripts/config --enable CONFIG_DRM_SIMPLEDRM
+  scripts/config --enable CONFIG_BACKLIGHT_CLASS_DEVICE
   scripts/config --module CONFIG_DRM_I915
   scripts/config --module CONFIG_DRM_AMDGPU
+  scripts/config --enable CONFIG_DRM_AMD_DC
   scripts/config --module CONFIG_DRM_NOUVEAU
   scripts/config --module CONFIG_DRM_VIRTIO_GPU
+  # mkinitcpio's COMPRESSION is now pinned to gzip (see mkinitcpio.conf.d
+  # fragments) for GRUB compatibility on older boards -- make sure the
+  # kernel's own initramfs decompressor actually matches, rather than
+  # assuming defconfig's default covers it.
+  scripts/config --enable CONFIG_RD_GZIP
 
   make olddefconfig
 
+  # scripts/config --enable/--module only *requests* a symbol -- if its
+  # `depends on` chain isn't already satisfied, olddefconfig silently
+  # answers "disabled" instead of erroring, with nothing in the log to
+  # show it happened. This has already bitten BTF, squashfs/loop, and
+  # zram earlier in this project, all silently -- so verify the DRM
+  # chain landed instead of assuming it did.
+  for _drmopt in CONFIG_DRM CONFIG_DRM_KMS_HELPER CONFIG_DRM_SIMPLEDRM \
+                 CONFIG_FRAMEBUFFER_CONSOLE CONFIG_DRM_I915 \
+                 CONFIG_DRM_AMDGPU CONFIG_DRM_AMD_DC CONFIG_DRM_NOUVEAU \
+                 CONFIG_DRM_VIRTIO_GPU CONFIG_DEBUG_INFO_BTF CONFIG_RD_GZIP; do
+    echo "=== ${_drmopt} resolved to: $(grep -E "^${_drmopt}=" .config || echo NOT-SET) ==="
+  done
+
   echo "=== pahole: $(pahole --version 2>&1) ==="
-  echo "=== CONFIG_DEBUG_INFO_BTF resolved to: $(grep -E '^CONFIG_DEBUG_INFO_BTF=' .config || echo NOT-SET) ==="
 }
 
 build() {
@@ -537,12 +557,22 @@ PACKAGES
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.conf.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf" << 'INITRAMFS'
 HOOKS=(base udev kms plymouth keyboard keymap modconf memdisk archiso block filesystems)
+# mkinitcpio's default compression is zstd, which some older GRUB builds
+# don't recognize -- known upstream as an "invalid magic number" error on
+# newer image/decompressor formats that predates the GRUB patch adding
+# support for them. Older UEFI boards are exactly where an older,
+# unpatched GRUB is more likely to still be in the boot chain. gzip is
+# the one format every GRUB version has always understood, at the cost
+# of a slightly larger initramfs and marginally slower decompression --
+# a fine trade for booting reliably on old hardware.
+COMPRESSION="gzip"
 INITRAMFS
 
 # installed.conf is what the INSTALLED system uses once the OOBE installer
 # runs initcpio. no memdisk/archiso hooks allowed here, those are live-only
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
 HOOKS=(base udev kms plymouth autodetect modconf block keyboard keymap filesystems fsck)
+COMPRESSION="gzip"
 INSTALLED_HOOKS
 
 # Filename here has to stay "linux.preset" -- that's the specific path
@@ -8846,14 +8876,40 @@ PLYMOUTHD
 
 # Set the theme now so it's in place before mkarchiso runs its own
 # mkinitcpio pass over linux.preset (archiso_config=archiso.conf, set above
-# with the plymouth/kms hooks already added). We do NOT manually re-run
-# mkinitcpio here: mkarchiso always rebuilds /boot/initramfs-kiba-kernel.img from
-# linux.preset right after customize_airootfs.sh finishes, so any manual
-# rebuild in here just gets overwritten — and running it against the wrong
-# config (installed.conf, which is for the INSTALLED system, not this live
-# ISO) was actively wrong on top of being redundant.
-plymouth-set-default-theme kibaos 2>/dev/null || true
+# with the plymouth/kms hooks already added).
+#
+# -R forces plymouth-set-default-theme to rebuild the initramfs itself
+# right now, per ArchWiki: "every time a theme is changed, the initramfs
+# must be rebuilt -- the -R option ensures that it is rebuilt". Skipping
+# it and just trusting mkarchiso's later automatic rebuild pass turned
+# out to be the reason live boot kept showing Arch's own default theme
+# instead of ours -- previously this also had its exit code silently
+# swallowed via `2>/dev/null || true`, so that failure was invisible.
+if ! plymouth-set-default-theme -R kibaos; then
+  echo "ERROR: plymouth-set-default-theme kibaos failed -- live boot" \
+       "would silently fall back to Arch's own default theme" \
+       "(bgrt) instead of erroring out here." >&2
+  exit 1
+fi
 echo "=== Boot splash: custom kibaos Plymouth theme installed ==="
+
+# Belt-and-suspenders: Arch's own `plymouth` package ships a pacman hook
+# that runs `plymouth-set-default-theme -R bgrt` automatically on every
+# install/upgrade of that package -- so if anything later in this script
+# (an AUR build, a stray `pacman -S`) touches plymouth again, the theme
+# selection above gets silently reset back to bgrt. Overwriting the
+# actual shared logo assets Arch's built-in themes read from means the
+# splash is still correctly branded even if theme *selection* ever
+# regresses -- per ArchWiki, fade-in/script/solar/spinfinity all read
+# from one shared file, and spinner/bgrt each read their own
+# watermark.png.
+cp "${KIBA_PLYMOUTH_DIR}/splash.png" /usr/share/plymouth/arch-logo.png
+for _theme_dir in bgrt spinner; do
+  if [ -d "/usr/share/plymouth/themes/${_theme_dir}" ]; then
+    cp "${KIBA_PLYMOUTH_DIR}/splash.png" \
+       "/usr/share/plymouth/themes/${_theme_dir}/watermark.png"
+  fi
+done
 
 # ══════════════════════════════════════════════════════════════════════════
 # ICON THEME — Numix Circle (github.com/numixproject/numix-icon-theme-circle)
