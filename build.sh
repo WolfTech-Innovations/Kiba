@@ -200,6 +200,19 @@ prepare() {
   # assuming defconfig's default covers it.
   scripts/config --enable CONFIG_RD_GZIP
 
+  # Landlock -- unprivileged sandboxing LSM. Depends on CONFIG_SECURITY
+  # (on by default, but set explicitly since nothing else in this file
+  # was relying on defconfig's default before now). This is also what
+  # pacman's own download sandbox (DownloadUser = alpm -- see the alpm
+  # user/group precreated at the very top of this script) uses under
+  # the hood; without this it's silently ignored (pacman just runs
+  # unsandboxed, no error) rather than actually failing loud.
+  scripts/config --enable CONFIG_SECURITY
+  scripts/config --enable CONFIG_SECURITY_LANDLOCK
+  # boot cmdline's lsm= (see kiba_install_finalize's UKI cmdline further
+  # down) already lists 'landlock' first, so no CONFIG_LSM default-string
+  # edit needed here -- the boot param takes precedence either way.
+
   make olddefconfig
 
   # scripts/config --enable/--module only *requests* a symbol -- if its
@@ -212,7 +225,8 @@ prepare() {
                  CONFIG_FRAMEBUFFER_CONSOLE CONFIG_DRM_I915 \
                  CONFIG_DRM_AMDGPU CONFIG_DRM_AMD_DC CONFIG_DRM_NOUVEAU \
                  CONFIG_DRM_VIRTIO_GPU CONFIG_DEBUG_INFO_BTF CONFIG_RD_GZIP \
-                 CONFIG_MTD_PHRAM CONFIG_MTD_BLOCK CONFIG_DM_SNAPSHOT; do
+                 CONFIG_MTD_PHRAM CONFIG_MTD_BLOCK CONFIG_DM_SNAPSHOT \
+                 CONFIG_SECURITY CONFIG_SECURITY_LANDLOCK; do
     echo "=== ${_drmopt} resolved to: $(grep -E "^${_drmopt}=" .config || echo NOT-SET) ==="
   done
 
