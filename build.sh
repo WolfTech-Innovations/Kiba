@@ -72,7 +72,15 @@ mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
 # Arch's own shipped x86_64 .config, fetched separately from the source
 # tag so it can be sha256-pinned like the old kernel.org tarball was --
 # same reproducibility guarantee, just two files instead of one.
-CONFIG_URL="https://raw.githubusercontent.com/archlinux/linux/${ALINUX_SRCTAG}/config"
+#
+# NOTE: this does NOT come from archlinux/linux on GitHub -- that repo is
+# only the kernel *source* mirror (patches on top of vanilla, tagged
+# vX.Y.Z-archN) and has never shipped a .config at any tag. Arch's actual
+# shipped config lives in the separate packaging repo on GitLab, tagged
+# with the plain pkgver-pkgrel string (e.g. "7.1.6.arch1-1"), which is
+# exactly what ALINUX_FULLVER already holds before it gets reshaped into
+# ALINUX_SRCTAG above.
+CONFIG_URL="https://gitlab.archlinux.org/archlinux/packaging/packages/linux/-/raw/${ALINUX_FULLVER}/config"
 curl -fsSL "${CONFIG_URL}" -o "${KBUILD_DIR}/config"
 CONFIG_SHA256=$(sha256sum "${KBUILD_DIR}/config" | awk '{print $1}')
 echo "=== Arch config sha256: ${CONFIG_SHA256} ==="
