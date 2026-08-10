@@ -27,75 +27,87 @@ pacman -S --noconfirm --needed \
   openssl curl imagemagick jq
 
 # ══════════════════════════════════════════════════════════════════════════
-# LINUX-KIBA — custom-branded kernel, built from vanilla kernel.org, NOT
-# from Arch's linux packaging
+# LINUX-KIBA — custom-branded kernel, built from Arch's own linux source,
+# NOT a vanilla kernel.org tarball
 # ══════════════════════════════════════════════════════════════════════════
-# Three build breaks in a row (prepare() shadowing, a working-directory
-# assumption, then a fully relocated CONFIG_LOCALVERSION anchor) all
-# traced back to Arch's own `linux` PKGBUILD restructuring itself between
-# CI runs, not anything wrong on our end -- it's a live rolling-release
-# packaging repo, so `git clone --depth 1` was tracking a moving target
-# by design. Rather than keep chasing upstream's internal refactors, this
-# writes a from-scratch PKGBUILD against a vanilla kernel.org tarball: no
-# Arch patches, no Arch config, no Arch prepare()/build() structure to
-# drift out from under us -- the only thing that can move now is the
-# kernel source itself, which we pin explicitly below by resolving
-# kernel.org's *current* "stable" release once and hashing exactly the
-# tarball we downloaded.
+# Switched here from a from-scratch kernel.org + `make defconfig` build.
+# defconfig's minimal baseline was the root cause of a whole string of
+# separately-chased bugs -- missing WLAN drivers, missing USB tethering
+# drivers, no Landlock -- because defconfig genuinely doesn't ship most of
+# what a real desktop needs, and every gap had to be found the hard way
+# (a dead feature in the field) and patched in one at a time. Arch's own
+# `linux` package config is the actual tested, comprehensive baseline
+# millions of real desktops run -- switching to it as the starting point
+# fixes that whole class of bug at the root instead of continuing to
+# whack individual moles.
 #
-# This is deliberately NOT a from-scratch config (that'd be closer to
-# what Android calls a GKI -- deliberately minimal, missing most desktop
-# hardware/filesystem support). `make defconfig` is the base, same as
-# any generic/GKI-style build would start from, but layered with the
-# filesystem, virtualization, and container primitives an actual desktop
-# distro needs, so it's fully func -- ext4/btrfs/ntfs3, overlayfs (fuse
-# for FUSE-based tools), KVM, cgroups/namespaces -- while never touching
-# Arch's own config or patch set. Everything about how this REPORTS
-# itself (pkgbase, install paths, CONFIG_LOCALVERSION) is KibaOS's own;
-# everything about how the kernel actually BEHAVES (syscalls, drivers,
-# ABI) is stock upstream Linux -- full compatibility, no translation
-# layer, so no speed penalty either. `uname -s`/sysname genuinely says
-# "Linux" on this system -- no shim rebranding it anymore (see the
-# CONFIG_LOCALVERSION note below in prepare() for why the branding
-# lives only in the release suffix, not sysname).
-echo "=== Resolving current kernel.org stable release ==="
-KVER=$(curl -fsSL https://www.kernel.org/releases.json | jq -r '[.releases[] | select(.moniker=="stable")][0].version')
-if [ -z "${KVER}" ] || [ "${KVER}" = "null" ]; then
-  echo "ERROR: couldn't resolve a 'stable' release from kernel.org/releases.json" >&2
+# This does NOT bring back the earlier problem that caused the move away
+# from Arch's source in the first place (three build breaks in a row from
+# Arch's own PKGBUILD restructuring between CI runs). That happened
+# because the old approach cloned Arch's *PKGBUILD* and inherited its
+# prepare()/build() structure directly, so any refactor upstream broke us
+# too. This keeps our own from-scratch PKGBUILD structure (prepare/build/
+# package written and owned here, nothing inherited from Arch's actual
+# PKGBUILD file) and only takes two things from Arch: their pinned kernel
+# *source* (a git tag off github.com/archlinux/linux, resolved fresh each
+# run from whatever `linux` version Arch's mirrors currently carry) and
+# their shipped *.config* as the starting baseline before our own
+# scripts/config overlay runs. Neither of those can "restructure" out
+# from under us the way a PKGBUILD's shell logic can.
+echo "=== Resolving current Arch linux package version ==="
+pacman -Sy --noconfirm
+ALINUX_FULLVER=$(pacman -Si linux | awk -F': ' '/^Version *:/{print $2; exit}')
+if [ -z "${ALINUX_FULLVER}" ]; then
+  echo "ERROR: couldn't resolve Arch's current 'linux' package version via pacman -Si" >&2
   exit 1
 fi
-KMAJOR="${KVER%%.*}"
-echo "=== Building kiba-kernel against vanilla kernel.org ${KVER} ==="
+ALINUX_PKGVER="${ALINUX_FULLVER%-*}"                    # drop -pkgrel, e.g. "6.12.6.arch1"
+ALINUX_SRCTAG="v${ALINUX_PKGVER%.*}-${ALINUX_PKGVER##*.}"  # -> "v6.12.6-arch1", archlinux/linux's tag format
+echo "=== Building kiba-kernel against Arch linux ${ALINUX_PKGVER} (source tag ${ALINUX_SRCTAG}) ==="
 
 KBUILD_DIR="/w/kiba-kernel-build"
 KIBA_REPO_DIR="/w/kiba-repo/x86_64"
 mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
 
-# Pre-download into $KBUILD_DIR itself (makepkg's default srcdest is the
-# directory containing PKGBUILD) so makepkg finds it already cached and
-# just verifies the checksum below instead of re-fetching.
-KTARBALL="linux-${KVER}.tar.xz"
-KURL="https://cdn.kernel.org/pub/linux/kernel/v${KMAJOR}.x/${KTARBALL}"
-curl -fsSL "${KURL}" -o "${KBUILD_DIR}/${KTARBALL}"
-KSHA256=$(sha256sum "${KBUILD_DIR}/${KTARBALL}" | awk '{print $1}')
-echo "=== ${KTARBALL} sha256: ${KSHA256} ==="
+# Arch's own shipped x86_64 .config, fetched separately from the source
+# tag so it can be sha256-pinned like the old kernel.org tarball was --
+# same reproducibility guarantee, just two files instead of one.
+CONFIG_URL="https://raw.githubusercontent.com/archlinux/linux/${ALINUX_SRCTAG}/config"
+curl -fsSL "${CONFIG_URL}" -o "${KBUILD_DIR}/config"
+CONFIG_SHA256=$(sha256sum "${KBUILD_DIR}/config" | awk '{print $1}')
+echo "=== Arch config sha256: ${CONFIG_SHA256} ==="
 
 cat > "${KBUILD_DIR}/PKGBUILD" << 'PKGBUILDEOF'
 pkgbase=kiba-kernel
 pkgname=(kiba-kernel kiba-kernel-headers)
-pkgver=@@KVER@@
+pkgver=@@ALINUX_PKGVER@@
 pkgrel=1
 arch=(x86_64)
-url="https://kernel.org/"
+url="https://github.com/archlinux/linux"
 license=(GPL-2.0-only)
-makedepends=(bc cpio gettext libelf pahole perl python tar xz kmod openssl)
+makedepends=(bc cpio gettext libelf pahole perl python tar xz kmod openssl git)
 options=(!strip !debug)
-_srcname="linux-@@KVER@@"
-source=("https://cdn.kernel.org/pub/linux/kernel/v@@KMAJOR@@.x/${_srcname}.tar.xz")
-sha256sums=('@@KSHA256@@')
+_srcname=archlinux-linux
+_srctag=@@ALINUX_SRCTAG@@
+source=(
+  "${_srcname}::git+https://github.com/archlinux/linux#tag=${_srctag}"
+  "config::https://raw.githubusercontent.com/archlinux/linux/${_srctag}/config"
+)
+# git source is tag-pinned above (that's its integrity guarantee, same as
+# Arch's own linux-git PKGBUILD uses SKIP for VCS sources); the config
+# file gets a real pin since it's a plain HTTP fetch.
+sha256sums=('SKIP' '@@CONFIG_SHA256@@')
 
 prepare() {
   cd "${_srcname}"
+
+  # Start from Arch's own shipped config, not `make defconfig` -- this is
+  # the actual fix for the whole class of "defconfig doesn't ship X"
+  # bugs (WLAN, USB tethering, Landlock, all previously patched in one at
+  # a time below). olddefconfig reconciles it against this exact checked-
+  # out source tree/version before we touch anything ourselves.
+  cp ../config .config
+  make olddefconfig
 
   # sysname ("Linux") is intentionally left untouched everywhere now --
   # no kernel-level UTS_SYSNAME patch, no LD_PRELOAD shim (kiba-identity
@@ -106,7 +118,7 @@ prepare() {
   # "Linux" as "can't determine kernel version, assume ancient/
   # unsupported" instead of failing open. That's what threw the "kernel
   # too old" EGL error. Branding now lives ONLY in the release string
-  # (below -- e.g. "6.12.3-kibaos"), which every version-parsing
+  # (below -- e.g. "6.12.6-kibaos"), which every version-parsing
   # consumer handles fine since it still starts with a real,
   # correctly-ordered version number.
   #
@@ -122,8 +134,6 @@ prepare() {
   # through olddefconfig.
   echo "-kibaos" > localversion
 
-  make defconfig
-
   # NOTE: CONFIG_LOCALVERSION is deliberately NOT set here. The
   # `localversion` file above already supplies the "-kibaos" suffix --
   # setting it again via .config would concatenate both
@@ -132,6 +142,13 @@ prepare() {
   # explicitly (and empty) everywhere kernelrelease gets queried below
   # and in build()/package() -- one source of truth for this string,
   # matching Arch's own linux/linux-git PKGBUILD convention exactly.
+  #
+  # LOCALVERSION_AUTO also matters more now than it did against a plain
+  # tarball -- this IS a real git checkout (source is a git tag, not a
+  # tarball), so without disabling it setlocalversion would try to
+  # append a "-gxxxxxxx" scm hash suffix on top of everything else.
+  # Disabling it here, same as before, keeps the release string exactly
+  # "<version>-kibaos", nothing else appended.
   scripts/config --disable CONFIG_LOCALVERSION_AUTO
   # Hostname baked into the kernel itself, shown before userspace/DHCP
   # ever sets a real one -- otherwise defaults to the generic "(none)".
@@ -139,8 +156,14 @@ prepare() {
   # Purely cosmetic, folds into the kernel's build-ID.
   scripts/config --set-str CONFIG_BUILD_SALT "kibaos"
 
-  # Broad desktop-usable filesystem/virtualization support on top of
-  # defconfig's deliberately minimal baseline.
+  # Everything below this point was originally written to patch gaps in
+  # `make defconfig`'s minimal baseline -- Arch's own config (now our
+  # starting point above) already ships virtually all of it. Left in
+  # explicitly anyway as reinforcement/documentation of what KibaOS
+  # actually depends on being on: harmless if Arch's config already
+  # enabled it (these are idempotent), and it means a future Arch config
+  # change can't silently regress any of this out from under us the way
+  # defconfig's gaps did originally.
   scripts/config --enable CONFIG_DEBUG_INFO_BTF
   scripts/config --enable CONFIG_MODULES
   scripts/config --enable CONFIG_BTRFS_FS
@@ -149,10 +172,7 @@ prepare() {
   scripts/config --enable CONFIG_OVERLAY_FS
   # archiso's live boot loop-mounts airootfs.sfs/.erofs (see the
   # archiso mkinitcpio hook + /run/archiso/bootmnt paths elsewhere in
-  # this script) -- without these, /dev/loop0 either doesn't exist or
-  # has nothing that can actually read what's mounted on it. Arch's
-  # stock kernel always had this built in by default, so it was never
-  # something we had to think about until moving to our own config.
+  # this script).
   scripts/config --enable CONFIG_BLK_DEV_LOOP
   scripts/config --enable CONFIG_SQUASHFS
   scripts/config --enable CONFIG_SQUASHFS_XZ
@@ -160,70 +180,38 @@ prepare() {
   scripts/config --enable CONFIG_EROFS_FS
   scripts/config --enable CONFIG_EROFS_FS_ZIP
   # archiso's mkinitcpio hooks need these two beyond squashfs/loop:
-  # 'memdisk' hook wants phram+mtdblock (MTD -- Memory Technology Device
-  # -- support for the BIOS/SYSLINUX memdisk boot fallback path), and
-  # 'archiso' hook wants dm_snapshot (device-mapper, for the live
-  # session's cow/persistence overlay). Same story as squashfs/loop --
-  # Arch's stock kernel always had these, defconfig doesn't.
+  # 'memdisk' hook wants phram+mtdblock, 'archiso' hook wants dm_snapshot.
   scripts/config --enable CONFIG_MTD
   scripts/config --enable CONFIG_MTD_PHRAM
   scripts/config --enable CONFIG_MTD_BLOCK
   scripts/config --enable CONFIG_BLK_DEV_DM
   scripts/config --enable CONFIG_DM_SNAPSHOT
   # zram-generator is configured (see zram-generator.conf later in this
-  # script) to bring up /dev/zram0 for swap, but that's userspace config
-  # for a kernel driver that was never actually enabled -- without it,
-  # systemd-zram-setup@zram0.service waits out a full device timeout
-  # before giving up, adding real boot delay for a feature that silently
-  # never worked.
+  # script) to bring up /dev/zram0 for swap.
   scripts/config --enable CONFIG_ZRAM
   scripts/config --enable CONFIG_ZSMALLOC
   scripts/config --enable CONFIG_CRYPTO_LZO
   scripts/config --enable CONFIG_CRYPTO_ZSTD
   scripts/config --enable CONFIG_FUSE_FS
   scripts/config --enable CONFIG_USB_STORAGE
-  # USB tethering (phone-as-modem over USB) -- CONFIG_USB_STORAGE above
-  # covers USB mass-storage, but that's a completely separate driver
-  # class from USB *networking*; nothing here was pulling in the
-  # actual netdev drivers a tethered phone enumerates as. USB core
-  # (CONFIG_USB, xhci_hcd) is already on via defconfig -- that's why
-  # the device itself shows up in dmesg/lsusb -- but with no matching
-  # driver to bind, it just sits there as a USB device with no network
-  # interface ever created for it.
+  # USB tethering (phone-as-modem over USB).
   scripts/config --module CONFIG_USB_USBNET
   scripts/config --module CONFIG_USB_NET_CDCETHER
   scripts/config --module CONFIG_USB_NET_CDC_NCM
   scripts/config --module CONFIG_USB_NET_RNDIS_HOST
-  # RNDIS's control channel rides on CDC-ACM-style command/response --
-  # USB_NET_RNDIS_HOST depends on this being present too.
   scripts/config --module CONFIG_USB_NET_CDC_SUBSET
 
-  # WLAN -- same gap as USB tethering: the firmware allowlist further
-  # down this script (find /usr/lib/firmware ... ! -name 'iwlwifi*'
-  # ! -name 'ath*' ! -name 'rtw88' ! -name 'rtw89' etc.) already assumes
-  # these drivers exist and keeps their blobs, but nothing here ever
-  # actually enabled the drivers themselves -- so on real hardware wifi
-  # would be exactly as dead as USB tethering was, just nobody's hit it
-  # yet. cfg80211/mac80211 are the shared stack every wifi driver needs.
+  # WLAN
   scripts/config --enable CONFIG_WLAN
   scripts/config --module CONFIG_CFG80211
   scripts/config --module CONFIG_MAC80211
-  # Intel (iwlwifi) -- iwlmvm is the modern firmware-driven op-mode
-  # every card since ~2012 needs; without it iwlwifi loads but no card
-  # actually associates.
   scripts/config --module CONFIG_IWLWIFI
   scripts/config --module CONFIG_IWLMVM
-  # Atheros/Qualcomm
   scripts/config --module CONFIG_ATH9K
   scripts/config --module CONFIG_ATH10K
   scripts/config --module CONFIG_ATH10K_PCI
   scripts/config --module CONFIG_ATH11K
   scripts/config --module CONFIG_ATH11K_PCI
-  # Realtek -- rtlwifi covers the older PCIe/USB chips (8188ee/8192ee/
-  # 8723ae/etc.), rtw88/rtw89 cover the newer ones (8822ce/8852ae/etc.
-  # -- rtw88_8822ce is literally the example already sitting in
-  # KNOWN_FALLBACKS in kortexd further down this file), rtl8xxxu covers
-  # the common USB dongles.
   scripts/config --module CONFIG_RTLWIFI
   scripts/config --module CONFIG_RTL8192CE
   scripts/config --module CONFIG_RTL8188EE
@@ -247,11 +235,7 @@ prepare() {
   scripts/config --module CONFIG_NF_TABLES
   scripts/config --module CONFIG_WIREGUARD
 
-  # Graphics/KMS -- without these, Plymouth (via mkinitcpio's kms hook)
-  # has no framebuffer to draw to at all, which is exactly what produces
-  # a black screen that hangs forever instead of erroring out: kms waits
-  # for a DRM device to appear, and none ever does. defconfig alone
-  # doesn't reliably include these.
+  # Graphics/KMS
   scripts/config --enable CONFIG_DRM
   scripts/config --enable CONFIG_DRM_KMS_HELPER
   scripts/config --enable CONFIG_DRM_FBDEV_EMULATION
@@ -265,19 +249,13 @@ prepare() {
   scripts/config --enable CONFIG_DRM_AMD_DC
   scripts/config --module CONFIG_DRM_NOUVEAU
   scripts/config --module CONFIG_DRM_VIRTIO_GPU
-  # mkinitcpio's COMPRESSION is now pinned to gzip (see mkinitcpio.conf.d
-  # fragments) for GRUB compatibility on older boards -- make sure the
-  # kernel's own initramfs decompressor actually matches, rather than
-  # assuming defconfig's default covers it.
+  # mkinitcpio's COMPRESSION is pinned to gzip (see mkinitcpio.conf.d
+  # fragments) for GRUB compatibility on older boards.
   scripts/config --enable CONFIG_RD_GZIP
 
-  # Landlock -- unprivileged sandboxing LSM. Depends on CONFIG_SECURITY
-  # (on by default, but set explicitly since nothing else in this file
-  # was relying on defconfig's default before now). This is also what
-  # pacman's own download sandbox (DownloadUser = alpm -- see the alpm
-  # user/group precreated at the very top of this script) uses under
-  # the hood; without this it's silently ignored (pacman just runs
-  # unsandboxed, no error) rather than actually failing loud.
+  # Landlock -- unprivileged sandboxing LSM, also what pacman's own
+  # download sandbox (DownloadUser = alpm -- see the alpm user/group
+  # precreated at the very top of this script) uses under the hood.
   scripts/config --enable CONFIG_SECURITY
   scripts/config --enable CONFIG_SECURITY_LANDLOCK
   # boot cmdline's lsm= (see kiba_install_finalize's UKI cmdline further
@@ -289,9 +267,10 @@ prepare() {
   # scripts/config --enable/--module only *requests* a symbol -- if its
   # `depends on` chain isn't already satisfied, olddefconfig silently
   # answers "disabled" instead of erroring, with nothing in the log to
-  # show it happened. This has already bitten BTF, squashfs/loop, and
-  # zram earlier in this project, all silently -- so verify the DRM
-  # chain landed instead of assuming it did.
+  # show it happened. Verify the full list landed instead of assuming it
+  # did, same as before -- still worth checking even against Arch's own
+  # config as the base, since our own additions on top can still fail
+  # silently the same way.
   for _drmopt in CONFIG_DRM CONFIG_DRM_KMS_HELPER CONFIG_DRM_SIMPLEDRM \
                  CONFIG_FRAMEBUFFER_CONSOLE CONFIG_DRM_I915 \
                  CONFIG_DRM_AMDGPU CONFIG_DRM_AMD_DC CONFIG_DRM_NOUVEAU \
@@ -326,14 +305,14 @@ build() {
 }
 
 package_kiba-kernel() {
-  pkgdesc="The KibaOS kernel and modules (vanilla kernel.org @@KVER@@, kibaos-branded)"
+  pkgdesc="The KibaOS kernel and modules (Arch linux source @@ALINUX_PKGVER@@, kibaos-branded)"
   depends=(coreutils kmod)
   cd "${_srcname}"
   local kernver
   kernver=$(make -s LOCALVERSION= kernelrelease)
 
   # `uname -r`/`kernelrelease` should always start with the real numeric
-  # kernel.org version (e.g. "6.12.3-kibaos"), never just the branding
+  # kernel version (e.g. "6.12.6-kibaos"), never just the branding
   # suffix alone -- a bare "kibaos" with no version number is exactly
   # what breaks Mesa/EGL's kernel-version gating (it can't parse a
   # version out of that and assumes ancient/unsupported). Fail the
@@ -388,9 +367,9 @@ package_kiba-kernel-headers() {
 PKGBUILDEOF
 
 sed -i \
-  -e "s/@@KVER@@/${KVER}/g" \
-  -e "s/@@KMAJOR@@/${KMAJOR}/g" \
-  -e "s/@@KSHA256@@/${KSHA256}/g" \
+  -e "s/@@ALINUX_PKGVER@@/${ALINUX_PKGVER}/g" \
+  -e "s/@@ALINUX_SRCTAG@@/${ALINUX_SRCTAG}/g" \
+  -e "s/@@CONFIG_SHA256@@/${CONFIG_SHA256}/g" \
   "${KBUILD_DIR}/PKGBUILD"
 
 # Install build deps as root first -- makepkg -s would try to do this
@@ -398,7 +377,7 @@ sed -i \
 # and no passwordless sudo in CI, so that just fails with "a password is
 # required". Preinstalling here and dropping -s sidesteps that entirely.
 pacman -S --noconfirm --needed \
-  base-devel bc cpio gettext libelf pahole perl python
+  base-devel bc cpio gettext libelf pahole perl python git
 
 chown -R nobody:nobody "${KBUILD_DIR}"   # makepkg refuses to run as root
 runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"' && makepkg --noconfirm --skippgpcheck'
@@ -493,13 +472,12 @@ kiba-kernel
 kiba-kernel-headers
 linux-firmware
 # linux-firmware split the Intel GuC/HuC blobs (i915/*_guc_*.bin,
-# i915/*_huc_*.bin) out into their own package. kiba-kernel is built
-# straight from a freshly-resolved kernel.org tarball rather than
-# Arch's own `linux`, so the DRM/i915 module is fine, but without this
-# it has no GuC firmware to fetch -- i915 loads, modesets simpledrm's
-# fbdev fine, but GuC init fails and wlroots/labwc can never get a
-# working renderer: compositor reports "loaded" (it genuinely is), but
-# the display stays black since there's no accelerated render node.
+# i915/*_huc_*.bin) out into their own package -- kiba-kernel doesn't
+# pull it in as a dependency itself, so it has to be listed explicitly
+# here or i915 loads and modesets simpledrm's fbdev fine, but GuC init
+# fails and wlroots/labwc can never get a working renderer: compositor
+# reports "loaded" (it genuinely is), but the display stays black since
+# there's no accelerated render node.
 linux-firmware-intel
 mkinitcpio
 mkinitcpio-archiso
