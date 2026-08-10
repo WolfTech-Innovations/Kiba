@@ -102,7 +102,20 @@ prepare() {
   # banner ("Linux version ...") and /proc/sys/kernel/ostype. Patching
   # it here means the rebrand holds even for statically-linked binaries
   # and anything making raw syscalls, no escape hatch, fully committed.
-  sed -i 's/#define UTS_SYSNAME "Linux"/#define UTS_SYSNAME "KibaOS"/' include/linux/uts.h
+  # NOTE: sysname rebrand intentionally NOT done here anymore -- see
+  # kiba-identity (LD_PRELOAD uname shim, built later in this script)
+  # for why. It was briefly moved down to this raw kernel level
+  # (UTS_SYSNAME "Linux" -> "KibaOS" in include/linux/uts.h) so it'd
+  # hold even for static binaries / raw syscalls, but that broke Mesa/
+  # EGL: a lot of userspace -- including kernel-feature-gating code in
+  # Mesa -- treats sysname != "Linux" as "can't determine kernel
+  # version, assume ancient/unsupported" rather than failing open,
+  # which is exactly what threw the "kernel too old" EGL error. Same
+  # failure mode as anything parsing /proc/version expecting a literal
+  # "Linux version %d.%d.%d" prefix. kiba-identity's LD_PRELOAD shim
+  # covers the same rebrand for the libc-linked 99% case and, crucially,
+  # has the KIBAOS_REAL_UNAME escape hatch this kernel patch didn't --
+  # so it's the one place this should live.
 
   make defconfig
 
