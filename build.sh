@@ -54,9 +54,10 @@ pacman -S --noconfirm --needed \
 # itself (pkgbase, install paths, CONFIG_LOCALVERSION) is KibaOS's own;
 # everything about how the kernel actually BEHAVES (syscalls, drivers,
 # ABI) is stock upstream Linux -- full compatibility, no translation
-# layer, so no speed penalty either. kiba-identity's LD_PRELOAD uname
-# shim (elsewhere in this file) still handles the userspace-visible
-# rebrand on top of this.
+# layer, so no speed penalty either. `uname -s`/sysname genuinely says
+# "Linux" on this system -- no shim rebranding it anymore (see the
+# CONFIG_LOCALVERSION note below in prepare() for why the branding
+# lives only in the release suffix, not sysname).
 echo "=== Resolving current kernel.org stable release ==="
 KVER=$(curl -fsSL https://www.kernel.org/releases.json | jq -r '[.releases[] | select(.moniker=="stable")][0].version')
 if [ -z "${KVER}" ] || [ "${KVER}" = "null" ]; then
@@ -96,36 +97,41 @@ sha256sums=('@@KSHA256@@')
 prepare() {
   cd "${_srcname}"
 
-  # UTS_SYSNAME is the literal string the raw uname(2) syscall hands
-  # back, straight from the kernel, before libc/kiba-identity's shim
-  # ever gets a chance to run -- also what shows up in dmesg's boot
-  # banner ("Linux version ...") and /proc/sys/kernel/ostype. Patching
-  # it here means the rebrand holds even for statically-linked binaries
-  # and anything making raw syscalls, no escape hatch, fully committed.
-  # NOTE: sysname rebrand intentionally NOT done here anymore -- see
-  # kiba-identity (LD_PRELOAD uname shim, built later in this script)
-  # for why. It was briefly moved down to this raw kernel level
-  # (UTS_SYSNAME "Linux" -> "KibaOS" in include/linux/uts.h) so it'd
-  # hold even for static binaries / raw syscalls, but that broke Mesa/
-  # EGL: a lot of userspace -- including kernel-feature-gating code in
-  # Mesa -- treats sysname != "Linux" as "can't determine kernel
-  # version, assume ancient/unsupported" rather than failing open,
-  # which is exactly what threw the "kernel too old" EGL error. Same
-  # failure mode as anything parsing /proc/version expecting a literal
-  # "Linux version %d.%d.%d" prefix. kiba-identity's LD_PRELOAD shim
-  # covers the same rebrand for the libc-linked 99% case and, crucially,
-  # has the KIBAOS_REAL_UNAME escape hatch this kernel patch didn't --
-  # so it's the one place this should live.
+  # sysname ("Linux") is intentionally left untouched everywhere now --
+  # no kernel-level UTS_SYSNAME patch, no LD_PRELOAD shim (kiba-identity
+  # was removed). Both were tried and both broke real userspace: the
+  # raw kernel patch made `uname -s`/sysname itself report "KibaOS" for
+  # every process with zero escape hatch, and a lot of software --
+  # including kernel-feature-gating code in Mesa -- treats sysname !=
+  # "Linux" as "can't determine kernel version, assume ancient/
+  # unsupported" instead of failing open. That's what threw the "kernel
+  # too old" EGL error. Branding now lives ONLY in the release string
+  # (below -- e.g. "6.12.3-kibaos"), which every version-parsing
+  # consumer handles fine since it still starts with a real,
+  # correctly-ordered version number.
+  #
+  # This is Arch's own convention, not something invented here: their
+  # actual `linux`/`linux-git` PKGBUILDs (archlinux/linux upstream)
+  # don't set CONFIG_LOCALVERSION in .config at all -- they drop a
+  # plain `localversion` file in the source root instead. setlocalversion
+  # (scripts/setlocalversion) collects any localversion* files in the
+  # tree and folds their contents into the release string as a
+  # completely separate step from the CONFIG_LOCALVERSION Kconfig
+  # string, before auto.conf even needs to exist -- which is exactly
+  # why it's more reliable than relying on the .config round-trip
+  # through olddefconfig.
+  echo "-kibaos" > localversion
 
   make defconfig
 
-  # Rebrand the release string -- this is what makes `uname -r` read
-  # "<ver>-kibaos" for real, not just a cosmetic string swap.
-  scripts/config --set-str CONFIG_LOCALVERSION "-kibaos"
-  # LOCALVERSION_AUTO would append a "-gxxxxxxxx" git-hash suffix if it
-  # ever detects a git tree -- shouldn't trigger from a plain tarball,
-  # but disabling it explicitly guarantees a clean, deterministic
-  # "-kibaos" with no chance of stray noise appended.
+  # NOTE: CONFIG_LOCALVERSION is deliberately NOT set here. The
+  # `localversion` file above already supplies the "-kibaos" suffix --
+  # setting it again via .config would concatenate both
+  # (file_localversion + CONFIG_LOCALVERSION), producing
+  # "-kibaos-kibaos". Same reasoning as why LOCALVERSION= is passed
+  # explicitly (and empty) everywhere kernelrelease gets queried below
+  # and in build()/package() -- one source of truth for this string,
+  # matching Arch's own linux/linux-git PKGBUILD convention exactly.
   scripts/config --disable CONFIG_LOCALVERSION_AUTO
   # Hostname baked into the kernel itself, shown before userspace/DHCP
   # ever sets a real one -- otherwise defaults to the generic "(none)".
@@ -311,7 +317,12 @@ build() {
   # leaking straight into every install. Override explicitly.
   export KBUILD_BUILD_USER=kiba
   export KBUILD_BUILD_HOST=kibaos
-  make -j"$(nproc)" all
+  # LOCALVERSION= explicitly empty here -- the `localversion` file
+  # (see prepare()) is the single source of truth for the "-kibaos"
+  # suffix; passing LOCALVERSION= blank guarantees no inherited/stray
+  # env var can double it up, matching Arch's own linux/linux-git
+  # PKGBUILD convention (they do the same at every kernelrelease call).
+  make -j"$(nproc)" LOCALVERSION= all
 }
 
 package_kiba-kernel() {
@@ -319,7 +330,23 @@ package_kiba-kernel() {
   depends=(coreutils kmod)
   cd "${_srcname}"
   local kernver
-  kernver=$(make -s kernelrelease)
+  kernver=$(make -s LOCALVERSION= kernelrelease)
+
+  # `uname -r`/`kernelrelease` should always start with the real numeric
+  # kernel.org version (e.g. "6.12.3-kibaos"), never just the branding
+  # suffix alone -- a bare "kibaos" with no version number is exactly
+  # what breaks Mesa/EGL's kernel-version gating (it can't parse a
+  # version out of that and assumes ancient/unsupported). Fail the
+  # build loudly here instead of shipping a kernel package that quietly
+  # reports garbage in `uname -r`.
+  case "${kernver}" in
+    [0-9]*) : ;;
+    *)
+      echo "FATAL: kernelrelease '${kernver}' doesn't start with a real kernel version -- the localversion file (see prepare()) isn't being picked up correctly. Refusing to package." >&2
+      exit 1
+      ;;
+  esac
+  echo "=== kiba-kernel kernelrelease resolved to: ${kernver} ==="
 
   make -j"$(nproc)" INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 modules_install
 
@@ -340,7 +367,7 @@ package_kiba-kernel-headers() {
   depends=(pahole)
   cd "${_srcname}"
   local kernver
-  kernver=$(make -s kernelrelease)
+  kernver=$(make -s LOCALVERSION= kernelrelease)
   local hdrdir="${pkgdir}/usr/lib/modules/${kernver}/build"
 
   install -Dm644 Makefile "${hdrdir}/Makefile"
@@ -3641,70 +3668,6 @@ ln -sf /usr/lib/systemd/user/kortex-authd.service \
   /etc/skel/.config/systemd/user/graphical-session.target.wants/kortex-authd.service
 echo "=== kortex-authd installed ==="
 
-# ══════════════════════════════════════════════════════════════════════════
-# KIBA IDENTITY MASK — brand the OS name reported to userspace software
-# ══════════════════════════════════════════════════════════════════════════
-# Honest scope note up front: this rebrand the *sysname* string
-# (Linux -> KibaOS) that libc's uname(2) wrapper hands to any dynamically
-# linked process, since that's the field software actually surfaces to
-# users ("uname -a", Python's platform.system(), Node's os.type(), etc).
-# It deliberately leaves release/version/machine untouched -- those are
-# the fields real software parses for kernel feature detection (Docker,
-# some drivers, some game anti-cheat, etc), and lying about them doesn't
-# hide anything, it just breaks things. This is branding, not a security
-# boundary: statically linked binaries and anything issuing the raw
-# uname(2) syscall directly (rare, but e.g. Go binaries with CGO
-# disabled) bypass it entirely, and any process is free to unset
-# LD_PRELOAD or export KIBAOS_REAL_UNAME=1 to see the real value. If
-# that matters for a given workload (kernel version probing in a
-# container build, driver installers, etc), that's what the escape
-# hatch is for.
-echo "=== Building kiba-identity (uname sysname rebrand, LD_PRELOAD) ==="
-mkdir -p /usr/lib/kibaos/src
-cat > /usr/lib/kibaos/src/kiba_identity.c << 'KIBA_IDENTITY_C'
-/* kiba_identity.c — LD_PRELOAD shim rebranding uname(2)'s sysname field
- * from "Linux" to "KibaOS" for any dynamically linked process that
- * loads it. See the build-script comment above this heredoc for the
- * full scope note (what this does and deliberately does not cover).
- */
-#define _GNU_SOURCE
-#include <sys/utsname.h>
-#include <dlfcn.h>
-#include <string.h>
-#include <stdlib.h>
-
-typedef int (*real_uname_fn)(struct utsname *);
-
-int uname(struct utsname *buf) {
-    static real_uname_fn real_uname = NULL;
-    if (!real_uname) real_uname = (real_uname_fn)dlsym(RTLD_NEXT, "uname");
-    int rc = real_uname(buf);
-    /* KIBAOS_REAL_UNAME is the documented escape hatch -- any process
-     * that actually needs the real kernel-reported sysname (rare, but
-     * real) can set it rather than fight LD_PRELOAD. */
-    if (rc == 0 && !getenv("KIBAOS_REAL_UNAME")) {
-        strncpy(buf->sysname, "KibaOS", sizeof(buf->sysname) - 1);
-        buf->sysname[sizeof(buf->sysname) - 1] = '\0';
-    }
-    return rc;
-}
-KIBA_IDENTITY_C
-
-gcc -shared -fPIC -O2 -Wall /usr/lib/kibaos/src/kiba_identity.c \
-    -o /usr/lib/kibaos/libkibaidentity.so -ldl \
-  || { echo "FATAL: kiba_identity.c failed to compile" >&2; exit 1; }
-rm -rf /usr/lib/kibaos/src
-chown root:root /usr/lib/kibaos/libkibaidentity.so
-chmod 755 /usr/lib/kibaos/libkibaidentity.so
-
-# System-wide activation. /etc/ld.so.preload is honored by the dynamic
-# linker for every dynamically linked process on the system (not just
-# graphical-session ones, unlike kortex-authd above) -- that's the
-# whole point here, since the goal is "uname just says KibaOS" without
-# every individual app needing to opt in.
-echo "/usr/lib/kibaos/libkibaidentity.so" > /etc/ld.so.preload
-chmod 644 /etc/ld.so.preload
-echo "=== kiba-identity installed ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # KIBA VIEW — a per-session translated filesystem view over XDG user dirs
@@ -11892,9 +11855,8 @@ cat > /usr/bin/pacman << 'PACMANSHIM'
 #!/usr/bin/env bash
 # pacman shim -- see the build-script comment above this heredoc for the
 # full design rationale (tty check, exact-match allowlist, fallback).
-# KIBAOS_REAL_PACMAN=1 is the documented escape hatch, same pattern as
-# kiba-identity's KIBAOS_REAL_UNAME: set it to always get the genuine
-# binary regardless of how this is invoked.
+# KIBAOS_REAL_PACMAN=1 is the documented escape hatch: set it to always
+# get the genuine binary regardless of how this is invoked.
 REAL=/usr/lib/kibaos/pacman-real
 
 if [ -n "${KIBAOS_REAL_PACMAN:-}" ] || [ ! -t 1 ]; then
