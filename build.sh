@@ -6931,7 +6931,9 @@ int kiba_fs_format(const char *part_path, kiba_fs_type_t type,
         int i = 0;
         argv[i++] = (char *)"mkfs.ext4";
         argv[i++] = (char *)"-F";
-        argv[i++] = (char *)"-q";
+        /* TEMP: -q dropped for one test run so mkfs's actual stderr
+         * message shows up instead of just "exited with status 1".
+         * Put -q back once the real failure reason is known. */
         if (volume_label) { argv[i++] = (char *)"-L"; argv[i++] = (char *)volume_label; }
         argv[i++] = (char *)part_path;
         argv[i++] = NULL;
@@ -8534,6 +8536,18 @@ int main(int argc, char **argv) {
         root_partno = 2;
         partition_path(disk, esp_partno,  esp_part,  sizeof(esp_part));
         partition_path(disk, root_partno, root_part, sizeof(root_part));
+
+        /* Force the kernel to re-read the partition table right now,
+         * rather than relying on it to notice on its own before
+         * kiba_wait_for_device() starts polling below. */
+        char *rereadpt_argv[4];
+        rereadpt_argv[0] = (char *)"blockdev";
+        rereadpt_argv[1] = (char *)"--rereadpt";
+        rereadpt_argv[2] = (char *)disk;
+        rereadpt_argv[3] = NULL;
+        run_argv(rereadpt_argv); /* best-effort, ignore rc -- if this
+                                   * fails, kiba_wait_for_device() below
+                                   * will time out and surface it */
     } else {
         /* ── Dual-boot: reuse the existing ESP, use free space only ──── */
         progress(4, "Looking for an existing EFI partition and free space...");
@@ -8573,6 +8587,18 @@ int main(int argc, char **argv) {
         }
         root_partno = new_partno;
         partition_path(disk, root_partno, root_part, sizeof(root_part));
+
+        /* Force the kernel to re-read the partition table right now,
+         * rather than relying on it to notice on its own before
+         * kiba_wait_for_device() starts polling below. */
+        char *rereadpt_argv[4];
+        rereadpt_argv[0] = (char *)"blockdev";
+        rereadpt_argv[1] = (char *)"--rereadpt";
+        rereadpt_argv[2] = (char *)disk;
+        rereadpt_argv[3] = NULL;
+        run_argv(rereadpt_argv); /* best-effort, ignore rc -- if this
+                                   * fails, kiba_wait_for_device() below
+                                   * will time out and surface it */
     }
 
     /* Wait for the kernel/udev to settle before touching the new
