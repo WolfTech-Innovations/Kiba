@@ -69,19 +69,34 @@ KBUILD_DIR="/w/kiba-kernel-build"
 KIBA_REPO_DIR="/w/kiba-repo/x86_64"
 mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
 
-# Arch's own shipped x86_64 .config, fetched separately from the source
-# tag so it can be sha256-pinned like the old kernel.org tarball was --
-# same reproducibility guarantee, just two files instead of one.
+# Arch's own shipped x86_64 .config -- pulled straight off disk via
+# linux-headers instead of fetched from a URL.
 #
-# NOTE: this does NOT come from archlinux/linux on GitHub -- that repo is
-# only the kernel *source* mirror (patches on top of vanilla, tagged
-# vX.Y.Z-archN) and has never shipped a .config at any tag. Arch's actual
-# shipped config lives in the separate packaging repo on GitLab, tagged
-# with the plain pkgver-pkgrel string (e.g. "7.1.6.arch1-1"), which is
-# exactly what ALINUX_FULLVER already holds before it gets reshaped into
-# ALINUX_SRCTAG above.
-CONFIG_URL="https://gitlab.archlinux.org/archlinux/packaging/packages/linux/-/raw/${ALINUX_FULLVER}/config"
-curl -fsSL "${CONFIG_URL}" -o "${KBUILD_DIR}/config"
+# Both external sources tried before this were dead ends:
+#   - raw.githubusercontent.com/archlinux/linux/<tag>/config -- 404 always,
+#     at every tag checked. That repo is only the kernel *source* mirror
+#     (patches on top of vanilla) and has never shipped a .config file.
+#   - gitlab.archlinux.org/.../packages/linux/-/raw/<tag>/config -- this IS
+#     where Arch's real shipped config lives, but the whole gitlab.archlinux.org
+#     host sits behind the Anubis anti-bot wall, which hands plain curl/CI
+#     clients a block page instead of the file (confirmed directly: fetching
+#     that URL returns Anubis's "Access Denied" page, not raw content).
+#
+# linux-headers sidesteps both problems entirely: it ships the exact config
+# Arch built that exact kernel version with, already local at
+# /usr/lib/modules/<kver>/build/.config, with zero network fetch and zero
+# tag-format guessing -- and it's guaranteed to match ALINUX_FULLVER since
+# pacman resolves it from the same synced repos.
+echo "=== Installing linux-headers to source Arch's shipped .config ==="
+pacman -S --noconfirm --needed linux-headers
+
+KVER_DIR=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -print -quit)
+if [ -z "${KVER_DIR}" ] || [ ! -f "${KVER_DIR}/build/.config" ]; then
+  echo "ERROR: couldn't find a shipped .config under /usr/lib/modules/*/build/.config after installing linux-headers" >&2
+  exit 1
+fi
+echo "=== Using shipped config from: ${KVER_DIR}/build/.config ==="
+cp "${KVER_DIR}/build/.config" "${KBUILD_DIR}/config"
 CONFIG_SHA256=$(sha256sum "${KBUILD_DIR}/config" | awk '{print $1}')
 echo "=== Arch config sha256: ${CONFIG_SHA256} ==="
 
@@ -99,11 +114,15 @@ _srcname=archlinux-linux
 _srctag=@@ALINUX_SRCTAG@@
 source=(
   "${_srcname}::git+https://github.com/archlinux/linux#tag=${_srctag}"
-  "config::https://raw.githubusercontent.com/archlinux/linux/${_srctag}/config"
+  "config"
 )
 # git source is tag-pinned above (that's its integrity guarantee, same as
-# Arch's own linux-git PKGBUILD uses SKIP for VCS sources); the config
-# file gets a real pin since it's a plain HTTP fetch.
+# Arch's own linux-git PKGBUILD uses SKIP for VCS sources); "config" here
+# is a plain local filename (no URL), so makepkg picks it up straight from
+# this same directory (${KBUILD_DIR}/config, dropped there before this
+# PKGBUILD is written -- sourced from linux-headers' shipped
+# /usr/lib/modules/<kver>/build/.config, not fetched from the network).
+# It still gets a real sha256 pin since it's a real on-disk file.
 sha256sums=('SKIP' '@@CONFIG_SHA256@@')
 
 prepare() {
