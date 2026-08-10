@@ -8377,6 +8377,8 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
 #include <ctype.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/ioctl.h>
+#include <linux/fs.h>   /* BLKRRPART */
 #include <time.h>
 #include <unistd.h>
 
@@ -8437,6 +8439,21 @@ static void partition_path(const char *disk, int n, char *buf, size_t buf_len) {
     bool ends_in_digit = disk_len > 0 && disk[disk_len - 1] >= '0' && disk[disk_len - 1] <= '9';
     if (ends_in_digit) snprintf(buf, buf_len, "%sp%d", disk, n);
     else                snprintf(buf, buf_len, "%s%d", disk, n);
+}
+
+/* Force the kernel to re-read the partition table right now, rather
+ * than relying on it to notice on its own before kiba_wait_for_device()
+ * starts polling below. Direct ioctl instead of shelling out to
+ * `blockdev --rereadpt`: run_argv() is a static helper private to the
+ * libkibadisk translation units, not visible here, and this is a
+ * one-line kernel call anyway -- no subprocess needed. */
+static void kiba_force_reread_partition_table(const char *disk) {
+    int fd = open(disk, O_RDONLY);
+    if (fd < 0) return; /* best-effort */
+    ioctl(fd, BLKRRPART, NULL); /* best-effort, ignore rc -- if this
+                                  * fails, kiba_wait_for_device() below
+                                  * will time out and surface it */
+    close(fd);
 }
 
 int main(int argc, char **argv) {
@@ -8537,17 +8554,7 @@ int main(int argc, char **argv) {
         partition_path(disk, esp_partno,  esp_part,  sizeof(esp_part));
         partition_path(disk, root_partno, root_part, sizeof(root_part));
 
-        /* Force the kernel to re-read the partition table right now,
-         * rather than relying on it to notice on its own before
-         * kiba_wait_for_device() starts polling below. */
-        char *rereadpt_argv[4];
-        rereadpt_argv[0] = (char *)"blockdev";
-        rereadpt_argv[1] = (char *)"--rereadpt";
-        rereadpt_argv[2] = (char *)disk;
-        rereadpt_argv[3] = NULL;
-        run_argv(rereadpt_argv); /* best-effort, ignore rc -- if this
-                                   * fails, kiba_wait_for_device() below
-                                   * will time out and surface it */
+        kiba_force_reread_partition_table(disk);
     } else {
         /* ── Dual-boot: reuse the existing ESP, use free space only ──── */
         progress(4, "Looking for an existing EFI partition and free space...");
@@ -8588,17 +8595,7 @@ int main(int argc, char **argv) {
         root_partno = new_partno;
         partition_path(disk, root_partno, root_part, sizeof(root_part));
 
-        /* Force the kernel to re-read the partition table right now,
-         * rather than relying on it to notice on its own before
-         * kiba_wait_for_device() starts polling below. */
-        char *rereadpt_argv[4];
-        rereadpt_argv[0] = (char *)"blockdev";
-        rereadpt_argv[1] = (char *)"--rereadpt";
-        rereadpt_argv[2] = (char *)disk;
-        rereadpt_argv[3] = NULL;
-        run_argv(rereadpt_argv); /* best-effort, ignore rc -- if this
-                                   * fails, kiba_wait_for_device() below
-                                   * will time out and surface it */
+        kiba_force_reread_partition_table(disk);
     }
 
     /* Wait for the kernel/udev to settle before touching the new
