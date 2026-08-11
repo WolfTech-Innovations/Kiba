@@ -97,7 +97,11 @@ cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
-sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+# multilib (32-bit x86 compat) doesn't exist as a concept on ARM -- there's
+# no such repo on the Arch Linux ARM mirrors, so only flip it on for x86_64.
+if [ "${KIBA_ARCH}" = "x86_64" ]; then
+  sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
+fi
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -532,7 +536,11 @@ useradd -r -s /usr/bin/nologin -U alpm 2>/dev/null || true
 mkdir -p /var/cache/pacman/pkg
 chmod 755 /var/cache/pacman /var/cache/pacman/pkg
 chown -R alpm:alpm /var/cache/pacman
-sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+# multilib doesn't exist on ARM mirrors -- this chroot script is shared
+# between x86_64 and aarch64 builds, so check uname -m rather than assume.
+if [ "$(uname -m)" = "x86_64" ]; then
+  sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+fi
 
 # CheckSpace already got disabled for the airootfs pacstrap up in
 # kibaos.sh's PROFILE/pacman.conf, but that edit isn't guaranteed to have
