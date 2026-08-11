@@ -1,7 +1,9 @@
 #!/bin/bash
 set -ex
 
-# --arm for ARM64 builds
+# sniffing out what arch we're building for today >:3
+# archiso doesn't do ARM out of the box so if --arm shows up we gotta
+# build our own copy later. everything downstream just checks $KIBA_ARCH.
 KIBA_ARCH="x86_64"
 for _a in "$@"; do
   case "${_a}" in
@@ -35,14 +37,13 @@ pacman -S --noconfirm --needed \
   base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   grub \
-  openssl curl imagemagick jq
+  openssl curl imagemagick jq \
+  python-docutils
 
-# ── archiso itself: try stock package, except build the aarch64-patched
-#    mkarchiso fork from source. Stock `archiso` doesn't exist as a package
-#    on Arch Linux ARM at all (ALARM's own repos don't carry it), and even
-#    on an x86_64 host the stock mkarchiso hardcodes x86_64-only assumptions
-#    that break an --arm build, so aarch64 always takes the except branch
-#    regardless of which host arch we're building ON. ──────────────────────
+# try normal archiso, except (arm detected) build it from source.
+# ALARM doesn't have an archiso package period, so aarch64 always takes
+# the scenic route. also grabbing python-docutils bc the fork's
+# makefile wants rst2man for the man pages.
 install_archiso() {
   if [ "${KIBA_ARCH}" = "x86_64" ]; then
     if pacman -S --noconfirm --needed archiso; then
@@ -50,7 +51,7 @@ install_archiso() {
     fi
     echo "!! stock archiso failed to install on x86_64 -- falling back to source build" >&2
   fi
-  # except: aarch64 target, or x86_64 stock install failed
+  # except: we're on arm, or x86 face-planted trying to install normally
   local _src="/tmp/archiso-aarch64-src"
   rm -rf "${_src}"
   if ! git clone --depth 1 https://github.com/graphitemaster/archiso-aarch64.git "${_src}" 2>/dev/null \
@@ -59,7 +60,11 @@ install_archiso() {
     exit 1
   fi
   make -C "${_src}" PREFIX=/usr
-  make -C "${_src}" PREFIX=/usr install
+  # make install can faceplant on just the man page and that's fine, we
+  # only actually need mkarchiso itself, not its manual. checking the
+  # binary showed up rather than trusting make's exit code
+  make -C "${_src}" PREFIX=/usr install || \
+    echo "!! 'make install' reported an error (possibly just man page generation) -- checking whether mkarchiso landed anyway" >&2
   if ! command -v mkarchiso >/dev/null 2>&1; then
     echo "FATAL: archiso build from source completed but mkarchiso isn't on PATH" >&2
     exit 1
@@ -119,24 +124,16 @@ file_permissions=(
 PROFILEDEF
 chmod +x "${PROFILE}/profiledef.sh"
 
-# ── aarch64: rewrite the x86_64-hardcoded bits of profiledef.sh in place.
-#    Left as a post-write sed pass rather than templating the heredoc
-#    itself, since the heredoc is intentionally quoted ('PROFILEDEF') to
-#    keep $(date +%Y.%m) unevaluated until profiledef.sh actually runs --
-#    switching it to an interpolating heredoc would evaluate that early
-#    and change the semantics for the plain x86_64 build path too. ───────
+# arm patch pass for profiledef.sh. heredoc's quoted on purpose so
+# $(date...) doesn't fire early, so sed does the arm edits after the
+# fact instead of baking them into the heredoc itself.
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
-  # uefi-x64.grub.eltorito is BIOS-CSM hybrid boot via El Torito -- there's
-  # no BIOS on aarch64, only UEFI, so that half of the tuple just doesn't
-  # apply; uefi-arm64.grub.esp is archiso's aarch64 UEFI-ESP bootmode.
+  # no BIOS on arm, only UEFI exists here, so eltorito gets yeeted
   sed -i "s/bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')/bootmodes=('uefi-arm64.grub.esp')/" \
     "${PROFILE}/profiledef.sh"
   sed -i 's/arch="x86_64"/arch="aarch64"/' "${PROFILE}/profiledef.sh"
-  # -Xbcj x86 is an x86-instruction-stream filter; using it on aarch64
-  # binaries doesn't error, it just silently gives worse compression since
-  # it's filtering the wrong instruction encoding. squashfs-tools >=4.5
-  # ships an arm64 bcj filter -- Arch's package is current enough to have
-  # it either way (native aarch64 build) or cross (x86_64 build host).
+  # x86 bcj filter on arm binaries doesn't explode, just squishes worse
+  # (wrong instruction set to filter for). swap to the arm64 one instead
   sed -i "s/'-Xbcj' 'x86'/'-Xbcj' 'arm64'/" "${PROFILE}/profiledef.sh"
 fi
 
@@ -357,19 +354,14 @@ firejail
 tuned
 PACKAGES
 
-# ── aarch64: swap in the ALARM kernel package, drop x86-only firmware,
-#    and rename the file to match archiso's own packages.${arch} convention
-#    (which mkarchiso reads based on profiledef.sh's arch= value). ────────
+# arm package swap: right kernel, drop the intel-only stuff, rename
+# the file so archiso can actually find it
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
-  # linux-firmware-intel is Intel iGPU GuC/HuC blobs -- there's no such
-  # thing on aarch64, and the package doesn't exist in ALARM's repos, so
-  # pacstrap would just hard-fail resolving it if left in.
+  # intel gpu firmware -- arm doesn't have an intel gpu to feed it to
   sed -i '/^linux-firmware-intel$/d' "${PROFILE}/packages.x86_64"
   sed -i '/^# linux-firmware split the Intel GuC\/HuC blobs/,/^# fails and wlroots\/labwc can never get a working renderer/d' \
     "${PROFILE}/packages.x86_64"
-  # ALARM's generic aarch64 target ships the kernel as linux-aarch64 (with
-  # an EFI-stubbed Image + Image.gz under /boot), not the "linux" name
-  # mainline Arch uses -- headers package follows the same naming.
+  # ALARM names its kernel package linux-aarch64, not plain "linux"
   sed -i 's/^linux$/linux-aarch64/; s/^linux-headers$/linux-aarch64-headers/' \
     "${PROFILE}/packages.x86_64"
   mv "${PROFILE}/packages.x86_64" "${PROFILE}/packages.aarch64"
@@ -461,13 +453,9 @@ if [ "${grub_platform}" == "efi" ]; then
 fi
 GRUBCFG
 
-# %ARCH% above is mkarchiso's own template token (see _build_grub_config)
-# so the /boot/%ARCH%/ path segment is already correct on both arches with
-# no further edit needed. The *filenames* aren't templated by mkarchiso
-# though -- they come straight from whatever the kernel package installs,
-# and linux-aarch64 (unlike plain "linux") names its output
-# vmlinuz-linux-aarch64 / initramfs-linux-aarch64.img, upstream Arch
-# packaging convention of vmlinuz-<pkgname>. Patch those in for aarch64.
+# %ARCH% is mkarchiso's own placeholder so the boot path just works on
+# both arches for free. filenames still need a manual poke tho, since
+# linux-aarch64 names its output vmlinuz-linux-aarch64, not vmlinuz-linux
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
   sed -i \
     -e 's#vmlinuz-linux archisobasedir#vmlinuz-linux-aarch64 archisobasedir#g' \
@@ -7207,16 +7195,12 @@ bool kiba_find_live_image(char *out_path, size_t out_len) {
     }
 
     /* (b) conventional archiso layout, direct check.
-     * The installer binary is only ever run booted on the same arch it
-     * was compiled for (a live aarch64 image can't boot and run an
-     * x86_64 installer, and vice versa) -- so instead of a second build
-     * of this file per arch, ask the running kernel via uname(2) and
-     * build the path at runtime. One binary, correct on whichever arch
-     * actually booted it. */
+     * this binary only ever boots on the arch it was built for, so just
+     * ask the kernel what we are instead of hardcoding it, chirp */
     struct utsname uts;
     const char *live_arch = "x86_64";
     if (uname(&uts) == 0 && uts.machine[0] != '\0') {
-        live_arch = uts.machine; /* "x86_64" or "aarch64" straight from the kernel */
+        live_arch = uts.machine; /* "x86_64" or "aarch64", straight from the kernel's mouth */
     }
     char conventional[5][256];
     snprintf(conventional[0], sizeof(conventional[0]), "/run/archiso/bootmnt/arch/%s/airootfs.sfs", live_arch);
@@ -7310,13 +7294,9 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     *slash = '\0';
     /* work is now ".../<install_dir>" */
 
-    /* Same reasoning as kiba_find_live_image: this binary only ever runs
-     * on the arch it was booted on, so ask the kernel rather than bake
-     * in a literal. The *destination* filenames stay the plain
-     * "vmlinuz-linux"/"initramfs-linux.img" on purpose regardless of
-     * arch -- the installed system's own bootloader config always
-     * refers to those generic names, so this is where the aarch64
-     * package's longer "-linux-aarch64" name gets normalized away. */
+    /* same trick as kiba_find_live_image -- ask uname instead of guessing.
+     * dst names stay generic (vmlinuz-linux) no matter the arch, so the
+     * installed system's bootloader never has to know what booted it. */
     struct utsname kuts;
     const char *karch = "x86_64";
     const char *kpkg_suffix = "linux";           /* package name: "linux" or "linux-aarch64" */
@@ -10215,13 +10195,10 @@ fi
 log "New patch available: ${CURRENT} → ${LATEST}"
 
 # ── Download patch bundle + signature ─────────────────────────────────────
-# Tarballs are per-arch: patches can (and do, e.g. kortexd -- a natively
-# compiled binary, not a script) contain compiled artifacts, so an
-# aarch64 device pulling an untagged tarball built for x86_64 would
-# silently drop an incompatible binary onto the live root. DEV_ARCH is
-# resolved from the running kernel, not baked in at build time, so this
-# stays correct even for an image cloned/re-imaged onto different
-# hardware later.
+# patches are tagged per-arch now -- kortexd's a compiled binary, not a
+# script, so an untagged tarball could hand an arm box an x86 binary and
+# that's a very bad day. DEV_ARCH comes from uname at download time so
+# this stays correct forever, even if a device gets re-imaged later. beep boop
 DEV_ARCH="$(uname -m)"
 PATCH_TAR="${OTA_WORKDIR}/kibaos-ota-${LATEST}-${DEV_ARCH}.tar.gz"
 PATCH_SIG="${PATCH_TAR}.asc"
@@ -10943,13 +10920,9 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   # copied alongside compose.yaml or the bind mount has nothing to point
   # at and `docker compose up -d` fails before the container is created.
   cp -r "${WINAPPS_SRC}/oem" "${CONF_DIR}/oem"
-  # On aarch64, swap the compose file's image from dockur/windows (x86_64
-  # Windows guest) to dockur/windows-arm -- same project, same RDP/8006
-  # setup flow WinApps already expects, but running a Windows 11 ARM64
-  # guest via KVM instead of emulating an x86_64 guest on ARM hardware
-  # (which dockur/windows itself doesn't support anyway). Runtime check
-  # here rather than KIBA_ARCH, since this setup script itself runs later
-  # on the installed system's first login, not at image build time.
+  # arm gets windows-arm instead of windows -- same project, same RDP
+  # setup, just a real arm64 windows guest instead of trying to emulate
+  # x86 windows on arm hardware (which doesn't work anyway, checked!)
   if [ "$(uname -m)" = "aarch64" ]; then
     sed -i -E 's#image: dockurr/windows(:[^[:space:]]*)?$#image: dockurr/windows-arm\1#' "${COMPOSE_FILE}"
   fi
