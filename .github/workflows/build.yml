@@ -4,7 +4,24 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+            docker_image: archlinux:latest
+          # ubuntu-24.04-arm is a GitHub-hosted *native* ARM64 runner (free
+          # for public repos) -- deliberately not QEMU here. kortexd gets
+          # Nuitka-compiled to a native binary during this build and
+          # Nuitka doesn't cross-compile, so emulating aarch64 on an x86_64
+          # runner would either fail outright or produce a binary that
+          # only runs under emulation. menci/archlinuxarm ships a real
+          # linux/arm64 base-devel image, so no binfmt/QEMU layer at all.
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+            docker_image: menci/archlinuxarm:base-devel
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
     outputs:
       patch_num: ${{ github.run_number }}
@@ -13,6 +30,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Free disk space
+        if: matrix.arch == 'x86_64'
         uses: endersonmenezes/free-disk-space@v3
         with:
           remove_android: true
@@ -25,14 +43,20 @@ jobs:
           remove_folders: "/usr/share/swift /usr/share/miniconda /usr/share/az* /usr/local/lib/node_modules /usr/local/share/chromium /usr/local/share/powershell"
           rm_cmd: "rmz"
           rmz_version: "3.1.1"
+          # This action assumes an Ubuntu amd64 image layout (apt package
+          # names, folder paths) that doesn't line up with the arm64
+          # runner image, so it only runs on the x86_64 leg. The arm64
+          # hosted runners ship a smaller default toolset anyway, so
+          # there's less to reclaim.
 
       - name: Run build in Docker
         run: |
           docker run --rm --privileged \
             -v "$PWD:/w" \
             -e RUN_NUM="${{ github.run_number }}" \
-            archlinux:latest \
-            /bin/bash /w/build.sh
+            -e KIBA_ARCH="${{ matrix.arch }}" \
+            "${{ matrix.docker_image }}" \
+            /bin/bash /w/build.sh ${{ matrix.arch == 'aarch64' && '--arm' || '' }}
 
       # ── ISO uploads immediately, in parallel with everything else ─────────
       # This has zero dependency on the OTA manifest/diff/sign pipeline below,
@@ -52,7 +76,10 @@ jobs:
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
           sudo apt-get install -y sshpass rsync
           # Single rsync call for all ISO/checksum files instead of one
-          # connection per file.
+          # connection per file. mkarchiso already bakes the arch into the
+          # ISO filename itself (kibaos-<version>-<arch>.iso, from
+          # profiledef.sh's arch= value), so both matrix legs' filenames
+          # never collide on SourceForge without any extra renaming here.
           sshpass -e rsync -avP --progress \
             *.iso *.iso.sha256 \
             "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
@@ -60,13 +87,20 @@ jobs:
       - name: Upload ISO artifact for OTA job
         uses: actions/upload-artifact@v4
         with:
-          name: kibaos-iso
+          # Matrix legs share the runner-level "kibaos-iso" name by default,
+          # which would silently overwrite one arch's ISO with the other's
+          # in the shared artifact store -- suffix by arch to keep both.
+          name: kibaos-iso-${{ matrix.arch }}
           path: |
             *.iso
           retention-days: 1
 
   ota:
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x86_64, aarch64]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -76,7 +110,7 @@ jobs:
       - name: Download ISO artifact
         uses: actions/download-artifact@v4
         with:
-          name: kibaos-iso
+          name: kibaos-iso-${{ matrix.arch }}
 
       - name: Install tools
         run: sudo apt-get install -y squashfs-tools sshpass rsync
@@ -92,6 +126,9 @@ jobs:
           mkdir -p /tmp/airootfs-extracted
           # -processors matches runner core count; single biggest win for
           # this step since unsquashfs was running single-threaded before.
+          # Note: this step itself runs on an amd64 runner regardless of
+          # matrix.arch -- unsquashfs just reads the squashfs data format,
+          # which is arch-agnostic, so it doesn't need to run on-arch.
           sudo unsquashfs -d /tmp/airootfs-extracted -processors "$(nproc)" "$SFS"
           sudo umount /tmp/iso-mount
           echo "Extracted file count: $(find /tmp/airootfs-extracted -type f | wc -l)"
@@ -103,8 +140,13 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+          # Per-arch baseline -- the two arches' rootfs contents diverge
+          # completely (different kernel package, no linux-firmware-intel
+          # on aarch64, etc.), so diffing aarch64's current manifest
+          # against an x86_64 baseline would flag nearly every file as
+          # "changed" and produce a useless, enormous patch.
           sshpass -e rsync -avP \
-            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest.txt" \
+            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest-${{ matrix.arch }}.txt" \
             ./last-build-manifest.txt 2>/dev/null || \
             echo "No previous manifest found — this is a full baseline build."
 
@@ -162,7 +204,8 @@ jobs:
         if: steps.diff.outputs.has_changes == 'true'
         run: |
           PATCH_NUM="${{ needs.build.outputs.patch_num }}"
-          PATCH_DIR="ota-patch-${PATCH_NUM}"
+          ARCH="${{ matrix.arch }}"
+          PATCH_DIR="ota-patch-${PATCH_NUM}-${ARCH}"
           mkdir -p "${PATCH_DIR}"
 
           echo "Bundling changed files from extracted airootfs..."
@@ -186,14 +229,17 @@ jobs:
           cd "${PATCH_DIR}"
           find . -type f -print0 \
             | xargs -0 -P "$(nproc)" -n 64 sha256sum \
-            > "../kibaos-ota-${PATCH_NUM}-manifest.txt"
+            > "../kibaos-ota-${PATCH_NUM}-${ARCH}-manifest.txt"
           cd ..
 
           echo "Patch manifest:"
-          cat "kibaos-ota-${PATCH_NUM}-manifest.txt"
+          cat "kibaos-ota-${PATCH_NUM}-${ARCH}-manifest.txt"
 
-          tar czf "kibaos-ota-${PATCH_NUM}.tar.gz" "${PATCH_DIR}/"
-          echo "Patch size: $(du -sh kibaos-ota-${PATCH_NUM}.tar.gz | cut -f1)"
+          # Arch-tagged tarball name -- matches what kibaos-ota (the
+          # on-device daemon) requests via $(uname -m) at patch-apply
+          # time, so an aarch64 device only ever pulls the aarch64 patch.
+          tar czf "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz" "${PATCH_DIR}/"
+          echo "Patch size: $(du -sh kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz | cut -f1)"
 
       - name: Sign OTA patch
         if: steps.diff.outputs.has_changes == 'true'
@@ -206,19 +252,27 @@ jobs:
           echo "${KEY_FP}:6:" | gpg --import-ownertrust
 
           PATCH_NUM="${{ needs.build.outputs.patch_num }}"
+          ARCH="${{ matrix.arch }}"
           gpg --batch --yes \
               --local-user ota@kibaos.wolftech.tech \
               --detach-sign --armor \
-              "kibaos-ota-${PATCH_NUM}.tar.gz"
+              "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz"
 
-          gpg --verify "kibaos-ota-${PATCH_NUM}.tar.gz.asc" \
-                       "kibaos-ota-${PATCH_NUM}.tar.gz" && \
+          gpg --verify "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz.asc" \
+                       "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz" && \
             echo "Signature verified OK." || \
             { echo "Signature self-check failed!"; exit 1; }
 
       - name: Write latest-patch-level
         if: steps.diff.outputs.has_changes == 'true'
-        run: echo "${{ needs.build.outputs.patch_num }}" > latest-patch-level
+        run: |
+          # Shared across both arches on purpose -- PATCH_NUM is the same
+          # run_number for both matrix legs, and kibaos-ota only uses this
+          # number to decide *whether* to update, then fetches the
+          # arch-tagged tarball for that same number. One shared file
+          # here is correct as long as both matrix legs actually produce
+          # a patch for this run (they do, barring a build failure).
+          echo "${{ needs.build.outputs.patch_num }}" > latest-patch-level
 
       # ── Single batched rsync instead of one connection per file ───────────
       - name: Upload OTA artifacts to SourceForge
@@ -233,29 +287,39 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
           PATCH_NUM="${{ needs.build.outputs.patch_num }}"
+          ARCH="${{ matrix.arch }}"
 
           echo "Uploading baseline manifest..."
           sshpass -e rsync -avP \
             "baseline-manifest.txt" \
-            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest.txt"
+            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest-${ARCH}.txt"
 
           if [ "${{ steps.diff.outputs.has_changes }}" == "true" ]; then
             sshpass -e rsync -avP \
-              "kibaos-ota-${PATCH_NUM}.tar.gz" \
-              "kibaos-ota-${PATCH_NUM}.tar.gz.asc" \
-              "kibaos-ota-${PATCH_NUM}-manifest.txt" \
+              "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz" \
+              "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz.asc" \
+              "kibaos-ota-${PATCH_NUM}-${ARCH}-manifest.txt" \
+              "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/"
+            echo "OTA patch ${PATCH_NUM} (${ARCH}) uploaded."
+          else
+            echo "No changes for ${ARCH} — only baseline manifest updated."
+          fi
+
+          # latest-patch-level is shared/arch-agnostic (see previous step)
+          # -- only push it once, from the x86_64 leg, so the two matrix
+          # jobs don't race to overwrite it with the same value.
+          if [ "${ARCH}" = "x86_64" ]; then
+            sshpass -e rsync -avP \
               "latest-patch-level" \
               "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/"
-            echo "OTA patch ${PATCH_NUM} uploaded."
-          else
-            echo "No changes — only baseline manifest updated."
           fi
 
       - name: Tag this build
-        if: steps.diff.outputs.has_changes == 'true'
+        if: steps.diff.outputs.has_changes == 'true' && matrix.arch == 'x86_64'
         run: |
+          # Tag once per run, not once per matrix leg -- the tag is a
+          # marker for the run/patch number, not per-arch.
           git config user.name  "KibaOS OTA Bot"
           git config user.email "ota@kibaos.wolftech.tech"
           git tag "ota-patch-${{ needs.build.outputs.patch_num }}"
           git push origin "ota-patch-${{ needs.build.outputs.patch_num }}" 2>/dev/null || true
-          
