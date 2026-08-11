@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-# sniffing out what arch we're building for today >:3
+# sniffing out what arch we're building for today :3
 # archiso doesn't do ARM out of the box so if --arm shows up we gotta
 # build our own copy later. everything downstream just checks $KIBA_ARCH.
 KIBA_ARCH="x86_64"
@@ -12391,6 +12391,33 @@ chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
 # ══════════════════════════════════════════════════════════════════════════
 cd "${WORKDIR}"
 rm -rf "${WORKDIR}/work"
+
+# mkarchiso's own _make_pacman_conf points pacstrap at an isolated GPGDir
+# under here (work/pacman-gnupg/), and pacstrap itself is invoked with -G
+# (never copies the host's /etc/pacman.d/gnupg in) -- mkarchiso's
+# _make_packages also never calls pacman-key on its own, so that GPGDir
+# starts out completely empty. On x86_64 this is invisible because
+# archlinux-keyring is a dependency of base and its own post-install
+# scriptlet populates the archlinux keys as part of pacstrap installing
+# it. ALARM packages are signed by a different key ("Arch Linux ARM
+# Build System <builder@archlinuxarm.org>") that the archlinux keyring
+# doesn't carry at all, and there's no archlinuxarm-keyring package on
+# this host's own x86_64 repos to pull it in the same way -- so on
+# aarch64 that GPGDir needs the ALARM key seeded by hand, before mkarchiso
+# ever touches this directory. Fingerprint per archlinuxarm.org's own
+# install docs and independently confirmed across several ALARM forum
+# threads: 68B3 537F 39A3 13B3 E574 D067 7719 3F15 2BDB E6A6.
+if [ "${KIBA_ARCH}" = "aarch64" ]; then
+  mkdir -p "${WORKDIR}/work/pacman-gnupg"
+  pacman-key --gpgdir "${WORKDIR}/work/pacman-gnupg" --init
+  pacman-key --gpgdir "${WORKDIR}/work/pacman-gnupg" --populate archlinux
+  pacman-key --gpgdir "${WORKDIR}/work/pacman-gnupg" --recv-keys \
+    68B3537F39A313B3E574D06777193F152BDBE6A6 \
+    --keyserver keyserver.ubuntu.com
+  pacman-key --gpgdir "${WORKDIR}/work/pacman-gnupg" --lsign-key \
+    68B3537F39A313B3E574D06777193F152BDBE6A6
+fi
+
 mkarchiso -v -w work -o out "${PROFILE}/"
 
 if ls out/*.iso 1>/dev/null 2>&1; then
