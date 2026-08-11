@@ -575,6 +575,22 @@ sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
 rm -rf /etc/pacman.d/gnupg
 pacman-key --init
 pacman-key --populate archlinux
+# ALARM-signed packages (gtk4-layer-shell, patchelf, pip's aarch64 deps
+# like python-cryptography/python-cffi, etc.) are signed by the Arch
+# Linux ARM Build System key, which the archlinux keyring above does not
+# carry. Without this, `pacman -S` on any ALARM package later in this
+# script fails with "signature ... unknown trust" -- the key gets
+# auto-fetched but never locally signed. This mirrors the recv/lsign done
+# for work/pacman-gnupg near the end of the outer build script, but that
+# one only covers the keyring pacstrap uses to populate the airootfs --
+# this chroot rebuilt its own separate keyring above, so it needs the
+# same treatment independently. $KIBA_ARCH isn't visible inside this
+# chroot, so detect via uname instead.
+if [ "$(uname -m)" = "aarch64" ]; then
+  pacman-key --recv-keys 68B3537F39A313B3E574D06777193F152BDBE6A6 \
+    --keyserver keyserver.ubuntu.com
+  pacman-key --lsign-key 68B3537F39A313B3E574D06777193F152BDBE6A6
+fi
 pacman -Syy --noconfirm
 
 # ── clear out disk before we install anything else ──────────────────────────
