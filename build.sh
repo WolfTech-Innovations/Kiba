@@ -7246,6 +7246,7 @@ cat > kiba_install_finish.c << 'KIBA_SRC_END_FINC'
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -7927,9 +7928,52 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     if (cb) cb(94, "Finishing up...", user_data);
     {
+        /* mkinitcpio with no -k falls back to `uname -r` -- which, inside
+         * a chroot, is still the LIVE ENVIRONMENT's running kernel version,
+         * not whatever the `linux` package pacman just pulled into
+         * target_root. chroot() only changes the filesystem root; uname()
+         * is answered by the actual running kernel regardless. With
+         * kiba-kernel this was a non-issue (same exact package/version
+         * baked into both the ISO and the install target, always). Stock
+         * `linux` from pacman removes that guarantee -- if the live ISO's
+         * kernel and the freshly-installed one ever drift, mkinitcpio
+         * silently builds against a /usr/lib/modules/<wrong-version>/
+         * that doesn't exist in target_root, producing an initramfs with
+         * no real modules in it (no root fs driver, no block layer) --
+         * which is exactly what an emergency-shell-on-first-boot looks
+         * like. Read the actual installed kernel version out of
+         * target_root's own /usr/lib/modules instead of trusting ambient
+         * uname -r, and pass it explicitly via -k. */
+        char kver[256] = {0};
+        {
+            char modpath[1024];
+            snprintf(modpath, sizeof(modpath), "%s/usr/lib/modules", target_root);
+            DIR *d = opendir(modpath);
+            if (d) {
+                struct dirent *ent;
+                while ((ent = readdir(d)) != NULL) {
+                    if (ent->d_name[0] == '.') continue;
+                    char full[1200];
+                    snprintf(full, sizeof(full), "%s/%s", modpath, ent->d_name);
+                    struct stat st;
+                    if (stat(full, &st) == 0 && S_ISDIR(st.st_mode)) {
+                        snprintf(kver, sizeof(kver), "%s", ent->d_name);
+                        break; /* stock `linux` ships exactly one versioned dir here */
+                    }
+                }
+                closedir(d);
+            }
+        }
+        if (kver[0] == '\0') {
+            snprintf(g_finish_err, sizeof(g_finish_err),
+                     "couldn't find an installed kernel under /usr/lib/modules");
+            return -1;
+        }
+
         char *argv[] = {
             (char *)"mkinitcpio", (char *)"-c", (char *)"/etc/mkinitcpio.conf.d/installed.conf",
-            (char *)"-g", (char *)"/boot/initramfs-linux.img", NULL
+            (char *)"-g", (char *)"/boot/initramfs-linux.img",
+            (char *)"-k", kver, NULL
         };
         if (chroot_run(target_root, argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "mkinitcpio failed");
@@ -11857,9 +11901,7 @@ systemctl enable kibaos-boot-dns.service
 # Rewriting them to Windows 10/11's classic defaults (TTL 128, window
 # 65535) flips the top-line guess on both tools without touching
 # anything user-visible -- no GUI, no config anyone opens, nothing in
-# /etc/os-release. This is separate from and unrelated to kiba-identity
-# (that's libc's uname(), purely local; this is packets actually hitting
-# the wire).
+# /etc/os-release, no libc-level uname() shim.
 #
 # Deliberately NOT touching TCP option order/presence (MSS/WScale/SACK/
 # Timestamp ordering, also fingerprinted) -- doing that means rewriting
