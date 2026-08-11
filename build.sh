@@ -37,6 +37,7 @@ pacman -S --noconfirm --needed \
   base-devel git squashfs-tools libisoburn mtools dosfstools \
   cmake ninja meson \
   grub \
+  arch-install-scripts \
   openssl curl imagemagick jq \
   python-docutils
 
