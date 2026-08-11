@@ -97,68 +97,6 @@ LOGO=kibaos
 OSRELEASE
 
 # ══════════════════════════════════════════════════════════════════════════
-# kiba-identity — LD_PRELOAD uname() shim
-# ══════════════════════════════════════════════════════════════════════════
-# Makes uname()'s sysname read "KibaOS" instead of "Linux" for every
-# process on the system, without touching the kernel itself.
-#
-# This was pulled once before and blamed for a Mesa/EGL "kernel too old"
-# error. That diagnosis was wrong -- the actual cause was the *kernel-
-# level* UTS_SYSNAME patch KibaOS was building at the time (a from-source
-# kiba-kernel with UTS_SYSNAME itself changed), not this shim. The two
-# are not the same mechanism: a kernel-level UTS_SYSNAME edit changes
-# what the sys_newuname syscall itself returns to *every* caller,
-# including anything that talks to the kernel directly (e.g. Mesa's DRM
-# ioctl-based version probing, which doesn't go through libc's uname()
-# wrapper at all). An LD_PRELOAD shim only intercepts the libc uname()
-# call site -- it never touches what the DRM ioctls report -- so it was
-# never actually capable of causing that failure in the first place.
-# Bringing it back now that KibaOS runs stock Arch `linux` with no
-# kernel-level UTS_SYSNAME patch of any kind.
-#
-# Deliberately only touches sysname. nodename/release/version/machine
-# are left as whatever the real uname() call reports -- release in
-# particular needs to stay a real, correctly-ordered kernel version
-# string (e.g. "6.12.6-arch1-1") for anything that version-gates off it.
-mkdir -p "${AIROOTFS}/usr/lib"
-cat > /tmp/kiba-identity.c << 'IDENTITYC'
-#define _GNU_SOURCE
-#include <sys/utsname.h>
-#include <string.h>
-#include <dlfcn.h>
-
-int uname(struct utsname *buf) {
-    static int (*real_uname)(struct utsname *) = NULL;
-    if (!real_uname) {
-        real_uname = dlsym(RTLD_NEXT, "uname");
-    }
-
-    int ret = real_uname(buf);
-    if (ret == 0) {
-        strncpy(buf->sysname, "KibaOS", sizeof(buf->sysname) - 1);
-        buf->sysname[sizeof(buf->sysname) - 1] = '\0';
-    }
-    return ret;
-}
-IDENTITYC
-
-gcc -shared -fPIC -O2 -Wall \
-    -o "${AIROOTFS}/usr/lib/kiba-identity.so" \
-    /tmp/kiba-identity.c -ldl
-chmod 755 "${AIROOTFS}/usr/lib/kiba-identity.so"
-rm -f /tmp/kiba-identity.c
-
-# ld.so.preload is a plain newline-separated list of shared objects
-# loaded into every dynamically-linked process on the system, ahead of
-# everything else in the link order -- exactly what's needed for a
-# uname() override to reach every caller instead of only ones launched
-# with LD_PRELOAD set explicitly in their own environment.
-touch "${AIROOTFS}/etc/ld.so.preload"
-grep -qxF '/usr/lib/kiba-identity.so' "${AIROOTFS}/etc/ld.so.preload" || \
-  echo '/usr/lib/kiba-identity.so' >> "${AIROOTFS}/etc/ld.so.preload"
-chmod 644 "${AIROOTFS}/etc/ld.so.preload"
-
-# ══════════════════════════════════════════════════════════════════════════
 # Package list
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
