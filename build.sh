@@ -27,392 +27,17 @@ pacman -S --noconfirm --needed \
   openssl curl imagemagick jq
 
 # ══════════════════════════════════════════════════════════════════════════
-# LINUX-KIBA — custom-branded kernel, built from Arch's own linux source,
-# NOT a vanilla kernel.org tarball
+# Kernel: stock Arch `linux` package, no runtime kernel build
 # ══════════════════════════════════════════════════════════════════════════
-# Switched here from a from-scratch kernel.org + `make defconfig` build.
-# defconfig's minimal baseline was the root cause of a whole string of
-# separately-chased bugs -- missing WLAN drivers, missing USB tethering
-# drivers, no Landlock -- because defconfig genuinely doesn't ship most of
-# what a real desktop needs, and every gap had to be found the hard way
-# (a dead feature in the field) and patched in one at a time. Arch's own
-# `linux` package config is the actual tested, comprehensive baseline
-# millions of real desktops run -- switching to it as the starting point
-# fixes that whole class of bug at the root instead of continuing to
-# whack individual moles.
-#
-# This does NOT bring back the earlier problem that caused the move away
-# from Arch's source in the first place (three build breaks in a row from
-# Arch's own PKGBUILD restructuring between CI runs). That happened
-# because the old approach cloned Arch's *PKGBUILD* and inherited its
-# prepare()/build() structure directly, so any refactor upstream broke us
-# too. This keeps our own from-scratch PKGBUILD structure (prepare/build/
-# package written and owned here, nothing inherited from Arch's actual
-# PKGBUILD file) and only takes two things from Arch: their pinned kernel
-# *source* (a git tag off github.com/archlinux/linux, resolved fresh each
-# run from whatever `linux` version Arch's mirrors currently carry) and
-# their shipped *.config* as the starting baseline before our own
-# scripts/config overlay runs. Neither of those can "restructure" out
-# from under us the way a PKGBUILD's shell logic can.
-echo "=== Resolving current Arch linux package version ==="
-pacman -Sy --noconfirm
-ALINUX_FULLVER=$(pacman -Si linux | awk -F': ' '/^Version *:/{print $2; exit}')
-if [ -z "${ALINUX_FULLVER}" ]; then
-  echo "ERROR: couldn't resolve Arch's current 'linux' package version via pacman -Si" >&2
-  exit 1
-fi
-ALINUX_PKGVER="${ALINUX_FULLVER%-*}"                    # drop -pkgrel, e.g. "6.12.6.arch1"
-ALINUX_SRCTAG="v${ALINUX_PKGVER%.*}-${ALINUX_PKGVER##*.}"  # -> "v6.12.6-arch1", archlinux/linux's tag format
-echo "=== Building kiba-kernel against Arch linux ${ALINUX_PKGVER} (source tag ${ALINUX_SRCTAG}) ==="
-
-KBUILD_DIR="/w/kiba-kernel-build"
-KIBA_REPO_DIR="/w/kiba-repo/x86_64"
-mkdir -p "${KBUILD_DIR}" "${KIBA_REPO_DIR}"
-
-# Arch's own shipped x86_64 .config -- pulled straight off disk via
-# linux-headers instead of fetched from a URL.
-#
-# Both external sources tried before this were dead ends:
-#   - raw.githubusercontent.com/archlinux/linux/<tag>/config -- 404 always,
-#     at every tag checked. That repo is only the kernel *source* mirror
-#     (patches on top of vanilla) and has never shipped a .config file.
-#   - gitlab.archlinux.org/.../packages/linux/-/raw/<tag>/config -- this IS
-#     where Arch's real shipped config lives, but the whole gitlab.archlinux.org
-#     host sits behind the Anubis anti-bot wall, which hands plain curl/CI
-#     clients a block page instead of the file (confirmed directly: fetching
-#     that URL returns Anubis's "Access Denied" page, not raw content).
-#
-# linux-headers sidesteps both problems entirely: it ships the exact config
-# Arch built that exact kernel version with, already local at
-# /usr/lib/modules/<kver>/build/.config, with zero network fetch and zero
-# tag-format guessing -- and it's guaranteed to match ALINUX_FULLVER since
-# pacman resolves it from the same synced repos.
-echo "=== Installing linux-headers to source Arch's shipped .config ==="
-pacman -S --noconfirm --needed linux-headers
-
-KVER_DIR=$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -print -quit)
-if [ -z "${KVER_DIR}" ] || [ ! -f "${KVER_DIR}/build/.config" ]; then
-  echo "ERROR: couldn't find a shipped .config under /usr/lib/modules/*/build/.config after installing linux-headers" >&2
-  exit 1
-fi
-echo "=== Using shipped config from: ${KVER_DIR}/build/.config ==="
-cp "${KVER_DIR}/build/.config" "${KBUILD_DIR}/config"
-CONFIG_SHA256=$(sha256sum "${KBUILD_DIR}/config" | awk '{print $1}')
-echo "=== Arch config sha256: ${CONFIG_SHA256} ==="
-
-cat > "${KBUILD_DIR}/PKGBUILD" << 'PKGBUILDEOF'
-pkgbase=kiba-kernel
-pkgname=(kiba-kernel kiba-kernel-headers)
-pkgver=@@ALINUX_PKGVER@@
-pkgrel=1
-arch=(x86_64)
-url="https://github.com/archlinux/linux"
-license=(GPL-2.0-only)
-makedepends=(bc cpio gettext libelf pahole perl python tar xz kmod openssl git)
-options=(!strip !debug)
-_srcname=archlinux-linux
-_srctag=@@ALINUX_SRCTAG@@
-source=(
-  "${_srcname}::git+https://github.com/archlinux/linux#tag=${_srctag}"
-  "config"
-)
-# git source is tag-pinned above (that's its integrity guarantee, same as
-# Arch's own linux-git PKGBUILD uses SKIP for VCS sources); "config" here
-# is a plain local filename (no URL), so makepkg picks it up straight from
-# this same directory (${KBUILD_DIR}/config, dropped there before this
-# PKGBUILD is written -- sourced from linux-headers' shipped
-# /usr/lib/modules/<kver>/build/.config, not fetched from the network).
-# It still gets a real sha256 pin since it's a real on-disk file.
-sha256sums=('SKIP' '@@CONFIG_SHA256@@')
-
-prepare() {
-  cd "${_srcname}"
-
-  # Start from Arch's own shipped config, not `make defconfig` -- this is
-  # the actual fix for the whole class of "defconfig doesn't ship X"
-  # bugs (WLAN, USB tethering, Landlock, all previously patched in one at
-  # a time below). olddefconfig reconciles it against this exact checked-
-  # out source tree/version before we touch anything ourselves.
-  cp ../config .config
-  make olddefconfig
-
-  # sysname ("Linux") is intentionally left untouched everywhere now --
-  # no kernel-level UTS_SYSNAME patch, no LD_PRELOAD shim (kiba-identity
-  # was removed). Both were tried and both broke real userspace: the
-  # raw kernel patch made `uname -s`/sysname itself report "KibaOS" for
-  # every process with zero escape hatch, and a lot of software --
-  # including kernel-feature-gating code in Mesa -- treats sysname !=
-  # "Linux" as "can't determine kernel version, assume ancient/
-  # unsupported" instead of failing open. That's what threw the "kernel
-  # too old" EGL error. Branding now lives ONLY in the release string
-  # (below -- e.g. "6.12.6-kibaos"), which every version-parsing
-  # consumer handles fine since it still starts with a real,
-  # correctly-ordered version number.
-  #
-  # This is Arch's own convention, not something invented here: their
-  # actual `linux`/`linux-git` PKGBUILDs (archlinux/linux upstream)
-  # don't set CONFIG_LOCALVERSION in .config at all -- they drop a
-  # plain `localversion` file in the source root instead. setlocalversion
-  # (scripts/setlocalversion) collects any localversion* files in the
-  # tree and folds their contents into the release string as a
-  # completely separate step from the CONFIG_LOCALVERSION Kconfig
-  # string, before auto.conf even needs to exist -- which is exactly
-  # why it's more reliable than relying on the .config round-trip
-  # through olddefconfig.
-  echo "-kibaos" > localversion
-
-  # NOTE: CONFIG_LOCALVERSION is deliberately NOT set here. The
-  # `localversion` file above already supplies the "-kibaos" suffix --
-  # setting it again via .config would concatenate both
-  # (file_localversion + CONFIG_LOCALVERSION), producing
-  # "-kibaos-kibaos". Same reasoning as why LOCALVERSION= is passed
-  # explicitly (and empty) everywhere kernelrelease gets queried below
-  # and in build()/package() -- one source of truth for this string,
-  # matching Arch's own linux/linux-git PKGBUILD convention exactly.
-  #
-  # LOCALVERSION_AUTO also matters more now than it did against a plain
-  # tarball -- this IS a real git checkout (source is a git tag, not a
-  # tarball), so without disabling it setlocalversion would try to
-  # append a "-gxxxxxxx" scm hash suffix on top of everything else.
-  # Disabling it here, same as before, keeps the release string exactly
-  # "<version>-kibaos", nothing else appended.
-  scripts/config --disable CONFIG_LOCALVERSION_AUTO
-  # Hostname baked into the kernel itself, shown before userspace/DHCP
-  # ever sets a real one -- otherwise defaults to the generic "(none)".
-  scripts/config --set-str CONFIG_DEFAULT_HOSTNAME "kibaos"
-  # Purely cosmetic, folds into the kernel's build-ID.
-  scripts/config --set-str CONFIG_BUILD_SALT "kibaos"
-
-  # Everything below this point was originally written to patch gaps in
-  # `make defconfig`'s minimal baseline -- Arch's own config (now our
-  # starting point above) already ships virtually all of it. Left in
-  # explicitly anyway as reinforcement/documentation of what KibaOS
-  # actually depends on being on: harmless if Arch's config already
-  # enabled it (these are idempotent), and it means a future Arch config
-  # change can't silently regress any of this out from under us the way
-  # defconfig's gaps did originally.
-  scripts/config --enable CONFIG_DEBUG_INFO_BTF
-  scripts/config --enable CONFIG_MODULES
-  scripts/config --enable CONFIG_BTRFS_FS
-  scripts/config --enable CONFIG_NTFS3_FS
-  scripts/config --enable CONFIG_NTFS3_LZX_XPRESS
-  scripts/config --enable CONFIG_OVERLAY_FS
-  # archiso's live boot loop-mounts airootfs.sfs/.erofs (see the
-  # archiso mkinitcpio hook + /run/archiso/bootmnt paths elsewhere in
-  # this script).
-  scripts/config --enable CONFIG_BLK_DEV_LOOP
-  scripts/config --enable CONFIG_SQUASHFS
-  scripts/config --enable CONFIG_SQUASHFS_XZ
-  scripts/config --enable CONFIG_SQUASHFS_ZSTD
-  scripts/config --enable CONFIG_EROFS_FS
-  scripts/config --enable CONFIG_EROFS_FS_ZIP
-  # archiso's mkinitcpio hooks need these two beyond squashfs/loop:
-  # 'memdisk' hook wants phram+mtdblock, 'archiso' hook wants dm_snapshot.
-  scripts/config --enable CONFIG_MTD
-  scripts/config --enable CONFIG_MTD_PHRAM
-  scripts/config --enable CONFIG_MTD_BLOCK
-  scripts/config --enable CONFIG_BLK_DEV_DM
-  scripts/config --enable CONFIG_DM_SNAPSHOT
-  # zram-generator is configured (see zram-generator.conf later in this
-  # script) to bring up /dev/zram0 for swap.
-  scripts/config --enable CONFIG_ZRAM
-  scripts/config --enable CONFIG_ZSMALLOC
-  scripts/config --enable CONFIG_CRYPTO_LZO
-  scripts/config --enable CONFIG_CRYPTO_ZSTD
-  scripts/config --enable CONFIG_FUSE_FS
-  scripts/config --enable CONFIG_USB_STORAGE
-  # USB tethering (phone-as-modem over USB).
-  scripts/config --module CONFIG_USB_USBNET
-  scripts/config --module CONFIG_USB_NET_CDCETHER
-  scripts/config --module CONFIG_USB_NET_CDC_NCM
-  scripts/config --module CONFIG_USB_NET_RNDIS_HOST
-  scripts/config --module CONFIG_USB_NET_CDC_SUBSET
-
-  # WLAN
-  scripts/config --enable CONFIG_WLAN
-  scripts/config --module CONFIG_CFG80211
-  scripts/config --module CONFIG_MAC80211
-  scripts/config --module CONFIG_IWLWIFI
-  scripts/config --module CONFIG_IWLMVM
-  scripts/config --module CONFIG_ATH9K
-  scripts/config --module CONFIG_ATH10K
-  scripts/config --module CONFIG_ATH10K_PCI
-  scripts/config --module CONFIG_ATH11K
-  scripts/config --module CONFIG_ATH11K_PCI
-  scripts/config --module CONFIG_RTLWIFI
-  scripts/config --module CONFIG_RTL8192CE
-  scripts/config --module CONFIG_RTL8188EE
-  scripts/config --module CONFIG_RTL8723AE
-  scripts/config --module CONFIG_RTW88
-  scripts/config --module CONFIG_RTW88_8822CE
-  scripts/config --module CONFIG_RTW88_8821CE
-  scripts/config --module CONFIG_RTW89
-  scripts/config --module CONFIG_RTW89_8852AE
-  scripts/config --module CONFIG_RTL8XXXU
-  scripts/config --enable CONFIG_VIRTIO
-  scripts/config --enable CONFIG_VIRTIO_PCI
-  scripts/config --enable CONFIG_VIRTIO_NET
-  scripts/config --enable CONFIG_VIRTIO_BLK
-  scripts/config --enable CONFIG_VIRTIO_CONSOLE
-  scripts/config --enable CONFIG_KVM
-  scripts/config --enable CONFIG_KVM_INTEL
-  scripts/config --enable CONFIG_KVM_AMD
-  scripts/config --enable CONFIG_CGROUPS
-  scripts/config --enable CONFIG_NAMESPACES
-  scripts/config --module CONFIG_NF_TABLES
-  scripts/config --module CONFIG_WIREGUARD
-
-  # Graphics/KMS
-  scripts/config --enable CONFIG_DRM
-  scripts/config --enable CONFIG_DRM_KMS_HELPER
-  scripts/config --enable CONFIG_DRM_FBDEV_EMULATION
-  scripts/config --enable CONFIG_FB
-  scripts/config --enable CONFIG_FRAMEBUFFER_CONSOLE
-  scripts/config --enable CONFIG_SYSFB_SIMPLEFB
-  scripts/config --enable CONFIG_DRM_SIMPLEDRM
-  scripts/config --enable CONFIG_BACKLIGHT_CLASS_DEVICE
-  scripts/config --module CONFIG_DRM_I915
-  scripts/config --module CONFIG_DRM_AMDGPU
-  scripts/config --enable CONFIG_DRM_AMD_DC
-  scripts/config --module CONFIG_DRM_NOUVEAU
-  scripts/config --module CONFIG_DRM_VIRTIO_GPU
-  # mkinitcpio's COMPRESSION is pinned to gzip (see mkinitcpio.conf.d
-  # fragments) for GRUB compatibility on older boards.
-  scripts/config --enable CONFIG_RD_GZIP
-
-  # Landlock -- unprivileged sandboxing LSM, also what pacman's own
-  # download sandbox (DownloadUser = alpm -- see the alpm user/group
-  # precreated at the very top of this script) uses under the hood.
-  scripts/config --enable CONFIG_SECURITY
-  scripts/config --enable CONFIG_SECURITY_LANDLOCK
-  # boot cmdline's lsm= (see kiba_install_finalize's UKI cmdline further
-  # down) already lists 'landlock' first, so no CONFIG_LSM default-string
-  # edit needed here -- the boot param takes precedence either way.
-
-  make olddefconfig
-
-  # scripts/config --enable/--module only *requests* a symbol -- if its
-  # `depends on` chain isn't already satisfied, olddefconfig silently
-  # answers "disabled" instead of erroring, with nothing in the log to
-  # show it happened. Verify the full list landed instead of assuming it
-  # did, same as before -- still worth checking even against Arch's own
-  # config as the base, since our own additions on top can still fail
-  # silently the same way.
-  for _drmopt in CONFIG_DRM CONFIG_DRM_KMS_HELPER CONFIG_DRM_SIMPLEDRM \
-                 CONFIG_FRAMEBUFFER_CONSOLE CONFIG_DRM_I915 \
-                 CONFIG_DRM_AMDGPU CONFIG_DRM_AMD_DC CONFIG_DRM_NOUVEAU \
-                 CONFIG_DRM_VIRTIO_GPU CONFIG_DEBUG_INFO_BTF CONFIG_RD_GZIP \
-                 CONFIG_MTD_PHRAM CONFIG_MTD_BLOCK CONFIG_DM_SNAPSHOT \
-                 CONFIG_SECURITY CONFIG_SECURITY_LANDLOCK \
-                 CONFIG_USB_USBNET CONFIG_USB_NET_CDCETHER \
-                 CONFIG_USB_NET_CDC_NCM CONFIG_USB_NET_RNDIS_HOST \
-                 CONFIG_WLAN CONFIG_CFG80211 CONFIG_MAC80211 \
-                 CONFIG_IWLWIFI CONFIG_IWLMVM CONFIG_ATH9K CONFIG_ATH10K \
-                 CONFIG_ATH11K CONFIG_RTLWIFI CONFIG_RTW88 CONFIG_RTW89 \
-                 CONFIG_RTL8XXXU; do
-    echo "=== ${_drmopt} resolved to: $(grep -E "^${_drmopt}=" .config || echo NOT-SET) ==="
-  done
-
-  echo "=== pahole: $(pahole --version 2>&1) ==="
-}
-
-build() {
-  cd "${_srcname}"
-  # Without these, /proc/version and `uname -v` bake in whoever actually
-  # ran the compile -- on CI that's the runner's real username@hostname,
-  # leaking straight into every install. Override explicitly.
-  export KBUILD_BUILD_USER=kiba
-  export KBUILD_BUILD_HOST=kibaos
-  # LOCALVERSION= explicitly empty here -- the `localversion` file
-  # (see prepare()) is the single source of truth for the "-kibaos"
-  # suffix; passing LOCALVERSION= blank guarantees no inherited/stray
-  # env var can double it up, matching Arch's own linux/linux-git
-  # PKGBUILD convention (they do the same at every kernelrelease call).
-  make -j"$(nproc)" LOCALVERSION= all
-}
-
-package_kiba-kernel() {
-  pkgdesc="The KibaOS kernel and modules (Arch linux source @@ALINUX_PKGVER@@, kibaos-branded)"
-  depends=(coreutils kmod)
-  cd "${_srcname}"
-  local kernver
-  kernver=$(make -s LOCALVERSION= kernelrelease)
-
-  # `uname -r`/`kernelrelease` should always start with the real numeric
-  # kernel version (e.g. "6.12.6-kibaos"), never just the branding
-  # suffix alone -- a bare "kibaos" with no version number is exactly
-  # what breaks Mesa/EGL's kernel-version gating (it can't parse a
-  # version out of that and assumes ancient/unsupported). Fail the
-  # build loudly here instead of shipping a kernel package that quietly
-  # reports garbage in `uname -r`.
-  case "${kernver}" in
-    [0-9]*) : ;;
-    *)
-      echo "FATAL: kernelrelease '${kernver}' doesn't start with a real kernel version -- the localversion file (see prepare()) isn't being picked up correctly. Refusing to package." >&2
-      exit 1
-      ;;
-  esac
-  echo "=== kiba-kernel kernelrelease resolved to: ${kernver} ==="
-
-  make -j"$(nproc)" INSTALL_MOD_PATH="${pkgdir}/usr" INSTALL_MOD_STRIP=1 modules_install
-
-  install -Dm644 arch/x86/boot/bzImage "${pkgdir}/boot/vmlinuz-kiba-kernel"
-  install -Dm644 System.map "${pkgdir}/usr/lib/modules/${kernver}/System.map"
-  echo kiba-kernel | install -Dm644 /dev/stdin "${pkgdir}/usr/lib/modules/${kernver}/pkgbase"
-
-  # modules_install drops build/source symlinks pointing at a kernel
-  # tree that doesn't exist inside this package -- kiba-kernel-headers
-  # provides the real target, so drop these here to avoid dangling
-  # symlinks in the runtime package.
-  rm -f "${pkgdir}/usr/lib/modules/${kernver}/build" \
-        "${pkgdir}/usr/lib/modules/${kernver}/source"
-}
-
-package_kiba-kernel-headers() {
-  pkgdesc="Headers and scripts for building modules against kiba-kernel"
-  depends=(pahole)
-  cd "${_srcname}"
-  local kernver
-  kernver=$(make -s LOCALVERSION= kernelrelease)
-  local hdrdir="${pkgdir}/usr/lib/modules/${kernver}/build"
-
-  install -Dm644 Makefile "${hdrdir}/Makefile"
-  install -Dm644 .config "${hdrdir}/.config"
-  install -Dm644 Module.symvers "${hdrdir}/Module.symvers"
-  install -Dm644 System.map "${hdrdir}/System.map"
-
-  mkdir -p "${hdrdir}/kernel" "${hdrdir}/arch/x86"
-  cp -a scripts "${hdrdir}/"
-  cp -a include "${hdrdir}/"
-  cp -a arch/x86/include "${hdrdir}/arch/x86/"
-  cp -a arch/x86/Makefile* "${hdrdir}/arch/x86/" 2>/dev/null || true
-  install -Dm644 kernel/Makefile "${hdrdir}/kernel/Makefile" 2>/dev/null || true
-  install -Dm755 tools/objtool/objtool "${hdrdir}/tools/objtool/objtool" 2>/dev/null || true
-
-  ln -sf "/usr/lib/modules/${kernver}/build" "${pkgdir}/usr/lib/modules/${kernver}/source"
-}
-PKGBUILDEOF
-
-sed -i \
-  -e "s/@@ALINUX_PKGVER@@/${ALINUX_PKGVER}/g" \
-  -e "s/@@ALINUX_SRCTAG@@/${ALINUX_SRCTAG}/g" \
-  -e "s/@@CONFIG_SHA256@@/${CONFIG_SHA256}/g" \
-  "${KBUILD_DIR}/PKGBUILD"
-
-# Install build deps as root first -- makepkg -s would try to do this
-# itself via sudo once we drop to `nobody` below, but nobody has no tty
-# and no passwordless sudo in CI, so that just fails with "a password is
-# required". Preinstalling here and dropping -s sidesteps that entirely.
-pacman -S --noconfirm --needed \
-  base-devel bc cpio gettext libelf pahole perl python git
-
-chown -R nobody:nobody "${KBUILD_DIR}"   # makepkg refuses to run as root
-runuser -u nobody -- bash -c 'cd '"${KBUILD_DIR}"' && makepkg --noconfirm --skippgpcheck'
-
-cp "${KBUILD_DIR}"/*.pkg.tar.zst "${KIBA_REPO_DIR}/"
-repo-add "${KIBA_REPO_DIR}/kiba-repo.db.tar.gz" "${KIBA_REPO_DIR}"/*.pkg.tar.zst
-echo "=== kiba-kernel built: $(ls "${KIBA_REPO_DIR}") ==="
-cd /
+# KibaOS previously built its own "kiba-kernel" package from Arch's kernel
+# source on every CI run (custom localversion, hand-picked config options,
+# a throwaway local pacman repo). That's gone now -- `linux` /
+# `linux-headers` are just pulled straight off Arch's mirrors like any
+# other package (see packages.x86_64 below), same as everything else in
+# this profile. All boot paths, mkinitcpio presets, and GRUB entries below
+# use the stock vmlinuz-linux / initramfs-linux.img names Arch's own
+# package ships, instead of the old vmlinuz-kiba-kernel / initramfs-kiba-
+# kernel.img names.
 
 # ── Paths ─────────────────────────────────────────────────────────────────
 WORKDIR="/w"
@@ -426,20 +51,6 @@ mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
 sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' "${PROFILE}/pacman.conf"
-
-# kiba-repo: the throwaway local repo kiba-kernel was just built into,
-# above. Name doesn't collide with anything on Arch's actual mirrors --
-# kiba-kernel doesn't exist upstream -- so append-at-the-end is fine,
-# no need to fight pacman.conf's include ordering for a priority that
-# doesn't matter here. SigLevel Never because this is a same-build-run
-# local repo, not something fetched over the network: there's nothing
-# in it that wasn't just produced by this exact CI job.
-cat >> "${PROFILE}/pacman.conf" << 'KIBAREPOCONF'
-
-[kiba-repo]
-SigLevel = Never
-Server = file:///w/kiba-repo/x86_64
-KIBAREPOCONF
 
 # ══════════════════════════════════════════════════════════════════════════
 # profiledef.sh
@@ -486,6 +97,68 @@ LOGO=kibaos
 OSRELEASE
 
 # ══════════════════════════════════════════════════════════════════════════
+# kiba-identity — LD_PRELOAD uname() shim
+# ══════════════════════════════════════════════════════════════════════════
+# Makes uname()'s sysname read "KibaOS" instead of "Linux" for every
+# process on the system, without touching the kernel itself.
+#
+# This was pulled once before and blamed for a Mesa/EGL "kernel too old"
+# error. That diagnosis was wrong -- the actual cause was the *kernel-
+# level* UTS_SYSNAME patch KibaOS was building at the time (a from-source
+# kiba-kernel with UTS_SYSNAME itself changed), not this shim. The two
+# are not the same mechanism: a kernel-level UTS_SYSNAME edit changes
+# what the sys_newuname syscall itself returns to *every* caller,
+# including anything that talks to the kernel directly (e.g. Mesa's DRM
+# ioctl-based version probing, which doesn't go through libc's uname()
+# wrapper at all). An LD_PRELOAD shim only intercepts the libc uname()
+# call site -- it never touches what the DRM ioctls report -- so it was
+# never actually capable of causing that failure in the first place.
+# Bringing it back now that KibaOS runs stock Arch `linux` with no
+# kernel-level UTS_SYSNAME patch of any kind.
+#
+# Deliberately only touches sysname. nodename/release/version/machine
+# are left as whatever the real uname() call reports -- release in
+# particular needs to stay a real, correctly-ordered kernel version
+# string (e.g. "6.12.6-arch1-1") for anything that version-gates off it.
+mkdir -p "${AIROOTFS}/usr/lib"
+cat > /tmp/kiba-identity.c << 'IDENTITYC'
+#define _GNU_SOURCE
+#include <sys/utsname.h>
+#include <string.h>
+#include <dlfcn.h>
+
+int uname(struct utsname *buf) {
+    static int (*real_uname)(struct utsname *) = NULL;
+    if (!real_uname) {
+        real_uname = dlsym(RTLD_NEXT, "uname");
+    }
+
+    int ret = real_uname(buf);
+    if (ret == 0) {
+        strncpy(buf->sysname, "KibaOS", sizeof(buf->sysname) - 1);
+        buf->sysname[sizeof(buf->sysname) - 1] = '\0';
+    }
+    return ret;
+}
+IDENTITYC
+
+gcc -shared -fPIC -O2 -Wall \
+    -o "${AIROOTFS}/usr/lib/kiba-identity.so" \
+    /tmp/kiba-identity.c -ldl
+chmod 755 "${AIROOTFS}/usr/lib/kiba-identity.so"
+rm -f /tmp/kiba-identity.c
+
+# ld.so.preload is a plain newline-separated list of shared objects
+# loaded into every dynamically-linked process on the system, ahead of
+# everything else in the link order -- exactly what's needed for a
+# uname() override to reach every caller instead of only ones launched
+# with LD_PRELOAD set explicitly in their own environment.
+touch "${AIROOTFS}/etc/ld.so.preload"
+grep -qxF '/usr/lib/kiba-identity.so' "${AIROOTFS}/etc/ld.so.preload" || \
+  echo '/usr/lib/kiba-identity.so' >> "${AIROOTFS}/etc/ld.so.preload"
+chmod 644 "${AIROOTFS}/etc/ld.so.preload"
+
+# ══════════════════════════════════════════════════════════════════════════
 # Package list
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
@@ -495,11 +168,11 @@ os-prober
 dosfstools
 mtools
 base
-kiba-kernel
-kiba-kernel-headers
+linux
+linux-headers
 linux-firmware
 # linux-firmware split the Intel GuC/HuC blobs (i915/*_guc_*.bin,
-# i915/*_huc_*.bin) out into their own package -- kiba-kernel doesn't
+# i915/*_huc_*.bin) out into their own package -- stock `linux` doesn't
 # pull it in as a dependency itself, so it has to be listed explicitly
 # here or i915 loads and modesets simpledrm's fbdev fine, but GuC init
 # fails and wlroots/labwc can never get a working renderer: compositor
@@ -513,6 +186,8 @@ fakeroot
 efibootmgr
 systemd-ukify
 bluez
+nftables
+libnetfilter_queue
 sudo
 bash
 irqbalance
@@ -714,19 +389,16 @@ COMPRESSION="gzip"
 INSTALLED_HOOKS
 
 # Filename here has to stay "linux.preset" -- that's the specific path
-# mkarchiso's own initramfs-build step looks for, regardless of what the
-# actual kernel package is named. kiba-kernel's own pacman hook would
-# normally auto-generate a kiba-kernel.preset of its own on a real install,
-# but mkarchiso never touches that one; it only ever runs this hand-
-# written file. Its CONTENTS do need to point at kiba-kernel's actual
-# installed filenames though, since ALL_kver/archiso_image are real paths,
-# not package-name-agnostic.
+# mkarchiso's own initramfs-build step looks for. This is stock `linux`'s
+# own preset name/layout, but it's hand-written here (not the one the
+# package's pacman hook would generate) since mkarchiso never touches
+# that one; it only ever runs this file.
 mkdir -p "${AIROOTFS}/etc/mkinitcpio.d"
 cat > "${AIROOTFS}/etc/mkinitcpio.d/linux.preset" << 'PRESET'
 PRESETS=('archiso')
-ALL_kver='/boot/vmlinuz-kiba-kernel'
+ALL_kver='/boot/vmlinuz-linux'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
-archiso_image='/boot/initramfs-kiba-kernel.img'
+archiso_image='/boot/initramfs-linux.img'
 PRESET
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -755,13 +427,13 @@ terminal_output gfxterm
 search --no-floppy --set=root --label %ARCHISO_LABEL%
 
 menuentry "KibaOS" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-kiba-kernel archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
-    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-kiba-kernel.img
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
 }
 
 menuentry "KibaOS (safe mode)" --class kibaos {
-    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-kiba-kernel archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
-    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-kiba-kernel.img
+    linux /%INSTALL_DIR%/boot/x86_64/vmlinuz-linux archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+    initrd /%INSTALL_DIR%/boot/x86_64/initramfs-linux.img
 }
 
 if [ "${grub_platform}" == "efi" ]; then
@@ -7284,7 +6956,7 @@ int kiba_install_extract_image(const char *image_path, const char *target_root,
                                 kiba_progress_cb cb, void *user_data);
 
 /* mkarchiso's _cleanup_pacstrap_dir() deletes everything under
- * pacstrap_dir/boot (including vmlinuz-kiba-kernel and initramfs-kiba-kernel.img)
+ * pacstrap_dir/boot (including vmlinuz-linux and initramfs-linux.img)
  * *before* the airootfs image is built, so the kernel is never actually
  * inside the squashfs/erofs image kiba_install_extract_image just
  * extracted -- it only exists on the boot medium, copied there
@@ -7596,10 +7268,10 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     /* work is now ".../<install_dir>" */
 
     char vmlinuz_src[600], initrd_src[600], vmlinuz_dst[600], initrd_dst[600];
-    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-kiba-kernel", work);
-    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-kiba-kernel.img", work);
-    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-kiba-kernel", target_root);
-    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-kiba-kernel.img", target_root);
+    snprintf(vmlinuz_src, sizeof(vmlinuz_src), "%s/boot/x86_64/vmlinuz-linux", work);
+    snprintf(initrd_src,  sizeof(initrd_src),  "%s/boot/x86_64/initramfs-linux.img", work);
+    snprintf(vmlinuz_dst, sizeof(vmlinuz_dst), "%s/boot/vmlinuz-linux", target_root);
+    snprintf(initrd_dst,  sizeof(initrd_dst),  "%s/boot/initramfs-linux.img", target_root);
 
     struct stat st;
     if (stat(vmlinuz_src, &st) != 0) {
@@ -7611,9 +7283,9 @@ int kiba_install_copy_kernel(const char *image_path, const char *target_root) {
     char *argv[] = { (char *)"cp", (char *)"-a", vmlinuz_src, vmlinuz_dst, NULL };
     if (run_argv(argv) != 0) return -1;
 
-    /* initramfs-kiba-kernel.img gets rebuilt from scratch a few steps later
+    /* initramfs-linux.img gets rebuilt from scratch a few steps later
      * in kiba_install_finalize (mkinitcpio -g), so this copy isn't load-
-     * bearing the way vmlinuz-kiba-kernel is -- but it means the target isn't
+     * bearing the way vmlinuz-linux is -- but it means the target isn't
      * momentarily without any initrd at all if that later step fails
      * partway through, so still worth doing and still best-effort. */
     char *argv2[] = { (char *)"cp", (char *)"-a", initrd_src, initrd_dst, NULL };
@@ -8171,7 +7843,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
          * permanently "good" entry with no counter in its name at all.
          * mkinitcpio's own preset (installed.conf) hasn't changed -- it
          * still just builds a plain initramfs; ukify is what wraps that
-         * plus vmlinuz-kiba-kernel into the actual bootable artifact. */
+         * plus vmlinuz-linux into the actual bootable artifact. */
         snprintf(path, sizeof(path), "%s/etc/kernel", target_root);
         mkdir(path, 0755);
         snprintf(path, sizeof(path), "%s/etc/kernel/cmdline", target_root);
@@ -8197,8 +7869,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
         char *argv[] = {
             (char *)"ukify", (char *)"build",
-            (char *)"--linux=/boot/vmlinuz-kiba-kernel",
-            (char *)"--initrd=/boot/initramfs-kiba-kernel.img",
+            (char *)"--linux=/boot/vmlinuz-linux",
+            (char *)"--initrd=/boot/initramfs-linux.img",
             (char *)"--cmdline=@/etc/kernel/cmdline",
             (char *)"--os-release=@/etc/os-release",
             (char *)"--output=/boot/EFI/Linux/kibaos+3.efi",
@@ -8319,7 +7991,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         char *argv[] = {
             (char *)"mkinitcpio", (char *)"-c", (char *)"/etc/mkinitcpio.conf.d/installed.conf",
-            (char *)"-g", (char *)"/boot/initramfs-kiba-kernel.img", NULL
+            (char *)"-g", (char *)"/boot/initramfs-linux.img", NULL
         };
         if (chroot_run(target_root, argv) != 0) {
             snprintf(g_finish_err, sizeof(g_finish_err), "mkinitcpio failed");
@@ -8653,7 +8325,7 @@ int main(int argc, char **argv) {
         fail(kiba_install_strerror());
     }
 
-    /* mkarchiso strips vmlinuz-kiba-kernel/initramfs-kiba-kernel.img out of the
+    /* mkarchiso strips vmlinuz-linux/initramfs-linux.img out of the
      * airootfs before building the image extracted above -- pull them
      * back in from the boot medium or the install has no kernel. */
     progress(70, "Copying kernel to target system...");
@@ -12237,6 +11909,194 @@ RemainAfterExit=yes
 WantedBy=sysinit.target
 BOOTDNSSVC
 systemctl enable kibaos-boot-dns.service
+
+# ── kiba-tcpmask: outbound TCP/IP fingerprint mask ───────────────────────
+# Rewrites the two heaviest-weighted fields in classic active/passive OS
+# fingerprinting (nmap -O, p0f) on every locally-generated SYN and
+# SYN-ACK before it leaves the box: IP TTL and initial TCP window size.
+# Stock Linux defaults (TTL 64, window ~64240-ish depending on MTU/scale)
+# are exactly what nmap/p0f signature databases key "Linux" off of.
+# Rewriting them to Windows 10/11's classic defaults (TTL 128, window
+# 65535) flips the top-line guess on both tools without touching
+# anything user-visible -- no GUI, no config anyone opens, nothing in
+# /etc/os-release. This is separate from and unrelated to kiba-identity
+# (that's libc's uname(), purely local; this is packets actually hitting
+# the wire).
+#
+# Deliberately NOT touching TCP option order/presence (MSS/WScale/SACK/
+# Timestamp ordering, also fingerprinted) -- doing that means rewriting
+# option bytes in place without changing total header length, and
+# getting it wrong risks silently breaking window scaling or SACK on
+# real connections. TTL + window alone already move both tools off
+# "Linux" as the top guess; that's the safe subset to ship.
+#
+# NFQUEUE + a tiny userspace daemon rather than a kernel patch (the old
+# IP Personality approach) -- IP Personality only ever supported 2.4-era
+# kernels and never got a modern port, so a netfilter-queue callback is
+# the current equivalent that actually works against `linux` today.
+mkdir -p /usr/lib/kibaos/src
+cat > /usr/lib/kibaos/src/kiba_tcpmask.c << 'TCPMASKC'
+/* kiba-tcpmask: rewrite TTL + TCP window on outbound SYN/SYN-ACK packets
+ * to mask the stock Linux TCP/IP fingerprint. See build.sh for the full
+ * rationale on what's touched and what's deliberately left alone. */
+#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <linux/netfilter.h>
+#include <libnetfilter_queue/libnetfilter_queue.h>
+
+/* Windows 10/11's classic nmap/p0f-visible defaults. */
+#define TARGET_TTL    128
+#define TARGET_WINDOW 65535
+
+static uint16_t in_cksum(const uint16_t *ptr, int nbytes) {
+    long sum = 0;
+    while (nbytes > 1) {
+        sum += *ptr++;
+        nbytes -= 2;
+    }
+    if (nbytes == 1) {
+        uint16_t odd = 0;
+        *((uint8_t *)&odd) = *(const uint8_t *)ptr;
+        sum += odd;
+    }
+    sum = (sum >> 16) + (sum & 0xffff);
+    sum += (sum >> 16);
+    return (uint16_t)(~sum);
+}
+
+static uint16_t tcp_cksum(const struct iphdr *iph, const struct tcphdr *tcph, int tcp_len) {
+    struct {
+        uint32_t src;
+        uint32_t dst;
+        uint8_t  zero;
+        uint8_t  proto;
+        uint16_t len;
+    } __attribute__((packed)) ps;
+
+    ps.src   = iph->saddr;
+    ps.dst   = iph->daddr;
+    ps.zero  = 0;
+    ps.proto = IPPROTO_TCP;
+    ps.len   = htons((uint16_t)tcp_len);
+
+    int total = (int)sizeof(ps) + tcp_len;
+    uint8_t *buf = malloc((size_t)total);
+    if (!buf) return 0;
+    memcpy(buf, &ps, sizeof(ps));
+    memcpy(buf + sizeof(ps), tcph, (size_t)tcp_len);
+    uint16_t sum = in_cksum((const uint16_t *)buf, total);
+    free(buf);
+    return sum;
+}
+
+static int cb(struct nfq_q_handle *qh, struct nfgenmsg *nfmsg,
+              struct nfq_data *nfa, void *data) {
+    (void)nfmsg; (void)data;
+    struct nfqnl_msg_packet_hdr *ph = nfq_get_msg_packet_hdr(nfa);
+    uint32_t id = ph ? ntohl(ph->packet_id) : 0;
+
+    unsigned char *pkt = NULL;
+    int len = nfq_get_payload(nfa, &pkt);
+    if (len < (int)sizeof(struct iphdr) || !pkt) {
+        return nfq_set_verdict(qh, id, NF_ACCEPT, 0, NULL);
+    }
+
+    struct iphdr *iph = (struct iphdr *)pkt;
+    int ip_hlen = iph->ihl * 4;
+
+    if (iph->protocol == IPPROTO_TCP && len >= ip_hlen + (int)sizeof(struct tcphdr)) {
+        struct tcphdr *tcph = (struct tcphdr *)(pkt + ip_hlen);
+        int tcp_len = len - ip_hlen;
+
+        if (tcph->syn) {
+            iph->ttl    = TARGET_TTL;
+            tcph->window = htons(TARGET_WINDOW);
+
+            iph->check = 0;
+            iph->check = in_cksum((const uint16_t *)iph, ip_hlen);
+
+            tcph->check = 0;
+            tcph->check = tcp_cksum(iph, tcph, tcp_len);
+        }
+    }
+
+    return nfq_set_verdict(qh, id, NF_ACCEPT, (uint32_t)len, pkt);
+}
+
+int main(void) {
+    struct nfq_handle *h = nfq_open();
+    if (!h) { perror("nfq_open"); return 1; }
+
+    nfq_unbind_pf(h, AF_INET);
+    if (nfq_bind_pf(h, AF_INET) < 0) { perror("nfq_bind_pf"); return 1; }
+
+    struct nfq_q_handle *qh = nfq_create_queue(h, 100, &cb, NULL);
+    if (!qh) { perror("nfq_create_queue"); return 1; }
+
+    if (nfq_set_mode(qh, NFQNL_COPY_PACKET, 0xffff) < 0) {
+        perror("nfq_set_mode"); return 1;
+    }
+
+    int fd = nfq_fd(h);
+    char buf[65536];
+    int rv;
+    while ((rv = (int)recv(fd, buf, sizeof(buf), 0)) >= 0) {
+        nfq_handle_packet(h, buf, rv);
+    }
+
+    nfq_destroy_queue(qh);
+    nfq_close(h);
+    return 0;
+}
+TCPMASKC
+
+gcc -O2 -Wall $(pkg-config --cflags libnetfilter_queue) \
+    -o /usr/local/bin/kiba-tcpmask /usr/lib/kibaos/src/kiba_tcpmask.c \
+    $(pkg-config --libs libnetfilter_queue) \
+  || { echo "FATAL: kiba_tcpmask.c failed to compile" >&2; exit 1; }
+
+# nftables ruleset: queue every locally-generated SYN/SYN-ACK to kiba-
+# tcpmask. 'bypass' is load-bearing -- if the daemon isn't running for
+# any reason, packets fall through and get accepted normally instead of
+# being dropped, so a crashed/masked daemon degrades to "looks like
+# Linux again" instead of "no network at all".
+mkdir -p /etc/nftables-kiba
+cat > /etc/nftables-kiba/tcpmask.conf << 'TCPMASKNFT'
+table inet kiba_tcpmask {
+  chain output {
+    type filter hook output priority mangle; policy accept;
+    tcp flags syn queue num 100 bypass
+  }
+}
+TCPMASKNFT
+
+cat > /etc/systemd/system/kiba-tcpmask.service << 'TCPMASKSVC'
+[Unit]
+Description=KibaOS outbound TCP/IP fingerprint mask
+After=network-pre.target
+Before=network.target NetworkManager.service
+Wants=network-pre.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/nft -f /etc/nftables-kiba/tcpmask.conf
+ExecStart=/usr/local/bin/kiba-tcpmask
+ExecStopPost=-/usr/bin/nft delete table inet kiba_tcpmask
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+TCPMASKSVC
+systemctl enable kiba-tcpmask.service
 
 chown -R 1000:1000 /home/liveuser
 chmod 750 /home/liveuser
