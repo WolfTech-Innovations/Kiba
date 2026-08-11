@@ -110,7 +110,7 @@ iso_application="KibaOS — A friendly general OS for all users"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
-bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')
+bootmodes=('uefi.grub')
 arch="x86_64"
 pacman_conf="pacman.conf"
 airootfs_image_type="squashfs"
@@ -128,9 +128,8 @@ chmod +x "${PROFILE}/profiledef.sh"
 # $(date...) doesn't fire early, so sed does the arm edits after the
 # fact instead of baking them into the heredoc itself.
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
-  # no BIOS on arm, only UEFI exists here, so eltorito gets yeeted
-  sed -i "s/bootmodes=('uefi-x64.grub.esp' 'uefi-x64.grub.eltorito')/bootmodes=('uefi-arm64.grub.esp')/" \
-    "${PROFILE}/profiledef.sh"
+  # bootmodes=('uefi.grub') is arch-generic in current mkarchiso (it derives
+  # grub_target/uefi_arch from $arch internally), so no bootmodes sed needed here.
   sed -i 's/arch="x86_64"/arch="aarch64"/' "${PROFILE}/profiledef.sh"
   # x86 bcj filter on arm binaries doesn't explode, just squishes worse
   # (wrong instruction set to filter for). swap to the arm64 one instead
