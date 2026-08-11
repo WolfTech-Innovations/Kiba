@@ -185,7 +185,6 @@ mkinitcpio-archiso
 earlyoom
 fakeroot
 efibootmgr
-systemd-ukify
 bluez
 nftables
 libnetfilter_queue
@@ -365,6 +364,16 @@ if [ "${KIBA_ARCH}" = "aarch64" ]; then
   sed -i '/^linux-firmware-intel$/d' "${PROFILE}/packages.x86_64"
   sed -i '/^# linux-firmware split the Intel GuC\/HuC blobs/,/^# fails and wlroots\/labwc can never get a working renderer/d' \
     "${PROFILE}/packages.x86_64"
+  # thermald: Intel-specific thermal daemon, doesn't exist for ARM
+  sed -i '/^thermald$/d' "${PROFILE}/packages.x86_64"
+  # syslinux: x86 BIOS bootloader package, ALARM doesn't ship it at all
+  # (memdiskfind loss is fine -- BIOS/isolinux boot is already dropped on
+  # this arch, see the comment above this package's line for why it was
+  # here in the first place)
+  sed -i '/^syslinux$/d' "${PROFILE}/packages.x86_64"
+  # lib32-*: 32-bit x86 multilib compat packages -- multilib isn't a thing
+  # on ARM (see the pacman.conf multilib gating elsewhere in this script)
+  sed -i '/^lib32-mesa$/d; /^lib32-vulkan-icd-loader$/d' "${PROFILE}/packages.x86_64"
   # ALARM names its kernel package linux-aarch64, not plain "linux"
   sed -i 's/^linux$/linux-aarch64/; s/^linux-headers$/linux-aarch64-headers/' \
     "${PROFILE}/packages.x86_64"
@@ -7784,16 +7793,13 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     {
-        /* grub/os-prober only ever existed to boot the INSTALLED system;
-         * now that's rEFInd's job (refind package, already pulled in via
-         * packages.x86_64), so drop them here same as the other live/
-         * no-longer-needed packages. The live ISO itself is unaffected --
-         * it's built from a separate GRUB-based archiso profile, not this
-         * chroot. */
+        /* grub and os-prober stay installed now -- see the GRUB bootloader
+         * setup further down. Only the archiso/live-medium-only tooling
+         * gets stripped here. */
         char *argv[] = {
             (char *)"pacman", (char *)"-Rns", (char *)"--noconfirm",
             (char *)"archiso", (char *)"mkinitcpio-archiso", (char *)"squashfs-tools",
-            (char *)"grub", (char *)"os-prober", NULL
+            NULL
         };
         chroot_run(target_root, argv); /* best-effort, same as old backend */
     }
@@ -7802,8 +7808,8 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         /* KibaOS is UEFI-only, which needs /sys/firmware/efi/efivars to
          * write the NVRAM boot entry. Fail fast with a clear message
-         * instead of letting bootctl die with a cryptic error. This is
-         * a firmware requirement, not a VM restriction -- a VM booted
+         * instead of letting grub-install die with a cryptic error. This
+         * is a firmware requirement, not a VM restriction -- a VM booted
          * in UEFI mode passes this check exactly like real hardware
          * does; it's specifically legacy/BIOS boot mode that trips it,
          * which happens to be a VM's *default* in a lot of hypervisors
@@ -7820,130 +7826,106 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             return -1;
         }
 
-        /* bootctl install (run from inside the chroot, so no --esp-path
-         * flag needed -- /boot is already the ESP mount point) drops
-         * systemd-boot's own loader at <esp>/EFI/systemd/systemd-bootx64.efi
-         * and a removable-media fallback copy at <esp>/EFI/BOOT/BOOTX64.EFI,
-         * and registers the NVRAM boot entry itself (no efibootmgr
-         * subprocess needed -- bootctl talks to efivarfs directly). This
-         * replaces the old refind-install call; see the KIBA IDENTITY/VIEW
-         * section's own comments elsewhere in this file for the general
-         * "why switch bootloaders" reasoning -- short version here: native
-         * GPT/BLS boot-counting (tries-left/tries-done, systemd-boot-
-         * check-no-failures.service, systemd-bless-boot.service) only
-         * works with systemd-boot, and rEFInd doesn't read any of it. */
-        char *argv[] = { (char *)"bootctl", (char *)"install", NULL };
-        if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
-            return -1;
-        }
-    }
-
-    /* loader.conf: systemd-boot's own top-level config, plain text same
-     * spirit as the old refind.conf. "default" is a glob matched against
-     * the boot entry/UKI filename -- kibaos+3.efi matches "kibaos*.efi"
-     * regardless of its current tries-left suffix, so this doesn't need
-     * rewriting every time the counter changes. timeout semantics here
-     * are systemd-boot's NORMAL ones (0 = boot default immediately
-     * without showing the menu unless a key is already buffered) -- this
-     * is actually what "switching back to systemd-boot" restores:
-     * rEFInd's "timeout 0 means wait forever" was the inverted,
-     * surprising case that needed its own callout comment; systemd-boot
-     * needs no such caveat here. */
-    snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
-    if (dualboot) {
-        /* Honest limitation carried over from the switch: unlike rEFInd,
-         * which scans the whole ESP for ANY .efi it recognizes, systemd-
-         * boot's own auto-discovery is narrower -- it lists BLS entries
-         * under /loader/entries/*.conf and UKIs under /EFI/Linux/*.efi,
-         * plus it specifically special-cases detecting an existing
-         * Windows Boot Manager (\\EFI\\Microsoft\\Boot\\bootmgfw.efi) and
-         * offering "Reboot Into Firmware Setup". It does NOT do rEFInd's
-         * broad "scan every vendor's EFI subdirectory" discovery of
-         * arbitrary other Linux installs' own bootloaders. For the
-         * Windows-dual-boot case (the actual common one) this is a
-         * non-issue; for dual-booting alongside another Linux distro's
-         * own GRUB/systemd-boot, that other loader's entry may not
-         * appear automatically the way it did under rEFInd. */
-        write_file(path,
-                   "timeout 5\n"
-                   "default kibaos*.efi\n"
-                   "editor no\n");
-    } else {
-        write_file(path,
-                   "timeout 0\n"
-                   "default kibaos*.efi\n"
-                   "editor no\n");
-    }
-
-    {
-        /* Build the initial UKI (Unified Kernel Image): kernel +
-         * initramfs + kernel cmdline + os-release bundled into one signed-
-         * later PE binary, dropped straight at the ESP path systemd-boot
-         * auto-discovers (<esp>/EFI/Linux/*.efi). "+3" is the initial
-         * boot-counting suffix (UAPI Boot Loader Specification / systemd's
-         * Automatic Boot Assessment) -- systemd-boot decrements it on
-         * every attempt and systemd-bless-boot.service (enabled below)
-         * clears it entirely once boot-complete.target is reached, so an
-         * install that boots fine on the very first try just becomes a
-         * permanently "good" entry with no counter in its name at all.
-         * mkinitcpio's own preset (installed.conf) hasn't changed -- it
-         * still just builds a plain initramfs; ukify is what wraps that
-         * plus vmlinuz-linux into the actual bootable artifact. */
-        snprintf(path, sizeof(path), "%s/etc/kernel", target_root);
-        mkdir(path, 0755);
-        snprintf(path, sizeof(path), "%s/etc/kernel/cmdline", target_root);
-        char cmdline[512];
-        snprintf(cmdline, sizeof(cmdline),
-                 "root=UUID=%s rw quiet splash loglevel=3 "
-                 "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                 "plymouth.use-simpledrm=1 "
-                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\n",
-                 root_uuid);
-        if (write_file(path, cmdline) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "writing /etc/kernel/cmdline failed");
-            return -1;
+        /* GRUB target depends on arch -- x86_64-efi vs arm64-efi. Same
+         * uname() trick used elsewhere in this file (kiba_find_live_image,
+         * the kernel copy step above) instead of a compile-time #ifdef, so
+         * one installer binary works whichever ISO it was built into. */
+        struct utsname gu;
+        const char *grub_target = "x86_64-efi";
+        if (uname(&gu) == 0 && strcmp(gu.machine, "aarch64") == 0) {
+            grub_target = "arm64-efi";
         }
 
-        snprintf(path, sizeof(path), "%s/boot/EFI/Linux", target_root);
-        /* mkdir -p equivalent: EFI/ likely already exists from bootctl
-         * install above, /Linux under it doesn't yet. */
-        char mkdir_efi[1024];
-        snprintf(mkdir_efi, sizeof(mkdir_efi), "%s/boot/EFI", target_root);
-        mkdir(mkdir_efi, 0755);
-        mkdir(path, 0755);
-
+        /* --bootloader-id names both the NVRAM entry and the
+         * /boot/EFI/KibaOS/ subdirectory grub-install writes its own
+         * grubx64.efi/grubaa64.efi into; efibootmgr (already in
+         * packages.x86_64/packages.aarch64) is what grub-install shells
+         * out to for the actual NVRAM registration. */
         char *argv[] = {
-            (char *)"ukify", (char *)"build",
-            (char *)"--linux=/boot/vmlinuz-linux",
-            (char *)"--initrd=/boot/initramfs-linux.img",
-            (char *)"--cmdline=@/etc/kernel/cmdline",
-            (char *)"--os-release=@/etc/os-release",
-            (char *)"--output=/boot/EFI/Linux/kibaos+3.efi",
-            NULL
+            (char *)"grub-install", (char *)"--target", (char *)grub_target,
+            (char *)"--efi-directory=/boot", (char *)"--bootloader-id=KibaOS",
+            (char *)"--recheck", NULL
         };
         if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "ukify build failed");
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install failed");
+            return -1;
+        }
+
+        /* Second pass at the generic removable-media fallback path
+         * (/boot/EFI/BOOT/BOOT*.EFI): some firmware ignores NVRAM boot
+         * entries entirely and only ever tries that path, so this is
+         * cheap insurance -- same dual-placement bootctl used to give us
+         * for free with systemd-boot. Best-effort: the primary install
+         * above is the one that has to succeed. */
+        char *argv_rm[] = {
+            (char *)"grub-install", (char *)"--target", (char *)grub_target,
+            (char *)"--efi-directory=/boot", (char *)"--bootloader-id=KibaOS",
+            (char *)"--removable", (char *)"--recheck", NULL
+        };
+        chroot_run(target_root, argv_rm);
+    }
+
+    if (cb) cb(86, "Building your boot menu...", user_data);
+    {
+        /* /etc/kernel/cmdline was the UKI-era spot for this; GRUB reads
+         * kernel cmdline options from GRUB_CMDLINE_LINUX_DEFAULT in
+         * /etc/default/grub instead, which grub-mkconfig picks up below. */
+        snprintf(path, sizeof(path), "%s/etc/default/grub", target_root);
+        char grub_default[1024];
+        snprintf(grub_default, sizeof(grub_default),
+                 "GRUB_DEFAULT=0\n"
+                 "GRUB_TIMEOUT=%d\n"
+                 "GRUB_DISTRIBUTOR=KibaOS\n"
+                 "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
+                 "rd.udev.log_level=3 vt.global_cursor_default=0 "
+                 "plymouth.use-simpledrm=1 "
+                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n"
+                 "GRUB_CMDLINE_LINUX=\"\"\n"
+                 "GRUB_DISABLE_OS_PROBER=%s\n"
+                 "GRUB_GFXMODE=auto\n"
+                 "GRUB_GFXPAYLOAD_LINUX=keep\n",
+                 dualboot ? 5 : 0,
+                 dualboot ? "false" : "true");
+        if (write_file(path, grub_default) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "writing /etc/default/grub failed");
+            return -1;
+        }
+
+        /* grub-mkconfig's 10_linux script matches vmlinuz-<X> against
+         * initramfs-<X>.img purely by the shared "-<X>" suffix -- it never
+         * checks which pacman package provided them -- so this works
+         * whether the live medium's kernel package was "linux" (x86_64) or
+         * "linux-aarch64" (ALARM); both get normalized to the same
+         * vmlinuz-linux/initramfs-linux.img names by the copy step earlier
+         * in kiba_install(). GRUB_DISABLE_OS_PROBER=false (dualboot case,
+         * set above) is what gives GRUB back the rEFInd-style "scan for
+         * other OSes" behavior -- os-prober is already pulled in via
+         * packages.x86_64/packages.aarch64 and no longer gets stripped
+         * during cleanup (see the pacman -Rns call above). */
+        char *argv[] = {
+            (char *)"grub-mkconfig", (char *)"-o", (char *)"/boot/grub/grub.cfg", NULL
+        };
+        if (chroot_run(target_root, argv) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "grub-mkconfig failed");
             return -1;
         }
     }
 
-    (void)disk_path;   /* no longer needed -- the UKI's cmdline is written directly from root_uuid */
+    (void)disk_path;   /* no longer needed -- grub-mkconfig finds the root device via the /boot mount itself */
     (void)root_partno;
+    (void)root_uuid;   /* no longer needed -- grub-mkconfig derives root=UUID=... from /etc/fstab, not a hand-written cmdline */
 
     if (cb) cb(88, "Turning on background features...", user_data);
     {
         static const char *services[] = {
             "NetworkManager", "sddm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
-            /* Automatic Boot Assessment: clears a UKI's tries-left/
-             * tries-done counter once boot-complete.target is actually
-             * reached, turning "indeterminate" into "good" so a later
-             * boot attempt isn't racing against a stale failure state.
-             * Without this enabled, tries-left would just
-             * count down to zero on every normal boot and the slot would
-             * eventually get marked bad even with nothing wrong. */
-            "systemd-bless-boot.service", "systemd-boot-check-no-failures.service",
+            /* systemd-bless-boot.service / systemd-boot-check-no-failures.
+             * service are gone -- those only exist to manage a UKI's
+             * tries-left/tries-done boot-counting suffix, which was a
+             * systemd-boot-specific mechanism. Plain GRUB + a plain
+             * vmlinuz/initramfs pair (no UKI, no counter in the filename)
+             * has nothing for them to track. */
         };
         for (size_t i = 0; i < sizeof(services)/sizeof(services[0]); i++) {
             char *argv[] = { (char *)"systemctl", (char *)"enable", (char *)services[i], NULL };
@@ -12300,12 +12282,12 @@ cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
 #!/usr/bin/env bash
 # Run this AFTER installing KibaOS, on the real target machine, with
 # Secure Boot's Setup Mode enabled in firmware settings. It creates and
-# enrolls your own Secure Boot keys, then signs systemd-boot's own EFI
-# binary (both copies bootctl install drops -- the primary loader under
-# EFI/systemd/ and the removable fallback path firmware falls back to on
-# some boards) plus the UKI in EFI/Linux/ (sbctl's own pacman hook
-# re-signs it automatically on any future kernel update, same as the
-# bootloader binaries above).
+# enrolls your own Secure Boot keys, then signs GRUB's own EFI binary
+# (both copies grub-install drops -- the named loader under EFI/KibaOS/
+# and the removable fallback path firmware falls back to on some boards)
+# plus vmlinuz-linux itself, since GRUB chainloads the kernel directly
+# rather than via a signed-as-one-unit UKI (sbctl's own pacman hook
+# re-signs both automatically on any future kernel/bootloader update).
 set -e
 echo "This will create and enroll new Secure Boot keys on THIS machine"
 echo "and is not easily reversible. Only continue if you understand what"
@@ -12316,11 +12298,10 @@ read -rp "Continue? [y/N] " _confirm
 sudo sbctl status
 sudo sbctl create-keys
 sudo sbctl enroll-keys -m
-sudo sbctl sign -s /boot/EFI/systemd/systemd-bootx64.efi
-sudo sbctl sign -s /boot/EFI/BOOT/BOOTX64.EFI
-for uki in /boot/EFI/Linux/kibaos*.efi; do
-  [ -e "${uki}" ] && sudo sbctl sign -s "${uki}"
+for grub_efi in /boot/EFI/KibaOS/grub*.efi /boot/EFI/BOOT/BOOT*.EFI; do
+  [ -e "${grub_efi}" ] && sudo sbctl sign -s "${grub_efi}"
 done
+sudo sbctl sign -s /boot/vmlinuz-linux
 sudo sbctl verify
 echo "Done. Reboot and re-enable Secure Boot in firmware settings."
 SBCTLSETUP
