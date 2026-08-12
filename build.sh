@@ -106,13 +106,27 @@ cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
 
 # upstream mkinitcpio dropped /usr/lib/initcpio/udev/11-dm-initramfs.rules
 # as of lvm2 2.03.24 -- its contents got folded into 10-dm.rules (see
-# mkinitcpio MR !416). The archiso hook this fork's releng profile ships
-# still references the dead path (mkinitcpio-archiso issue #20 upstream),
-# which hard-fails the initramfs build with "file not found" on both
-# arches. 10-dm.rules is already add_file'd right above it, so the extra
-# line is just dead weight now -- strip it before mkarchiso ever runs.
-sed -i '/11-dm-initramfs\.rules/d' \
-  "${PROFILE}/airootfs/usr/lib/initcpio/install/archiso"
+# mkinitcpio MR !416). Older archiso releng profiles shipped their own
+# copy of the "archiso" mkinitcpio install hook under this path with a
+# still-dangling reference to that dead file (mkinitcpio-archiso issue
+# #20 upstream), which hard-failed the initramfs build with "file not
+# found" on both arches. 10-dm.rules is already add_file'd right above
+# it in that hook, so the extra line was just dead weight -- stripped
+# before mkarchiso ever runs.
+#
+# Current archiso (89-1 and later) no longer ships this file as part of
+# the releng overlay at all -- confirmed against the package's own file
+# list, the profile now only carries etc/mkinitcpio.conf.d/archiso.conf
+# and etc/mkinitcpio.d/linux.preset, with the "archiso" hook itself
+# supplied some other way at pacstrap time instead of being a static
+# profile file. Guarded on existence so this quietly no-ops on current
+# archiso instead of hard-failing the way it just did -- if a future
+# archiso version brings the file back with the same stale reference,
+# this still patches it.
+if [ -f "${PROFILE}/airootfs/usr/lib/initcpio/install/archiso" ]; then
+  sed -i '/11-dm-initramfs\.rules/d' \
+    "${PROFILE}/airootfs/usr/lib/initcpio/install/archiso"
+fi
 
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
@@ -8179,7 +8193,7 @@ int main(int argc, char **argv) {
         snprintf(p, sizeof(p), "%s/etc/kibaos/winapps-pending", target_root);
         FILE *f = fopen(p, "w");
         if (f) fclose(f); /* best-effort: a missed marker just means the
-                            * user runs "Set Up Windows Apps" from the app
+                            * user runs "Set Up KWS" from the app
                             * menu themselves instead of it prompting them */
     }
 
@@ -10326,7 +10340,7 @@ OEMAUTOCFG
 # feature, not opt-in, so unlike the oem-pending marker it mirrors, nothing
 # ever leaves it unset. The marker's what triggers kibaos-winapps-setup on
 # first login (see kibaos-winapps-firstrun.desktop below); the user can
-# also launch it manually via "Set Up Windows Apps" in the app menu any
+# also launch it manually via "Set Up KWS" in the app menu any
 # time, e.g. to retry after a failed first attempt.
 # ══════════════════════════════════════════════════════════════════════════
 
@@ -10356,8 +10370,8 @@ HINT_MARKER="${HOME}/.config/kibaos/.winapps-workspace-hint-shown"
 WIN_URL="http://localhost:8006"
 
 if [ ! -f "${COMPOSE_FILE}" ]; then
-  zenity --question --title="Windows Apps Aren't Set Up Yet" \
-    --text="This computer isn't set up to run Windows programs yet.\n\nWant to set it up now? It takes about 15–20 minutes." \
+  zenity --question --title="KWS Isn't Set Up Yet" \
+    --text="The KibaOS Windows Subsystem (KWS) isn't set up on this computer yet.\n\nWant to set it up now? It takes about 15–20 minutes." \
     --ok-label="Set It Up" --cancel-label="Not Now" 2>/dev/null
   if [ "$?" -eq 0 ]; then
     exec /usr/local/bin/kibaos-winapps-setup --manual-launch
@@ -10462,7 +10476,7 @@ if [ "${ALREADY_UP}" -eq 0 ]; then
       echo "$((i * 100 / 60))"
     done
     echo "100"
-  ) | zenity --progress --title="Windows" --text="Starting your Windows workspace…" \
+  ) | zenity --progress --title="KWS" --text="Starting KWS…" \
       --pulsate --auto-close --no-cancel --width=360 2>/dev/null
 
   wait "${COMPOSE_PID}"
@@ -10470,11 +10484,11 @@ if [ "${ALREADY_UP}" -eq 0 ]; then
 
   if ! curl -fsS -o /dev/null --max-time 2 "${WIN_URL}" 2>/dev/null; then
     if [ "${COMPOSE_STATUS}" -ne 0 ]; then
-      zenity --error --title="Windows" --width=420 \
-        --text="Windows didn't start. Try again in a moment, or open 'Set Up Windows Apps' from the app menu if this keeps happening." 2>/dev/null
+      zenity --error --title="KWS" --width=420 \
+        --text="KWS didn't start. Try again in a moment, or open 'Set Up KWS' from the app menu if this keeps happening." 2>/dev/null
     else
-      zenity --error --title="Windows" --width=420 \
-        --text="Windows is taking longer than usual to come up. Give it a bit and try 'Run Windows Workspace' again -- nothing's broken, it just needs more time." 2>/dev/null
+      zenity --error --title="KWS" --width=420 \
+        --text="KWS is taking longer than usual to come up. Give it a bit and try 'Open KWS' again -- nothing's broken, it just needs more time." 2>/dev/null
     fi
     exit 1
   fi
@@ -10488,9 +10502,9 @@ add_keybind
 if [ "${KEYBIND_ADDED}" -eq 1 ] && [ ! -f "${HINT_MARKER}" ]; then
   mkdir -p "$(dirname "${HINT_MARKER}")"
   touch "${HINT_MARKER}"
-  notify-send -i kibaos-winapps "Windows Workspace" \
+  notify-send -i kibaos-winapps "KWS" \
     "Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null || \
-    zenity --info --title="Windows" --width=380 \
+    zenity --info --title="KWS" --width=380 \
       --text="Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null
 fi
 
@@ -10502,8 +10516,8 @@ chmod +x /usr/local/bin/kibaos-winapps-workspace
 cat > /usr/share/applications/kibaos-winapps-workspace.desktop << 'WORKSPACEDESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Run Windows Workspace
-Comment=Open the Windows environment full-screen
+Name=Open KWS
+Comment=Open the KibaOS Windows Subsystem (KWS) full-screen
 Icon=kibaos-winapps
 Exec=/usr/local/bin/kibaos-winapps-workspace
 Terminal=false
@@ -10536,10 +10550,10 @@ COMPOSE_FILE="${CONF_DIR}/compose.yaml"
 MARKER="/etc/kibaos/winapps-pending"
 MANUAL_LAUNCH="${1:-}"
 
-notify() { zenity --info --title="Windows Apps" --text="$1" --width=420 2>/dev/null; }
-ask()    { zenity --question --title="Windows Apps" --text="$1" \
+notify() { zenity --info --title="KWS" --text="$1" --width=420 2>/dev/null; }
+ask()    { zenity --question --title="KWS" --text="$1" \
              --ok-label="${2:-Yes}" --cancel-label="${3:-No}" --width=420 2>/dev/null; }
-err()    { zenity --error --title="Windows Apps" --text="$1" --width=420 2>/dev/null; }
+err()    { zenity --error --title="KWS" --text="$1" --width=420 2>/dev/null; }
 
 # Group membership in /etc/group only takes effect for *new* login
 # sessions, not the one you're already in -- and the OEM-finish flow in
@@ -10569,7 +10583,7 @@ fi
 
 # Already fully set up? Just say so and offer a normal re-check.
 if command -v winapps >/dev/null 2>&1 && [ -f "${CONF_DIR}/winapps.conf" ]; then
-  notify "Windows app support is already set up on this computer.\n\nOpen 'Run Windows Workspace' from the app menu or desktop to use Windows full-screen, or find your installed Windows programs in the app menu."
+  notify "KWS is already set up on this computer.\n\nOpen 'Open KWS' from the app menu or desktop to use Windows full-screen, or find your installed Windows programs in the app menu."
   rm -f "${MARKER}"
   exit 0
 fi
@@ -10590,18 +10604,18 @@ fi
 # actually optional. This still isn't silent: the notify below tells the
 # person what's happening and where to watch it, they just don't have to
 # click a button to agree to a feature that's already part of KibaOS.
-# Manually re-launching from "Run Windows Workspace" already implies
+# Manually re-launching from "Open KWS" already implies
 # consent (that's an explicit, deliberate click), so there's nothing left
 # to ask there either.
 if [ "${RESUMING}" -eq 1 ]; then
-  notify "Picking up where Windows app setup left off. This window will let you know once it's ready -- you can also watch progress at localhost:8006 in your browser."
+  notify "Picking up where KWS setup left off. This window will let you know once it's ready -- you can also watch progress at localhost:8006 in your browser."
 else
-  notify "Setting up Windows app support now, so you can run Windows programs (like Office) right from KibaOS.\n\nHere's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing, and needs a spare 30+ GB of disk space.\n\nIf you're curious, you can watch progress at localhost:8006 in your browser, but you don't need to do anything there."
+  notify "Setting up the KibaOS Windows Subsystem (KWS) now, so you can run Windows programs (like Office) right from KibaOS.\n\nHere's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing, and needs a spare 30+ GB of disk space.\n\nIf you're curious, you can watch progress at localhost:8006 in your browser, but you don't need to do anything there."
 fi
 
 pkexec systemctl enable --now docker >/dev/null 2>&1
 if ! systemctl is-active --quiet docker; then
-  err "KibaOS couldn't start the background service Windows apps need (Docker). Check /var/log for details, or try again later from the app menu."
+  err "KibaOS couldn't start the background service KWS needs (Docker). Check /var/log for details, or try again later from the app menu."
   exit 1
 fi
 
@@ -10745,7 +10759,7 @@ fi
 COMPOSE_LOG="$(mktemp)"
 if ! ( cd "${CONF_DIR}" && pkexec docker compose "${COMPOSE_ARGS[@]}" up -d ) > "${COMPOSE_LOG}" 2>&1; then
   logger -t kibaos-winapps-setup "docker compose up -d failed: $(cat "${COMPOSE_LOG}")"
-  err "Something went wrong starting the Windows environment (see journalctl -t kibaos-winapps-setup for details). Nothing was changed permanently — you can try again from the app menu ('Set Up Windows Apps')."
+  err "Something went wrong starting the Windows environment (see journalctl -t kibaos-winapps-setup for details). Nothing was changed permanently — you can try again from the app menu ('Set Up KWS')."
   rm -f "${COMPOSE_LOG}"
   exit 1
 fi
@@ -10762,7 +10776,7 @@ WIN_USER=$(grep -oP '^\s*USERNAME:\s*"\K[^"]+' "${COMPOSE_FILE}")
 WIN_PASS=$(grep -oP '^\s*PASSWORD:\s*"\K[^"]+' "${COMPOSE_FILE}")
 
 if [ -z "${WIN_USER}" ] || [ -z "${WIN_PASS}" ]; then
-  err "Couldn't read the Windows account details from the config. Run 'Set Up Windows Apps' again from the app menu, or check ${COMPOSE_FILE} manually."
+  err "Couldn't read the Windows account details from the config. Run 'Set Up KWS' again from the app menu, or check ${COMPOSE_FILE} manually."
   exit 1
 fi
 
@@ -10797,7 +10811,7 @@ for i in $(seq 1 420); do
 done
 
 if [ "${RDP_UP}" -ne 1 ]; then
-  err "Windows is taking longer than expected to finish installing. Nothing's broken — it may just need more time on a slower connection. Check progress at http://127.0.0.1:8006, and re-run 'Set Up Windows Apps' from the app menu once it shows a desktop."
+  err "Windows is taking longer than expected to finish installing. Nothing's broken — it may just need more time on a slower connection. Check progress at http://127.0.0.1:8006, and re-run 'Set Up KWS' from the app menu once it shows a desktop."
   exit 1
 fi
 
@@ -10823,16 +10837,16 @@ SETUP_STATUS=$?
 kill "${TAIL_TERM_PID}" >/dev/null 2>&1
 
 if [ "${SETUP_STATUS}" -ne 0 ]; then
-  err "The Windows app shortcut installer hit a problem partway through (see ${SETUP_LOG} for details). Windows itself is still fine -- run 'Set Up Windows Apps' again from the app menu to retry just that step."
+  err "The Windows app shortcut installer hit a problem partway through (see ${SETUP_LOG} for details). Windows itself is still fine -- run 'Set Up KWS' again from the app menu to retry just that step."
   exit 1
 fi
 rm -f "${SETUP_LOG}"
 
 rm -f "${MARKER}"
 if [ "${GPU_DETECTED}" -eq 1 ]; then
-  notify "All set! Open 'Run Windows Workspace' from the app menu or desktop to use Windows full-screen, and any Windows programs WinApps found are now in your app menu.\n\nAn NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
+  notify "All set! Open 'Open KWS' from the app menu or desktop to use Windows full-screen, and any Windows programs KWS found are now in your app menu.\n\nAn NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
 else
-  notify "All set! Open 'Run Windows Workspace' from the app menu or desktop to use Windows full-screen, and any Windows programs WinApps found are now in your app menu."
+  notify "All set! Open 'Open KWS' from the app menu or desktop to use Windows full-screen, and any Windows programs KWS found are now in your app menu."
 fi
 WINAPPSSETUP
 chmod +x /usr/local/bin/kibaos-winapps-setup
@@ -10842,8 +10856,8 @@ chmod +x /usr/local/bin/kibaos-winapps-setup
 cat > /usr/share/applications/kibaos-winapps-setup.desktop << 'SETUPDESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Set Up Windows Apps
-Comment=Set up Windows app support, including the full-screen Windows Workspace
+Name=Set Up KWS
+Comment=Set up the KibaOS Windows Subsystem (KWS), including the full-screen KWS workspace
 Icon=kibaos-winapps
 Exec=/usr/local/bin/kibaos-winapps-setup
 Terminal=false
@@ -10857,7 +10871,7 @@ SETUPDESKTOP
 cat > "${SKEL}/.config/autostart/kibaos-winapps-firstrun.desktop" << 'WINAPPSAUTOCFG'
 [Desktop Entry]
 Type=Application
-Name=Windows App Support Setup
+Name=KWS Setup
 Exec=sh -c 'test -f /etc/kibaos/winapps-pending && exec /usr/local/bin/kibaos-winapps-setup'
 Hidden=false
 NoDisplay=true
