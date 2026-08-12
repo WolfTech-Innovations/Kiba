@@ -103,6 +103,17 @@ AIROOTFS="${PROFILE}/airootfs"
 
 cd "${WORKDIR}"
 cp -r /usr/share/archiso/configs/releng/ "${PROFILE}"
+
+# upstream mkinitcpio dropped /usr/lib/initcpio/udev/11-dm-initramfs.rules
+# as of lvm2 2.03.24 -- its contents got folded into 10-dm.rules (see
+# mkinitcpio MR !416). The archiso hook this fork's releng profile ships
+# still references the dead path (mkinitcpio-archiso issue #20 upstream),
+# which hard-fails the initramfs build with "file not found" on both
+# arches. 10-dm.rules is already add_file'd right above it, so the extra
+# line is just dead weight now -- strip it before mkarchiso ever runs.
+sed -i '/11-dm-initramfs\.rules/d' \
+  "${PROFILE}/airootfs/usr/lib/initcpio/install/archiso"
+
 mkdir -p "${AIROOTFS}"
 sed -i 's/^CheckSpace/#CheckSpace/' "${PROFILE}/pacman.conf"
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' "${PROFILE}/pacman.conf"
