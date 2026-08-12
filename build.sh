@@ -383,6 +383,16 @@ if [ "${KIBA_ARCH}" = "aarch64" ]; then
   # lib32-*: 32-bit x86 multilib compat packages -- multilib isn't a thing
   # on ARM (see the pacman.conf multilib gating elsewhere in this script)
   sed -i '/^lib32-mesa$/d; /^lib32-vulkan-icd-loader$/d' "${PROFILE}/packages.x86_64"
+  # mkinitcpio-archiso: this is exactly what JackMyers001/archiso-aarch64
+  # exists to work around -- ALARM has no usable mkinitcpio-archiso, so
+  # the fork's own mkarchiso already drops the archiso/archiso_pxe_*/
+  # archiso_kms initcpio hooks straight onto the target airootfs itself
+  # before pacstrap ever runs. Leaving this package in packages.aarch64
+  # makes pacstrap try to lay the same files down a second time via
+  # pacman, which refuses ("exists in filesystem") since it doesn't
+  # already own them -- that's the "Failed to install packages to new
+  # root" pacstrap failure this specifically avoids.
+  sed -i '/^mkinitcpio-archiso$/d' "${PROFILE}/packages.x86_64"
   # ALARM names its kernel package linux-aarch64, not plain "linux"
   sed -i 's/^linux$/linux-aarch64/; s/^linux-headers$/linux-aarch64-headers/' \
     "${PROFILE}/packages.x86_64"
