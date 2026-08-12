@@ -403,6 +403,21 @@ HOOKS=(base udev kms plymouth keyboard keymap modconf memdisk archiso block file
 COMPRESSION="gzip"
 INITRAMFS
 
+# ARM: drop the memdisk hook -- it needs the memdiskfind binary, which
+# ships in the `syslinux` package (kept deliberately on x86_64 for this
+# reason, see the packages.x86_64 comment above `syslinux` for why it's
+# there even with BIOS boot dropped). ALARM has no syslinux package at
+# all, so on aarch64 the binary can never be present and mkinitcpio just
+# hard-fails every build ("ERROR: module not found: 'phram'" / "ERROR:
+# binary not found: 'memdiskfind'"), which is what actually turns
+# mkinitcpio's generic "errors were encountered during the build"
+# warning into a nonzero exit -- not the sbctl post hook that runs after
+# it and just skips signing cleanly when no Secure Boot keys exist yet.
+# x86_64 keeps memdisk (and its RAM-load-the-whole-ISO capability) intact.
+if [ "${KIBA_ARCH}" = "aarch64" ]; then
+  sed -i 's/ memdisk / /' "${AIROOTFS}/etc/mkinitcpio.conf.d/archiso.conf"
+fi
+
 # installed.conf is what the INSTALLED system uses once the OOBE installer
 # runs initcpio. no memdisk/archiso hooks allowed here, those are live-only
 #
