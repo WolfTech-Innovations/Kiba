@@ -62,6 +62,16 @@ jobs:
       # This has zero dependency on the OTA manifest/diff/sign pipeline below,
       # so it no longer waits behind ~30+ minutes of manifest work before the
       # actual release artifact goes out the door.
+      #
+      # Per-arch directories: build.sh names the ISO purely off the run
+      # number (kibaos-v<run>.iso) -- it does NOT encode arch into the
+      # filename, even though both matrix legs share the same run number.
+      # Uploaded to one flat SourceForge directory, x86_64 and aarch64
+      # would produce identical filenames and race to overwrite each
+      # other. Giving each arch its own directory makes that collision
+      # structurally impossible instead of relying on filenames staying
+      # unique. rsync creates the destination subdirectory automatically
+      # on first upload -- no separate mkdir step needed.
       - name: Upload ISO to SourceForge
         env:
           SF_USER: ${{ secrets.SF_USER }}
@@ -74,15 +84,49 @@ jobs:
           sudo apt-get install -y sshpass rsync
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
-          sudo apt-get install -y sshpass rsync
-          # Single rsync call for all ISO/checksum files instead of one
-          # connection per file. mkarchiso already bakes the arch into the
-          # ISO filename itself (kibaos-<version>-<arch>.iso, from
-          # profiledef.sh's arch= value), so both matrix legs' filenames
-          # never collide on SourceForge without any extra renaming here.
+
+          ARCH="${{ matrix.arch }}"
+          REMOTE_DIR="/home/frs/project/kibaos/${ARCH}"
+          MARKER="last-iso-build-number-${ARCH}.txt"
+
+          # ── Remove the previous build's ISO + checksum for this arch ──
+          # Only ever deletes the exact filename recorded in a marker WE
+          # wrote on a prior successful run of this same arch -- never a
+          # glob, never a guess at what "the old one" might be named. If
+          # that marker isn't there (first run for this arch, or a prior
+          # run never got far enough to write it), nothing is deleted:
+          # an unlabeled file is left alone rather than assumed safe to
+          # remove.
+          rm -f "${MARKER}"
+          sshpass -e rsync -avP \
+            "$SF_USER@frs.sourceforge.net:${REMOTE_DIR}/${MARKER}" \
+            "${MARKER}" 2>/dev/null || true
+
+          if [ -s "${MARKER}" ]; then
+            PREV_NUM="$(cat "${MARKER}")"
+            PREV_ISO="kibaos-v${PREV_NUM}.iso"
+            echo "Removing previous ${ARCH} build: ${PREV_ISO} (+ .sha256)"
+            printf '%s\n' \
+              "cd ${REMOTE_DIR}" \
+              "rm ${PREV_ISO}" \
+              "rm ${PREV_ISO}.sha256" \
+              "bye" \
+              | sshpass -e sftp -oStrictHostKeyChecking=no -oBatchMode=no \
+                  "$SF_USER@frs.sourceforge.net" 2>/dev/null || true
+          else
+            echo "No previous build marker for ${ARCH} -- nothing to delete."
+          fi
+
+          # ── Upload this build's ISO + checksum into the arch directory ─
           sshpass -e rsync -avP --progress \
             *.iso *.iso.sha256 \
-            "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/"
+            "$SF_USER@frs.sourceforge.net:${REMOTE_DIR}/"
+
+          # ── Record this run's number as the marker for next time ──────
+          echo "${{ github.run_number }}" > "${MARKER}"
+          sshpass -e rsync -avP \
+            "${MARKER}" \
+            "$SF_USER@frs.sourceforge.net:${REMOTE_DIR}/${MARKER}"
 
       - name: Upload ISO artifact for OTA job
         uses: actions/upload-artifact@v4
