@@ -470,6 +470,27 @@ ALL_kver='/boot/vmlinuz-linux'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
 archiso_image='/boot/initramfs-linux.img'
 PRESET
+# aarch64: the fork's own bundled configs/releng (copied in via cp -r
+# above -- this is what /usr/share/archiso/configs/releng actually is on
+# this arch, since install_archiso() never installs a real `archiso`
+# package here, only builds+installs JackMyers001/archiso-aarch64's own
+# copy) ships its own /etc/mkinitcpio.d/linux-aarch64.preset as part of
+# that same overlay, per its README ("moved archiso initcpio files
+# directly into the releng airootfs" to patch around ALARM's stock
+# mkinitcpio-archiso hooks). _make_custom_airootfs copies this overlay
+# into pacstrap_dir BEFORE _make_packages() pacstraps `linux-aarch64`
+# (see mkarchiso's own function order) -- so that inherited preset file
+# collides with the one the real linux-aarch64 package also tries to
+# install, and pacstrap refuses to overwrite a file it doesn't already
+# own ("linux-aarch64.preset exists in filesystem"). Safe to just delete
+# it: nothing in this build ever reads it -- customize_airootfs.sh
+# invokes mkinitcpio by hand for aarch64 with explicit -k/-c/-g flags
+# (see the ARM initramfs section further down) specifically because
+# ALARM's linux-aarch64 package doesn't carry the pacman hook that would
+# auto-trigger it off this preset in the first place.
+if [ "${KIBA_ARCH}" = "aarch64" ]; then
+  rm -f "${AIROOTFS}/etc/mkinitcpio.d/linux-aarch64.preset"
+fi
 # NOTE: this stays at the generic vmlinuz-linux/initramfs-linux.img names
 # for BOTH arches now. On aarch64, ALL_kver here is moot anyway --
 # customize_airootfs.sh invokes mkinitcpio directly with an explicit -k
