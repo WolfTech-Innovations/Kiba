@@ -361,6 +361,21 @@ pciutils
 apparmor
 firejail
 
+# ── Storage/initcpio support ─────────────────────────────────────────────
+# lvm2: not used for LVM itself here, but this is what actually ships
+# /usr/lib/initcpio/udev/11-dm-initramfs.rules (device-mapper's initcpio
+# integration). On x86_64 this arrives for free as a dependency of the
+# official mkinitcpio-archiso package. On aarch64 that package is
+# deliberately skipped (see the packages.aarch64 swap below -- the fork's
+# own mkarchiso bakes the archiso/archiso_kms hook files onto the
+# airootfs directly, bypassing pacman dependency resolution entirely), so
+# without this explicit line the archiso build hook fails with
+# "file not found: '/usr/lib/initcpio/udev/11-dm-initramfs.rules'" since
+# nothing else ever pulls lvm2 in on that arch. Listed here (not just
+# under the aarch64 branch) so x86_64 keeps getting it the same explicit
+# way instead of silently relying on a transitive dependency.
+lvm2
+
 # ── System tuning/maintenance ────────────────────────────────────────────
 tuned
 PACKAGES
