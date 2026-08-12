@@ -304,7 +304,6 @@ chromium
 ntfs-3g
 exfatprogs
 polkit
-fuse3
 udisks2
 upower
 scrot
@@ -406,8 +405,21 @@ INITRAMFS
 
 # installed.conf is what the INSTALLED system uses once the OOBE installer
 # runs initcpio. no memdisk/archiso hooks allowed here, those are live-only
+#
+# HOOKS order fixed to match Arch's documented "sane defaults" order
+# (base udev autodetect modconf kms keyboard keymap block filesystems
+# fsck -- see mkinitcpio.conf's own upstream comments and the ArchWiki
+# Plymouth page). `autodetect` has to come right after base/udev and
+# BEFORE the other module-affecting hooks (modconf, kms, block,
+# filesystems) -- that's what lets it trim their module list down to
+# what's actually present on this machine; anything placed ahead of it
+# (like the old kms/plymouth-before-autodetect order here) just skips
+# that trim for itself and bloats the initramfs. Not the direct cause
+# of a root-not-found failure, but a real correctness bug regardless.
+# `plymouth` placed right after udev per the ArchWiki's own Plymouth
+# hook-ordering guidance.
 cat > "${AIROOTFS}/etc/mkinitcpio.conf.d/installed.conf" << 'INSTALLED_HOOKS'
-HOOKS=(base udev kms plymouth autodetect modconf block keyboard keymap filesystems fsck)
+HOOKS=(base udev plymouth autodetect modconf kms keyboard keymap block filesystems fsck)
 COMPRESSION="gzip"
 INSTALLED_HOOKS
 
@@ -3398,473 +3410,6 @@ ln -sf /usr/lib/systemd/user/kortex-authd.service \
   /etc/skel/.config/systemd/user/graphical-session.target.wants/kortex-authd.service
 echo "=== kortex-authd installed ==="
 
-
-# ══════════════════════════════════════════════════════════════════════════
-# KIBA VIEW — a per-session translated filesystem view over XDG user dirs
-# ══════════════════════════════════════════════════════════════════════════
-# Honest scope note: this is a real FUSE read/write passthrough (getattr,
-# readdir, open/create, read, write, truncate, mkdir, unlink, rmdir,
-# rename -- tested against exactly this operation set during development),
-# not a symlink farm. A symlink farm is trivially seen through with a
-# single `ls -la` (every entry shows its real target); a passthrough FUSE
-# mount doesn't expose the backing path to callers at all through any of
-# the operations it implements. It is NOT a security boundary and doesn't
-# try to be one -- the real ~/Documents etc. still exist at their real
-# paths, still owned by the same user, still readable by that user or
-# root through the real path exactly as before. What this actually does
-# is give the desktop (Nemo's sidebar/bookmarks, see the desktop-config
-# section) somewhere friendly-looking to point at instead of the FHS-y
-# real path, for the same "the user never needs to see /home/username"
-# reason the KibaOS branding work elsewhere in this file exists. Runs
-# per-user via a systemd --user unit (below), not system-wide -- root
-# and other users are unaffected.
-#
-# Coverage: this used to only translate the six curated XDG roots, which
-# meant anything else living under $HOME (a stray project folder, a
-# manually-created directory) simply wasn't reachable through the view
-# at all -- not hidden, just absent. There's now a seventh catch-all
-# root, "Other Files", that passes through the rest of $HOME so nothing
-# a user has actually put there goes missing. Dotfiles/dot-directories
-# (.config, .cache, .local, .var, etc. -- our AppData-equivalent) are
-# filtered out of every directory listing this filesystem serves, the
-# same "hidden by convention" treatment they already got everywhere
-# else. That, plus pointing the desktop's default file-manager location
-# and sidebar bookmarks at this mount instead of raw $HOME (see the
-# desktop-config and first-login sections below), makes ~/KibaOS the
-# only filesystem view a user browsing files graphically ever lands on
-# -- the ChromeOS Files-app idea, just backed by a real POSIX overlay
-# instead of a sandboxed Downloads folder. This is still additive, not
-# a takeover: the mount lives at ~/KibaOS, a directory alongside the
-# real $HOME rather than over top of it, so anything that legitimately
-# wants a regular file path -- a terminal, an editor, dev tooling, the
-# package manager, systemd itself -- keeps using real $HOME exactly as
-# before and is completely unaffected by any of this.
-echo "=== Building kiba-view (translated per-user FUSE filesystem) ==="
-mkdir -p /usr/lib/kibaos/src
-cat > /usr/lib/kibaos/src/kiba_view_fs.c << 'KIBA_VIEW_FS_C'
-/* kiba_view_fs.c — FUSE3 read/write passthrough presenting a curated
- * top-level layout (Documents/Downloads/Pictures/Music/Videos/Desktop)
- * mapped onto the real $HOME's XDG user dirs, resolved once at startup
- * via xdg-user-dir(1) rather than hardcoded -- respects whatever
- * localized/relocated directories the user (or KibaOS's OOBE locale
- * step) actually configured. See kv_ops at the bottom for the exact
- * operation set implemented; anything not listed there (symlinks,
- * xattrs, hardlinks, special files) isn't supported by this passthrough
- * and will surface ENOSYS/ENOTSUP to the caller rather than silently
- * doing the wrong thing.
- */
-#define FUSE_USE_VERSION 31
-#include <fuse3/fuse.h>
-#include <stdio.h>
-#include <string.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <dirent.h>
-#include <limits.h>
-#include <stdbool.h>
-
-/* The first 6 are the curated XDG roots, resolved via xdg-user-dir(1)
- * below. The 7th, "Other Files", is a catch-all passthrough straight to
- * $HOME itself -- see the coverage note above the build step that emits
- * this file for why it exists. It has no XDG key (index kept in sync
- * with OTHER_IDX, not looked up via xdg-user-dir). */
-#define N_CURATED_ROOTS 6
-#define N_ROOTS (N_CURATED_ROOTS + 1)
-#define OTHER_IDX (N_ROOTS - 1)
-static const char *ROOT_NAMES[N_ROOTS] = {
-    "Documents", "Downloads", "Pictures", "Music", "Videos", "Desktop",
-    "Other Files"
-};
-static const char *XDG_KEYS[N_CURATED_ROOTS] = {
-    "DOCUMENTS", "DOWNLOAD", "PICTURES", "MUSIC", "VIDEOS", "DESKTOP"
-};
-static char root_backing[N_ROOTS][PATH_MAX];
-
-/* Resolves each translated root's real path once at startup by shelling
- * out to xdg-user-dir(1) -- the same source of truth the rest of the
- * desktop (file manager, portals, xdg-user-dirs.service) already uses,
- * so this view never drifts out of sync with wherever those actually
- * point. Falls back to $HOME/<name> if xdg-user-dir isn't available or
- * a given dir hasn't been configured yet. "Other Files" backs directly
- * onto $HOME with no xdg-user-dir lookup and no mkdir (it always
- * exists -- it's the home directory). */
-static void resolve_roots(void) {
-    const char *home = getenv("HOME");
-    if (!home) home = "/tmp";
-    for (int i = 0; i < N_CURATED_ROOTS; i++) {
-        char cmd[256];
-        snprintf(cmd, sizeof(cmd), "xdg-user-dir %s 2>/dev/null", XDG_KEYS[i]);
-        FILE *fp = popen(cmd, "r");
-        bool got = false;
-        if (fp) {
-            if (fgets(root_backing[i], sizeof(root_backing[i]), fp)) {
-                size_t len = strlen(root_backing[i]);
-                if (len > 0 && root_backing[i][len - 1] == '\n') root_backing[i][len - 1] = '\0';
-                if (root_backing[i][0] == '/') got = true;
-            }
-            pclose(fp);
-        }
-        if (!got) snprintf(root_backing[i], sizeof(root_backing[i]), "%s/%s", home, ROOT_NAMES[i]);
-        mkdir(root_backing[i], 0755); /* no-op if it already exists */
-    }
-    snprintf(root_backing[OTHER_IDX], sizeof(root_backing[OTHER_IDX]), "%s", home);
-}
-
-static int resolve(const char *path, char *out, size_t outsz) {
-    if (strcmp(path, "/") == 0) return -1;
-    for (int i = 0; i < N_ROOTS; i++) {
-        size_t nlen = strlen(ROOT_NAMES[i]);
-        if (strncmp(path + 1, ROOT_NAMES[i], nlen) == 0 &&
-            (path[1 + nlen] == '\0' || path[1 + nlen] == '/')) {
-            snprintf(out, outsz, "%s%s", root_backing[i], path + 1 + nlen);
-            return 0;
-        }
-    }
-    return -2;
-}
-
-static int kv_getattr(const char *path, struct stat *st, struct fuse_file_info *fi) {
-    (void)fi;
-    memset(st, 0, sizeof(*st));
-    if (strcmp(path, "/") == 0) { st->st_mode = S_IFDIR | 0755; st->st_nlink = 2; return 0; }
-    char real[PATH_MAX];
-    int r = resolve(path, real, sizeof(real));
-    if (r == -1) { st->st_mode = S_IFDIR | 0755; st->st_nlink = 2; return 0; }
-    if (r == -2) return -ENOENT;
-    if (lstat(real, st) != 0) return -errno;
-    return 0;
-}
-
-static int kv_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-                       off_t offset, struct fuse_file_info *fi, enum fuse_readdir_flags flags) {
-    (void)offset; (void)fi; (void)flags;
-    filler(buf, ".", NULL, 0, 0);
-    filler(buf, "..", NULL, 0, 0);
-    if (strcmp(path, "/") == 0) {
-        for (int i = 0; i < N_ROOTS; i++) filler(buf, ROOT_NAMES[i], NULL, 0, 0);
-        return 0;
-    }
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    DIR *d = opendir(real);
-    if (!d) return -errno;
-    /* Top level of the "Other Files" catch-all is the one place that can
-     * legitimately show the same real entries the curated roots already
-     * show elsewhere in this view (Documents, Downloads, ... all live
-     * directly under $HOME on disk). Skip those names there so they
-     * don't appear twice under two different names in the same view. */
-    bool at_other_top = (strcmp(path, "/") != 0 &&
-                          strcmp(path + 1, ROOT_NAMES[OTHER_IDX]) == 0);
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        /* Hide dotfiles/dot-directories everywhere this filesystem is
-         * browsed -- our AppData-equivalent (.config, .cache, .local,
-         * .var, ...) shouldn't clutter a view meant to be the tidy,
-         * ChromeOS-style "this is all your stuff" surface. They're
-         * still real files at their real path for anything that opens
-         * them directly by name (e.g. an app reading its own config)
-         * -- this only affects what shows up in a directory listing. */
-        if (e->d_name[0] == '.') continue;
-        if (at_other_top) {
-            bool is_curated_dup = false;
-            for (int i = 0; i < N_CURATED_ROOTS; i++) {
-                if (strcmp(e->d_name, ROOT_NAMES[i]) == 0) { is_curated_dup = true; break; }
-            }
-            if (is_curated_dup) continue;
-        }
-        filler(buf, e->d_name, NULL, 0, 0);
-    }
-    closedir(d);
-    return 0;
-}
-
-static int kv_open(const char *path, struct fuse_file_info *fi) {
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    int fd = open(real, fi->flags);
-    if (fd < 0) return -errno;
-    fi->fh = fd;
-    return 0;
-}
-
-static int kv_create(const char *path, mode_t mode, struct fuse_file_info *fi) {
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    int fd = open(real, fi->flags | O_CREAT, mode);
-    if (fd < 0) return -errno;
-    fi->fh = fd;
-    return 0;
-}
-
-static int kv_read(const char *path, char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    (void)path;
-    ssize_t r = pread(fi->fh, buf, size, offset);
-    return r < 0 ? -errno : (int)r;
-}
-
-static int kv_write(const char *path, const char *buf, size_t size, off_t offset, struct fuse_file_info *fi) {
-    (void)path;
-    ssize_t r = pwrite(fi->fh, buf, size, offset);
-    return r < 0 ? -errno : (int)r;
-}
-
-static int kv_truncate(const char *path, off_t size, struct fuse_file_info *fi) {
-    if (fi) return ftruncate(fi->fh, size) == 0 ? 0 : -errno;
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    return truncate(real, size) == 0 ? 0 : -errno;
-}
-
-static int kv_release(const char *path, struct fuse_file_info *fi) { (void)path; close(fi->fh); return 0; }
-
-static int kv_mkdir(const char *path, mode_t mode) {
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    return mkdir(real, mode) == 0 ? 0 : -errno;
-}
-
-static int kv_unlink(const char *path) {
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    return unlink(real) == 0 ? 0 : -errno;
-}
-
-static int kv_rmdir(const char *path) {
-    char real[PATH_MAX];
-    if (resolve(path, real, sizeof(real)) != 0) return -ENOENT;
-    return rmdir(real) == 0 ? 0 : -errno;
-}
-
-static int kv_rename(const char *from, const char *to, unsigned int flags) {
-    (void)flags;
-    char rfrom[PATH_MAX], rto[PATH_MAX];
-    if (resolve(from, rfrom, sizeof(rfrom)) != 0) return -ENOENT;
-    /* Cross-root renames (Documents/x -> Downloads/x) aren't supported
-     * by this prototype-derived passthrough -- each translated root maps
-     * to a different real XDG directory, and silently doing a copy+
-     * unlink instead of an atomic rename would be a correctness
-     * footgun for anything relying on rename's atomicity. Surfacing
-     * EXDEV (the same errno a real cross-filesystem rename gives) lets
-     * the file manager fall back to its own copy+delete UI flow instead. */
-    if (resolve(to, rto, sizeof(rto)) != 0) return -ENOENT;
-    char from_root[64], to_root[64];
-    sscanf(from + 1, "%63[^/]", from_root);
-    sscanf(to + 1, "%63[^/]", to_root);
-    if (strcmp(from_root, to_root) != 0) return -EXDEV;
-    return rename(rfrom, rto) == 0 ? 0 : -errno;
-}
-
-static const struct fuse_operations kv_ops = {
-    .getattr  = kv_getattr,
-    .readdir  = kv_readdir,
-    .open     = kv_open,
-    .create   = kv_create,
-    .read     = kv_read,
-    .write    = kv_write,
-    .truncate = kv_truncate,
-    .release  = kv_release,
-    .mkdir    = kv_mkdir,
-    .unlink   = kv_unlink,
-    .rmdir    = kv_rmdir,
-    .rename   = kv_rename,
-};
-
-int main(int argc, char *argv[]) {
-    resolve_roots();
-    return fuse_main(argc, argv, &kv_ops, NULL);
-}
-KIBA_VIEW_FS_C
-
-gcc -O2 -Wall $(pkg-config --cflags fuse3) /usr/lib/kibaos/src/kiba_view_fs.c \
-    -o /usr/lib/kibaos/kiba-view-fs $(pkg-config --libs fuse3) \
-  || { echo "FATAL: kiba_view_fs.c failed to compile/link" >&2; exit 1; }
-rm -rf /usr/lib/kibaos/src
-chown root:root /usr/lib/kibaos/kiba-view-fs
-chmod 755 /usr/lib/kibaos/kiba-view-fs
-
-# Per-user session unit: mounts at ~/KibaOS right before the desktop
-# comes up, unmounts on session teardown. "-o auto_unmount" means an
-# unclean session death (crash, kill -9) still gets fusermount'd rather
-# than leaving a stale mountpoint behind next login.
-cat > /usr/lib/systemd/user/kiba-view.service << 'KIBA_VIEW_SERVICE'
-[Unit]
-Description=KibaOS translated file view (~/KibaOS)
-After=graphical-session-pre.target
-Before=graphical-session.target
-PartOf=graphical-session.target
-
-[Service]
-Type=simple
-ExecStartPre=/usr/bin/mkdir -p %h/KibaOS
-ExecStart=/usr/lib/kibaos/kiba-view-fs -f -o auto_unmount %h/KibaOS
-# Type=simple only means "the process was forked" -- it says nothing
-# about whether the FUSE handshake with the kernel has actually
-# finished, i.e. whether %h/KibaOS is really mountable yet. The labwc
-# wrapper (kibaos-session-userview, see the SESSION-SCOPED HOME VIEW
-# section) needs a real "yes, it's live" signal before it dares
-# bind-mount this over $HOME for the whole session, so poll for the
-# mountpoint to actually come up (bounded, half a second max) and only
-# then touch the ready marker it waits on. Cleaned up on the way down so
-# a crashed/stopped session can never be mistaken for a ready one.
-ExecStartPost=/bin/sh -c 'for i in $(seq 1 50); do mountpoint -q %h/KibaOS && { touch %t/kiba-view-ready; exit 0; }; sleep 0.01; done; exit 1'
-ExecStopPost=/usr/bin/rm -f %t/kiba-view-ready
-ExecStop=/usr/bin/fusermount3 -u %h/KibaOS
-Restart=on-failure
-RestartSec=3
-
-[Install]
-WantedBy=graphical-session.target
-KIBA_VIEW_SERVICE
-
-mkdir -p /etc/skel/.config/systemd/user/graphical-session.target.wants
-ln -sf /usr/lib/systemd/user/kiba-view.service \
-  /etc/skel/.config/systemd/user/graphical-session.target.wants/kiba-view.service
-echo "=== kiba-view installed ==="
-
-# ══════════════════════════════════════════════════════════════════════════
-# SESSION-SCOPED HOME VIEW — the other half of KIBA VIEW
-# ══════════════════════════════════════════════════════════════════════════
-# Everything above gives kiba-view its own separate mountpoint at
-# ~/KibaOS, alongside real $HOME, which apps only see if something
-# (Nemo's sidebar, the Files launcher) specifically points them there.
-# This section goes further: it makes ~/KibaOS what $HOME itself
-# *resolves to* for the graphical session, so every GUI app -- not just
-# the ones explicitly wired to it -- gets the curated view by default,
-# while everything outside the graphical session (SSH logins, systemd
-# services, cron, and -- deliberately carved back out below -- a
-# terminal opened from inside the session) keeps seeing the real thing.
-#
-# The mechanism is a private Linux mount namespace (unshare(CLONE_NEWNS)),
-# NOT a symlink or a bind mount at the filesystem level everyone shares --
-# see https://zameermanji.com/blog/2022/8/5/using-fuse-without-root-on-linux/
-# for the background this leans on: an unprivileged user can create a new
-# user+mount namespace via `unshare --user --mount` and mount/bind-mount
-# freely inside it, and -- critically -- nothing done inside that
-# namespace is visible from outside it, not even by bind-mounting the
-# mountpoint back out. That second property is exactly what "the user
-# sees X, programs still see real $HOME" needs: it's not a permissions
-# trick or a filter, it's two genuinely different views of the
-# filesystem that can't leak into each other by accident.
-#
-# `--map-current-user` (added to util-linux's unshare specifically for
-# this kind of use case) rather than the more commonly-seen
-# `--map-root-user`: it identity-maps the real UID/GID into the new user
-# namespace instead of remapping to 0. That matters here because the
-# Wayland socket, the D-Bus session bus, and XDG_RUNTIME_DIR are all
-# permission-checked by numeric UID -- remapping to root would make
-# every one of those checks see a different "user" than the one that
-# actually owns them and break the session outright. Identity mapping
-# sidesteps that: as far as any ownership check anywhere on the system
-# is concerned, this is still exactly the same user it always was, just
-# with a private view of the mount table.
-#
-# Where the substitution happens: PATH-shadowing /usr/bin/labwc with a
-# wrapper of the same name in /usr/local/bin (which sits earlier in
-# PATH), rather than editing Budgie's own packaged wayland-sessions
-# .desktop file or adding a competing one. That keeps this update-safe
-# -- a `pacman -Syu` to budgie-desktop can't clobber or conflict with a
-# file it doesn't know exists -- and self-contained to one script.
-#
-# Known limitation, stated plainly rather than glossed over: this relies
-# on GUI apps being launched as actual descendants of this process tree
-# (which is how Budgie's panel/dock launch things -- direct fork, not
-# GNOME Shell's systemd-scope-per-app model). An app launched via
-# `systemd-run --user --scope` instead of a direct fork would be
-# reparented under systemd --user itself and would NOT inherit this
-# namespace, since it was never a child of it in the first place. If
-# KibaOS ever moves to that launch model, this needs revisiting -- it
-# would silently stop taking effect for newly-launched apps rather than
-# fail loudly, which is worth knowing going in.
-cat > /usr/local/bin/labwc << 'LABWC_WRAPPER'
-#!/bin/bash
-# PATH-shadowed wrapper for the real labwc (/usr/bin/labwc) -- see the
-# SESSION-SCOPED HOME VIEW comment block in the build script for the
-# full design. Fails open at every step: a broken/missing unshare, an
-# old kernel with unprivileged user namespaces disabled, kiba-view.service
-# never coming up in time -- none of it may ever block login. Worst case
-# is just "no view substitution this session," never "can't log in."
-REAL_LABWC="/usr/bin/labwc"
-REAL_HOME_MARK="${XDG_RUNTIME_DIR:-/tmp}/kibaos-real-home"
-READY_MARK="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kiba-view-ready"
-
-can_userns() {
-  command -v unshare >/dev/null 2>&1 && \
-    unshare --user --map-current-user --mount true 2>/dev/null
-}
-
-wait_for_kiba_view() {
-  # kiba-view.service is what actually populates ~/KibaOS -- it's
-  # started as part of reaching graphical-session.target, which is
-  # usually pulled in from labwc's own autostart, i.e. *after* this
-  # wrapper's exec happens. Poll its readiness marker for a few seconds
-  # rather than assume any particular ordering -- if it never shows up
-  # (service failed, disabled, whatever), fail open and skip the
-  # substitution entirely instead of hanging the session waiting for it.
-  for _ in $(seq 1 100); do
-    [ -f "${READY_MARK}" ] && return 0
-    sleep 0.1
-  done
-  return 1
-}
-
-if can_userns && wait_for_kiba_view; then
-  exec unshare --user --map-current-user --mount --propagation private -- \
-    bash -c 'mkdir -p "$0" 2>/dev/null
-             mount --bind "$HOME" "$0" 2>/dev/null &&
-             mount --bind "$HOME/KibaOS" "$HOME" 2>/dev/null
-             exec "$1" "${@:2}"' \
-    "${REAL_HOME_MARK}" "${REAL_LABWC}" "$@"
-fi
-
-exec "${REAL_LABWC}" "$@"
-LABWC_WRAPPER
-chmod +x /usr/local/bin/labwc
-
-# ── The terminal's escape hatch back to the real $HOME ──────────────────
-# Without this, a terminal opened from inside the substituted session
-# would inherit the overlay too -- meaning dev tools, git, the package
-# manager, and anything else run from a shell would be working against
-# ~/KibaOS instead of real $HOME, which is exactly the "programs still
-# see real $HOME" half of this feature. Same PATH-shadow trick, this
-# time against kgx (GNOME Console's actual binary name -- see the
-# "GNOME Console (kgx)" note elsewhere in this file for why it's the
-# one that matters; gnome-terminal is hidden from the app menu entirely
-# and only used internally by the WinApps setup flow, and its D-Bus
-# single-instance-server architecture means a simple exec-time wrapper
-# like this one can't reliably reach it anyway -- not attempting to
-# solve that here).
-#
-# Nested unshare, not just "undo the parent's mount": this needs its own
-# fresh private mount namespace to safely re-bind $HOME without
-# disturbing every other window/app still running in the session's
-# substituted view -- mount namespaces nest cleanly (a child namespace
-# starts as a copy of the parent's table and diverges from there), so
-# this only changes what *this terminal and its own children* see.
-cat > /usr/local/bin/kgx << 'KGX_WRAPPER'
-#!/bin/bash
-REAL_KGX="/usr/bin/kgx"
-REAL_HOME_MARK="${XDG_RUNTIME_DIR:-/tmp}/kibaos-real-home"
-
-if [ -d "${REAL_HOME_MARK}" ] && command -v unshare >/dev/null 2>&1 && \
-   unshare --user --map-current-user --mount true 2>/dev/null
-then
-  exec unshare --user --map-current-user --mount --propagation private -- \
-    bash -c 'mount --bind "$0" "$HOME" 2>/dev/null
-             exec "$1" "${@:2}"' \
-    "${REAL_HOME_MARK}" "${REAL_KGX}" "$@"
-fi
-
-# REAL_HOME_MARK missing means this terminal isn't actually running
-# inside a substituted session (e.g. the labwc wrapper above never got
-# a chance to set it up) -- there's nothing to undo, just run kgx as
-# normal rather than fail or loop.
-exec "${REAL_KGX}" "$@"
-KGX_WRAPPER
-chmod +x /usr/local/bin/kgx
-
-echo "=== session-scoped home view installed ==="
 
 
 pacman-key --init
@@ -7380,6 +6925,7 @@ cat > kiba_install_finish.c << 'KIBA_SRC_END_FINC'
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <sys/utsname.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -7933,6 +7479,20 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     if (cb) cb(88, "Turning on background features...", user_data);
     {
+        /* `systemctl enable sddm` below only wires up the
+         * display-manager.service alias -- it does NOT change
+         * default.target. A stock pacstrap install leaves default.target
+         * at multi-user.target, so without this explicit set-default the
+         * freshly installed system boots straight to a text-mode login
+         * prompt on first boot instead of SDDM's graphical login screen. */
+        char *argv_target[] = {
+            (char *)"systemctl", (char *)"set-default", (char *)"graphical.target", NULL
+        };
+        if (chroot_run(target_root, argv_target) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "systemctl set-default graphical.target failed");
+            return -1;
+        }
+
         static const char *services[] = {
             "NetworkManager", "sddm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
@@ -11323,24 +10883,15 @@ XDG_MUSIC_DIR="$HOME/Music"
 XDG_VIDEOS_DIR="$HOME/Videos"
 USERDIRS
 
-# ── "Files" launcher: opens Nemo straight into the kiba-view overlay ───────
-# Plain `nemo` with no path argument opens raw $HOME, which is exactly the
-# FHS-y view kiba-view exists to keep users away from (see the KIBA VIEW
-# section earlier in this file). Nemo's own .desktop entry can't be edited
-# in place without fighting future package updates, so this ships a
-# separate launcher that's used everywhere a "Files" icon is needed instead
-# (pinned dock slot, app menu) -- Exec= field codes don't expand $HOME, so
-# it's a one-line wrapper script rather than a raw Exec= path.
+# ── "Files" launcher: opens Nemo straight into $HOME ────────────────────
+# Nemo's own .desktop entry can't be edited in place without fighting
+# future package updates, so this ships a separate launcher that's used
+# everywhere a "Files" icon is needed instead (pinned dock slot, app
+# menu) -- Exec= field codes don't expand $HOME, so it's a one-line
+# wrapper script rather than a raw Exec= path.
 cat > /usr/local/bin/kibaos-files << 'FILESWRAP'
 #!/bin/bash
-# kiba-view.service should already have this mounted by the time any
-# graphical app can launch (see Before=graphical-session.target on that
-# unit) -- this check is just a last-resort fallback in case the mount
-# ever fails or is still coming up, so "Files" degrades to raw $HOME
-# instead of opening an empty/missing directory.
-target="$HOME/KibaOS"
-mountpoint -q "$target" 2>/dev/null || target="$HOME"
-exec nemo "$target"
+exec nemo "$HOME"
 FILESWRAP
 chmod +x /usr/local/bin/kibaos-files
 
@@ -11366,16 +10917,6 @@ FILESDESK
 # more — no stray "Other Locations"/raw filesystem browsing sitting front
 # and center.
 #
-# These now point into the kiba-view overlay (~/KibaOS/...) rather than
-# straight at $HOME/... -- that overlay is what "Files" (above) opens
-# into, and is meant to be the only filesystem surface a user browsing
-# graphically ever lands on. Content is identical either way (kiba-view
-# is a passthrough onto these same real directories), this just keeps
-# every door into "my stuff" -- the dock icon, the sidebar, the sidebar's
-# own bookmarks -- consistently leading through the same friendly view
-# instead of half pointing at the overlay and half at raw $HOME. An
-# "Other Files" bookmark is added too, for the overlay's catch-all root.
-#
 # heads up: this can't just be a static /etc/skel file — GTK bookmark
 # files are plain file:// URIs with zero variable expansion, and skel
 # gets copied byte-for-byte at account creation before the real username
@@ -11389,13 +10930,12 @@ MARKER="$HOME/.config/.kibaos-first-login-done"
 [ -f "$MARKER" ] && exit 0
 mkdir -p "$HOME/.config/gtk-3.0"
 cat > "$HOME/.config/gtk-3.0/bookmarks" << BOOKMARKS
-file://$HOME/KibaOS/Desktop Desktop
-file://$HOME/KibaOS/Documents Documents
-file://$HOME/KibaOS/Downloads Downloads
-file://$HOME/KibaOS/Pictures Pictures
-file://$HOME/KibaOS/Music Music
-file://$HOME/KibaOS/Videos Videos
-file://$HOME/KibaOS/Other%20Files Other Files
+file://$HOME/Desktop Desktop
+file://$HOME/Documents Documents
+file://$HOME/Downloads Downloads
+file://$HOME/Pictures Pictures
+file://$HOME/Music Music
+file://$HOME/Videos Videos
 BOOKMARKS
 mkdir -p "$HOME/.config"
 touch "$MARKER"
