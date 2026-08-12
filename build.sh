@@ -358,7 +358,6 @@ zenity
 pciutils
 
 # ── Security ────────────────────────────────────────────────────────────
-sbctl
 apparmor
 firejail
 
@@ -11905,7 +11904,7 @@ TMPFILES
 systemctl enable systemd-tmpfiles-clean.timer
 
 # ══════════════════════════════════════════════════════════════════════════
-# SECURITY — AppArmor, Firejail, Secure Boot (sbctl)
+# SECURITY — AppArmor, Firejail
 # ══════════════════════════════════════════════════════════════════════════
 # AppArmor: the LSM itself is only live if apparmor is in the kernel's
 # lsm= boot param (baked into /etc/kernel/cmdline and bundled into the
@@ -11929,44 +11928,6 @@ systemctl enable apparmor
 # `aa-status`/`journalctl` for AppArmor DENIED lines before assuming it's
 # just a firejail bug.
 firecfg 2>/dev/null || true
-
-# Secure Boot (sbctl): key generation/enrollment is inherently a per-
-# machine, post-install action -- it needs the target's own firmware in
-# Setup Mode, and on a handful of boards (some ASUS/Lenovo models per the
-# Arch wiki) it can interact badly with OEM-signed Option ROMs if done
-# carelessly. None of that is safe or meaningful to run against this
-# build chroot, so this just installs sbctl (which also drops its own
-# pacman hook to auto-resign the kernel/bootloader on future updates once
-# keys exist) and a helper script the end user runs themselves.
-cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
-#!/usr/bin/env bash
-# Run this AFTER installing KibaOS, on the real target machine, with
-# Secure Boot's Setup Mode enabled in firmware settings. It creates and
-# enrolls your own Secure Boot keys, then signs systemd-boot's own EFI
-# binary (both copies bootctl install drops -- the one under EFI/systemd/
-# and the removable fallback path firmware falls back to on some boards)
-# plus vmlinuz-linux itself, since systemd-boot chainloads the kernel
-# directly here rather than via a signed-as-one-unit UKI (sbctl's own
-# pacman hook re-signs both automatically on any future kernel/bootloader
-# update).
-set -e
-echo "This will create and enroll new Secure Boot keys on THIS machine"
-echo "and is not easily reversible. Only continue if you understand what"
-echo "Secure Boot key enrollment does. See: wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot"
-read -rp "Continue? [y/N] " _confirm
-[ "${_confirm}" = "y" ] || [ "${_confirm}" = "Y" ] || exit 0
-
-sudo sbctl status
-sudo sbctl create-keys
-sudo sbctl enroll-keys -m
-for sdboot_efi in /boot/EFI/systemd/systemd-boot*.efi /boot/EFI/BOOT/BOOT*.EFI; do
-  [ -e "${sdboot_efi}" ] && sudo sbctl sign -s "${sdboot_efi}"
-done
-sudo sbctl sign -s /boot/vmlinuz-linux
-sudo sbctl verify
-echo "Done. Reboot and re-enable Secure Boot in firmware settings."
-SBCTLSETUP
-chmod +x /usr/local/bin/kibaos-secureboot-setup
 
 # ── Size reduction ─────────────────────────────────────────────────────────
 rm -rf /var/cache/pacman/pkg/*
