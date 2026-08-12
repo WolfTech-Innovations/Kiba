@@ -11954,6 +11954,36 @@ nameserver 1.1.1.1
 nameserver 1.0.0.1
 RESOLVCONF
 
+# ── ARM: manufacture the vmlinuz-* file mkarchiso's ISO 9660 step expects ──
+# ALARM's linux-aarch64 package (unlike x86_64's `linux`) does NOT drop a
+# vmlinuz-* file into /boot via a pacman hook -- it only ships /boot/Image
+# (an EFI-stub-formatted, uncompressed kernel) and /boot/Image.gz. archiso's
+# own _make_boot_on_iso9660() globs literally for "${pacstrap_dir}/boot/
+# vmlinuz-*" with no arch-awareness, so on an aarch64 build that glob never
+# matches anything and mkarchiso dies with "cannot stat ... vmlinuz-*".
+#
+# The fix is the uncompressed Image, not Image.gz: aarch64 UEFI/GRUB loads
+# this file directly as a PE/COFF EFI stub, it doesn't self-decompress the
+# way an x86 bzImage does, so gzipping it here would just produce a vmlinuz
+# GRUB can't parse. Named vmlinuz-linux-aarch64 to match the linux.preset
+# rewrite and the grub.cfg sed done earlier in this build script, so every
+# reference to the kernel filename agrees on this build.
+#
+# mkinitcpio -p archiso is run explicitly afterward because ALARM's kernel
+# package doesn't carry the same 90-mkinitcpio-install.hook trigger path
+# x86_64's linux package does, so nothing else in this chroot will
+# regenerate the initramfs off our preset on its own.
+if [ "$(uname -m)" = "aarch64" ]; then
+  if [ -f /boot/Image ]; then
+    cp -f /boot/Image /boot/vmlinuz-linux-aarch64
+  elif [ -f /boot/Image.gz ]; then
+    gunzip -c /boot/Image.gz > /boot/vmlinuz-linux-aarch64
+  else
+    echo "!!! aarch64 kernel image not found at /boot/Image or /boot/Image.gz -- ISO build will fail at the vmlinuz-* copy step !!!" >&2
+  fi
+  mkinitcpio -p archiso
+fi
+
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
 chmod +x "${AIROOTFS}/root/customize_airootfs.sh"
