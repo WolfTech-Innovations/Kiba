@@ -11969,10 +11969,13 @@ RESOLVCONF
 # rewrite and the grub.cfg sed done earlier in this build script, so every
 # reference to the kernel filename agrees on this build.
 #
-# mkinitcpio -p archiso is run explicitly afterward because ALARM's kernel
-# package doesn't carry the same 90-mkinitcpio-install.hook trigger path
-# x86_64's linux package does, so nothing else in this chroot will
-# regenerate the initramfs off our preset on its own.
+# mkinitcpio -p is run explicitly afterward because ALARM's kernel package
+# doesn't carry the same 90-mkinitcpio-install.hook trigger path x86_64's
+# linux package does, so nothing else in this chroot will regenerate the
+# initramfs off our preset on its own. -p takes the preset FILENAME (this
+# preset lives at /etc/mkinitcpio.d/linux.preset, so the argument is
+# "linux") -- NOT the PRESETS=('archiso') entry name written inside that
+# file, which is just the label for the one build target it defines.
 if [ "$(uname -m)" = "aarch64" ]; then
   if [ -f /boot/Image ]; then
     cp -f /boot/Image /boot/vmlinuz-linux-aarch64
@@ -11981,7 +11984,7 @@ if [ "$(uname -m)" = "aarch64" ]; then
   else
     echo "!!! aarch64 kernel image not found at /boot/Image or /boot/Image.gz -- ISO build will fail at the vmlinuz-* copy step !!!" >&2
   fi
-  mkinitcpio -p archiso
+  mkinitcpio -p linux
 fi
 
 echo "=== customize_airootfs.sh complete ==="
