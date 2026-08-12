@@ -436,6 +436,22 @@ archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
 archiso_image='/boot/initramfs-linux.img'
 PRESET
 
+# linux-aarch64 names its output vmlinuz-linux-aarch64 / initramfs-linux-
+# aarch64.img, not the generic vmlinuz-linux / initramfs-linux.img names
+# written above. mkarchiso parses this exact preset file to figure out
+# what kernel/initramfs filenames to copy out of work/${arch}/boot/ when
+# it builds the ISO 9660 tree -- if this doesn't match what the actual
+# linux-aarch64 package produces, that copy step globs for a vmlinuz-*
+# that was never built and dies with "cannot stat". Same mismatch the
+# grub.cfg sed below this handles for the boot menu; preset needs the
+# same treatment.
+if [ "${KIBA_ARCH}" = "aarch64" ]; then
+  sed -i \
+    -e "s#/boot/vmlinuz-linux#/boot/vmlinuz-linux-aarch64#g" \
+    -e "s#/boot/initramfs-linux\.img#/boot/initramfs-linux-aarch64.img#g" \
+    "${AIROOTFS}/etc/mkinitcpio.d/linux.preset"
+fi
+
 # ══════════════════════════════════════════════════════════════════════════
 # Boot menu — GRUB, UEFI only
 # ══════════════════════════════════════════════════════════════════════════
