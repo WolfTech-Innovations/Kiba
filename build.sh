@@ -70,6 +70,21 @@ install_archiso() {
     echo "FATAL: archiso build from source completed but mkarchiso isn't on PATH" >&2
     exit 1
   fi
+  # Upstream mkarchiso's grubmodules list (in _make_common_efi/the UEFI GRUB
+  # step) is one hardcoded array shared by every grub-mkstandalone target,
+  # x86_64-efi and arm64-efi alike. at_keyboard is GRUB's driver for a
+  # legacy PC "AT"/PS-2 keyboard controller -- that hardware concept
+  # doesn't exist on arm64-efi, so grub never builds an at_keyboard.mod
+  # for that target, and grub-mkstandalone hard-fails with "cannot open
+  # '.../arm64-efi/at_keyboard.mod': No such file or directory" trying to
+  # embed a module that was never compiled. Neither the aarch64 fork nor
+  # upstream has this fixed as of writing, so strip it from whatever
+  # mkarchiso we ended up with, same either way.
+  if [ "${KIBA_ARCH}" = "aarch64" ]; then
+    local _mkarchiso_bin
+    _mkarchiso_bin="$(command -v mkarchiso)"
+    sed -i 's/ at_keyboard / /' "${_mkarchiso_bin}"
+  fi
 }
 install_archiso
 
