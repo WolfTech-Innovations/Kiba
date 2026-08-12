@@ -43,8 +43,18 @@ pacman -S --noconfirm --needed \
 
 # try normal archiso, except (arm detected) build it from source.
 # ALARM doesn't have an archiso package period, so aarch64 always takes
-# the scenic route. also grabbing python-docutils bc the fork's
-# makefile wants rst2man for the man pages.
+# the scenic route -- specifically JackMyers001/archiso-aarch64, a fork
+# that adds real aarch64 support to mkarchiso itself (uefi-aarch64.
+# systemd-boot.esp/.eltorito bootmodes, an aarch64-aware
+# _make_boot_on_fat_aarch64 that copies /boot/Image* directly instead of
+# a vmlinuz-*, etc). Stock upstream archiso only targets x86_64 -- it has
+# a GRUB arm64-efi bootmode, but that target's grubmodules list still
+# includes at_keyboard, a legacy PC PS/2-keyboard-controller module that
+# never gets built for arm64-efi, so grub-mkstandalone hard-fails on it.
+# The fork sidesteps the whole GRUB-on-arm64 mess by using systemd-boot
+# instead, which is also what ALARM's own install docs lean on. also
+# grabbing python-docutils bc the fork's makefile wants rst2man for the
+# man pages.
 install_archiso() {
   if [ "${KIBA_ARCH}" = "x86_64" ]; then
     if pacman -S --noconfirm --needed archiso; then
@@ -55,9 +65,8 @@ install_archiso() {
   # except: we're on arm, or x86 face-planted trying to install normally
   local _src="/tmp/archiso-aarch64-src"
   rm -rf "${_src}"
-  if ! git clone --depth 1 https://github.com/graphitemaster/archiso-aarch64.git "${_src}" 2>/dev/null \
-    && ! git clone --depth 1 https://gitlab.archlinux.org/archlinux/archiso.git "${_src}"; then
-    echo "FATAL: couldn't fetch an archiso source tree (aarch64 fork or upstream) -- check network access to github.com/gitlab.archlinux.org" >&2
+  if ! git clone --depth 1 https://github.com/JackMyers001/archiso-aarch64.git "${_src}"; then
+    echo "FATAL: couldn't fetch JackMyers001/archiso-aarch64 -- check network access to github.com" >&2
     exit 1
   fi
   make -C "${_src}" PREFIX=/usr
@@ -69,21 +78,6 @@ install_archiso() {
   if ! command -v mkarchiso >/dev/null 2>&1; then
     echo "FATAL: archiso build from source completed but mkarchiso isn't on PATH" >&2
     exit 1
-  fi
-  # Upstream mkarchiso's grubmodules list (in _make_common_efi/the UEFI GRUB
-  # step) is one hardcoded array shared by every grub-mkstandalone target,
-  # x86_64-efi and arm64-efi alike. at_keyboard is GRUB's driver for a
-  # legacy PC "AT"/PS-2 keyboard controller -- that hardware concept
-  # doesn't exist on arm64-efi, so grub never builds an at_keyboard.mod
-  # for that target, and grub-mkstandalone hard-fails with "cannot open
-  # '.../arm64-efi/at_keyboard.mod': No such file or directory" trying to
-  # embed a module that was never compiled. Neither the aarch64 fork nor
-  # upstream has this fixed as of writing, so strip it from whatever
-  # mkarchiso we ended up with, same either way.
-  if [ "${KIBA_ARCH}" = "aarch64" ]; then
-    local _mkarchiso_bin
-    _mkarchiso_bin="$(command -v mkarchiso)"
-    sed -i 's/ at_keyboard / /' "${_mkarchiso_bin}"
   fi
 }
 install_archiso
@@ -148,8 +142,11 @@ chmod +x "${PROFILE}/profiledef.sh"
 # $(date...) doesn't fire early, so sed does the arm edits after the
 # fact instead of baking them into the heredoc itself.
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
-  # bootmodes=('uefi.grub') is arch-generic in current mkarchiso (it derives
-  # grub_target/uefi_arch from $arch internally), so no bootmodes sed needed here.
+  # GRUB's arm64-efi target is broken upstream (at_keyboard.mod never gets
+  # built for it -- see install_archiso above), so aarch64 boots via
+  # systemd-boot instead, using the bootmode names JackMyers001's fork
+  # adds to mkarchiso for this exact purpose.
+  sed -i "s/bootmodes=('uefi.grub')/bootmodes=('uefi-aarch64.systemd-boot.esp' 'uefi-aarch64.systemd-boot.eltorito')/" "${PROFILE}/profiledef.sh"
   sed -i 's/arch="x86_64"/arch="aarch64"/' "${PROFILE}/profiledef.sh"
   # x86 bcj filter on arm binaries doesn't explode, just squishes worse
   # (wrong instruction set to filter for). swap to the arm64 one instead
@@ -179,8 +176,6 @@ OSRELEASE
 # ══════════════════════════════════════════════════════════════════════════
 cat > "${PROFILE}/packages.x86_64" << 'PACKAGES'
 archlinux-keyring
-grub
-os-prober
 dosfstools
 mtools
 base
@@ -465,40 +460,38 @@ ALL_kver='/boot/vmlinuz-linux'
 archiso_config='/etc/mkinitcpio.conf.d/archiso.conf'
 archiso_image='/boot/initramfs-linux.img'
 PRESET
-
-# linux-aarch64 names its output vmlinuz-linux-aarch64 / initramfs-linux-
-# aarch64.img, not the generic vmlinuz-linux / initramfs-linux.img names
-# written above. mkarchiso parses this exact preset file to figure out
-# what kernel/initramfs filenames to copy out of work/${arch}/boot/ when
-# it builds the ISO 9660 tree -- if this doesn't match what the actual
-# linux-aarch64 package produces, that copy step globs for a vmlinuz-*
-# that was never built and dies with "cannot stat". Same mismatch the
-# grub.cfg sed below this handles for the boot menu; preset needs the
-# same treatment.
-if [ "${KIBA_ARCH}" = "aarch64" ]; then
-  sed -i \
-    -e "s#/boot/vmlinuz-linux#/boot/vmlinuz-linux-aarch64#g" \
-    -e "s#/boot/initramfs-linux\.img#/boot/initramfs-linux-aarch64.img#g" \
-    "${AIROOTFS}/etc/mkinitcpio.d/linux.preset"
-fi
+# NOTE: this stays at the generic vmlinuz-linux/initramfs-linux.img names
+# for BOTH arches now. On aarch64, ALL_kver here is moot anyway --
+# customize_airootfs.sh invokes mkinitcpio directly with an explicit -k
+# "$(uname -r)" for that arch (see below) rather than relying on ALL_kver
+# path resolution, since ALARM's linux-aarch64 package never drops a
+# vmlinuz-linux file to resolve against in the first place (only
+# /boot/Image and /boot/Image.gz -- see the systemd-boot loader entry
+# further down, which references /boot/Image directly).
 
 # ══════════════════════════════════════════════════════════════════════════
-# Boot menu — GRUB, UEFI only
+# Boot menu — GRUB (x86_64) or systemd-boot (aarch64), UEFI only
 # ══════════════════════════════════════════════════════════════════════════
 # releng ships both syslinux/ (BIOS) and efiboot/ (systemd-boot) by
-# default, but neither one matters now that bootmodes up top is
-# GRUB/UEFI-only, so out they go — no point leaving dead config sitting
-# around in the profile.
-rm -rf "${PROFILE}/syslinux" "${PROFILE}/efiboot"
-mkdir -p "${PROFILE}/grub"
+# default. BIOS boot is gone on both arches, so syslinux/ always goes.
+# efiboot/ is x86_64's dead weight (GRUB is what boots x86_64) but it's
+# exactly what aarch64 needs (systemd-boot, per install_archiso's note on
+# why GRUB's arm64-efi target doesn't work) -- so only strip efiboot/ on
+# x86_64, and generate fresh content into it for aarch64 instead of also
+# deleting it there.
+rm -rf "${PROFILE}/syslinux"
 
-# grub.cfg is a template — mkarchiso fills in %ARCHISO_LABEL%,
-# %INSTALL_DIR%, %ARCH%, %ARCHISO_SEARCH_FILENAME% for us at build time
-# (see _build_grub_config in mkarchiso). GRUB just draws its splash right
-# away no matter what the timeout is — unlike systemd-boot, which needs
-# timeout>=1 to even show one — so timeout=0 here means we boot straight
-# in without hitting that systemd-boot splash bug from before.
-cat > "${PROFILE}/grub/grub.cfg" << 'GRUBCFG'
+if [ "${KIBA_ARCH}" = "x86_64" ]; then
+  rm -rf "${PROFILE}/efiboot"
+  mkdir -p "${PROFILE}/grub"
+
+  # grub.cfg is a template — mkarchiso fills in %ARCHISO_LABEL%,
+  # %INSTALL_DIR%, %ARCH%, %ARCHISO_SEARCH_FILENAME% for us at build time
+  # (see _build_grub_config in mkarchiso). GRUB just draws its splash right
+  # away no matter what the timeout is — unlike systemd-boot, which needs
+  # timeout>=1 to even show one — so timeout=0 here means we boot straight
+  # in without hitting that systemd-boot splash bug from before.
+  cat > "${PROFILE}/grub/grub.cfg" << 'GRUBCFG'
 set default=0
 set timeout=0
 insmod all_video
@@ -523,15 +516,33 @@ if [ "${grub_platform}" == "efi" ]; then
     }
 fi
 GRUBCFG
-
-# %ARCH% is mkarchiso's own placeholder so the boot path just works on
-# both arches for free. filenames still need a manual poke tho, since
-# linux-aarch64 names its output vmlinuz-linux-aarch64, not vmlinuz-linux
-if [ "${KIBA_ARCH}" = "aarch64" ]; then
-  sed -i \
-    -e 's#vmlinuz-linux archisobasedir#vmlinuz-linux-aarch64 archisobasedir#g' \
-    -e 's#initramfs-linux\.img#initramfs-linux-aarch64.img#g' \
-    "${PROFILE}/grub/grub.cfg"
+else
+  # aarch64: systemd-boot. loader.conf/entries/*.conf format and the
+  # %ARCHISO_LABEL%/%INSTALL_DIR%/%ARCH% templating are the same
+  # mkarchiso mechanism GRUB used above, just read out of efiboot/loader
+  # instead of grub/grub.cfg -- see JackMyers001/archiso-aarch64's own
+  # releng profile, which this is matched against directly. Entries
+  # reference /boot/Image (the uncompressed EFI-stub kernel ALARM's
+  # linux-aarch64 package actually ships -- see customize_airootfs.sh's
+  # note on why there's no vmlinuz-* on this arch at all) and the generic
+  # initramfs-linux.img the preset above still produces.
+  mkdir -p "${PROFILE}/efiboot/loader/entries"
+  cat > "${PROFILE}/efiboot/loader/loader.conf" << 'LOADERCONF'
+timeout 0
+default kibaos.conf
+LOADERCONF
+  cat > "${PROFILE}/efiboot/loader/entries/kibaos.conf" << 'ENTRYCONF'
+title   KibaOS
+linux   /%INSTALL_DIR%/boot/%ARCH%/Image
+initrd  /%INSTALL_DIR%/boot/%ARCH%/initramfs-linux.img
+options archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G quiet splash loglevel=3 rd.udev.log_level=3 vt.global_cursor_default=0 plymouth.use-simpledrm=1
+ENTRYCONF
+  cat > "${PROFILE}/efiboot/loader/entries/kibaos-safe.conf" << 'ENTRYCONF'
+title   KibaOS (safe mode)
+linux   /%INSTALL_DIR%/boot/%ARCH%/Image
+initrd  /%INSTALL_DIR%/boot/%ARCH%/initramfs-linux.img
+options archisobasedir=%INSTALL_DIR% archisolabel=%ARCHISO_LABEL% cow_spacesize=4G nomodeset systemd.unit=multi-user.target systemd.log_level=info
+ENTRYCONF
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -3631,7 +3642,7 @@ echo "=== AUR packages installed ==="
 #     dragging in a libfdisk link dependency. no archinstall, no parted,
 #     no blkid/partprobe subprocess anywhere near the disk-critical path.
 #     whatever external tools are left (sgdisk, unsquashfs, mkfs.fat/
-#     mkfs.ext4, arch-chroot, refind-install, mkinitcpio, useradd/
+#     mkfs.ext4, arch-chroot, bootctl, mkinitcpio, useradd/
 #     chpasswd, locale-gen, pacman) just don't have a sane from-scratch
 #     replacement, so those get invoked via argv arrays too, never a
 #     shell. the library source lives in /usr/share/kibaos-oobe/src/disk/
@@ -5410,7 +5421,7 @@ cd /
 # from-scratch GPT writer, mkfs/mount wrapper, and udev-settle
 # replacement respectively. the only external tools I kept around are
 # ones that genuinely have no sane from-scratch replacement: unsquashfs,
-# mkfs.fat, mkfs.ext4, useradd/chpasswd, refind-install, mkinitcpio,
+# mkfs.fat, mkfs.ext4, useradd/chpasswd, bootctl, mkinitcpio,
 # locale-gen, pacman — all invoked via posix_spawn argv arrays, never a
 # shell, so there's zero string-quoting/injection surface in this
 # backend (same argv-array fix I already did on the Vala/sudo side).
@@ -6567,8 +6578,8 @@ cat > kiba_install.h << 'KIBA_SRC_END_INSTH'
  * Same rule as kiba_fs.c: no shell, no string-parsing of subprocess
  * stdout. Where a maintained external tool is the only sane
  * implementation of something complex (unsquashfs's LZMA/xz/zstd
- * decompression, arch-chroot's mount namespace setup, refind-install's
- * rEFInd installation), it's invoked via posix_spawnp with a
+ * decompression, arch-chroot's mount namespace setup, bootctl's
+ * systemd-boot installation), it's invoked via posix_spawnp with a
  * literal argv array -- never system()/popen(), so there's no shell
  * to inject into and no string protocol to desync.
  *
@@ -6629,30 +6640,33 @@ int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password);
 
 /* Removes live-only files/packages, installs the bootloader via
- * posix_spawnp arch-chroot refind-install (rEFInd) plus a hand-written
- * refind.conf/refind_linux.conf, enables services, rebuilds the initramfs.
+ * posix_spawnp arch-chroot bootctl (systemd-boot) plus hand-written
+ * loader.conf/entry files, enables services, rebuilds the initramfs.
  * This only affects the INSTALLED system's bootloader -- the live ISO
- * itself still boots via GRUB (see the archiso profile config), this
- * function is never invoked for the ISO build. */
-/* root_partno/disk_path are no longer used by the rEFInd path
- * (refind_linux.conf is written directly from root_uuid, which the
+ * itself still boots via its own archiso-managed boot stub (GRUB on
+ * x86_64, systemd-boot on aarch64 -- see the archiso profile config),
+ * this function is never invoked for the ISO build. bootctl needs no
+ * --target/arch flag the way grub-install did: it ships one binary per
+ * arch and always installs the one matching itself, so the same call
+ * works unmodified on both x86_64 and aarch64 targets. */
+/* root_partno/disk_path are no longer used by the systemd-boot path
+ * (the boot entry is written directly from root_uuid, which the
  * caller already resolved from the freshly-formatted filesystem) but
  * are kept in the signature for compatibility with the rest of the
  * install pipeline. */
 /* dualboot: when true, the ESP being installed to is shared with an
  * existing OS. We leave that OS's own boot files on the ESP completely
- * untouched (refind-install only ever adds rEFInd's own files under
- * /EFI/refind and an NVRAM entry -- it never removes anyone else's).
- * Unlike GRUB, rEFInd auto-discovers other EFI bootloaders already
- * present on the ESP on its own (no os-prober equivalent needed) -- we
- * just give it a longer timeout on dual-boot installs so that menu is
- * actually visible instead of auto-booting straight into KibaOS. Note
- * we deliberately write refind_linux.conf ourselves rather than letting
- * refind-install/mkrlconf auto-generate it: when run inside a chroot,
- * that auto-generation picks up kernel parameters from the live/host
- * environment rather than the target system (a known rEFInd/chroot
- * footgun per the ArchWiki), so hand-writing it from root_uuid sidesteps
- * that entirely. */
+ * untouched (bootctl install only ever adds systemd-boot's own files
+ * under /EFI/systemd/ and /EFI/BOOT/, plus an NVRAM entry -- it never
+ * removes anyone else's). Like rEFInd before it, systemd-boot
+ * auto-discovers other EFI bootloaders already present on the ESP on
+ * its own per the Boot Loader Specification (no os-prober equivalent
+ * needed) -- we just give it a longer timeout on dual-boot installs so
+ * that menu is actually visible instead of auto-booting straight into
+ * KibaOS. We deliberately write the boot entry ourselves from
+ * root_uuid rather than relying on any auto-generation, for the same
+ * reason the old rEFInd path did: no chroot/live-environment
+ * kernel-parameter footguns to worry about. */
 int kiba_install_finalize(const char *target_root, const char *disk_path,
                            const char *root_part, const char *root_uuid,
                            int root_partno, bool dualboot,
@@ -7401,9 +7415,12 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     }
 
     {
-        /* grub and os-prober stay installed now -- see the GRUB bootloader
-         * setup further down. Only the archiso/live-medium-only tooling
-         * gets stripped here. */
+        /* Only the archiso/live-medium-only tooling gets stripped here;
+         * nothing bootloader-related is pulled from the target by this
+         * step (grub/os-prober were dropped from packages.x86_64 /
+         * packages.aarch64 entirely -- systemd-boot ships as part of
+         * the systemd package, which `base` already depends on, so
+         * there's nothing extra to install or remove for it). */
         char *argv[] = {
             (char *)"pacman", (char *)"-Rns", (char *)"--noconfirm",
             (char *)"archiso", (char *)"mkinitcpio-archiso", (char *)"squashfs-tools",
@@ -7416,7 +7433,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
     {
         /* KibaOS is UEFI-only, which needs /sys/firmware/efi/efivars to
          * write the NVRAM boot entry. Fail fast with a clear message
-         * instead of letting grub-install die with a cryptic error. This
+         * instead of letting bootctl die with a cryptic error. This
          * is a firmware requirement, not a VM restriction -- a VM booted
          * in UEFI mode passes this check exactly like real hardware
          * does; it's specifically legacy/BIOS boot mode that trips it,
@@ -7434,94 +7451,102 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             return -1;
         }
 
-        /* GRUB target depends on arch -- x86_64-efi vs arm64-efi. Same
-         * uname() trick used elsewhere in this file (kiba_find_live_image,
-         * the kernel copy step above) instead of a compile-time #ifdef, so
-         * one installer binary works whichever ISO it was built into. */
-        struct utsname gu;
-        const char *grub_target = "x86_64-efi";
-        if (uname(&gu) == 0 && strcmp(gu.machine, "aarch64") == 0) {
-            grub_target = "arm64-efi";
-        }
-
-        /* --bootloader-id names both the NVRAM entry and the
-         * /boot/EFI/KibaOS/ subdirectory grub-install writes its own
-         * grubx64.efi/grubaa64.efi into; efibootmgr (already in
-         * packages.x86_64/packages.aarch64) is what grub-install shells
-         * out to for the actual NVRAM registration. */
+        /* Unlike grub-install, bootctl takes no --target/arch flag --
+         * systemd ships one systemd-boot*.efi per arch and bootctl always
+         * installs the copy matching the binary's own arch, so this one
+         * call works unmodified whether the installer binary is running
+         * on x86_64 or aarch64 (no uname()-based branching needed here
+         * the way grub_target required). `install` writes both the
+         * generic removable-media fallback path (/boot/EFI/BOOT/) and,
+         * via efibootmgr under the hood (already in
+         * packages.x86_64/packages.aarch64), a real NVRAM boot entry --
+         * bootctl labels that entry from /etc/os-release's PRETTY_NAME
+         * (already "KibaOS", set earlier in this build) rather than a
+         * generic "Linux Boot Manager", so no separate manual efibootmgr
+         * call is needed the way grub-install's --bootloader-id used to
+         * require. bootctl also figures out the ESP's disk and partition
+         * number itself from the /boot mountpoint -- unlike the old
+         * hand-rolled efibootmgr approach this replaced, it doesn't need
+         * disk_path/an ESP partition number handed to it at all, so this
+         * works identically whether the ESP is partition 1 (fresh
+         * install) or some other number (dualboot, sharing an existing
+         * ESP). --esp-path=/boot matches where the OOBE partitioner
+         * already mounted the ESP (see the partitioning step earlier in
+         * the install pipeline). */
         char *argv[] = {
-            (char *)"grub-install", (char *)"--target", (char *)grub_target,
-            (char *)"--efi-directory=/boot", (char *)"--bootloader-id=KibaOS",
-            (char *)"--recheck", NULL
+            (char *)"bootctl", (char *)"--esp-path=/boot", (char *)"install", NULL
         };
         if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "grub-install failed");
+            snprintf(g_finish_err, sizeof(g_finish_err), "bootctl install failed");
             return -1;
         }
-
-        /* Second pass at the generic removable-media fallback path
-         * (/boot/EFI/BOOT/BOOT*.EFI): some firmware ignores NVRAM boot
-         * entries entirely and only ever tries that path, so this is
-         * cheap insurance -- same dual-placement bootctl used to give us
-         * for free with systemd-boot. Best-effort: the primary install
-         * above is the one that has to succeed. */
-        char *argv_rm[] = {
-            (char *)"grub-install", (char *)"--target", (char *)grub_target,
-            (char *)"--efi-directory=/boot", (char *)"--bootloader-id=KibaOS",
-            (char *)"--removable", (char *)"--recheck", NULL
-        };
-        chroot_run(target_root, argv_rm);
     }
 
     if (cb) cb(86, "Building your boot menu...", user_data);
     {
-        /* /etc/kernel/cmdline was the UKI-era spot for this; GRUB reads
-         * kernel cmdline options from GRUB_CMDLINE_LINUX_DEFAULT in
-         * /etc/default/grub instead, which grub-mkconfig picks up below. */
-        snprintf(path, sizeof(path), "%s/etc/default/grub", target_root);
-        char grub_default[1024];
-        snprintf(grub_default, sizeof(grub_default),
-                 "GRUB_DEFAULT=0\n"
-                 "GRUB_TIMEOUT=%d\n"
-                 "GRUB_DISTRIBUTOR=KibaOS\n"
-                 "GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash loglevel=3 "
-                 "rd.udev.log_level=3 vt.global_cursor_default=0 "
-                 "plymouth.use-simpledrm=1 "
-                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\"\n"
-                 "GRUB_CMDLINE_LINUX=\"\"\n"
-                 "GRUB_DISABLE_OS_PROBER=%s\n"
-                 "GRUB_GFXMODE=auto\n"
-                 "GRUB_GFXPAYLOAD_LINUX=keep\n",
-                 dualboot ? 5 : 0,
-                 dualboot ? "false" : "true");
-        if (write_file(path, grub_default) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "writing /etc/default/grub failed");
+        /* loader.conf: systemd-boot's own top-level config. bootctl
+         * install above already wrote a stub one; overwrite it with our
+         * own values rather than editing in place, since we know exactly
+         * what we want and don't need to preserve anything it generated.
+         * timeout 0 means boot straight to KibaOS with no visible menu,
+         * same as GRUB_TIMEOUT=0 used to give us -- except on a dualboot
+         * install, where a longer timeout matters for the same reason it
+         * did under the old rEFInd path: systemd-boot auto-discovers
+         * other EFI bootloaders already on the ESP on its own (Boot
+         * Loader Specification autodetection, no os-prober equivalent
+         * needed), but that discovered menu is only useful if it's
+         * actually visible long enough to pick from. */
+        snprintf(path, sizeof(path), "%s/boot/loader/loader.conf", target_root);
+        char loader_conf[256];
+        snprintf(loader_conf, sizeof(loader_conf),
+                 "default kibaos.conf\n"
+                 "timeout %d\n"
+                 "console-mode max\n"
+                 "editor no\n",
+                 dualboot ? 5 : 0);
+        if (write_file(path, loader_conf) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "writing loader.conf failed");
             return -1;
         }
 
-        /* grub-mkconfig's 10_linux script matches vmlinuz-<X> against
-         * initramfs-<X>.img purely by the shared "-<X>" suffix -- it never
-         * checks which pacman package provided them -- so this works
-         * whether the live medium's kernel package was "linux" (x86_64) or
-         * "linux-aarch64" (ALARM); both get normalized to the same
-         * vmlinuz-linux/initramfs-linux.img names by the copy step earlier
-         * in kiba_install(). GRUB_DISABLE_OS_PROBER=false (dualboot case,
-         * set above) is what gives GRUB back the rEFInd-style "scan for
-         * other OSes" behavior -- os-prober is already pulled in via
-         * packages.x86_64/packages.aarch64 and no longer gets stripped
-         * during cleanup (see the pacman -Rns call above). */
-        char *argv[] = {
-            (char *)"grub-mkconfig", (char *)"-o", (char *)"/boot/grub/grub.cfg", NULL
-        };
-        if (chroot_run(target_root, argv) != 0) {
-            snprintf(g_finish_err, sizeof(g_finish_err), "grub-mkconfig failed");
+        /* kibaos.conf: the actual boot entry (Boot Loader Specification
+         * Type #1 -- a plain text file, not a UKI). bootctl install
+         * already created /boot/loader/entries/ for us. Unlike GRUB's
+         * grub-mkconfig, this file never needs regenerating on a kernel
+         * update: vmlinuz-linux/initramfs-linux.img are the same fixed
+         * names on every boot (the copy step earlier in kiba_install()
+         * normalizes both x86_64's "linux" and ALARM's "linux-aarch64"
+         * packages down to those names), and the `linux` package's own
+         * pacman hooks keep initramfs-linux.img refreshed in place on
+         * future kernel updates -- so this gets written once, here, and
+         * never touched again. root=UUID=... is written directly from
+         * root_uuid (resolved by the caller from the freshly-formatted
+         * filesystem) rather than relying on any auto-generation, the
+         * same reasoning the old rEFInd path used to avoid picking up
+         * kernel parameters from the live/chroot environment instead of
+         * the target system. */
+        snprintf(path, sizeof(path), "%s/boot/loader/entries", target_root);
+        mkdir(path, 0755); /* best-effort, bootctl install already made this */
+
+        snprintf(path, sizeof(path), "%s/boot/loader/entries/kibaos.conf", target_root);
+        char entry[1024];
+        snprintf(entry, sizeof(entry),
+                 "title KibaOS\n"
+                 "linux /vmlinuz-linux\n"
+                 "initrd /initramfs-linux.img\n"
+                 "options root=UUID=%s rw quiet splash loglevel=3 "
+                 "rd.udev.log_level=3 vt.global_cursor_default=0 "
+                 "plymouth.use-simpledrm=1 "
+                 "lsm=landlock,lockdown,yama,integrity,apparmor,bpf\n",
+                 root_uuid);
+        if (write_file(path, entry) != 0) {
+            snprintf(g_finish_err, sizeof(g_finish_err), "writing boot entry failed");
             return -1;
         }
     }
 
-    (void)disk_path;   /* no longer needed -- grub-mkconfig finds the root device via the /boot mount itself */
-    (void)root_partno;
-    (void)root_uuid;   /* no longer needed -- grub-mkconfig derives root=UUID=... from /etc/fstab, not a hand-written cmdline */
+    (void)disk_path;   /* no longer needed -- bootctl resolves the ESP's disk from the /boot mountpoint itself */
+    (void)root_partno; /* no longer needed -- bootctl resolves the ESP's partition number the same way */
 
     if (cb) cb(88, "Turning on background features...", user_data);
     {
@@ -7543,11 +7568,13 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
             "NetworkManager", "sddm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
             /* systemd-bless-boot.service / systemd-boot-check-no-failures.
-             * service are gone -- those only exist to manage a UKI's
-             * tries-left/tries-done boot-counting suffix, which was a
-             * systemd-boot-specific mechanism. Plain GRUB + a plain
-             * vmlinuz/initramfs pair (no UKI, no counter in the filename)
-             * has nothing for them to track. */
+             * service are gone -- those manage systemd-boot's optional
+             * tries-left/tries-done boot-counting suffix on an entry's
+             * filename (e.g. kibaos+3-0.conf), which only kicks in if
+             * the entry file is named with a counter to begin with.
+             * kibaos.conf (written above) deliberately isn't, so there's
+             * nothing for these services to track -- same effective
+             * behavior as under GRUB, just for a different reason. */
         };
         for (size_t i = 0; i < sizeof(services)/sizeof(services[0]); i++) {
             char *argv[] = { (char *)"systemctl", (char *)"enable", (char *)services[i], NULL };
@@ -7720,7 +7747,7 @@ cat > kibaos_oobe_backend_main.c << 'KIBA_SRC_END_MAINC'
  * partprobe as subprocesses: all of that is libkibadisk (kiba_gpt.c /
  * kiba_fs.c / kiba_udev.c). The only external tools left are the ones
  * with no sane from-scratch replacement: sgdisk (GPT writer, see
- * kiba_gpt.c), unsquashfs, useradd/chpasswd, refind-install,
+ * kiba_gpt.c), unsquashfs, useradd/chpasswd, bootctl,
  * mkinitcpio, locale-gen, pacman -- all invoked via argv
  * arrays inside libkibadisk, never through a shell.
  *
@@ -7991,8 +8018,8 @@ int main(int argc, char **argv) {
     }
     /* Dual-boot: the ESP already belongs to the other OS and already has
      * a filesystem on it, plus that OS's own boot files -- formatting it
-     * would destroy them. refind-install (further down) only ever adds
-     * KibaOS's own files there, so we deliberately never touch the ESP's
+     * would destroy them. bootctl install (further down) only ever adds
+     * systemd-boot's own files there, so we deliberately never touch the ESP's
      * filesystem in this mode. */
     if (kiba_fs_format(root_part, KIBA_FS_EXT4, "KIBAOS-ROOT") != 0) {
         fail(kiba_fs_strerror());
@@ -11884,12 +11911,13 @@ cat > /usr/local/bin/kibaos-secureboot-setup << 'SBCTLSETUP'
 #!/usr/bin/env bash
 # Run this AFTER installing KibaOS, on the real target machine, with
 # Secure Boot's Setup Mode enabled in firmware settings. It creates and
-# enrolls your own Secure Boot keys, then signs GRUB's own EFI binary
-# (both copies grub-install drops -- the named loader under EFI/KibaOS/
+# enrolls your own Secure Boot keys, then signs systemd-boot's own EFI
+# binary (both copies bootctl install drops -- the one under EFI/systemd/
 # and the removable fallback path firmware falls back to on some boards)
-# plus vmlinuz-linux itself, since GRUB chainloads the kernel directly
-# rather than via a signed-as-one-unit UKI (sbctl's own pacman hook
-# re-signs both automatically on any future kernel/bootloader update).
+# plus vmlinuz-linux itself, since systemd-boot chainloads the kernel
+# directly here rather than via a signed-as-one-unit UKI (sbctl's own
+# pacman hook re-signs both automatically on any future kernel/bootloader
+# update).
 set -e
 echo "This will create and enroll new Secure Boot keys on THIS machine"
 echo "and is not easily reversible. Only continue if you understand what"
@@ -11900,8 +11928,8 @@ read -rp "Continue? [y/N] " _confirm
 sudo sbctl status
 sudo sbctl create-keys
 sudo sbctl enroll-keys -m
-for grub_efi in /boot/EFI/KibaOS/grub*.efi /boot/EFI/BOOT/BOOT*.EFI; do
-  [ -e "${grub_efi}" ] && sudo sbctl sign -s "${grub_efi}"
+for sdboot_efi in /boot/EFI/systemd/systemd-boot*.efi /boot/EFI/BOOT/BOOT*.EFI; do
+  [ -e "${sdboot_efi}" ] && sudo sbctl sign -s "${sdboot_efi}"
 done
 sudo sbctl sign -s /boot/vmlinuz-linux
 sudo sbctl verify
@@ -11984,37 +12012,26 @@ nameserver 1.1.1.1
 nameserver 1.0.0.1
 RESOLVCONF
 
-# ── ARM: manufacture the vmlinuz-* file mkarchiso's ISO 9660 step expects ──
-# ALARM's linux-aarch64 package (unlike x86_64's `linux`) does NOT drop a
-# vmlinuz-* file into /boot via a pacman hook -- it only ships /boot/Image
-# (an EFI-stub-formatted, uncompressed kernel) and /boot/Image.gz. archiso's
-# own _make_boot_on_iso9660() globs literally for "${pacstrap_dir}/boot/
-# vmlinuz-*" with no arch-awareness, so on an aarch64 build that glob never
-# matches anything and mkarchiso dies with "cannot stat ... vmlinuz-*".
+# ── ARM: generate the live-medium initramfs by hand ─────────────────────
+# ALARM's linux-aarch64 package (unlike x86_64's `linux`) doesn't carry
+# the 90-mkinitcpio-install.hook trigger path that would otherwise
+# regenerate the initramfs automatically on install, so nothing else in
+# this chroot ever runs mkinitcpio for us -- do it explicitly.
 #
-# The fix is the uncompressed Image, not Image.gz: aarch64 UEFI/GRUB loads
-# this file directly as a PE/COFF EFI stub, it doesn't self-decompress the
-# way an x86 bzImage does, so gzipping it here would just produce a vmlinuz
-# GRUB can't parse. Named vmlinuz-linux-aarch64 to match the linux.preset
-# rewrite and the grub.cfg sed done earlier in this build script, so every
-# reference to the kernel filename agrees on this build.
-#
-# mkinitcpio -p is run explicitly afterward because ALARM's kernel package
-# doesn't carry the same 90-mkinitcpio-install.hook trigger path x86_64's
-# linux package does, so nothing else in this chroot will regenerate the
-# initramfs off our preset on its own. -p takes the preset FILENAME (this
-# preset lives at /etc/mkinitcpio.d/linux.preset, so the argument is
-# "linux") -- NOT the PRESETS=('archiso') entry name written inside that
-# file, which is just the label for the one build target it defines.
+# No vmlinuz-* manufacturing needed here anymore: this build boots
+# aarch64 via systemd-boot (see the boot menu section and
+# install_archiso's note on why GRUB's arm64-efi target doesn't work),
+# and the fork's _make_boot_on_fat_aarch64 copies /boot/Image* onto the
+# live medium directly -- ALARM already ships that file, no renaming or
+# repackaging required. Called with an explicit -k/-g instead of -p
+# linux specifically to sidestep ALL_kver resolution: mkinitcpio's normal
+# path-based kernel-version detection wants to inspect a vmlinuz file
+# that plain ALARM installs never produce (only /boot/Image[.gz], which
+# aren't in a format mkinitcpio's version-sniffing understands), so
+# handing it uname -r directly is more robust than hoping ALL_kver
+# resolves against a file that was never there in the first place.
 if [ "$(uname -m)" = "aarch64" ]; then
-  if [ -f /boot/Image ]; then
-    cp -f /boot/Image /boot/vmlinuz-linux-aarch64
-  elif [ -f /boot/Image.gz ]; then
-    gunzip -c /boot/Image.gz > /boot/vmlinuz-linux-aarch64
-  else
-    echo "!!! aarch64 kernel image not found at /boot/Image or /boot/Image.gz -- ISO build will fail at the vmlinuz-* copy step !!!" >&2
-  fi
-  mkinitcpio -p linux
+  mkinitcpio -k "$(uname -r)" -c /etc/mkinitcpio.conf.d/archiso.conf -g /boot/initramfs-linux.img
 fi
 
 echo "=== customize_airootfs.sh complete ==="
