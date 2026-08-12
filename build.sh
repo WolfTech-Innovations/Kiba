@@ -12059,10 +12059,24 @@ RESOLVCONF
 # path-based kernel-version detection wants to inspect a vmlinuz file
 # that plain ALARM installs never produce (only /boot/Image[.gz], which
 # aren't in a format mkinitcpio's version-sniffing understands), so
-# handing it uname -r directly is more robust than hoping ALL_kver
-# resolves against a file that was never there in the first place.
+# an explicit -k is required rather than hoping ALL_kver resolves
+# against a file that was never there in the first place. That -k
+# value has to come from the chroot's own /usr/lib/modules though,
+# not ambient uname -r -- see the note just below.
 if [ "$(uname -m)" = "aarch64" ]; then
-  mkinitcpio -k "$(uname -r)" -c /etc/mkinitcpio.conf.d/archiso.conf -g /boot/initramfs-linux.img
+  # NOTE: uname -r here is the GH Actions RUNNER's kernel (e.g.
+  # 6.17.0-1020-azure) -- chroot only changes the filesystem root, it
+  # doesn't change what uname() reports, so ambient uname -r never
+  # matches whatever version linux-aarch64 actually dropped into this
+  # chroot's own /usr/lib/modules. Same class of bug already fixed in
+  # kibaos_oobe_backend (see kiba_install_finalize) -- read the real
+  # installed version off disk instead of trusting uname -r.
+  _kver="$(ls -1 /usr/lib/modules | head -n1)"
+  if [ -z "${_kver}" ]; then
+    echo "ERROR: no kernel module directory found under /usr/lib/modules" >&2
+    exit 1
+  fi
+  mkinitcpio -k "${_kver}" -c /etc/mkinitcpio.conf.d/archiso.conf -g /boot/initramfs-linux.img
 fi
 
 echo "=== customize_airootfs.sh complete ==="
