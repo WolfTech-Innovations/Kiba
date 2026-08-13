@@ -5068,7 +5068,249 @@ public class KibaOOBE : Adw.Application {
 
 OOBEVALA
 
+# ── winapps-setup.vala ──────────────────────────────────────────────────
+# GTK4/libadwaita frontend for kibaos-winapps-setup, the headless
+# PROGRESS/FATAL backend defined in the WINDOWS APP SUPPORT section
+# further down. Built as a second executable in the same meson project as
+# the OOBE app rather than a whole separate build tree -- one shared
+# vala/gtk4/libadwaita toolchain, one `meson setup && ninja` invocation,
+# same dependency versions guaranteed for both.
+#
+# Deliberately its OWN small file rather than folded into main.vala:
+# kiba_install_finalize() (see kiba_install.h/kiba_install.c further down)
+# rm -rf's the whole usr/share/kibaos-oobe tree on every normal disk
+# install, since KibaOOBE only ever runs during install/OEM-finish and
+# has no reason to exist afterward. This app is the opposite -- it's what
+# a person launches from the app menu on an already-installed system,
+# potentially months later -- so it can't depend on anything under
+# kibaos-oobe/ surviving that cleanup. It only reuses libadwaita's own
+# semantic style classes (title-1, dim-label, suggested-action, flat),
+# not oobe.css, for exactly that reason: nothing here needs a resource
+# file to exist post-install, just the compiled binary itself, which
+# lands in /usr/bin -- untouched by the live_only cleanup list.
+cat > /usr/share/kibaos-oobe/src/winapps-setup.vala << 'WINAPPSSETUPVALA'
+public class KibaWinAppsSetup : Adw.Application {
+    private Adw.ApplicationWindow window;
+    private Gtk.ProgressBar progress_bar;
+    private Gtk.Label       heading_label;
+    private Gtk.Label       status_label;
+    private Gtk.Box         button_row;
+    private Gtk.Button      retry_btn;
+    private Gtk.Button      open_btn;
+    private Gtk.Button      close_btn;
+    private string          last_fatal_message = "";
+    private string[]        launch_args;
+
+    // Same tiny inline translator as KibaOOBE (see main.vala) -- kept as
+    // a separate copy rather than a shared header, since this is a
+    // single-file build target and Vala has no lightweight way to share
+    // one private method across two unrelated executable() targets
+    // without a proper library split, which is more plumbing than a
+    // three-line helper is worth here.
+    private string ui_lang = "en";
+    private string t (string en, string tr, string pl) {
+        return ui_lang == "tr" ? tr : ui_lang == "pl" ? pl : en;
+    }
+
+    public KibaWinAppsSetup (string[] args) {
+        Object (application_id: "io.kibaos.winapps-setup", flags: ApplicationFlags.FLAGS_NONE);
+        // Everything after argv[0] -- just the optional "--manual-launch"
+        // flag kibaos-winapps-workspace already passes today -- gets
+        // forwarded straight through to the backend unchanged, same as
+        // it always did back when kibaos-winapps-workspace exec'd the
+        // backend directly.
+        launch_args = args;
+    }
+
+    protected override void activate () {
+        var locale = GLib.Environment.get_variable ("LANG") ?? "";
+        if (locale.has_prefix ("tr")) ui_lang = "tr";
+        else if (locale.has_prefix ("pl")) ui_lang = "pl";
+
+        window = new Adw.ApplicationWindow (this) {
+            default_width  = 480,
+            default_height = 420,
+            resizable      = false,
+            title = t ("Windows Workspace Setup",
+                       "Windows Çalışma Alanı Kurulumu",
+                       "Konfiguracja Windows Workspace")
+        };
+
+        var toolbar = new Adw.ToolbarView ();
+        toolbar.add_top_bar (new Adw.HeaderBar ());
+
+        var content = new Gtk.Box (Gtk.Orientation.VERTICAL, 18) {
+            halign = Gtk.Align.CENTER, valign = Gtk.Align.CENTER,
+            margin_top = 12, margin_bottom = 30, margin_start = 36, margin_end = 36
+        };
+
+        var icon = new Gtk.Image.from_icon_name ("kibaos-winapps") {
+            pixel_size = 64, halign = Gtk.Align.CENTER
+        };
+        content.append (icon);
+
+        heading_label = new Gtk.Label (
+            t ("Setting up Windows Workspace",
+               "Windows Çalışma Alanı Kuruluyor",
+               "Konfigurowanie Windows Workspace")) {
+            halign = Gtk.Align.CENTER, justify = Gtk.Justification.CENTER
+        };
+        heading_label.add_css_class ("title-1");
+        content.append (heading_label);
+
+        progress_bar = new Gtk.ProgressBar () { show_text = false, hexpand = true };
+        content.append (progress_bar);
+
+        status_label = new Gtk.Label (t ("Starting…", "Başlatılıyor…", "Uruchamianie…")) {
+            halign = Gtk.Align.CENTER, justify = Gtk.Justification.CENTER,
+            wrap = true, max_width_chars = 48
+        };
+        status_label.add_css_class ("dim-label");
+        content.append (status_label);
+
+        // All three buttons exist from the start, just hidden -- toggling
+        // visibility rather than reparenting widgets keeps run_backend()
+        // (which is also the retry path) simple to reset between runs.
+        button_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
+            halign = Gtk.Align.CENTER, visible = false
+        };
+        retry_btn = new Gtk.Button.with_label (t ("Retry", "Tekrar Dene", "Spróbuj ponownie"));
+        retry_btn.add_css_class ("suggested-action");
+        retry_btn.clicked.connect (() => run_backend ());
+        open_btn = new Gtk.Button.with_label (
+            t ("Open Windows Workspace", "Windows Çalışma Alanını Aç", "Otwórz Windows Workspace"));
+        open_btn.add_css_class ("suggested-action");
+        open_btn.clicked.connect (() => {
+            try { GLib.Process.spawn_command_line_async ("/usr/local/bin/kibaos-winapps-workspace"); }
+            catch (GLib.SpawnError e) { warning ("Failed to launch Windows Workspace: %s", e.message); }
+            window.close ();
+        });
+        close_btn = new Gtk.Button.with_label (t ("Close", "Kapat", "Zamknij"));
+        close_btn.add_css_class ("flat");
+        close_btn.clicked.connect (() => window.close ());
+        button_row.append (retry_btn);
+        button_row.append (open_btn);
+        button_row.append (close_btn);
+        content.append (button_row);
+
+        toolbar.set_content (content);
+        window.set_content (toolbar);
+        window.present ();
+
+        run_backend ();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Backend plumbing -- same PROGRESS/FATAL reader as KibaOOBE's
+    // launch_backend()/read_backend_output() (see main.vala), just
+    // pointed at kibaos-winapps-setup instead of kibaos-oobe-backend/
+    // kibaos-oem-finish.sh, and spawned WITHOUT a sudo/pkexec prefix --
+    // unlike those two, this backend has to run as the actual invoking
+    // user (it writes under $HOME/.config/winapps) and elevates only the
+    // specific docker/systemd calls it needs, itself, inline, via its
+    // own pkexec calls. Wrapping the whole thing in sudo here would hand
+    // it root's $HOME instead and break that.
+    // ══════════════════════════════════════════════════════════════════
+    private void run_backend () {
+        button_row.visible = false;
+        retry_btn.visible  = false;
+        open_btn.visible   = false;
+        close_btn.visible  = false;
+        heading_label.label = t ("Setting up Windows Workspace",
+                                  "Windows Çalışma Alanı Kuruluyor",
+                                  "Konfigurowanie Windows Workspace");
+        progress_bar.fraction = 0.0;
+        // Undo whatever show_failure_state() below left behind from a
+        // previous failed attempt -- without this, a retry that succeeds
+        // would still show the status line in error styling.
+        status_label.remove_css_class ("error");
+        status_label.add_css_class ("dim-label");
+        status_label.label = t ("Starting…", "Başlatılıyor…", "Uruchamianie…");
+
+        string[] argv = (launch_args.length > 1)
+            ? new string[] { "/usr/local/bin/kibaos-winapps-setup", launch_args[1] }
+            : new string[] { "/usr/local/bin/kibaos-winapps-setup" };
+
+        try {
+            var launcher = new GLib.SubprocessLauncher (
+                GLib.SubprocessFlags.STDOUT_PIPE | GLib.SubprocessFlags.STDERR_MERGE);
+            var proc = launcher.spawnv (argv);
+            last_fatal_message = "";
+            read_backend_output.begin (
+                new GLib.DataInputStream (proc.get_stdout_pipe ()), proc);
+        } catch (GLib.Error e) {
+            status_label.label = t ("Failed to start: %s", "Başlatılamadı: %s",
+                                     "Nie udało się uruchomić: %s").printf (e.message);
+            show_failure_state ();
+        }
+    }
+
+    private async void read_backend_output (GLib.DataInputStream stream, GLib.Subprocess proc) {
+        try {
+            while (true) {
+                string? line = yield stream.read_line_async ();
+                if (line == null) break;
+                if (line.has_prefix ("PROGRESS ")) {
+                    var parts = line.substring (9).split (" ", 2);
+                    int    pct = int.parse (parts[0]);
+                    string msg = parts.length > 1 ? parts[1] : "";
+                    progress_bar.fraction = pct / 100.0;
+                    status_label.label    = msg;
+                } else if (line.has_prefix ("FATAL: ")) {
+                    // Same reasoning as KibaOOBE: STDERR_MERGE means this
+                    // is the one place the real failure reason (not a
+                    // generic message) is ever actually available.
+                    last_fatal_message = line.substring (7);
+                }
+            }
+            yield proc.wait_async ();
+            if (proc.get_exit_status () == 0) {
+                heading_label.label   = t ("All set!", "Her şey hazır!", "Wszystko gotowe!");
+                progress_bar.fraction = 1.0;
+                open_btn.visible      = true;
+                close_btn.visible     = true;
+                button_row.visible    = true;
+            } else {
+                heading_label.label = t ("Setup didn't finish", "Kurulum tamamlanamadı",
+                                          "Konfiguracja się nie powiodła");
+                status_label.label = last_fatal_message != "" ? last_fatal_message : t (
+                    "Something went wrong. Check the system log (journalctl -t kibaos-winapps-setup) for details.",
+                    "Bir şeyler ters gitti. Ayrıntılar için sistem günlüğünü kontrol edin (journalctl -t kibaos-winapps-setup).",
+                    "Coś poszło nie tak. Sprawdź dziennik systemowy (journalctl -t kibaos-winapps-setup), aby uzyskać szczegóły.");
+                show_failure_state ();
+            }
+        } catch (GLib.Error e) {
+            heading_label.label = t ("Setup didn't finish", "Kurulum tamamlanamadı",
+                                      "Konfiguracja się nie powiodła");
+            status_label.label = t ("Lost connection to the setup process: %s",
+                                     "Kurulum sürecine bağlantı kesildi: %s",
+                                     "Utracono połączenie z procesem konfiguracji: %s").printf (e.message);
+            show_failure_state ();
+        }
+    }
+
+    private void show_failure_state () {
+        status_label.remove_css_class ("dim-label");
+        status_label.add_css_class ("error");
+        retry_btn.visible  = true;
+        close_btn.visible  = true;
+        button_row.visible = true;
+    }
+
+    public static int main (string[] args) {
+        return new KibaWinAppsSetup (args).run (args);
+    }
+}
+WINAPPSSETUPVALA
+
 # ── meson build files ─────────────────────────────────────────────────────
+# Two executables, one project: io.kibaos.oobe (install/OEM-finish UI,
+# stripped off normal installs post-setup) and io.kibaos.winapps-setup
+# (the WinApps setup UI, meant to persist and be re-runnable any time
+# after install). Sharing one meson.build means one `meson setup build`
+# and one `ninja -C build` builds and installs both -- no second
+# configure/compile pass, no second copy of the gtk4/libadwaita/gee
+# dependency lookups to keep in sync with the first.
 cat > /usr/share/kibaos-oobe/src/meson.build << 'OOBEMESON'
 project('kibaos-oobe', 'vala', 'c', version: '1.0')
 
@@ -5084,6 +5326,13 @@ executable(
   'io.kibaos.oobe',
   'main.vala',
   dependencies: [gtk4_dep, adwaita_dep, gee_dep, m_dep, threads_dep],
+  install: true
+)
+
+executable(
+  'io.kibaos.winapps-setup',
+  'winapps-setup.vala',
+  dependencies: [gtk4_dep, adwaita_dep, m_dep, threads_dep],
   install: true
 )
 OOBEMESON
@@ -5477,7 +5726,7 @@ cp /usr/share/kibaos/logo-256.png /usr/share/icons/hicolor/scalable/actions/kiba
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 
 # ── Build the OOBE app ─────────────────────────────────────────────────────
-echo "=== Building KibaOS OOBE installer ==="
+echo "=== Building KibaOS OOBE installer + Windows Workspace setup UI ==="
 cd /usr/share/kibaos-oobe/src
 meson setup build --prefix=/usr || { echo "FATAL: meson setup failed for kibaos-oobe — check vala/gtk4/libadwaita dev package availability." >&2; exit 1; }
 ninja -C build || { echo "FATAL: ninja build failed for kibaos-oobe — check the Vala compile errors above." >&2; exit 1; }
@@ -7465,6 +7714,15 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     if (cb) cb(80, "Cleaning up installer files...", user_data);
 
+    /* io.kibaos.winapps-setup and kibaos-winapps-setup are deliberately
+     * NOT in this list, even though io.kibaos.winapps-setup is built
+     * alongside io.kibaos.oobe in the same meson project (see WINDOWS APP
+     * SUPPORT further down) -- unlike OOBE, that app is meant to still be
+     * launchable from the app menu long after install, so its binary
+     * (usr/bin/io.kibaos.winapps-setup) and its backend
+     * (usr/local/bin/kibaos-winapps-setup) both have to survive this
+     * cleanup. Only usr/share/kibaos-oobe -- the vala source tree, needed
+     * at build time only -- gets removed. */
     static const char *live_only[] = {
         "usr/share/applications/kibaos-install.desktop",
         "usr/bin/io.kibaos.oobe",
@@ -8193,8 +8451,8 @@ int main(int argc, char **argv) {
         snprintf(p, sizeof(p), "%s/etc/kibaos/winapps-pending", target_root);
         FILE *f = fopen(p, "w");
         if (f) fclose(f); /* best-effort: a missed marker just means the
-                            * user runs "Set Up KWS" from the app
-                            * menu themselves instead of it prompting them */
+                            * user runs "Set Up Windows Workspace" from the
+                            * app menu themselves instead of it prompting them */
     }
 
     progress(98, "Finishing up...");
@@ -10340,8 +10598,8 @@ OEMAUTOCFG
 # feature, not opt-in, so unlike the oem-pending marker it mirrors, nothing
 # ever leaves it unset. The marker's what triggers kibaos-winapps-setup on
 # first login (see kibaos-winapps-firstrun.desktop below); the user can
-# also launch it manually via "Set Up KWS" in the app menu any
-# time, e.g. to retry after a failed first attempt.
+# also launch it manually via "Set Up Windows Workspace" in the app menu
+# any time, e.g. to retry after a failed first attempt.
 # ══════════════════════════════════════════════════════════════════════════
 
 # A KibaOS-branded icon for the exe-runner + app-menu entry, pulled from the
@@ -10370,11 +10628,15 @@ HINT_MARKER="${HOME}/.config/kibaos/.winapps-workspace-hint-shown"
 WIN_URL="http://localhost:8006"
 
 if [ ! -f "${COMPOSE_FILE}" ]; then
-  zenity --question --title="KWS Isn't Set Up Yet" \
-    --text="The KibaOS Windows Subsystem (KWS) isn't set up on this computer yet.\n\nWant to set it up now? It takes about 15–20 minutes." \
-    --ok-label="Set It Up" --cancel-label="Not Now" 2>/dev/null
+  zenity --question --title="Set Up Windows Workspace?" \
+    --text="Windows Workspace lets you run Windows programs -- like Word, Excel, or other apps that don't have a Linux version -- right alongside everything else in KibaOS.\n\nWant to set it up now? It takes about 15–20 minutes, and you won't need to do anything but wait." \
+    --ok-label="Yes, Let's Do It" --cancel-label="Maybe Later" 2>/dev/null
   if [ "$?" -eq 0 ]; then
-    exec /usr/local/bin/kibaos-winapps-setup --manual-launch
+    # io.kibaos.winapps-setup, not the raw backend script -- it's the GTK
+    # wrapper that actually reads the PROGRESS/FATAL protocol and shows
+    # something on screen while kibaos-winapps-setup runs headless behind
+    # it (see WINDOWS APP SUPPORT further down for both).
+    exec /usr/bin/io.kibaos.winapps-setup --manual-launch
   fi
   exit 1
 fi
@@ -10476,7 +10738,7 @@ if [ "${ALREADY_UP}" -eq 0 ]; then
       echo "$((i * 100 / 60))"
     done
     echo "100"
-  ) | zenity --progress --title="KWS" --text="Starting KWS…" \
+  ) | zenity --progress --title="Windows Workspace" --text="Just a moment, opening your Windows Workspace…" \
       --pulsate --auto-close --no-cancel --width=360 2>/dev/null
 
   wait "${COMPOSE_PID}"
@@ -10484,11 +10746,11 @@ if [ "${ALREADY_UP}" -eq 0 ]; then
 
   if ! curl -fsS -o /dev/null --max-time 2 "${WIN_URL}" 2>/dev/null; then
     if [ "${COMPOSE_STATUS}" -ne 0 ]; then
-      zenity --error --title="KWS" --width=420 \
-        --text="KWS didn't start. Try again in a moment, or open 'Set Up KWS' from the app menu if this keeps happening." 2>/dev/null
+      zenity --error --title="Windows Workspace" --width=420 \
+        --text="Hmm, your Windows Workspace didn't start. Give it another try -- if it keeps happening, open 'Set Up Windows Workspace' from the app menu and we'll get it sorted." 2>/dev/null
     else
-      zenity --error --title="KWS" --width=420 \
-        --text="KWS is taking longer than usual to come up. Give it a bit and try 'Open KWS' again -- nothing's broken, it just needs more time." 2>/dev/null
+      zenity --error --title="Windows Workspace" --width=420 \
+        --text="Your Windows Workspace is taking a little longer than usual to wake up. Nothing's broken -- just give it another moment, then try 'Open Windows Workspace' again." 2>/dev/null
     fi
     exit 1
   fi
@@ -10502,10 +10764,10 @@ add_keybind
 if [ "${KEYBIND_ADDED}" -eq 1 ] && [ ! -f "${HINT_MARKER}" ]; then
   mkdir -p "$(dirname "${HINT_MARKER}")"
   touch "${HINT_MARKER}"
-  notify-send -i kibaos-winapps "KWS" \
-    "Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null || \
-    zenity --info --title="KWS" --width=380 \
-      --text="Tip: press Super+K any time to minimize this and get back to your desktop." 2>/dev/null
+  notify-send -i kibaos-winapps "Windows Workspace" \
+    "Tip: press Super+K any time to duck back to your KibaOS desktop. Windows Workspace stays right where you left it." 2>/dev/null || \
+    zenity --info --title="Windows Workspace" --width=380 \
+      --text="Tip: press Super+K any time to duck back to your KibaOS desktop. Windows Workspace stays right where you left it." 2>/dev/null
 fi
 
 chromium --kiosk --app="${WIN_URL}" 2>/dev/null
@@ -10516,8 +10778,8 @@ chmod +x /usr/local/bin/kibaos-winapps-workspace
 cat > /usr/share/applications/kibaos-winapps-workspace.desktop << 'WORKSPACEDESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Open KWS
-Comment=Open the KibaOS Windows Subsystem (KWS) full-screen
+Name=Open Windows Workspace
+Comment=Run Windows programs like Word and Excel, right alongside KibaOS
 Icon=kibaos-winapps
 Exec=/usr/local/bin/kibaos-winapps-workspace
 Terminal=false
@@ -10540,6 +10802,26 @@ chmod +x "${SKEL}/Desktop/kibaos-winapps-workspace.desktop"
 # hood, none of which the person running it should ever need to know.
 # Re-runnable: launching it again after a successful setup just re-opens
 # the "everything's already working" summary instead of redoing anything.
+# ── The setup wizard itself ─────────────────────────────────────────────
+# Written entirely in plain language on purpose — this is the one part of
+# KibaOS setup that talks about Docker, RDP ports, and VMs under the
+# hood, none of which the person running it should ever need to know.
+# Re-runnable: launching it again after a successful setup just re-opens
+# the "everything's already working" summary instead of redoing anything.
+#
+# Headless PROGRESS/FATAL backend, not a dialog-driven script. This used
+# to talk straight to the person via zenity --info/--question/--error/
+# --progress, which meant it could only ever run inside an X session with
+# zenity installed, and had no way to hand its status to anything other
+# than a zenity window. It now speaks the exact same wire protocol as
+# kibaos-oobe-backend and kibaos-oem-finish.sh instead: "PROGRESS <pct>
+# <msg>" lines on stdout, "FATAL: <msg>" on stderr, plain exit code for
+# success/failure. See launch_backend()/read_backend_output() in the OOBE
+# frontend above for the reference reader -- any caller that spawns this
+# with stdout piped and stderr merged (GLib.SubprocessLauncher with
+# STDOUT_PIPE|STDERR_MERGE, same as the OOBE launcher does) can drive its
+# own UI off these two prefixes, or none at all. No zenity calls remain
+# anywhere in this script.
 cat > /usr/local/bin/kibaos-winapps-setup << 'WINAPPSSETUP'
 #!/bin/bash
 set -uo pipefail
@@ -10550,10 +10832,8 @@ COMPOSE_FILE="${CONF_DIR}/compose.yaml"
 MARKER="/etc/kibaos/winapps-pending"
 MANUAL_LAUNCH="${1:-}"
 
-notify() { zenity --info --title="KWS" --text="$1" --width=420 2>/dev/null; }
-ask()    { zenity --question --title="KWS" --text="$1" \
-             --ok-label="${2:-Yes}" --cancel-label="${3:-No}" --width=420 2>/dev/null; }
-err()    { zenity --error --title="KWS" --text="$1" --width=420 2>/dev/null; }
+progress() { echo "PROGRESS $1 $2"; }
+fail()     { progress 100 "Setup failed: $1"; echo "FATAL: $1" >&2; exit 1; }
 
 # Group membership in /etc/group only takes effect for *new* login
 # sessions, not the one you're already in -- and the OEM-finish flow in
@@ -10581,46 +10861,48 @@ if [ -z "${WINAPPS_REGROUPED:-}" ] \
 NEWGRPCMD
 fi
 
-# Already fully set up? Just say so and offer a normal re-check.
+progress 1 "Checking Windows Workspace status..."
+
+# Already fully set up? Report done and clear the marker instead of
+# redoing anything -- this is a normal outcome, not a failure.
 if command -v winapps >/dev/null 2>&1 && [ -f "${CONF_DIR}/winapps.conf" ]; then
-  notify "KWS is already set up on this computer.\n\nOpen 'Open KWS' from the app menu or desktop to use Windows full-screen, or find your installed Windows programs in the app menu."
   rm -f "${MARKER}"
+  progress 100 "Windows Workspace is already set up and running."
   exit 0
 fi
 
 # Docker already installed and the Windows container already created from
 # a prior attempt (compose.yaml exists), just not finished (setup.sh
 # never completed, or the RDP wait timed out last time)? That means
-# someone already said yes to this once -- resume instead of asking the
-# "want to set this up" question all over again every time this runs.
+# someone already went through this once -- resume instead of restarting
+# from scratch.
 RESUMING=0
 if command -v docker >/dev/null 2>&1 && [ -f "${COMPOSE_FILE}" ]; then
   RESUMING=1
 fi
 
 # WinApps is a listed, always-on KibaOS feature, not an opt-in add-on
-# (see the WINDOWS APP SUPPORT header above) -- so first-login setup goes
-# straight ahead instead of asking permission for something that's not
-# actually optional. This still isn't silent: the notify below tells the
-# person what's happening and where to watch it, they just don't have to
-# click a button to agree to a feature that's already part of KibaOS.
-# Manually re-launching from "Open KWS" already implies
-# consent (that's an explicit, deliberate click), so there's nothing left
-# to ask there either.
+# (see the WINDOWS APP SUPPORT header above), so this proceeds straight
+# through rather than gating on a confirmation dialog for something
+# that's not actually optional. kibaos-winapps-workspace's own "want to
+# set this up now?" question, before it ever launches this backend, is
+# the one and only consent point.
 if [ "${RESUMING}" -eq 1 ]; then
-  notify "Picking up where KWS setup left off. This window will let you know once it's ready -- you can also watch progress at localhost:8006 in your browser."
+  progress 5 "Resuming Windows Workspace setup..."
 else
-  notify "Setting up the KibaOS Windows Subsystem (KWS) now, so you can run Windows programs (like Office) right from KibaOS.\n\nHere's what's about to happen:\n\n1. KibaOS turns on the background service that runs Windows.\n2. Windows installs itself completely automatically — nothing to click through, just a wait.\n3. This window will let you know once it's ready. It typically takes 15-20 minutes, mostly just downloading and installing, and needs a spare 30+ GB of disk space.\n\nIf you're curious, you can watch progress at localhost:8006 in your browser, but you don't need to do anything there."
+  progress 5 "Setting up Windows Workspace..."
 fi
 
+progress 10 "Starting Docker..."
 pkexec systemctl enable --now docker >/dev/null 2>&1
 if ! systemctl is-active --quiet docker; then
-  err "KibaOS couldn't start the background service KWS needs (Docker). Check /var/log for details, or try again later from the app menu."
-  exit 1
+  logger -t kibaos-winapps-setup "docker failed to start; see systemctl status docker"
+  fail "Docker couldn't be started -- check 'systemctl status docker'."
 fi
 
 mkdir -p "${CONF_DIR}"
 if [ ! -f "${COMPOSE_FILE}" ]; then
+  progress 15 "Preparing Windows Workspace configuration..."
   cp "${WINAPPS_SRC}/compose.yaml" "${COMPOSE_FILE}"
   # compose.yaml references "./oem" as a relative bind-mount source (for
   # post-install RDPApps.reg / install.bat execution inside the guest).
@@ -10635,6 +10917,7 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   if [ "$(uname -m)" = "aarch64" ]; then
     sed -i -E 's#image: dockurr/windows(:[^[:space:]]*)?$#image: dockurr/windows-arm\1#' "${COMPOSE_FILE}"
   fi
+
   # WinApps' docker backend (dockur/windows under the hood) installs
   # Windows completely unattended using whatever USERNAME/PASSWORD is
   # baked into compose.yaml at container creation -- there's no
@@ -10644,44 +10927,42 @@ if [ ! -f "${COMPOSE_FILE}" ]; then
   # MyWindowsPassword), that's a weak, publicly documented password --
   # and per WinApps' own docs, an empty/default password can make Windows
   # auto-login in a way that breaks the RDP handshake WinApps needs.
-  #
-  # Rather than a random 24-char string the person is never shown (and
-  # so can never actually type in if they ever need to log into the
-  # Windows console directly -- e.g. after a UAC prompt or a session
-  # lock), reuse the same password they already log into KibaOS with.
-  # One password to remember, not two. kiba_install_create_user() (disk
-  # installs) and kibaos-oem-finish.sh (OEM-imaged devices) both stash it
-  # root-only and one-time-use, right after account creation, for
-  # exactly this. Read it via pkexec (it's 0600 root:root) and delete
-  # the stash the moment it's read, so it never sits around longer than
-  # this single read needs it to.
+  progress 20 "Setting your Windows account password..."
   WIN_USER="KibaUser"
   WIN_PASS=""
+  # Rather than a random string the person is never shown, reuse the same
+  # password they already log into KibaOS with -- one password to
+  # remember, not two. kiba_install_create_user() (disk installs) and
+  # kibaos-oem-finish.sh (OEM-imaged devices) both stash it root-only and
+  # one-time-use, right after account creation, for exactly this. Read it
+  # via pkexec (it's 0600 root:root) and delete the stash the moment it's
+  # read, so it never sits around longer than this single read needs it
+  # to.
   STASH="/etc/kibaos/winapps-userpass"
   if pkexec test -f "${STASH}" 2>/dev/null; then
     WIN_PASS="$(pkexec cat "${STASH}" 2>/dev/null)"
     pkexec rm -f "${STASH}" 2>/dev/null || true
   fi
-  # Falls back to asking directly if the stash is missing (setup run long
-  # after install, e.g. the Linux password's since been changed) or too
-  # short for Windows' own unattended-install minimum. Looped so a too-
-  # short retry doesn't just silently continue with a rejected password.
-  while [ -z "${WIN_PASS}" ] || [ "${#WIN_PASS}" -lt 8 ]; do
-    WIN_PASS="$(zenity --password --title="Set a Windows Password" 2>/dev/null)"
-    if [ -z "${WIN_PASS}" ]; then
-      err "Windows app support needs a password to finish setting up. Try again from the app menu when you're ready."
-      exit 1
-    fi
-    if [ "${#WIN_PASS}" -lt 8 ]; then
-      notify "That password's a bit short -- Windows needs at least 8 characters. Try again."
-    fi
-  done
+  # Headless: there's no dialog left to ask for a password interactively
+  # if the stash is missing or too short (e.g. this runs long after
+  # install, once the KibaOS login password has since changed) -- the
+  # old zenity --password loop simply can't happen here, and blocking a
+  # backend process on input that can never arrive would just hang it
+  # forever. Fall back to a freshly generated password instead, stashed
+  # the same root-only, 0600 way as the original -- written back out
+  # this time rather than consumed, so it can still be recovered later.
+  if [ -z "${WIN_PASS}" ] || [ "${#WIN_PASS}" -lt 8 ]; then
+    WIN_PASS="$(tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 20)"
+    NOTE="/etc/kibaos/winapps-password-note"
+    pkexec bash -c "umask 077; printf '%s\n' '${WIN_PASS}' > '${NOTE}'" 2>/dev/null || true
+    logger -t kibaos-winapps-setup "no reusable KibaOS password found -- generated a new Windows password, stashed root-only at ${NOTE}"
+  fi
   # Rewritten line-by-line rather than with sed/awk substitution -- the
   # password can contain characters (/, &, \) that sed and awk both treat
   # as special in a replacement string, which would silently corrupt the
-  # line for anyone whose Linux password has one. printf '%s' never
+  # line for anyone whose password has one. printf '%s' never
   # reinterprets its argument, so this is the one substitution method
-  # that's actually safe for an arbitrary user-chosen password.
+  # that's actually safe for an arbitrary password.
   COMPOSE_TMP="$(mktemp)"
   while IFS= read -r line; do
     if [[ "${line}" =~ ^([[:space:]]*)USERNAME:[[:space:]]* ]]; then
@@ -10722,16 +11003,17 @@ fi
 # "docker compose up" fail outright rather than just skip GPU passthrough.
 #
 # `docker info` (and `docker compose` below) talk to the Docker daemon's
-# socket, which is root-owned. The `sg docker` re-exec earlier only fixes
-# up *this shell's* group token, and that's not enough on its own if group
-# membership isn't actually granting socket access -- plenty of reports of
-# a rootful Docker/Podman only being visible to root, group membership or
-# not. Elevate these two calls with pkexec rather than assume the group
-# path works. pkexec resets the environment, so $HOME (and therefore any
-# path derived from it, like CONF_DIR/COMPOSE_FILE) must NOT be re-derived
-# inside the elevated command -- it has to be the already-resolved
-# absolute path from this unprivileged part of the script, passed straight
-# through as an argument.
+# socket, which is root-owned. The `newgrp docker` re-exec earlier only
+# fixes up *this shell's* group token, and that's not enough on its own
+# if group membership isn't actually granting socket access -- plenty of
+# reports of a rootful Docker/Podman only being visible to root, group
+# membership or not. Elevate these two calls with pkexec rather than
+# assume the group path works. pkexec resets the environment, so $HOME
+# (and therefore any path derived from it, like CONF_DIR/COMPOSE_FILE)
+# must NOT be re-derived inside the elevated command -- it has to be the
+# already-resolved absolute path from this unprivileged part of the
+# script, passed straight through as an argument.
+progress 30 "Checking for GPU passthrough..."
 COMPOSE_ARGS=(--file "${COMPOSE_FILE}")
 GPU_DETECTED=0
 if lspci -nnk 2>/dev/null | grep -qi 'nvidia' \
@@ -10756,30 +11038,34 @@ fi
 # inherited across fork/exec same as any other child process, so this
 # still lands docker compose in CONF_DIR (needed for the compose file's
 # relative "./oem" mount) without depending on $HOME surviving elevation.
+progress 35 "Starting the Windows virtual machine..."
 COMPOSE_LOG="$(mktemp)"
 if ! ( cd "${CONF_DIR}" && pkexec docker compose "${COMPOSE_ARGS[@]}" up -d ) > "${COMPOSE_LOG}" 2>&1; then
   logger -t kibaos-winapps-setup "docker compose up -d failed: $(cat "${COMPOSE_LOG}")"
-  err "Something went wrong starting the Windows environment (see journalctl -t kibaos-winapps-setup for details). Nothing was changed permanently — you can try again from the app menu ('Set Up KWS')."
   rm -f "${COMPOSE_LOG}"
-  exit 1
+  fail "Windows Workspace couldn't start -- nothing was changed permanently, retry from the app menu."
 fi
 rm -f "${COMPOSE_LOG}"
 
-chromium "http://localhost:8006" >/dev/null 2>&1 &
+# No chromium launch here on purpose. Opening a browser window is a UI
+# concern that belongs to whatever's driving this backend, not something
+# a headless process should do on its own -- kibaos-winapps-workspace
+# already opens the noVNC console itself once winapps.conf exists below.
 
 # Source of truth for credentials from here on is compose.yaml itself,
 # not a fresh random generation -- keeps this idempotent if setup gets
 # re-run after a partial failure. The container (and whatever account is
 # actually inside it) may already exist from a prior attempt, and
 # regenerating a new password here would just desync from it.
+progress 40 "Reading Windows account details..."
 WIN_USER=$(grep -oP '^\s*USERNAME:\s*"\K[^"]+' "${COMPOSE_FILE}")
 WIN_PASS=$(grep -oP '^\s*PASSWORD:\s*"\K[^"]+' "${COMPOSE_FILE}")
 
 if [ -z "${WIN_USER}" ] || [ -z "${WIN_PASS}" ]; then
-  err "Couldn't read the Windows account details from the config. Run 'Set Up KWS' again from the app menu, or check ${COMPOSE_FILE} manually."
-  exit 1
+  fail "Couldn't read the Windows account details back out of compose.yaml."
 fi
 
+progress 45 "Writing Windows Workspace configuration..."
 cat > "${CONF_DIR}/winapps.conf" << CONF
 RDP_USER="${WIN_USER}"
 RDP_PASS="${WIN_PASS}"
@@ -10800,66 +11086,64 @@ chmod 600 "${CONF_DIR}/winapps.conf"
 
 # Wait for the unattended install to actually finish -- this is a real
 # Windows install (download + setup), not a quick boot, so budget up to
-# ~35 minutes rather than the couple of minutes a already-installed VM
+# ~35 minutes rather than the couple of minutes an already-installed VM
 # would need to just bring RDP up after a restart. An open RDP port is
 # used as the "Windows is ready" signal since there's no other clean
 # hook into dockur/windows' unattended install process from out here.
+# Progress ticks every ~30s (every 6th 5s poll) rather than on every
+# single poll -- PROGRESS lines are meant to mark real movement for
+# whatever's reading them, not flood the pipe with 420 near-identical
+# updates over up to 35 minutes.
+progress 50 "Waiting for Windows to finish installing (this can take up to 35 minutes)..."
 RDP_UP=0
 for i in $(seq 1 420); do
   nc -z 127.0.0.1 3389 >/dev/null 2>&1 && { RDP_UP=1; break; }
   sleep 5
+  if [ $((i % 6)) -eq 0 ]; then
+    progress "$((50 + i * 35 / 420))" "Still waiting for Windows to finish installing..."
+  fi
 done
 
 if [ "${RDP_UP}" -ne 1 ]; then
-  err "Windows is taking longer than expected to finish installing. Nothing's broken — it may just need more time on a slower connection. Check progress at http://127.0.0.1:8006, and re-run 'Set Up KWS' from the app menu once it shows a desktop."
-  exit 1
+  fail "Windows is taking longer than expected to finish installing -- nothing's broken, just re-run this to pick up where it left off."
 fi
 
-notify "Almost done — one more window will open to finish installing the app shortcuts (Word, Excel, whatever Windows found installed). It'll look technical for a minute; that's normal, just follow along."
-
-# NOTE: deliberately not relying on a terminal emulator's "--wait" flag to
-# block until setup.sh finishes. gnome-console's --wait is a documented
-# no-op (upstream man page literally lists it as "(TODO)"), and even
-# gnome-terminal's --wait only helps if gnome-console isn't picked first.
-# So: run setup.sh directly in *this* process (a real, unambiguous
-# blocking call), log its output to a file, and just tail that log in a
-# terminal window purely for the user to watch -- the terminal is
-# cosmetic here, not something the script's control flow depends on.
+# Runs setup.sh synchronously -- with nowhere to render a progress dialog
+# anyway, there's no reason left to background it behind one. Full output
+# is still captured to SETUP_LOG and, on failure, forwarded to the system
+# log via logger for anyone who does need to dig in.
+progress 85 "Setting up your Windows app shortcuts..."
 SETUP_LOG="$(mktemp)"
-TERMINAL_CMD="gnome-console"
-command -v "${TERMINAL_CMD}" >/dev/null 2>&1 || TERMINAL_CMD="gnome-terminal"
-"${TERMINAL_CMD}" -- bash -lc "tail -n +1 -f '${SETUP_LOG}'" &
-TAIL_TERM_PID=$!
-
-"${WINAPPS_SRC}/setup.sh" --user --setupAllOfficiallySupportedApps > "${SETUP_LOG}" 2>&1
-SETUP_STATUS=$?
-
-kill "${TAIL_TERM_PID}" >/dev/null 2>&1
-
-if [ "${SETUP_STATUS}" -ne 0 ]; then
-  err "The Windows app shortcut installer hit a problem partway through (see ${SETUP_LOG} for details). Windows itself is still fine -- run 'Set Up KWS' again from the app menu to retry just that step."
-  exit 1
+if ! "${WINAPPS_SRC}/setup.sh" --user --setupAllOfficiallySupportedApps > "${SETUP_LOG}" 2>&1; then
+  logger -t kibaos-winapps-setup "app shortcut setup failed: $(cat "${SETUP_LOG}")"
+  rm -f "${SETUP_LOG}"
+  fail "Windows itself is all set up and ready to go, but hooking up the individual app shortcuts hit a snag -- re-run this to retry just that step."
 fi
 rm -f "${SETUP_LOG}"
 
 rm -f "${MARKER}"
 if [ "${GPU_DETECTED}" -eq 1 ]; then
-  notify "All set! Open 'Open KWS' from the app menu or desktop to use Windows full-screen, and any Windows programs KWS found are now in your app menu.\n\nAn NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
+  progress 100 "All set! An NVIDIA GPU was detected and passed through to Windows for faster, hardware-accelerated apps."
 else
-  notify "All set! Open 'Open KWS' from the app menu or desktop to use Windows full-screen, and any Windows programs KWS found are now in your app menu."
+  progress 100 "All set!"
 fi
+exit 0
 WINAPPSSETUP
 chmod +x /usr/local/bin/kibaos-winapps-setup
 
 # Menu entry so this is re-runnable any time, not just at first login
 # (e.g. if someone skips it initially, or wants to fix a broken setup).
+# Points at io.kibaos.winapps-setup (built above alongside the OOBE app)
+# rather than the raw backend script directly -- running the headless
+# script straight from a .desktop entry would mean PROGRESS/FATAL lines
+# with nowhere to go and no visible feedback at all.
 cat > /usr/share/applications/kibaos-winapps-setup.desktop << 'SETUPDESKTOP'
 [Desktop Entry]
 Type=Application
-Name=Set Up KWS
-Comment=Set up the KibaOS Windows Subsystem (KWS), including the full-screen KWS workspace
+Name=Set Up Windows Workspace
+Comment=Set up Windows so you can run Windows programs, like Office, right from KibaOS
 Icon=kibaos-winapps
-Exec=/usr/local/bin/kibaos-winapps-setup
+Exec=/usr/bin/io.kibaos.winapps-setup
 Terminal=false
 Categories=System;Settings;
 SETUPDESKTOP
@@ -10867,12 +11151,14 @@ SETUPDESKTOP
 # First-login autostart: only actually shows anything if the marker from
 # kibaos-oobe-backend / kibaos-oem-finish.sh is present, which it always
 # is now (WinApps is a mandatory feature, not opt-in). Same gating style
-# as the OEM-finish entry above.
+# as the OEM-finish entry above -- also updated to launch the GUI wrapper
+# rather than the headless backend directly, same reasoning as the menu
+# entry above.
 cat > "${SKEL}/.config/autostart/kibaos-winapps-firstrun.desktop" << 'WINAPPSAUTOCFG'
 [Desktop Entry]
 Type=Application
-Name=KWS Setup
-Exec=sh -c 'test -f /etc/kibaos/winapps-pending && exec /usr/local/bin/kibaos-winapps-setup'
+Name=Windows Workspace Setup
+Exec=sh -c 'test -f /etc/kibaos/winapps-pending && exec /usr/bin/io.kibaos.winapps-setup'
 Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
