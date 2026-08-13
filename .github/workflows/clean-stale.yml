@@ -1,0 +1,114 @@
+# Cleanup stale branches workflow
+# This workflow runs on a weekly schedule and on manual dispatch.
+# It deletes branches that meet the following conditions:
+# - Not the default branch
+# - Not protected
+# - Last commit date older than the configured threshold (default 90 days)
+# - Not matching safe-prefixes (keep/, release/)
+# Use DRY_RUN=true to only list branches that would be deleted.
+
+name: Cleanup stale branches
+
+on:
+  schedule:
+    - cron: '0 3 * * 1' # Every Monday at 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Number of days of inactivity to consider a branch stale'
+        required: false
+        default: '90'
+      dry_run:
+        description: 'If true, don't delete branches, just log what would be deleted'
+        required: false
+        default: 'true'
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (read-only)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete stale branches
+        uses: actions/github-script@v6
+        env:
+          INPUT_DAYS: ${{ github.event.inputs.days || github.event.inputs.days }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'true' }}
+        with:
+          script: |
+            const daysInput = process.env.INPUT_DAYS || '90';
+            const days = parseInt(daysInput, 10);
+            const dryRun = String(process.env.DRY_RUN).toLowerCase() === 'true';
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+
+            console.log(`Repo: ${owner}/${repo}`);
+            console.log(`Default branch will be preserved. Stale after ${days} days. Dry run: ${dryRun}`);
+
+            // Get default branch
+            const repoResp = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = repoResp.data.default_branch;
+
+            // Fetch all branches (paginated)
+            const branches = await github.paginate(github.rest.repos.listBranches, { owner, repo, per_page: 100 });
+
+            const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+
+            // Configure branch name patterns to skip
+            const skipPrefixes = ['keep/', 'release/', 'stable/', 'protected/'];
+
+            const results = [];
+
+            for (const br of branches) {
+              try {
+                const name = br.name;
+                if (name === defaultBranch) continue;
+                if (br.protected) { console.log(`Skipping protected branch: ${name}`); continue; }
+
+                // Skip specific safe prefixes
+                if (skipPrefixes.some(p => name.startsWith(p))) { console.log(`Skipping by prefix: ${name}`); continue; }
+
+                // Get the commit info for the branch's tip
+                const commitResp = await github.rest.repos.getCommit({ owner, repo, ref: br.commit.sha });
+                const commitDate = new Date(commitResp.data.commit.committer.date).getTime();
+
+                if (isNaN(commitDate)) { console.log(`Could not determine commit date for ${name}, skipping.`); continue; }
+
+                if (commitDate < cutoff) {
+                  results.push({ branch: name, lastCommit: commitResp.data.sha, date: commitResp.data.commit.committer.date });
+                }
+              } catch (err) {
+                console.log(`Error inspecting branch ${br.name}: ${err.message || err}`);
+              }
+            }
+
+            if (results.length === 0) {
+              console.log('No stale branches found.');
+            } else {
+              console.log(`Found ${results.length} stale branch(es):`);
+              for (const r of results) {
+                console.log(`- ${r.branch}  (last commit: ${r.date}, sha: ${r.lastCommit})`);
+              }
+
+              if (dryRun) {
+                console.log('Dry run enabled — no branches were deleted. To delete branches, re-run this workflow with dry_run=false.');
+              } else {
+                // Delete branches
+                for (const r of results) {
+                  try {
+                    console.log(`Deleting branch ${r.branch}...`);
+                    await github.rest.git.deleteRef({ owner, repo, ref: `refs/heads/${r.branch}` });
+                    console.log(`Deleted ${r.branch}`);
+                  } catch (err) {
+                    console.log(`Failed to delete ${r.branch}: ${err.message || err}`);
+                  }
+                }
+              }
+            }
+
+            // Optionally create an issue summary when deletions occur (left as comment for maintainers)
+            return { stale_count: results.length };
