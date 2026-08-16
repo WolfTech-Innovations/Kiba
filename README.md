@@ -9,6 +9,7 @@
 <div align="center">
 
 # KibaOS
+# An OS by Kiba Labs, LLC
 ![OIN](https://github.com/WolfTech-Innovations/Kiba/blob/main/branding/oin-member-2-0-horiz-1.png?raw=true)
 **A friendly, ready-to-use ~~Linux~~ general OS desktop, built for people switching to simple.**
 
@@ -38,7 +39,7 @@
 
 </div>
 
-<img width="1000" alt="Desktop screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_000000008ac881f5beb3622a8ec72855.png?raw=true" />
+<img width="1000" alt="Desktop screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/IMG_0168.png" />
 
 ---
 
@@ -87,7 +88,7 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 | **`kiba`, a friendly app manager** | Install, remove, and update software with plain-language commands instead of memorizing package-manager flags. See [Managing Apps with kibapkg](#managing-apps-with-kibapkg). |
 | **A guided setup experience** | KibaOS's own built-in installer (the OOBE app, short for "Out-Of-Box Experience") asks you one simple question at a time. |
 | **A calm, uncluttered live session** | The trial/install session never dims, locks, or falls asleep on you mid-setup, and stays free of raw system dialogs, developer tools, and other things you'd never need to see. |
-| **LSW (Linux Subsystem for Windows)** | A real Windows environment runs alongside KibaOS and opens full-screen with one click — Office, Photoshop, and most other Windows programs work as they normally would. |
+| **Windows Workspace** | A real Windows environment runs alongside KibaOS and opens full-screen with one click — Office, Photoshop, and most other Windows programs work as they normally would. |
 | **Automatic background updates** | Small fixes download and apply on their own, without interrupting what you're doing. |
 
 > [!TIP]
