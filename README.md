@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true" width="250" alt="Kiba Badge">
+  <img src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/A25ACB5D-92F7-4408-8972-CBD562BE4898.png?raw=true" width="250" alt="KibaOS Banner">
 </p>
 
 > [!IMPORTANT]
@@ -14,8 +14,6 @@
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/build.yml?branch=main&label=Build&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/WolfTech-Innovations/Kiba/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3DDC97?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](#license)
-[![Arch Linux](https://img.shields.io/badge/Base-Arch_Linux-1793D1?style=for-the-badge&logo=archlinux&logoColor=white)](https://archlinux.org)
-[![Budgie Desktop](https://img.shields.io/badge/Desktop-Budgie-2C001E?style=for-the-badge&logo=linux&logoColor=white)](https://buddiesofbudgie.org)
 
 <sub>
 <img src="https://img.shields.io/badge/Icons-Numix_Circle-6b5ce7?style=flat-square" alt="Numix Circle Icons">
@@ -66,7 +64,7 @@ KibaOS is built and maintained by **Kiba Labs**.
 - [System Requirements](#system-requirements)
 - [Everyday Use](#everyday-use)
   - [Managing Apps with kibapkg](#managing-apps-with-kibapkg)
-  - [Running Windows Programs with LSW](#running-windows-programs-with-lsw)
+  - [Running Windows Programs with Windows Workspace](#running-windows-programs-with-windows-workspace)
   - [Automatic Updates](#automatic-updates)
 - [Building KibaOS Yourself](#building-kibaos-yourself)
 - [Project Structure](#project-structure)
@@ -197,16 +195,16 @@ kiba info    <app name>    # details about an app
 > [!TIP]
 > Most people won't need `kiba` day-to-day — the App Store handles installing and updating apps visually. `kiba` is there for when you'd rather type a command.
 
-### Running Windows Programs with LSW
+### Running Windows Programs with Windows Workspace
 
-KibaOS includes **LSW (Linux Subsystem for Windows)** — the reverse of what its name implies: instead of Windows running a Linux environment inside it, KibaOS runs a real Windows environment inside itself. This lets you use Windows-only programs like Microsoft Office or Photoshop without leaving KibaOS or setting up a separate computer.
+KibaOS includes **Windows Workspace** — the reverse of what its name implies: instead of Windows running a Linux environment inside it, KibaOS runs a real Windows environment inside itself. This lets you use Windows-only programs like Microsoft Office or Photoshop without leaving KibaOS or setting up a separate computer.
 
 The first time you open **"Run Windows Workspace"** from the app menu or desktop, KibaOS downloads and installs Windows automatically in the background — no product key or install disc needed, and nothing to click through. This takes 15–20 minutes and needs about 30 GB of free disk space, all done once.
 
 After that, opening **"Run Windows Workspace"** brings up the full Windows desktop, full-screen, in seconds. Press `Super+K` at any time to switch back to your KibaOS desktop without closing Windows — everything stays running in the background, ready when you switch back.
 
 > [!TIP]
-> Not every Windows program will work perfectly — this depends on the program itself, not on KibaOS. LSW works best with at least 4 GB of RAM free for the Windows environment on top of what KibaOS itself is using.
+> Not every Windows program will work perfectly — this depends on the program itself, not on KibaOS. Windows Workspace works best with at least 4 GB of RAM free for the Windows environment on top of what KibaOS itself is using.
 
 ### Automatic Updates
 
