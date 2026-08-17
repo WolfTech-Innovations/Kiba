@@ -128,9 +128,13 @@ Include = /etc/pacman.d/mobile-mirrorlist
 Include = /etc/pacman.d/mobile-mirrorlist
 [alarm]
 Include = /etc/pacman.d/mobile-mirrorlist
-[aur]
-Include = /etc/pacman.d/mobile-mirrorlist
 PACMANCONF
+  # No [aur] section here on purpose -- ALARM doesn't host a prebuilt
+  # binary AUR repo at this mirror path (or anywhere), so it never
+  # resolved any package; it just sat there as a dead sync target every
+  # run. AUR-only packages (ofono, libhybris, gnome-calls, chatty,
+  # libgestures, wlrctl) are all built from source in the AUR loop below
+  # instead of pacstrap'd.
 
   mkdir -p "${_root}/var/lib/pacman"
 
@@ -141,7 +145,13 @@ PACMANCONF
   #
   # gnome-calls/chatty/libgestures aren't in Arch's own repos (they're
   # GNOME-mobile-ecosystem packages); pulled from the AUR pass below
-  # instead of assuming they exist here.
+  # instead of assuming they exist here. ofono and libhybris were
+  # previously listed in this call too, but neither actually exists as a
+  # binary package in core/extra/alarm -- both are AUR-only upstream (the
+  # [aur] entry in mobile-pacman.conf isn't a real ALARM-hosted binary
+  # repo, so it never resolved them either; pacstrap failed outright with
+  # "target not found: ofono" / "target not found: libhybris"). Moved
+  # into the AUR build loop below alongside the other AUR-only packages.
   pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
     base sudo networkmanager \
     budgie-desktop labwc-is-not-used-placeholder 2>/dev/null || true
@@ -152,12 +162,13 @@ PACMANCONF
     base sudo networkmanager dbus polkit \
     budgie-desktop budgie-control-center \
     phoc squeekboard waybar wtype \
-    ofono bluez bluez-utils upower \
+    bluez bluez-utils upower \
     wireplumber pipewire pipewire-pulse \
-    mesa vulkan-icd-loader libhybris \
+    mesa vulkan-icd-loader \
     openssh git base-devel
 
-  # ── AUR: gnome-calls (gnome-dialer), chatty, libgestures, wlrctl ────────
+  # ── AUR: ofono, libhybris, gnome-calls (gnome-dialer), chatty,
+  #    libgestures, wlrctl ────────────────────────────────────────────────
   # No AUR helper assumed present on a fresh ALARM rootfs -- build each
   # manually as the alpm build user already seeded near the top of this
   # script, inside the target rootfs via arch-chroot. wlrctl backs the
@@ -166,7 +177,9 @@ PACMANCONF
   # as the other three here.
   arch-chroot "${_root}" useradd -m -G wheel builder || true
   echo 'builder ALL=(ALL) NOPASSWD: ALL' > "${_root}/etc/sudoers.d/builder"
-  for _pkg in gnome-calls chatty libgestures wlrctl; do
+
+  _aur_build() {
+    local _pkg="$1"
     arch-chroot "${_root}" bash -c "
       su - builder -c '
         cd /tmp &&
@@ -174,7 +187,30 @@ PACMANCONF
         cd ${_pkg} &&
         makepkg -si --noconfirm --needed
       '
-    " || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
+    "
+  }
+
+  # ofono/libhybris used to come from the plain pacstrap call above with
+  # no fallback -- i.e. the build was already designed to hard-fail if
+  # either was missing, since they're the actual telephony/hybris stack a
+  # "mobile" build exists to ship, not cosmetic AUR extras. Preserving
+  # that: unlike the soft-fail loop below, a failure here aborts the
+  # build instead of shipping a phone image with no modem/SIM support.
+  for _pkg in ofono libhybris; do
+    _aur_build "${_pkg}" || {
+      echo "ERROR: ${_pkg} AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
+      rm -f "${_root}/etc/sudoers.d/builder"
+      arch-chroot "${_root}" userdel -r builder || true
+      exit 1
+    }
+  done
+
+  # gnome-calls (gnome-dialer), chatty, libgestures, wlrctl -- genuinely
+  # optional polish; a build can reasonably ship without one of these
+  # (see the phosh-lockscreen check right below, which explains why THAT
+  # one is treated differently).
+  for _pkg in gnome-calls chatty libgestures wlrctl; do
+    _aur_build "${_pkg}" || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
   done
   rm -f "${_root}/etc/sudoers.d/builder"
   arch-chroot "${_root}" userdel -r builder || true
@@ -2074,7 +2110,19 @@ lib32-vulkan-icd-loader
 pkg-config
 labwc
 sddm
-budgie
+# "budgie" used to resolve to a single package; it's now a pacman GROUP
+# (budgie-backgrounds, budgie-control-center, budgie-desktop,
+# budgie-desktop-services, budgie-desktop-view, budgie-session), and
+# resolving a group during pacstrap prompts interactively for a member
+# selection ("Enter a selection (default=all):") -- which just hangs/
+# fails under non-interactive CI. Spelling out the concrete package
+# names below gets the same "all members" result as the group would,
+# without the prompt. budgie-desktop-view and budgie-desktop-services
+# were already listed explicitly; adding the three the bare "budgie"
+# line used to stand in for.
+budgie-desktop
+budgie-backgrounds
+budgie-control-center
 budgie-desktop-view
 budgie-desktop-services
 swaybg
@@ -2113,7 +2161,15 @@ vulkan-headers
 vulkan-icd-loader
 wayland
 wayland-protocols
-wlroots0.19
+# Arch's wlroots is soname-versioned (wlroots0.17/0.18/0.19/0.20...) and
+# old sonames get dropped from the repos once nothing depends on them --
+# this was wlroots0.19 as of the last time this list was touched; that's
+# gone now, current is wlroots0.20. This line will need bumping again
+# whenever Arch cuts the next wlroots ABI break and drops this one; if
+# labwc/phoc/etc. later require a wlroots version this pin doesn't
+# provide, that'll surface as an unrelated dependency error at pacstrap
+# time, not here.
+wlroots0.20
 cairo
 pango
 pixman
