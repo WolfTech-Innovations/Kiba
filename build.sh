@@ -207,6 +207,31 @@ PACMANCONF
   # below runs against via arch-chroot.
   sed -i 's/^CheckSpace/#CheckSpace/' "${_root}/etc/pacman.conf"
 
+  # ── seed the TARGET root's own pacman keyring ───────────────────────────
+  # pacstrap was called with -G above ("avoid copying the host's pacman
+  # keyring to the target") -- so while the HOST's /etc/pacman.d/gnupg got
+  # initialized+populated+ALARM-key-signed near the top of this function,
+  # ${_root}/etc/pacman.d/gnupg was never touched at all: it's either
+  # missing or empty. Every arch-chroot pacman call from here on
+  # (the -Syy resync right below, every makepkg -si dependency install in
+  # the AUR loop, and the final phosh-lockscreen install) runs pacman
+  # INSIDE this chroot against that empty keyring, which is what actually
+  # produces "keyring is not writable" / "required key missing from
+  # keyring" -- and once that happens pacman can't verify (or in some
+  # cases even fetch) anything from the ALARM repo, so downstream
+  # failures like "target not found: phosh-lockscreen" are a symptom of
+  # this, not a real missing-package problem. Mirror the exact
+  # init/populate/recv/lsign sequence already done on the host earlier in
+  # this function, just run via arch-chroot so it lands in ${_root}'s own
+  # gnupg dir instead.
+  arch-chroot "${_root}" pacman-key --init
+  arch-chroot "${_root}" pacman-key --populate archlinux
+  arch-chroot "${_root}" pacman-key --recv-keys \
+    68B3537F39A313B3E574D06777193F152BDBE6A6 \
+    --keyserver keyserver.ubuntu.com
+  arch-chroot "${_root}" pacman-key --lsign-key \
+    68B3537F39A313B3E574D06777193F152BDBE6A6
+
   # Force a resync against the target's OWN (post-swap) pacman.conf --
   # pacstrap synced core/extra/alarm under /tmp/mobile-pacman.conf above,
   # but nothing has refreshed the sync DBs since we swapped in the
