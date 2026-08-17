@@ -266,11 +266,37 @@ PACMANCONF
     arch-chroot "${_root}" bash -c "
       su - builder -c '
         cd /tmp &&
+        rm -rf ${_pkg} &&
         git clone --depth 1 https://aur.archlinux.org/${_pkg}.git &&
         cd ${_pkg} &&
         makepkg -si --noconfirm --needed ${_extra_args}
       '
     "
+  }
+
+  # ── retry wrapper: AUR's git-over-HTTPS throws transient TLS/EOF
+  #    errors under load ("SSL_read: ... unexpected eof while reading")
+  #    that have nothing to do with the package itself -- a plain
+  #    network blip, not a real build failure. Retrying the whole
+  #    clone+build a few times with a short backoff clears these without
+  #    having to hand-rerun the entire mobile build over one flaky
+  #    connection. _aur_build itself cleans up any half-cloned dir from
+  #    the previous attempt before retrying, so this is safe to call
+  #    repeatedly.
+  _aur_build_retry() {
+    local _pkg="$1"
+    local _extra_args="${2:-}"
+    local _tries
+    for _tries in 1 2 3 4 5; do
+      if _aur_build "${_pkg}" "${_extra_args}"; then
+        return 0
+      fi
+      if [ "${_tries}" -lt 5 ]; then
+        echo "!! ${_pkg} AUR build attempt ${_tries}/5 failed -- retrying in 10s (this is usually a transient AUR git/TLS blip, not a real package error)..." >&2
+        sleep 10
+      fi
+    done
+    return 1
   }
 
   # ofono used to come from the plain pacstrap call above with no
@@ -279,7 +305,7 @@ PACMANCONF
   # exists to ship, not a cosmetic AUR extra. Preserving that: unlike the
   # soft-fail loop below, a failure here aborts the build instead of
   # shipping a phone image with no modem/SIM support.
-  _aur_build ofono || {
+  _aur_build_retry ofono || {
     echo "ERROR: ofono AUR build failed -- refusing to ship a mobile rootfs with no working telephony stack. Check the makepkg log above." >&2
     rm -f "${_root}/etc/sudoers.d/builder"
     arch-chroot "${_root}" userdel -r builder || true
@@ -296,7 +322,7 @@ PACMANCONF
   # (see the sddm check right below, which explains why THAT
   # one is treated differently).
   for _pkg in gnome-calls chatty libgestures wlrctl; do
-    _aur_build "${_pkg}" || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
+    _aur_build_retry "${_pkg}" || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
   done
   rm -f "${_root}/etc/sudoers.d/builder"
   arch-chroot "${_root}" userdel -r builder || true
@@ -1656,9 +1682,12 @@ public class KibaMobileOobe : Adw.Application {
     async void connect_wifi (string ssid, string? password) {
         wifi_status_label.label = "Connecting to %s...".printf (ssid);
         try {
-            string[] argv = password != null
-                ? { "nmcli", "device", "wifi", "connect", ssid, "password", password }
-                : { "nmcli", "device", "wifi", "connect", ssid };
+            string[] argv;
+            if (password != null) {
+                argv = { "nmcli", "device", "wifi", "connect", ssid, "password", password };
+            } else {
+                argv = { "nmcli", "device", "wifi", "connect", ssid };
+            }
             var proc = new Subprocess.newv (argv,
                 SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
             yield proc.wait_async ();
@@ -1911,7 +1940,7 @@ OOBEAUTOSTART
   # override KIBA_MOBILE_GSI_URL to pin a specific build/mirror. Set
   # KIBA_SKIP_GSI_FETCH=1 to skip entirely (e.g. offline CI) and fall
   # back to the manual pointer in README-INSTALL.md.
-  : "${KIBA_MOBILE_GSI_URL:=https://mirrors.lolinet.com/firmware/halium/GSI/ubports_GSI_installer_v10.zip}"
+  : "${KIBA_MOBILE_GSI_URL:=https://build.lolinet.com/file/halium/GSI/halium-10.0/arm64ab/halium-generic-arm64ab-ota-latest.zip}"
   if [ "${KIBA_SKIP_GSI_FETCH:-0}" = "1" ]; then
     echo "=== KIBA_SKIP_GSI_FETCH=1 -- skipping Halium GSI fetch (see README-INSTALL.md for a manual pointer) ==="
   else
@@ -1933,7 +1962,7 @@ OOBEAUTOSTART
     else
       echo "!! GSI fetch failed (${KIBA_MOBILE_GSI_URL}) -- see README-INSTALL.md for a manual pointer" >&2
     fi
-    cd "${WORKDIR}"
+    cd /w
   fi
 
   # ── boot.img repack ingredients (generic Halium ramdisk + magiskboot) ───
@@ -2001,7 +2030,7 @@ OOBEAUTOSTART
   mv libmagiskboot.so magiskboot
   chmod 0755 magiskboot
   echo "=== Bundled magiskboot + generic Halium ramdisk for on-device boot.img repack ==="
-  cd "${WORKDIR}"
+  cd /w
 
   # ── package + ship ───────────────────────────────────────────────────────
   tar -C "${_root}" --numeric-owner -cpf "${_out}/kibaos-mobile-rootfs.tar" .
