@@ -29,7 +29,7 @@ echo "=== KibaOS build target: ${KIBA_ARCH} ==="
 # mkarchiso entirely.
 
 # ── speed hack: crank up parallel downloads so pacman isn't crawling ───────
-sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 
 # ── gotta pre-make the alpm user inside airootfs or pacman throws a fit
 #    when it tries to run inside the chroot later ──────────────────────────
@@ -282,14 +282,36 @@ PACMANCONF
   # makepkg failure. libhybris-git's PKGBUILD declares provides=(libhybris),
   # so everything downstream that depends on the `libhybris` name still
   # resolves fine against the -git build.
-  for _pkg in ofono libhybris-git; do
-    _aur_build "${_pkg}" || {
-      echo "ERROR: ${_pkg} AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
-      rm -f "${_root}/etc/sudoers.d/builder"
-      arch-chroot "${_root}" userdel -r builder || true
-      exit 1
-    }
-  done
+  _aur_build ofono || {
+    echo "ERROR: ofono AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
+    rm -f "${_root}/etc/sudoers.d/builder"
+    arch-chroot "${_root}" userdel -r builder || true
+    exit 1
+  }
+
+  # ── libhybris-git: build from halium/libhybris, not upstream mainline ──
+  # The AUR PKGBUILD's source=() points at libhybris/libhybris (mainline),
+  # which has let its per-Android-version linker namespace hooks bitrot --
+  # LINKER_VERSION_DEFAULT/LINKER_NAME_DEFAULT (needed for Q-era hooks.c)
+  # only exist in Halium's fork, which actually carries the maintained
+  # per-SDK-version linker patches real Halium ports build against.
+  # Rewriting the git source instead of patching hooks.c ourselves so we
+  # stay on a maintained, coherent source tree rather than hand-patching
+  # one symbol and finding the next one bitrotted on the next rebuild.
+  arch-chroot "${_root}" bash -c "
+    su - builder -c '
+      cd /tmp &&
+      git clone --depth 1 https://aur.archlinux.org/libhybris-git.git &&
+      cd libhybris-git &&
+      sed -i \"s#https://github.com/libhybris/libhybris#https://github.com/halium/libhybris#g\" PKGBUILD &&
+      makepkg -si --noconfirm --needed
+    '
+  " || {
+    echo "ERROR: libhybris-git AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
+    rm -f "${_root}/etc/sudoers.d/builder"
+    arch-chroot "${_root}" userdel -r builder || true
+    exit 1
+  }
 
   # gnome-calls (gnome-dialer), chatty, libgestures, wlrctl -- genuinely
   # optional polish; a build can reasonably ship without one of these
