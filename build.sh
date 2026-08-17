@@ -240,6 +240,24 @@ PACMANCONF
     "
   }
 
+  # ── hybris-android-headers: a hard makedepend of libhybris-git ─────────
+  # `makepkg -si` shells out to plain `pacman` to satisfy deps, and pacman
+  # has no concept of the AUR -- it can only ever resolve dependencies that
+  # exist in a configured repo (core/extra/alarm here). hybris-android-headers
+  # is itself AUR-only (no ALARM/official package), so libhybris-git's
+  # makepkg run was failing dependency resolution ("Missing dependencies:
+  # hybris-android-headers") the same way ofono/libhybris did before this
+  # loop existed -- it has to be built+installed manually first, same as
+  # every other AUR-only dependency in this chroot. Hard fail here too:
+  # without it libhybris-git can't build at all, so there's no point
+  # continuing to the mandatory loop below.
+  _aur_build hybris-android-headers || {
+    echo "ERROR: hybris-android-headers AUR build failed -- libhybris-git can't build without it, refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
+    rm -f "${_root}/etc/sudoers.d/builder"
+    arch-chroot "${_root}" userdel -r builder || true
+    exit 1
+  }
+
   # ofono/libhybris used to come from the plain pacstrap call above with
   # no fallback -- i.e. the build was already designed to hard-fail if
   # either was missing, since they're the actual telephony/hybris stack a
