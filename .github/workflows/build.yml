@@ -11,14 +11,18 @@ jobs:
           - arch: x86_64
             runner: ubuntu-latest
             docker_image: archlinux:latest
-          # ubuntu-24.04-arm is a GitHub-hosted *native* ARM64 runner (free
-          # for public repos) -- deliberately not QEMU here. kortexd gets
-          # Nuitka-compiled to a native binary during this build and
-          # Nuitka doesn't cross-compile, so emulating aarch64 on an x86_64
-          # runner would either fail outright or produce a binary that
-          # only runs under emulation. menci/archlinuxarm ships a real
-          # linux/arm64 base-devel image, so no binfmt/QEMU layer at all.
-          - arch: aarch64
+          # ARM desktop/ISO leg is gone from build.sh itself now (the old
+          # --arm flag is a silent no-op there) -- replaced by --mobile,
+          # which doesn't build an ISO at all, just a pacstrap'd aarch64
+          # rootfs + Halium GSI installer bundle for phones. Still needs a
+          # real aarch64 host for the same reason the old leg did: pacman
+          # runs each package's post-install scriptlets inside the target
+          # root, which needs to execute aarch64 binaries -- QEMU-emulating
+          # that on an x86_64 runner is exactly the kind of foreign-arch
+          # execution this native runner was chosen to avoid. menci/archlinuxarm
+          # ships a real linux/arm64 base-devel image, so still no binfmt/QEMU
+          # layer at all.
+          - arch: mobile
             runner: ubuntu-24.04-arm
             docker_image: menci/archlinuxarm:base-devel
     runs-on: ${{ matrix.runner }}
@@ -45,9 +49,9 @@ jobs:
           rmz_version: "3.1.1"
           # This action assumes an Ubuntu amd64 image layout (apt package
           # names, folder paths) that doesn't line up with the arm64
-          # runner image, so it only runs on the x86_64 leg. The arm64
-          # hosted runners ship a smaller default toolset anyway, so
-          # there's less to reclaim.
+          # runner image, so it only runs on the x86_64 leg. The mobile
+          # leg's pacstrap'd rootfs is also far smaller than a full
+          # desktop pacstrap, so there's less to reclaim either way.
 
       - name: Run build in Docker
         run: |
@@ -56,23 +60,20 @@ jobs:
             -e RUN_NUM="${{ github.run_number }}" \
             -e KIBA_ARCH="${{ matrix.arch }}" \
             "${{ matrix.docker_image }}" \
-            /bin/bash /w/build.sh ${{ matrix.arch == 'aarch64' && '--arm' || '' }}
+            /bin/bash /w/build.sh ${{ matrix.arch == 'mobile' && '--mobile' || '' }}
 
-      # ── ISO uploads immediately, in parallel with everything else ─────────
-      # This has zero dependency on the OTA manifest/diff/sign pipeline below,
-      # so it no longer waits behind ~30+ minutes of manifest work before the
-      # actual release artifact goes out the door.
-      #
-      # Per-arch directories: build.sh names the ISO purely off the run
-      # number (kibaos-v<run>.iso) -- it does NOT encode arch into the
-      # filename, even though both matrix legs share the same run number.
-      # Uploaded to one flat SourceForge directory, x86_64 and aarch64
-      # would produce identical filenames and race to overwrite each
-      # other. Giving each arch its own directory makes that collision
-      # structurally impossible instead of relying on filenames staying
-      # unique. rsync creates the destination subdirectory automatically
-      # on first upload -- no separate mkdir step needed.
+      # ── x86_64: ISO uploads immediately, in parallel with everything else ─
+      # Unchanged from before. This has zero dependency on the OTA
+      # manifest/diff/sign pipeline below, so it doesn't wait behind
+      # ~30+ minutes of manifest work before the actual release artifact
+      # goes out the door. Split into its own x86_64-only step now that
+      # the other leg produces a completely different set of files
+      # (out/*, not *.iso) with a completely different upload strategy
+      # (see "Upload mobile artifacts to SourceForge" below) -- trying to
+      # keep one step that branched on both would've been harder to
+      # follow than just two steps.
       - name: Upload ISO to SourceForge
+        if: matrix.arch == 'x86_64'
         env:
           SF_USER: ${{ secrets.SF_USER }}
           SSHPASS: ${{ secrets.SF_PASS }}
@@ -128,15 +129,99 @@ jobs:
             "${MARKER}" \
             "$SF_USER@frs.sourceforge.net:${REMOTE_DIR}/${MARKER}"
 
-      - name: Upload ISO artifact for OTA job
+      # ── mobile: the zip is meant to be a single flash-and-go artifact --
+      # boot.img/init_boot repack ingredients (magiskboot + generic
+      # ramdisk), the rootfs.img, AND the Halium GSI (android-rootfs.img)
+      # all need to actually be inside it, or a user flashing it hits
+      # update-binary's "no GSI bundled -- push one yourself" fallback
+      # instead of a working install. build.sh only bundles the GSI if
+      # its fetch succeeded that run (KIBA_SKIP_GSI_FETCH=1, or the
+      # lolinet mirror just being down, both skip it silently on the
+      # build side) -- so verify the zip is actually complete before
+      # publishing it, rather than shipping one that quietly needs manual
+      # follow-up.
+      - name: Verify mobile installer zip is self-contained
+        if: matrix.arch == 'mobile'
+        run: |
+          ZIP="out/kibaos-mobile-installer.zip"
+          if [ ! -f "$ZIP" ]; then
+            echo "::error::${ZIP} not found -- build.sh didn't produce it"
+            exit 1
+          fi
+          command -v unzip >/dev/null || sudo apt-get install -y unzip
+          echo "Zip contents:"
+          unzip -l "$ZIP"
+
+          missing=0
+          for required in rootfs.img android-rootfs.img halium-generic-ramdisk.cpio.gz magiskboot META-INF/com/google/android/update-binary; do
+            if ! unzip -l "$ZIP" | awk '{print $4}' | grep -qx "$required"; then
+              echo "::error::${ZIP} is missing ${required} -- not a self-contained installer (GSI fetch likely failed/was skipped this run)"
+              missing=1
+            fi
+          done
+          if [ "$missing" -eq 1 ]; then
+            echo "::error::Refusing to publish an installer zip that requires a manual GSI push -- see build.sh's KIBA_MOBILE_GSI_URL / KIBA_SKIP_GSI_FETCH handling."
+            exit 1
+          fi
+          echo "Zip is self-contained: rootfs + GSI + boot-repack ingredients all present."
+
+      # ── same "upload immediately, don't wait on OTA" idea as the x86_64
+      # ISO leg, but simpler -- build.sh names mobile's output files
+      # statically, never encoding the run number, so there's nothing to
+      # version or clean up: each run's rsync just overwrites the
+      # previous build's files under the same names. Only the installer
+      # zip + its checksum go up here -- that's the one thing an end user
+      # actually flashes; the rootfs tarball/.img/GSI copy stay local to
+      # this job for the OTA leg below rather than being published.
+      - name: Upload mobile artifacts to SourceForge
+        if: matrix.arch == 'mobile'
+        env:
+          SF_USER: ${{ secrets.SF_USER }}
+          SSHPASS: ${{ secrets.SF_PASS }}
+        run: |
+          if [ -z "$SF_USER" ] || [ -z "$SSHPASS" ]; then
+            echo "SourceForge credentials not configured. Skipping."
+            exit 0
+          fi
+          if [ ! -f out/kibaos-mobile-installer.zip ] || [ ! -f out/kibaos-mobile-installer.zip.sha256 ]; then
+            echo "out/kibaos-mobile-installer.zip(.sha256) not found -- build.sh didn't produce it?" >&2
+            exit 1
+          fi
+          sudo apt-get install -y sshpass rsync
+          mkdir -p ~/.ssh
+          ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+
+          REMOTE_DIR="/home/frs/project/kibaos/mobile"
+          echo "Uploading mobile installer zip:"
+          ls -la out/kibaos-mobile-installer.zip out/kibaos-mobile-installer.zip.sha256
+          sshpass -e rsync -avP --progress \
+            out/kibaos-mobile-installer.zip out/kibaos-mobile-installer.zip.sha256 \
+            "$SF_USER@frs.sourceforge.net:${REMOTE_DIR}/"
+
+      - name: Upload build artifact for OTA job
+        if: matrix.arch == 'x86_64'
         uses: actions/upload-artifact@v4
         with:
-          # Matrix legs share the runner-level "kibaos-iso" name by default,
-          # which would silently overwrite one arch's ISO with the other's
-          # in the shared artifact store -- suffix by arch to keep both.
-          name: kibaos-iso-${{ matrix.arch }}
+          # Matrix legs share the runner-level "kibaos-build" name by
+          # default, which would silently overwrite one leg's artifact
+          # with the other's in the shared artifact store -- suffix by
+          # arch to keep both.
+          name: kibaos-build-${{ matrix.arch }}
           path: |
             *.iso
+          retention-days: 1
+
+      - name: Upload mobile build artifact for OTA job
+        if: matrix.arch == 'mobile'
+        uses: actions/upload-artifact@v4
+        with:
+          name: kibaos-build-${{ matrix.arch }}
+          # Whole out/ directory -- mobile has no single "the" artifact
+          # the way the ISO leg does; OTA diffing needs the rootfs
+          # tarball specifically, but everything else rides along so a
+          # single artifact download in the OTA job has all of it.
+          path: |
+            out/
           retention-days: 1
 
   ota:
@@ -144,22 +229,24 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x86_64, aarch64]
+        arch: [x86_64, mobile]
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Download ISO artifact
+      - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: kibaos-iso-${{ matrix.arch }}
+          name: kibaos-build-${{ matrix.arch }}
 
       - name: Install tools
         run: sudo apt-get install -y squashfs-tools sshpass rsync
 
+      # ── x86_64: unpack the ISO's squashfs airootfs ─────────────────────
       - name: Extract airootfs from ISO for OTA diffing
+        if: matrix.arch == 'x86_64'
         run: |
           ISO=$(ls *.iso | head -1)
           echo "Mounting ISO: $ISO"
@@ -177,6 +264,24 @@ jobs:
           sudo umount /tmp/iso-mount
           echo "Extracted file count: $(find /tmp/airootfs-extracted -type f | wc -l)"
 
+      # ── mobile: no ISO, no squashfs -- kibaos-mobile-rootfs.tar.gz IS
+      # the rootfs already, just tarred. Extracting it straight into the
+      # same /tmp/airootfs-extracted path lets every step below (manifest
+      # generation, diffing, bundling, signing) stay identical for both
+      # legs without caring which one produced the directory.
+      - name: Extract mobile rootfs tarball for OTA diffing
+        if: matrix.arch == 'mobile'
+        run: |
+          TARBALL=$(find . -name 'kibaos-mobile-rootfs.tar.gz' | head -1)
+          if [ -z "$TARBALL" ]; then
+            echo "kibaos-mobile-rootfs.tar.gz not found in downloaded artifact!" >&2
+            exit 1
+          fi
+          echo "Extracting: $TARBALL"
+          mkdir -p /tmp/airootfs-extracted
+          sudo tar -xzf "$TARBALL" -C /tmp/airootfs-extracted
+          echo "Extracted file count: $(find /tmp/airootfs-extracted -type f | wc -l)"
+
       - name: Download previous build manifest from SourceForge
         env:
           SF_USER: ${{ secrets.SF_USER }}
@@ -184,11 +289,12 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
-          # Per-arch baseline -- the two arches' rootfs contents diverge
-          # completely (different kernel package, no linux-firmware-intel
-          # on aarch64, etc.), so diffing aarch64's current manifest
-          # against an x86_64 baseline would flag nearly every file as
-          # "changed" and produce a useless, enormous patch.
+          # Per-arch baseline -- x86_64's desktop rootfs and mobile's
+          # phone rootfs diverge completely (different package set
+          # entirely, no GRUB/kernel packages on mobile, etc.), so
+          # diffing mobile's current manifest against an x86_64 baseline
+          # would flag nearly every file as "changed" and produce a
+          # useless, enormous patch.
           sshpass -e rsync -avP \
             "$SF_USER@frs.sourceforge.net:/home/frs/project/kibaos/ota/last-build-manifest-${{ matrix.arch }}.txt" \
             ./last-build-manifest.txt 2>/dev/null || \
@@ -281,7 +387,9 @@ jobs:
 
           # Arch-tagged tarball name -- matches what kibaos-ota (the
           # on-device daemon) requests via $(uname -m) at patch-apply
-          # time, so an aarch64 device only ever pulls the aarch64 patch.
+          # time on x86_64, and whatever the mobile-side updater requests
+          # for "mobile" builds, so a device only ever pulls its own leg's
+          # patch.
           tar czf "kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz" "${PATCH_DIR}/"
           echo "Patch size: $(du -sh kibaos-ota-${PATCH_NUM}-${ARCH}.tar.gz | cut -f1)"
 
@@ -310,7 +418,7 @@ jobs:
       - name: Write latest-patch-level
         if: steps.diff.outputs.has_changes == 'true'
         run: |
-          # Shared across both arches on purpose -- PATCH_NUM is the same
+          # Shared across both legs on purpose -- PATCH_NUM is the same
           # run_number for both matrix legs, and kibaos-ota only uses this
           # number to decide *whether* to update, then fetches the
           # arch-tagged tarball for that same number. One shared file
@@ -362,7 +470,7 @@ jobs:
         if: steps.diff.outputs.has_changes == 'true' && matrix.arch == 'x86_64'
         run: |
           # Tag once per run, not once per matrix leg -- the tag is a
-          # marker for the run/patch number, not per-arch.
+          # marker for the run/patch number, not per-leg.
           git config user.name  "KibaOS OTA Bot"
           git config user.email "ota@kibaos.wolftech.tech"
           git tag "ota-patch-${{ needs.build.outputs.patch_num }}"
