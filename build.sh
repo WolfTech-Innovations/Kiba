@@ -190,6 +190,16 @@ PACMANCONF
   ' "${_root}/etc/pacman.conf" > "${_root}/etc/pacman.conf.new" \
     && mv "${_root}/etc/pacman.conf.new" "${_root}/etc/pacman.conf"
 
+  # CheckSpace's disk-space check is unreliable inside arch-chroot -- it
+  # resolves the cache dir's mountpoint via /proc/self/mountinfo, which
+  # doesn't reflect the chroot's view correctly, so it misreports "not
+  # enough free disk space" on a runner that has plenty. Same fix already
+  # applied to the desktop ISO's chroot pacman.conf elsewhere in this
+  # script (see the other CheckSpace sed calls) -- just needed here too
+  # for the mobile rootfs's own pacman.conf, which every makepkg -si
+  # below runs against via arch-chroot.
+  sed -i 's/^CheckSpace/#CheckSpace/' "${_root}/etc/pacman.conf"
+
   # ── AUR: ofono, libhybris, gnome-calls (gnome-dialer), chatty,
   #    libgestures, wlrctl ────────────────────────────────────────────────
   # No AUR helper assumed present on a fresh ALARM rootfs -- build each
