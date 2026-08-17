@@ -55,8 +55,15 @@ if [ "${KIBA_ARCH}" = "mobile" ]; then
   # for the on-device boot.img repack update-binary does at install
   # time -- nothing Python/AOSP-tooling related runs on this build host
   # anymore).
+  # imagemagick added here for the same reason it's on the desktop
+  # branch: the mobile rootfs now ships the same branded SDDM greeter
+  # theme desktop does (see the "shared SDDM theme" block below), which
+  # needs wallpaper.jpg/logo-256.png generated the same way -- `magick`
+  # runs on THIS build host and writes straight into ${_root}, same
+  # pattern as every other direct-write in this function (phoc.ini,
+  # oobe.css, etc.), no arch-chroot needed for image processing itself.
   pacman -S --noconfirm --needed \
-    base-devel git arch-install-scripts openssl curl jq e2fsprogs zip unzip
+    base-devel git arch-install-scripts openssl curl jq e2fsprogs zip unzip imagemagick
 else
   pacman -S --noconfirm --needed \
     base-devel git squashfs-tools libisoburn mtools dosfstools \
@@ -91,7 +98,7 @@ fi
 # the userspace: a pacstrap'd Arch
 # Linux ARM aarch64 rootfs
 # carrying KibaOS's mobile stack (Budgie panel/raven on phoc, ofono,
-# Calls, Chatty, squeekboard, libgestures, borrowed phosh-lockscreen),
+# Calls, Chatty, squeekboard, libgestures, sddm for lock/login),
 # tarred up the same way Manjaro's libhybris/image-ci project packages
 # its own Halium rootfs for adb-sideload install onto /data alongside
 # the GSI + halium-boot.img.
@@ -214,12 +221,12 @@ PACMANCONF
   # ${_root}/etc/pacman.d/gnupg was never touched at all: it's either
   # missing or empty. Every arch-chroot pacman call from here on
   # (the -Syy resync right below, every makepkg -si dependency install in
-  # the AUR loop, and the final phosh-lockscreen install) runs pacman
+  # the AUR loop, and the final sddm install) runs pacman
   # INSIDE this chroot against that empty keyring, which is what actually
   # produces "keyring is not writable" / "required key missing from
   # keyring" -- and once that happens pacman can't verify (or in some
   # cases even fetch) anything from the ALARM repo, so downstream
-  # failures like "target not found: phosh-lockscreen" are a symptom of
+  # failures like "target not found: sddm" are a symptom of
   # this, not a real missing-package problem. Mirror the exact
   # init/populate/recv/lsign sequence already done on the host earlier in
   # this function, just run via arch-chroot so it lands in ${_root}'s own
@@ -286,7 +293,7 @@ PACMANCONF
 
   # gnome-calls (gnome-dialer), chatty, libgestures, wlrctl -- genuinely
   # optional polish; a build can reasonably ship without one of these
-  # (see the phosh-lockscreen check right below, which explains why THAT
+  # (see the sddm check right below, which explains why THAT
   # one is treated differently).
   for _pkg in gnome-calls chatty libgestures wlrctl; do
     _aur_build "${_pkg}" || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
@@ -294,14 +301,364 @@ PACMANCONF
   rm -f "${_root}/etc/sudoers.d/builder"
   arch-chroot "${_root}" userdel -r builder || true
 
-  # ── borrow phosh-lockscreen rather than write our own ───────────────────
-  # Hard fail if this isn't available -- a phone build with no lockscreen
-  # is not an acceptable degraded state to ship silently, unlike the
-  # AUR telephony packages above which can reasonably continue without.
-  if ! arch-chroot "${_root}" pacman -S --noconfirm --needed phosh-lockscreen; then
-    echo "ERROR: phosh-lockscreen not available -- refusing to build a mobile rootfs with no lockscreen. Check phosh git package / AUR fallback." >&2
+  # ── lock/login screen: sddm, same as the desktop build ──────────────────
+  # phosh-lockscreen was AUR-only and not actually resolvable ("target not
+  # found") -- sddm is a real official ALARM [extra] package, so this pulls
+  # straight from pacman, no AUR/makepkg step needed. It's also already
+  # what the desktop x86_64 build uses (see install_archiso's SDDM theme
+  # section and the enable/wants-symlink calls elsewhere in this script),
+  # so mobile now matches it instead of depending on a separate phone-only
+  # greeter stack. Hard fail if this isn't available -- a phone build with
+  # no lock/login screen is not an acceptable degraded state to ship
+  # silently, unlike the AUR telephony packages above which can reasonably
+  # continue without.
+  if ! arch-chroot "${_root}" pacman -S --noconfirm --needed sddm; then
+    echo "ERROR: sddm not available -- refusing to build a mobile rootfs with no lock/login screen. Check the ALARM [extra] repo/mirror." >&2
     exit 1
   fi
+  arch-chroot "${_root}" systemctl enable sddm
+
+  # ── liveuser account ─────────────────────────────────────────────────────
+  # The dconf install right below has always written into
+  # /home/liveuser/.config/dconf assuming that account exists -- it never
+  # actually did on mobile (only the desktop ISO's own
+  # customize_airootfs.sh creates it, in AIROOTFS/etc/passwd, which this
+  # function's ${_root} is entirely separate from). Needed for real now
+  # that SDDM Autologin below points at it: autologin has to authenticate
+  # against a real target-rootfs account, not just a directory owned by
+  # uid 1000. Mirrors the exact passwd/group lines the desktop path uses.
+  arch-chroot "${_root}" bash -c "
+    grep -q '^liveuser:' /etc/passwd || \
+      echo 'liveuser:x:1000:1000:KibaOS Live User:/home/liveuser:/bin/bash' >> /etc/passwd
+    grep -q '^liveuser:' /etc/group || \
+      echo 'liveuser:x:1000:liveuser' >> /etc/group
+    mkdir -p /home/liveuser
+    chown 1000:1000 /home/liveuser
+  "
+
+  # ── shared branded SDDM theme ────────────────────────────────────────────
+  # Same wallpaper/logo source and same Main.qml/metadata.desktop as the
+  # desktop build's SDDM theme (see install_archiso's "SDDM -- custom
+  # KibaOS frosted-glass greeter theme" section) -- kept byte-identical by
+  # hand between the two copies, since they run in genuinely different
+  # execution contexts (that one's baked into customize_airootfs.sh and
+  # runs inside a chroot at ISO-customize time; this one runs directly
+  # against ${_root} during this function, on this build host). The QML
+  # itself is screen-size-aware (see its own `isPhone` check), so the
+  # exact same file already renders touch-friendly on a phone panel and
+  # unchanged on a desktop one -- no separate mobile QML needed.
+  KIBA_WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
+  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
+  mkdir -p "${_root}/usr/share/kibaos"
+
+  curl -fL --retry 5 --retry-delay 3 -o "${_root}/usr/share/kibaos/wallpaper.jpg" \
+    "${KIBA_WALLPAPER_URL}" || \
+    magick -size 1080x2400 gradient:"#003f5c-#0099cc" "${_root}/usr/share/kibaos/wallpaper.jpg"
+
+  curl -fL --retry 5 --retry-delay 3 -o /tmp/kiba-boot-splash-raw.png "${KIBA_BOOT_SPLASH_URL}" || true
+  if [ -f /tmp/kiba-boot-splash-raw.png ] && file /tmp/kiba-boot-splash-raw.png | grep -qi image; then
+    # same fixed crop box as the desktop branding pass -- see its comment
+    # for why these numbers are what they are (measured against this one
+    # specific source image, centered on the badge, wordmark excluded).
+    magick /tmp/kiba-boot-splash-raw.png -crop 640x640+450+117 +repage /tmp/kiba-logo-raw.png
+    magick /tmp/kiba-logo-raw.png -filter Lanczos -resize 256x256 "${_root}/usr/share/kibaos/logo-256.png"
+    rm -f /tmp/kiba-boot-splash-raw.png /tmp/kiba-logo-raw.png
+  else
+    magick -size 256x256 xc:none \
+      -fill '#0099cc' -draw 'circle 128,128 128,1' \
+      -fill white -pointsize 128 -gravity Center -annotate 0 'K' \
+      "${_root}/usr/share/kibaos/logo-256.png"
+  fi
+
+  SDDM_THEME_DIR="${_root}/usr/share/sddm/themes/kibaos"
+  mkdir -p "${SDDM_THEME_DIR}"
+  cp "${_root}/usr/share/kibaos/wallpaper.jpg" "${SDDM_THEME_DIR}/background.png" 2>/dev/null || true
+  cp "${_root}/usr/share/kibaos/logo-256.png"  "${SDDM_THEME_DIR}/logo.png"       2>/dev/null || true
+
+  cat > "${SDDM_THEME_DIR}/metadata.desktop" << 'SDDMMETA'
+[SddmGreeterTheme]
+Name=KibaOS
+Description=KibaOS frosted-glass greeter
+Author=WolfTech Innovations
+Copyright=2026, WolfTech Innovations
+License=GPLv3
+Type=sddm-theme
+Version=1.0
+Website=https://github.com/WolfTech-Innovations/Kiba
+MainScript=Main.qml
+Font=Noto Sans
+QuickVersion=6
+SDDMMETA
+
+  # Keep in sync by hand with install_archiso's copy -- see the comment
+  # block above for why these can't literally share a bash variable.
+  cat > "${SDDM_THEME_DIR}/Main.qml" << 'SDDMQML'
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+
+// Single shared greeter for both the desktop ISO and KibaOS Mobile --
+// this exact file is written byte-for-byte into both images (see the
+// desktop copy inside install_archiso's customize_airootfs.sh heredoc).
+// Rather than branching into two separate QML files, the layout adapts
+// itself at runtime off Screen.width, so a genuinely single theme
+// covers a 1920x1080 desktop panel and a ~1080x2400 phone panel without
+// drifting out of sync on brand/behavior over time.
+Rectangle {
+    id: root
+    width: Screen.width  > 0 ? Screen.width  : 1920
+    height: Screen.height > 0 ? Screen.height : 1080
+    color: "#0d1b2a"
+    focus: true
+
+    // phoc's own config scales the DSI panel output 2x at the Wayland
+    // protocol level (see phoc.ini's [output:DSI-1] scale=2) -- Qt's
+    // Wayland QPA backend reads that wl_output scale itself and already
+    // renders this file's logical pixels at the right physical density,
+    // so nothing extra is needed here for HiDPI; this width/height check
+    // is purely about aspect ratio/orientation, not pixel density.
+    readonly property bool isPhone: width < 700
+    readonly property int touchH: isPhone ? 56 : 44
+    readonly property int fieldR: isPhone ? 18 : 14
+
+    property int sessionIndex: sessionModel.lastIndex >= 0 ? sessionModel.lastIndex : 0
+
+    // ── Background wallpaper, darkened so the glass card pops ──────────────
+    Image {
+        anchors.fill: parent
+        source: "background.png"
+        fillMode: Image.PreserveAspectCrop
+        asynchronous: true
+    }
+    Rectangle {
+        anchors.fill: parent
+        color: "#0d1b2a"
+        opacity: 0.42
+    }
+
+    // ── Clock ────────────────────────────────────────────────────────────
+    // Desktop: small pill, top-right, matches the KibaOS panel style.
+    // Phone: big lockscreen-style clock, top-center, clear of any status
+    // bar / camera-cutout safe area -- Android/iOS lockscreen convention,
+    // and it doubles as a landmark while your thumb finds the card below.
+    Column {
+        id: clockCol
+        anchors {
+            top: parent.top
+            topMargin: isPhone ? 64 : 28
+        }
+        anchors.horizontalCenter: isPhone ? parent.horizontalCenter : undefined
+        anchors.right: isPhone ? undefined : parent.right
+        anchors.rightMargin: isPhone ? 0 : 28
+        spacing: isPhone ? 4 : 0
+        Text {
+            id: clockTime
+            text: Qt.formatTime(new Date(), "h:mm AP")
+            color: "#ffffff"
+            font.pixelSize: isPhone ? 56 : 18
+            font.weight: Font.Medium
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Text {
+            text: Qt.formatDate(new Date(), "ddd, MMM d")
+            color: "#aebccd"
+            font.pixelSize: isPhone ? 16 : 11
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Timer { interval: 1000; running: true; repeat: true; onTriggered: clockTime.text = Qt.formatTime(new Date(), "h:mm AP") }
+    }
+
+    // ── Central frosted-glass login card ────────────────────────────────────
+    // Desktop: fixed 360px, dead-centered, unchanged from before.
+    // Phone: full-width (minus margins), anchored in the lower half
+    // rather than dead-center -- that's within comfortable one-handed
+    // thumb reach, and critically it leaves the *upper* half of the
+    // screen clear for squeekboard to pop up underneath without ever
+    // covering the password field it's currently focused on.
+    Rectangle {
+        id: card
+        anchors {
+            horizontalCenter: isPhone ? parent.horizontalCenter : undefined
+            centerIn: isPhone ? undefined : parent
+            bottom: isPhone ? parent.bottom : undefined
+            bottomMargin: isPhone ? 96 : 0
+        }
+        width: isPhone ? parent.width - 48 : 360
+        height: cardCol.implicitHeight + (isPhone ? 40 : 56)
+        radius: isPhone ? 32 : 26
+        color: "#101828"
+        opacity: 0.001
+        // emulated glass: just a solid translucent fill, no real blur.
+        // labwc/phoc don't have a blur plugin at all (Wayfire did, sorta
+        // — see LABWC CONFIG notes for the full story on why I dropped
+        // it), so this fake-glass approach is doing all the work here
+        // now, not just backstopping a spot where real blur wouldn't
+        // reach anyway.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            color: Qt.rgba(0.063, 0.094, 0.157, 0.72)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.14)
+        }
+
+        ColumnLayout {
+            id: cardCol
+            anchors { top: parent.top; left: parent.left; right: parent.right; margins: isPhone ? 24 : 28 }
+            spacing: isPhone ? 16 : 14
+
+            Image {
+                Layout.alignment: Qt.AlignHCenter
+                source: "logo.png"
+                width: isPhone ? 56 : 64; height: isPhone ? 56 : 64
+                fillMode: Image.PreserveAspectFit
+            }
+
+            Text {
+                Layout.alignment: Qt.AlignHCenter
+                text: userModel.count > 0 ? userModel.data(userModel.index(userList.currentIndex, 0), 257) : "User"
+                color: "#e8eef5"; font.pixelSize: isPhone ? 19 : 17; font.weight: Font.Medium
+            }
+
+            ListView {
+                id: userList
+                Layout.fillWidth: true
+                height: 0; visible: false  // names shown via combo below instead
+                model: userModel
+                currentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
+            }
+
+            ComboBox {
+                id: userBox
+                Layout.fillWidth: true
+                Layout.preferredHeight: touchH
+                model: userModel
+                textRole: "name"
+                currentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
+                font.pixelSize: isPhone ? 16 : 13
+                background: Rectangle { radius: fieldR; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
+                contentItem: Text { text: userBox.displayText; color: "#e8eef5"; font: userBox.font; padding: 10; verticalAlignment: Text.AlignVCenter }
+            }
+
+            TextField {
+                id: passwordField
+                Layout.fillWidth: true
+                Layout.preferredHeight: touchH
+                placeholderText: "Password"
+                echoMode: TextInput.Password
+                color: "#e8eef5"
+                font.pixelSize: isPhone ? 16 : 13
+                placeholderTextColor: "#8a99ad"
+                background: Rectangle { radius: fieldR; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
+                onAccepted: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
+                Keys.onReturnPressed: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
+            }
+
+            Button {
+                id: loginButton
+                Layout.fillWidth: true
+                Layout.preferredHeight: touchH
+                text: "Sign In"
+                onClicked: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
+                background: Rectangle { radius: fieldR; color: "#0099cc" }
+                contentItem: Text { text: loginButton.text; color: "#ffffff"; font.pixelSize: isPhone ? 16 : 13; font.weight: Font.DemiBold; horizontalAlignment: Text.AlignHCenter }
+            }
+
+            // Session picker: only worth showing where there's actually
+            // more than one to pick from. Desktop offers Budgie/etc
+            // session choices; the phone image ships exactly one
+            // (kibaos-mobile, Exec=phoc) so this is dead weight there --
+            // one less thing to accidentally fat-finger on a small card.
+            ComboBox {
+                Layout.fillWidth: true
+                Layout.preferredHeight: isPhone ? 0 : undefined
+                visible: !isPhone
+                model: sessionModel
+                textRole: "name"
+                currentIndex: root.sessionIndex
+                onActivated: root.sessionIndex = currentIndex
+                background: Rectangle { radius: fieldR; color: "transparent" }
+                contentItem: Text { text: parent.displayText; color: "#aebccd"; font.pixelSize: 11; padding: 6; horizontalAlignment: Text.AlignHCenter }
+            }
+        }
+    }
+
+    // ── Power row ────────────────────────────────────────────────────────
+    // Desktop: small 44px pills, bottom-right, unchanged.
+    // Phone: bigger 56px targets (comfortable thumb-tap size), moved to
+    // top-right instead -- bottom-right on a phone sits right where the
+    // login card's bottom edge and any on-screen-keyboard region already
+    // are, so it's both more reachable and less likely to be covered.
+    Row {
+        anchors {
+            top: isPhone ? parent.top : undefined
+            bottom: isPhone ? undefined : parent.bottom
+            right: parent.right
+            margins: isPhone ? 24 : 28
+        }
+        spacing: isPhone ? 14 : 10
+        Repeater {
+            model: [
+                { label: "⏻", visible: sddm.canPowerOff, action: function(){ sddm.powerOff() } },
+                { label: "⟲", visible: sddm.canReboot,   action: function(){ sddm.reboot()   } }
+            ]
+            delegate: Rectangle {
+                visible: modelData.visible
+                width: touchH; height: touchH; radius: fieldR
+                color: "#1c2433"; opacity: 0.78
+                Text { anchors.centerIn: parent; text: modelData.label; color: "#e8eef5"; font.pixelSize: isPhone ? 22 : 18 }
+                MouseArea { anchors.fill: parent; onClicked: modelData.action() }
+            }
+        }
+    }
+
+    Connections {
+        target: sddm
+        function onLoginFailed() { passwordField.text = ""; passwordField.placeholderText = "Incorrect password"; }
+    }
+
+    Component.onCompleted: passwordField.forceActiveFocus()
+}
+SDDMQML
+
+  # ── phoc wayland session + mobile sddm config ────────────────────────────
+  # Desktop's own /etc/sddm.conf.d/kibaos.conf hardcodes
+  # CompositorCommand=labwc, which is desktop-only (Budgie-on-labwc) and
+  # would just fail to start anything on a phone -- mobile runs
+  # Budgie's panel/raven on top of phoc instead (see the phoc.ini block
+  # above), so it needs its own session file and its own sddm.conf.d
+  # entry pointing at phoc, not desktop's.
+  mkdir -p "${_root}/usr/share/wayland-sessions"
+  cat > "${_root}/usr/share/wayland-sessions/kibaos-mobile.desktop" << 'MOBILESESSION'
+[Desktop Entry]
+Name=KibaOS Mobile
+Comment=Budgie panel/raven on phoc
+Exec=phoc
+Type=Application
+DesktopNames=Budgie
+MOBILESESSION
+
+  mkdir -p "${_root}/etc/sddm.conf.d"
+  cat > "${_root}/etc/sddm.conf.d/kibaos-mobile.conf" << 'SDDMMOBILECONF'
+[General]
+DisplayServer=wayland
+
+[Wayland]
+CompositorCommand=phoc
+
+[Theme]
+Current=kibaos
+
+[Autologin]
+User=liveuser
+Session=kibaos-mobile
+SDDMMOBILECONF
+
+  arch-chroot "${_root}" bash -c "
+    mkdir -p /var/lib/sddm
+    chown sddm:sddm /var/lib/sddm 2>/dev/null || true
+    chmod 750 /var/lib/sddm
+  "
 
   # ── minimal branding/behavior pass (the parts of the desktop
   #    customize_airootfs.sh that still make sense with no disk installer
@@ -1878,8 +2235,8 @@ UPDATEBINARY
 # KibaOS Mobile — install
 
 This is the KibaOS Mobile *userspace only* (Budgie panel/raven on phoc,
-ofono, Calls, Chatty, squeekboard, libgestures, borrowed
-phosh-lockscreen), shipped in three forms:
+ofono, Calls, Chatty, squeekboard, libgestures, sddm for lock/login),
+shipped in three forms:
 
 - `kibaos-mobile-installer.zip` — flash this from TWRP, easiest path.
 - `kibaos-mobile-rootfs.img` — the same thing pre-built as a raw ext4
@@ -11361,12 +11718,33 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
+// Single shared greeter for both the desktop ISO and KibaOS Mobile --
+// this exact file is written byte-for-byte into both images (see the
+// mobile copy inside build_kibaos_mobile(), which carries a comment
+// pointing back here -- keep the two in sync by hand, they can't
+// literally share a bash variable since they run inside two different
+// execution contexts: this one at ISO customize time inside a chroot,
+// the mobile one directly against the target root while build.sh itself
+// runs). Rather than branching into two separate QML files, the layout
+// adapts itself at runtime off Screen.width, so a genuinely single
+// theme covers a 1920x1080 desktop panel and a ~1080x2400 phone panel
+// without drifting out of sync on brand/behavior over time.
 Rectangle {
     id: root
     width: Screen.width  > 0 ? Screen.width  : 1920
     height: Screen.height > 0 ? Screen.height : 1080
     color: "#0d1b2a"
     focus: true
+
+    // phoc's own config scales the DSI panel output 2x at the Wayland
+    // protocol level (see phoc.ini's [output:DSI-1] scale=2) -- Qt's
+    // Wayland QPA backend reads that wl_output scale itself and already
+    // renders this file's logical pixels at the right physical density,
+    // so nothing extra is needed here for HiDPI; this width/height check
+    // is purely about aspect ratio/orientation, not pixel density.
+    readonly property bool isPhone: width < 700
+    readonly property int touchH: isPhone ? 56 : 44
+    readonly property int fieldR: isPhone ? 18 : 14
 
     property int sessionIndex: sessionModel.lastIndex >= 0 ? sessionModel.lastIndex : 0
 
@@ -11383,54 +11761,67 @@ Rectangle {
         opacity: 0.42
     }
 
-    // ── Clock, top-right, matches KibaOS panel rounded-rectangle style ──────
-    Rectangle {
-        anchors { top: parent.top; right: parent.right; margins: 28 }
-        width: clockCol.implicitWidth + 28; height: 56
-        radius: 18
-        color: "#1c2433"
-        opacity: 0.78
-        Column {
-            id: clockCol
-            anchors.centerIn: parent
-            spacing: 0
-            Text {
-                text: Qt.formatTime(new Date(), "h:mm AP")
-                color: "#ffffff"; font.pixelSize: 18; font.weight: Font.Medium
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
-            Text {
-                text: Qt.formatDate(new Date(), "ddd, MMM d")
-                color: "#aebccd"; font.pixelSize: 11
-                anchors.horizontalCenter: parent.horizontalCenter
-            }
+    // ── Clock ────────────────────────────────────────────────────────────
+    // Desktop: small pill, top-right, matches the KibaOS panel style.
+    // Phone: big lockscreen-style clock, top-center, clear of any status
+    // bar / camera-cutout safe area -- Android/iOS lockscreen convention,
+    // and it doubles as a landmark while your thumb finds the card below.
+    Column {
+        id: clockCol
+        anchors {
+            top: parent.top
+            topMargin: isPhone ? 64 : 28
         }
-        Timer { interval: 1000; running: true; repeat: true; onTriggered: clockCol.children[0].text = Qt.formatTime(new Date(), "h:mm AP") }
+        anchors.horizontalCenter: isPhone ? parent.horizontalCenter : undefined
+        anchors.right: isPhone ? undefined : parent.right
+        anchors.rightMargin: isPhone ? 0 : 28
+        spacing: isPhone ? 4 : 0
+        Text {
+            id: clockTime
+            text: Qt.formatTime(new Date(), "h:mm AP")
+            color: "#ffffff"
+            font.pixelSize: isPhone ? 56 : 18
+            font.weight: Font.Medium
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Text {
+            text: Qt.formatDate(new Date(), "ddd, MMM d")
+            color: "#aebccd"
+            font.pixelSize: isPhone ? 16 : 11
+            anchors.horizontalCenter: parent.horizontalCenter
+        }
+        Timer { interval: 1000; running: true; repeat: true; onTriggered: clockTime.text = Qt.formatTime(new Date(), "h:mm AP") }
     }
 
     // ── Central frosted-glass login card ────────────────────────────────────
+    // Desktop: fixed 360px, dead-centered, unchanged from before.
+    // Phone: full-width (minus margins), anchored in the lower half
+    // rather than dead-center -- that's within comfortable one-handed
+    // thumb reach, and critically it leaves the *upper* half of the
+    // screen clear for squeekboard to pop up underneath without ever
+    // covering the password field it's currently focused on.
     Rectangle {
         id: card
-        anchors.centerIn: parent
-        width: 360
-        height: cardCol.implicitHeight + 56
-        radius: 26
+        anchors {
+            horizontalCenter: isPhone ? parent.horizontalCenter : undefined
+            centerIn: isPhone ? undefined : parent
+            bottom: isPhone ? parent.bottom : undefined
+            bottomMargin: isPhone ? 96 : 0
+        }
+        width: isPhone ? parent.width - 48 : 360
+        height: cardCol.implicitHeight + (isPhone ? 40 : 56)
+        radius: isPhone ? 32 : 26
         color: "#101828"
         opacity: 0.001
-        Rectangle {
-            anchors.fill: parent
-            radius: 26
-            color: "#101828"
-            opacity: 0.001
-        }
         // emulated glass: just a solid translucent fill, no real blur.
-        // labwc doesn't have a blur plugin at all (Wayfire did, sorta — see
-        // LABWC CONFIG notes for the full story on why I dropped it), so
-        // this fake-glass approach is doing all the work here now, not
-        // just backstopping a spot where real blur wouldn't reach anyway.
+        // labwc/phoc don't have a blur plugin at all (Wayfire did, sorta
+        // — see LABWC CONFIG notes for the full story on why I dropped
+        // it), so this fake-glass approach is doing all the work here
+        // now, not just backstopping a spot where real blur wouldn't
+        // reach anyway.
         Rectangle {
             anchors.fill: parent
-            radius: 26
+            radius: parent.radius
             color: Qt.rgba(0.063, 0.094, 0.157, 0.72)
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, 0.14)
@@ -11438,20 +11829,20 @@ Rectangle {
 
         ColumnLayout {
             id: cardCol
-            anchors { top: parent.top; left: parent.left; right: parent.right; margins: 28 }
-            spacing: 14
+            anchors { top: parent.top; left: parent.left; right: parent.right; margins: isPhone ? 24 : 28 }
+            spacing: isPhone ? 16 : 14
 
             Image {
                 Layout.alignment: Qt.AlignHCenter
                 source: "logo.png"
-                width: 64; height: 64
+                width: isPhone ? 56 : 64; height: isPhone ? 56 : 64
                 fillMode: Image.PreserveAspectFit
             }
 
             Text {
                 Layout.alignment: Qt.AlignHCenter
                 text: userModel.count > 0 ? userModel.data(userModel.index(userList.currentIndex, 0), 257) : "User"
-                color: "#e8eef5"; font.pixelSize: 17; font.weight: Font.Medium
+                color: "#e8eef5"; font.pixelSize: isPhone ? 19 : 17; font.weight: Font.Medium
             }
 
             ListView {
@@ -11465,21 +11856,25 @@ Rectangle {
             ComboBox {
                 id: userBox
                 Layout.fillWidth: true
+                Layout.preferredHeight: touchH
                 model: userModel
                 textRole: "name"
                 currentIndex: userModel.lastIndex >= 0 ? userModel.lastIndex : 0
-                background: Rectangle { radius: 14; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
-                contentItem: Text { text: userBox.displayText; color: "#e8eef5"; padding: 10; verticalAlignment: Text.AlignVCenter }
+                font.pixelSize: isPhone ? 16 : 13
+                background: Rectangle { radius: fieldR; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
+                contentItem: Text { text: userBox.displayText; color: "#e8eef5"; font: userBox.font; padding: 10; verticalAlignment: Text.AlignVCenter }
             }
 
             TextField {
                 id: passwordField
                 Layout.fillWidth: true
+                Layout.preferredHeight: touchH
                 placeholderText: "Password"
                 echoMode: TextInput.Password
                 color: "#e8eef5"
+                font.pixelSize: isPhone ? 16 : 13
                 placeholderTextColor: "#8a99ad"
-                background: Rectangle { radius: 14; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
+                background: Rectangle { radius: fieldR; color: Qt.rgba(1,1,1,0.07); border.width: 1; border.color: Qt.rgba(1,1,1,0.10) }
                 onAccepted: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
                 Keys.onReturnPressed: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
             }
@@ -11487,28 +11882,46 @@ Rectangle {
             Button {
                 id: loginButton
                 Layout.fillWidth: true
+                Layout.preferredHeight: touchH
                 text: "Sign In"
                 onClicked: sddm.login(userBox.currentText, passwordField.text, root.sessionIndex)
-                background: Rectangle { radius: 14; color: "#0099cc" }
-                contentItem: Text { text: loginButton.text; color: "#ffffff"; font.weight: Font.DemiBold; horizontalAlignment: Text.AlignHCenter }
+                background: Rectangle { radius: fieldR; color: "#0099cc" }
+                contentItem: Text { text: loginButton.text; color: "#ffffff"; font.pixelSize: isPhone ? 16 : 13; font.weight: Font.DemiBold; horizontalAlignment: Text.AlignHCenter }
             }
 
+            // Session picker: only worth showing where there's actually
+            // more than one to pick from. Desktop offers Budgie/etc
+            // session choices; the phone image ships exactly one
+            // (kibaos-mobile, Exec=phoc) so this is dead weight there --
+            // one less thing to accidentally fat-finger on a small card.
             ComboBox {
                 Layout.fillWidth: true
+                Layout.preferredHeight: isPhone ? 0 : undefined
+                visible: !isPhone
                 model: sessionModel
                 textRole: "name"
                 currentIndex: root.sessionIndex
                 onActivated: root.sessionIndex = currentIndex
-                background: Rectangle { radius: 14; color: "transparent" }
+                background: Rectangle { radius: fieldR; color: "transparent" }
                 contentItem: Text { text: parent.displayText; color: "#aebccd"; font.pixelSize: 11; padding: 6; horizontalAlignment: Text.AlignHCenter }
             }
         }
     }
 
-    // ── Power row, bottom-right pill buttons ────────────────────────────────
+    // ── Power row ────────────────────────────────────────────────────────
+    // Desktop: small 44px pills, bottom-right, unchanged.
+    // Phone: bigger 56px targets (comfortable thumb-tap size), moved to
+    // top-right instead -- bottom-right on a phone sits right where the
+    // login card's bottom edge and any on-screen-keyboard region already
+    // are, so it's both more reachable and less likely to be covered.
     Row {
-        anchors { bottom: parent.bottom; right: parent.right; margins: 28 }
-        spacing: 10
+        anchors {
+            top: isPhone ? parent.top : undefined
+            bottom: isPhone ? undefined : parent.bottom
+            right: parent.right
+            margins: isPhone ? 24 : 28
+        }
+        spacing: isPhone ? 14 : 10
         Repeater {
             model: [
                 { label: "⏻", visible: sddm.canPowerOff, action: function(){ sddm.powerOff() } },
@@ -11516,9 +11929,9 @@ Rectangle {
             ]
             delegate: Rectangle {
                 visible: modelData.visible
-                width: 44; height: 44; radius: 14
+                width: touchH; height: touchH; radius: fieldR
                 color: "#1c2433"; opacity: 0.78
-                Text { anchors.centerIn: parent; text: modelData.label; color: "#e8eef5"; font.pixelSize: 18 }
+                Text { anchors.centerIn: parent; text: modelData.label; color: "#e8eef5"; font.pixelSize: isPhone ? 22 : 18 }
                 MouseArea { anchors.fill: parent; onClicked: modelData.action() }
             }
         }
