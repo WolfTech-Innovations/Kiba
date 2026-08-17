@@ -165,7 +165,14 @@ PACMANCONF
     bluez bluez-utils upower \
     wireplumber pipewire pipewire-pulse \
     mesa vulkan-icd-loader \
-    openssh git base-devel
+    openssh git base-devel \
+    ell
+
+  # ell installed explicitly above -- it's a real ALARM [extra] binary
+  # package (unlike ofono/libhybris, which are genuinely AUR-only), and
+  # it's a build dep of the AUR ofono PKGBUILD below. Pre-installing it
+  # here means makepkg -si never has to resolve it as a missing dep at
+  # all, on top of the pacman -Syy resync added above.
 
   # ── strip the dead [aur] entry from the TARGET root's own pacman.conf ──
   # /tmp/mobile-pacman.conf (cleaned of its own dead [aur] section above)
@@ -199,6 +206,16 @@ PACMANCONF
   # for the mobile rootfs's own pacman.conf, which every makepkg -si
   # below runs against via arch-chroot.
   sed -i 's/^CheckSpace/#CheckSpace/' "${_root}/etc/pacman.conf"
+
+  # Force a resync against the target's OWN (post-swap) pacman.conf --
+  # pacstrap synced core/extra/alarm under /tmp/mobile-pacman.conf above,
+  # but nothing has refreshed the sync DBs since we swapped in the
+  # target's default ALARM-template pacman.conf just above. Without this,
+  # makepkg -si's dependency resolution in the AUR loop below (e.g.
+  # ofono's `ell` build dep, which genuinely exists in ALARM's [extra])
+  # can hit "target not found: ell" against a stale/empty sync DB even
+  # though the package is real. Cheap and idempotent, so just always do it.
+  arch-chroot "${_root}" pacman -Syy --noconfirm
 
   # ── AUR: ofono, libhybris, gnome-calls (gnome-dialer), chatty,
   #    libgestures, wlrctl ────────────────────────────────────────────────
