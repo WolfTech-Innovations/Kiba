@@ -150,9 +150,17 @@ PACMANCONF
   # from halium-boot.img, a rootfs-supplied kernel would never be used and
   # just bloats the tarball.
   #
-  # gnome-calls/chatty/libgestures aren't in Arch's own repos (they're
-  # GNOME-mobile-ecosystem packages); pulled from the AUR pass below
-  # instead of assuming they exist here. ofono and libhybris were
+  # gnome-calls and chatty ARE real binary packages (gnome-calls ships on
+  # ALARM's own aarch64 repo; chatty -- the GNOME/Purism SMS+Matrix app --
+  # was absorbed into Arch's official [extra] a while back, at which point
+  # the AUR maintainer handed the bare "chatty" AUR name over to an
+  # unrelated Java/Gradle Twitch-chat client). Pulled here via pacstrap
+  # instead of the AUR loop below -- building "chatty" from AUR now grabs
+  # the wrong project entirely (and drags in `gradle`, which isn't even
+  # packaged for ALARM/aarch64, so that AUR build could never succeed).
+  # libgestures has no aarch64 build in AUR at all (arch=('x86_64') in its
+  # PKGBUILD) -- dropped from the AUR loop below instead of retried
+  # pointlessly every run. ofono and libhybris were
   # previously listed in this call too, but neither actually exists as a
   # binary package in core/extra/alarm -- both are AUR-only upstream (the
   # [aur] entry in mobile-pacman.conf isn't a real ALARM-hosted binary
@@ -173,7 +181,7 @@ PACMANCONF
     wireplumber pipewire pipewire-pulse \
     mesa vulkan-icd-loader \
     openssh git base-devel \
-    ell
+    ell gnome-calls chatty
 
   # ell installed explicitly above -- it's a real ALARM [extra] binary
   # package (unlike ofono/libhybris, which are genuinely AUR-only), and
@@ -317,11 +325,12 @@ PACMANCONF
   # libhybris-git on this build host was just redundant work with none of
   # its output actually used by the rootfs this function produces.
 
-  # gnome-calls (gnome-dialer), chatty, libgestures, wlrctl -- genuinely
-  # optional polish; a build can reasonably ship without one of these
-  # (see the sddm check right below, which explains why THAT
-  # one is treated differently).
-  for _pkg in gnome-calls chatty libgestures wlrctl; do
+  # wlrctl -- genuinely AUR-only, no official/ALARM package. gnome-calls
+  # and chatty are pacstrap'd above now instead of built here (see the
+  # comment near that pacstrap call); libgestures is skipped entirely --
+  # its AUR PKGBUILD has no aarch64 build at all, so retrying it here
+  # every run would just burn ~50s on a guaranteed failure.
+  for _pkg in wlrctl; do
     _aur_build_retry "${_pkg}" || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
   done
   rm -f "${_root}/etc/sudoers.d/builder"
