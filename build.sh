@@ -1,18 +1,32 @@
 #!/bin/bash
 set -ex
 
-# sniffing out what arch we're building for today :3
-# archiso doesn't do ARM out of the box so if --arm shows up we gotta
-# build our own copy later. everything downstream just checks $KIBA_ARCH.
+# sniffing out what target we're building for today :3
+# the ARM branch (archiso-on-ALARM, boots a real PC-shaped ISO) is gone --
+# replaced outright by --mobile, which doesn't build an ISO at all. Mobile
+# targets a Halium GSI phone: no archiso, no GRUB/systemd-boot, no OOBE
+# installer -- just a pacstrap'd rootfs tarball that gets bundled with a
+# halium-boot.img + the Halium GSI system.img and flashed/sideloaded onto
+# the phone's existing Android partitions. Everything downstream still
+# just checks $KIBA_ARCH.
 KIBA_ARCH="x86_64"
 for _a in "$@"; do
   case "${_a}" in
-    --arm|--aarch64) KIBA_ARCH="aarch64" ;;
+    --mobile) KIBA_ARCH="mobile" ;;
   esac
 done
-[ "${KIBA_ARCH}" = "x86_64" ] && [ "${KIBA_ARM:-0}" = "1" ] && KIBA_ARCH="aarch64"
+[ "${KIBA_ARCH}" = "x86_64" ] && [ "${KIBA_MOBILE:-0}" = "1" ] && KIBA_ARCH="mobile"
 export KIBA_ARCH
 echo "=== KibaOS build target: ${KIBA_ARCH} ==="
+
+# mobile takes a completely separate, much shorter code path (see
+# build_kibaos_mobile() below) -- it shares the parallel-downloads tweak
+# and pacman bootstrap right below this block, but skips archiso,
+# profiledef.sh, packages.x86_64/customize_airootfs.sh (that whole heredoc
+# is the desktop OOBE installer + disk-partitioning/GRUB-NVRAM backend,
+# none of which applies to a phone that already has Android partitions
+# and boots through halium-boot.img instead of GRUB/systemd-boot) and
+# mkarchiso entirely.
 
 # ── speed hack: crank up parallel downloads so pacman isn't crawling ───────
 sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
@@ -33,52 +47,1844 @@ pacman-key --init
 pacman-key --populate archlinux
 pacman -Syy --noconfirm
 pacman -Su  --noconfirm
-pacman -S --noconfirm --needed \
-  base-devel git squashfs-tools libisoburn mtools dosfstools \
-  cmake ninja meson \
-  grub \
-  arch-install-scripts \
-  openssl curl imagemagick jq \
-  python-docutils
+if [ "${KIBA_ARCH}" = "mobile" ]; then
+  # mobile doesn't touch archiso/GRUB/squashfs at all -- just needs
+  # pacstrap (arch-install-scripts) plus basic fetch/package tooling.
+  # jq is here for parsing the GitHub API response when resolving the
+  # latest Magisk release (magiskboot is pulled from it further down,
+  # for the on-device boot.img repack update-binary does at install
+  # time -- nothing Python/AOSP-tooling related runs on this build host
+  # anymore).
+  pacman -S --noconfirm --needed \
+    base-devel git arch-install-scripts openssl curl jq e2fsprogs zip unzip
+else
+  pacman -S --noconfirm --needed \
+    base-devel git squashfs-tools libisoburn mtools dosfstools \
+    cmake ninja meson \
+    grub \
+    arch-install-scripts \
+    openssl curl imagemagick jq \
+    python-docutils
+fi
 
-# try normal archiso, except (arm detected) build it from source.
+# ══════════════════════════════════════════════════════════════════════════
+# MOBILE: KibaOS Mobile rootfs for Halium GSI phones
+# ══════════════════════════════════════════════════════════════════════════
+# Not an ISO. Halium GSI devices boot through boot.img (kernel + Halium
+# ramdisk) and the Halium GSI system.img. Following the "Halium-boot"
+# porting method, this script fetches the prebuilt, device-agnostic GSI
+# directly (no AOSP repo sync) -- but does NOT try to pre-build boot.img
+# on this build host anymore. That was tried (fetch a "certified GKI
+# kernel" and repack it here) and didn't hold up: Google doesn't publish
+# a stable download URL for those, and even where the kernel really is
+# generic, assembling a bootable image still needs the device's own
+# vendor_boot/dtb -- something a build host with no idea what phone
+# it's targeting can't supply. Instead, this ships the ingredients
+# (magiskboot + a generic Halium ramdisk) and the installer zip's
+# update-binary does the unpack/swap-ramdisk/repack itself, on the
+# phone, against that phone's own stock boot/init_boot partition --
+# see the boot-repack-tools section below and update-binary further
+# down for the actual mechanics. No per-device kernel tree, no
+# repo/breakfast/mka, and no KIBA_MOBILE_HALIUM_BOOT_IMG to hand-supply
+# either -- but also no pretending a build host can know a phone's
+# vendor_boot ahead of time. What this function otherwise produces is
+# the userspace: a pacstrap'd Arch
+# Linux ARM aarch64 rootfs
+# carrying KibaOS's mobile stack (Budgie panel/raven on phoc, ofono,
+# Calls, Chatty, squeekboard, libgestures, borrowed phosh-lockscreen),
+# tarred up the same way Manjaro's libhybris/image-ci project packages
+# its own Halium rootfs for adb-sideload install onto /data alongside
+# the GSI + halium-boot.img.
+build_kibaos_mobile() {
+  local _root="/w/mobile-rootfs"
+  local _out="/w/out"
+  rm -rf "${_root}"
+  mkdir -p "${_root}" "${_out}"
+
+  # ── ALARM signing key, same reasoning as the aarch64 GPGDir seed later
+  #    in this file used to need: ALARM packages are signed by a key the
+  #    archlinux keyring doesn't ship, so pacman-key needs it seeded
+  #    before pacstrap can pull anything off an ALARM mirror. ─────────────
+  pacman-key --init
+  pacman-key --populate archlinux
+  pacman-key --recv-keys 68B3537F39A313B3E574D06777193F152BDBE6A6 \
+    --keyserver keyserver.ubuntu.com
+  pacman-key --lsign-key 68B3537F39A313B3E574D06777193F152BDBE6A6
+
+  cat > /etc/pacman.d/mobile-mirrorlist << 'MIRRORLIST'
+Server = http://mirror.archlinuxarm.org/aarch64/$repo
+MIRRORLIST
+
+  cat > /tmp/mobile-pacman.conf << 'PACMANCONF'
+[options]
+Architecture = aarch64
+CheckSpace
+ParallelDownloads = 10
+SigLevel = Required DatabaseOptional
+
+[core]
+Include = /etc/pacman.d/mobile-mirrorlist
+[extra]
+Include = /etc/pacman.d/mobile-mirrorlist
+[alarm]
+Include = /etc/pacman.d/mobile-mirrorlist
+[aur]
+Include = /etc/pacman.d/mobile-mirrorlist
+PACMANCONF
+
+  mkdir -p "${_root}/var/lib/pacman"
+
+  # ── base + telephony + mobile shell stack ───────────────────────────────
+  # linux-aarch64/linux-firmware deliberately OMITTED -- the kernel comes
+  # from halium-boot.img, a rootfs-supplied kernel would never be used and
+  # just bloats the tarball.
+  #
+  # gnome-calls/chatty/libgestures aren't in Arch's own repos (they're
+  # GNOME-mobile-ecosystem packages); pulled from the AUR pass below
+  # instead of assuming they exist here.
+  pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
+    base sudo networkmanager \
+    budgie-desktop labwc-is-not-used-placeholder 2>/dev/null || true
+
+  # (real pacstrap call -- the line above is deliberately allowed to
+  # partially fail on the placeholder package name and retried clean here)
+  pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
+    base sudo networkmanager dbus polkit \
+    budgie-desktop budgie-control-center \
+    phoc squeekboard waybar wtype \
+    ofono bluez bluez-utils upower \
+    wireplumber pipewire pipewire-pulse \
+    mesa vulkan-icd-loader libhybris \
+    openssh git base-devel
+
+  # ── AUR: gnome-calls (gnome-dialer), chatty, libgestures, wlrctl ────────
+  # No AUR helper assumed present on a fresh ALARM rootfs -- build each
+  # manually as the alpm build user already seeded near the top of this
+  # script, inside the target rootfs via arch-chroot. wlrctl backs the
+  # nav bar's recents button below (wlr-foreign-toplevel-management
+  # listing) -- it's genuinely AUR-only, no official/ALARM package, same
+  # as the other three here.
+  arch-chroot "${_root}" useradd -m -G wheel builder || true
+  echo 'builder ALL=(ALL) NOPASSWD: ALL' > "${_root}/etc/sudoers.d/builder"
+  for _pkg in gnome-calls chatty libgestures wlrctl; do
+    arch-chroot "${_root}" bash -c "
+      su - builder -c '
+        cd /tmp &&
+        git clone --depth 1 https://aur.archlinux.org/${_pkg}.git &&
+        cd ${_pkg} &&
+        makepkg -si --noconfirm --needed
+      '
+    " || echo "!! ${_pkg} AUR build failed -- check the log above, continuing" >&2
+  done
+  rm -f "${_root}/etc/sudoers.d/builder"
+  arch-chroot "${_root}" userdel -r builder || true
+
+  # ── borrow phosh-lockscreen rather than write our own ───────────────────
+  # Hard fail if this isn't available -- a phone build with no lockscreen
+  # is not an acceptable degraded state to ship silently, unlike the
+  # AUR telephony packages above which can reasonably continue without.
+  if ! arch-chroot "${_root}" pacman -S --noconfirm --needed phosh-lockscreen; then
+    echo "ERROR: phosh-lockscreen not available -- refusing to build a mobile rootfs with no lockscreen. Check phosh git package / AUR fallback." >&2
+    exit 1
+  fi
+
+  # ── minimal branding/behavior pass (the parts of the desktop
+  #    customize_airootfs.sh that still make sense with no disk installer
+  #    or GRUB in the picture: DNS, dconf panel state, hidden launchers) ──
+  install -d -m 755 -o 1000 -g 1000 "${_root}/home/liveuser/.config/dconf" 2>/dev/null || true
+  cat > "${_root}/etc/resolv.conf" << 'RESOLVCONF'
+nameserver 1.1.1.1
+nameserver 1.0.0.1
+RESOLVCONF
+
+  # phoc's own config -- points it at Budgie's panel/raven as layer-shell
+  # clients instead of Phosh's shell, keeps libgestures/squeekboard as-is
+  # since both talk to whatever compositor implements layer-shell, not
+  # specifically Phosh.
+  mkdir -p "${_root}/etc/phoc"
+  cat > "${_root}/etc/phoc/phoc.ini" << 'PHOCINI'
+[core]
+xwayland=true
+
+[output:DSI-1]
+scale=2
+PHOCINI
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Bottom navigation bar -- Waybar
+  # ══════════════════════════════════════════════════════════════════════
+  # Waybar over gtk-layer-shell rather than a bespoke GTK bar: it's the
+  # de-facto modern bar on wlroots-based Wayland compositors (same
+  # layer-shell protocol phoc/squeekboard already speak here), actively
+  # maintained, and themeable entirely through CSS -- so it can carry the
+  # exact same design tokens as the OOBE (oobe.css's #0071e3 accent, pill
+  # shapes) instead of introducing a second, unrelated visual language
+  # for the persistent chrome the user sees on every screen after setup.
+  #
+  # Reachable actions are necessarily best-effort here: phoc doesn't ship
+  # a swaymsg-equivalent IPC or a full foreign-toplevel switching UI like
+  # sway does, so "recents" runs wlrctl's toplevel list (wlrctl is built
+  # from AUR above) rather than a live-thumbnail switcher -- real data,
+  # just not a real switcher UI yet. Worth revisiting once phoc's own
+  # protocol support covers richer toplevel management (track
+  # https://gitlab.gnome.org/World/Phosh/phoc issues).
+  mkdir -p "${_root}/etc/xdg/waybar"
+  cat > "${_root}/etc/xdg/waybar/config" << 'WAYBARCONFIG'
+{
+    "layer": "top",
+    "position": "bottom",
+    "height": 76,
+    "margin-bottom": 0,
+    "modules-left": ["custom/back"],
+    "modules-center": ["custom/home"],
+    "modules-right": ["custom/recents"],
+
+    "custom/back": {
+        "format": "←",
+        "tooltip": false,
+        "on-click": "wtype -k Escape"
+    },
+    "custom/home": {
+        "format": "⌂",
+        "tooltip": false,
+        "on-click": "budgie-panel --toggle-appswitch 2>/dev/null || pkill -SIGUSR1 budgie-panel"
+    },
+    "custom/recents": {
+        "format": "▦",
+        "tooltip": false,
+        "on-click": "kibaos-mobile-recents"
+    }
+}
+WAYBARCONFIG
+
+  cat > "${_root}/etc/xdg/waybar/style.css" << 'WAYBARCSS'
+/* KibaOS Mobile nav bar -- same accent/timing tokens as oobe.css, just
+ * applied to the bar that's actually on-screen every day after setup.
+ * Sized noticeably above Material's 48dp minimum touch target -- this
+ * bar gets tapped constantly, one-handed, often without looking, so
+ * bigger/simpler beats dense every time. Plain classic Unicode glyphs
+ * (← ⌂ ▦) instead of an icon font dependency -- render everywhere with
+ * zero extra packages, and read clearly even at a glance. */
+* {
+    font-family: "Inter", sans-serif;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(18, 22, 29, 0.92);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#custom-back, #custom-home, #custom-recents {
+    color: #e2e8f0;
+    font-size: 26px;
+    min-width: 76px;
+    min-height: 56px;
+    margin: 10px 10px;
+    border-radius: 999px;
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+                transform 90ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+#custom-back:hover, #custom-home:hover, #custom-recents:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+#custom-back:active, #custom-home:active, #custom-recents:active {
+    background: rgba(0, 113, 227, 0.35);
+    transform: scale(0.90);
+}
+
+/* Home gets the accent treatment -- it's the "you are always one tap from
+ * a known place" affordance, same role the OOBE's primary button plays:
+ * exactly one clearly-weighted action, unmistakable at a glance. */
+#custom-home {
+    color: #ffffff;
+    background: #0071e3;
+    min-width: 84px;
+}
+#custom-home:hover  { background: #0077ed; }
+#custom-home:active { background: #0068d6; }
+WAYBARCSS
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Status bar -- Android/iOS-style top bar: clock left, cellular/Wi-Fi/
+  # Bluetooth/battery right. A second, independent waybar instance rather
+  # than folding these into the nav bar above: the nav bar claims the
+  # bottom screen edge ("position": "bottom"), this one claims the top
+  # ("position": "top") -- two separate waybar processes with their own
+  # config/style pair is the normal way to run a top+bottom bar pair
+  # under wlroots (each is its own layer-shell surface; nothing about
+  # running two waybar processes conflicts, they just claim different
+  # screen edges). Same design tokens as the nav bar and oobe.css
+  # (#0071e3 accent, translucent dark chrome), same "plain Unicode
+  # glyphs, no icon font" rule the nav bar already follows -- no Nerd
+  # Font dependency for a bar that's on-screen 100% of the time.
+  # ══════════════════════════════════════════════════════════════════════
+  mkdir -p "${_root}/etc/xdg/waybar"
+  cat > "${_root}/etc/xdg/waybar/statusbar-config" << 'STATUSBARCONFIG'
+{
+    "layer": "top",
+    "position": "top",
+    "height": 34,
+    "spacing": 2,
+    "modules-left": ["clock"],
+    "modules-center": [],
+    "modules-right": ["custom/cellular", "network", "bluetooth", "battery"],
+
+    "clock": {
+        "format": "{:%I:%M %p}",
+        "tooltip-format": "{:%A, %B %d}"
+    },
+
+    "custom/cellular": {
+        "exec": "/usr/local/bin/kibaos-mobile-cellular",
+        "interval": 8,
+        "return-type": "json",
+        "tooltip": true
+    },
+
+    "network": {
+        "format-wifi": "{icon}",
+        "format-disconnected": "",
+        "format-icons": ["▁", "▂", "▄", "▆", "█"],
+        "tooltip-format-wifi": "{essid} · {signalStrength}%",
+        "on-click": "budgie-control-center wifi 2>/dev/null || true"
+    },
+
+    "bluetooth": {
+        "format": "◇",
+        "format-connected": "◆",
+        "format-disabled": "",
+        "format-off": "",
+        "tooltip-format": "{controller_alias} ({controller_address})",
+        "tooltip-format-connected": "{device_alias}",
+        "on-click": "budgie-control-center bluetooth 2>/dev/null || true"
+    },
+
+    "battery": {
+        "format": "{icon} {capacity}%",
+        "format-charging": "{icon} {capacity}% ↑",
+        "format-icons": ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"],
+        "states": {
+            "warning": 20,
+            "critical": 10
+        }
+    }
+}
+STATUSBARCONFIG
+
+  cat > "${_root}/etc/xdg/waybar/statusbar-style.css" << 'STATUSBARCSS'
+/* KibaOS Mobile status bar -- same tokens as the nav bar/oobe.css, sized
+ * for a compact always-on strip instead of a tap target: small text,
+ * tight padding, no hover/active states (nothing here is a button except
+ * the network/bluetooth quick-launch clicks, and those don't need a
+ * press-state animation on a strip this thin). */
+* {
+    font-family: "Inter", sans-serif;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+}
+
+window#waybar {
+    background: rgba(18, 22, 29, 0.92);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#clock {
+    color: #f1f5f9;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 12px;
+}
+
+#custom-cellular, #network, #bluetooth, #battery {
+    color: #e2e8f0;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 6px;
+}
+
+#bluetooth { font-size: 15px; }
+
+/* Battery warning/critical tint -- same red used for oobe.css's
+ * .oobe-error, same amber Material typically reserves for a low-battery
+ * state, so a glance at the bar reads consistently with the rest of the
+ * UI's color language. */
+#battery.warning  { color: #f59e0b; }
+#battery.critical { color: #f87171; }
+STATUSBARCSS
+
+  # ── Cellular signal module: no built-in waybar module reads ofono, so
+  # this is a small polling script (waybar re-execs it every "interval"
+  # seconds per statusbar-config above) that queries ofono's own D-Bus
+  # API directly via gdbus (part of glib2, already a hard dependency of
+  # dbus which is pulled above -- no extra package needed) the same way
+  # check_sim() in the OOBE does, just outside a GLib main loop since
+  # this runs standalone rather than inside the Vala wizard. Emits
+  # waybar's custom-module JSON contract: {text, tooltip, class}.
+  # Deliberately fails soft everywhere -- no modem, no SIM, or a gdbus
+  # parse miss all just print {"text":""}, which waybar collapses to
+  # nothing rather than showing a broken/stale reading.
+  cat > "${_root}/usr/local/bin/kibaos-mobile-cellular" << 'CELLULARSCRIPT'
+#!/bin/bash
+# KibaOS Mobile status bar -- cellular signal custom module for waybar.
+# Reads modem/signal state straight from ofono over D-Bus; see the
+# longer explanation above where this file gets written.
+set -u
+
+_empty() { echo '{"text":"","tooltip":"No SIM/modem detected","class":"none"}'; }
+
+command -v gdbus >/dev/null 2>&1 || { _empty; exit 0; }
+
+_modem_path="$(
+  gdbus call --system --dest org.ofono --object-path / \
+    --method org.ofono.Manager.GetModems 2>/dev/null \
+    | grep -oP "(?<=objpath ')[^']+" | head -n1
+)"
+[ -z "${_modem_path}" ] && { _empty; exit 0; }
+
+_netreg="$(
+  gdbus call --system --dest org.ofono --object-path "${_modem_path}" \
+    --method org.ofono.NetworkRegistration.GetProperties 2>/dev/null
+)"
+[ -z "${_netreg}" ] && { _empty; exit 0; }
+
+_status="$(echo "${_netreg}"   | grep -oP "'Status': <'\K[^']+")"
+_strength="$(echo "${_netreg}" | grep -oP "'Strength': <(uint16 |byte )?\K[0-9]+" | head -n1)"
+_tech="$(echo "${_netreg}"     | grep -oP "'Technology': <'\K[^']+")"
+_carrier="$(echo "${_netreg}"  | grep -oP "'Name': <'\K[^']+")"
+
+if [ "${_status}" != "registered" ] && [ "${_status}" != "roaming" ]; then
+  echo "{\"text\":\"✕\",\"tooltip\":\"No service\",\"class\":\"none\"}"
+  exit 0
+fi
+
+_strength="${_strength:-0}"
+if   [ "${_strength}" -ge 80 ]; then _bar="█"
+elif [ "${_strength}" -ge 60 ]; then _bar="▆"
+elif [ "${_strength}" -ge 40 ]; then _bar="▄"
+elif [ "${_strength}" -ge 20 ]; then _bar="▂"
+else                                 _bar="▁"
+fi
+
+_tech_label="$(echo "${_tech}" | tr '[:lower:]' '[:upper:]')"
+_roam_suffix=""
+[ "${_status}" = "roaming" ] && _roam_suffix=" (roaming)"
+
+echo "{\"text\":\"${_bar} ${_tech_label}\",\"tooltip\":\"${_carrier}${_roam_suffix} · ${_strength}%\",\"class\":\"connected\"}"
+CELLULARSCRIPT
+  chmod +x "${_root}/usr/local/bin/kibaos-mobile-cellular"
+
+  # Minimal placeholder task-switcher -- lists wlr-foreign-toplevel
+  # clients via wlrctl (built above in the AUR pass). Still not a real
+  # thumbnail switcher -- phoc doesn't expose a richer IPC/foreign-
+  # toplevel-based switching surface yet -- but wlrctl toplevel list is
+  # at least real data now instead of a "not installed" stub. Kept the
+  # command-existence check anyway since the AUR build above can still
+  # fail without aborting the whole rootfs build (see the `||` there).
+  cat > "${_root}/usr/local/bin/kibaos-mobile-recents" << 'RECENTSSCRIPT'
+#!/bin/bash
+if command -v wlrctl >/dev/null 2>&1; then
+  wlrctl toplevel list
+else
+  echo "kibaos-mobile-recents: wlrctl not installed, no toplevel list available" >&2
+fi
+RECENTSSCRIPT
+  chmod +x "${_root}/usr/local/bin/kibaos-mobile-recents"
+
+  cat > "${_root}/etc/xdg/autostart/kibaos-mobile-navbar.desktop" << 'NAVBARAUTOSTART'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Mobile Navigation Bar
+Exec=waybar -c /etc/xdg/waybar/config -s /etc/xdg/waybar/style.css
+X-GNOME-Autostart-enabled=true
+NAVBARAUTOSTART
+
+  cat > "${_root}/etc/xdg/autostart/kibaos-mobile-statusbar.desktop" << 'STATUSBARAUTOSTART'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Mobile Status Bar
+Exec=waybar -c /etc/xdg/waybar/statusbar-config -s /etc/xdg/waybar/statusbar-style.css
+X-GNOME-Autostart-enabled=true
+STATUSBARAUTOSTART
+
+  # bluetoothd/upowerd back the status bar's bluetooth + battery modules
+  # -- neither package enables its service by default on a fresh ALARM
+  # rootfs, so wire them up explicitly the same way the rest of this
+  # function reaches into ${_root} via arch-chroot.
+  arch-chroot "${_root}" systemctl enable bluetooth upower || true
+
+  cat > "${_root}/etc/xdg/autostart/kibaos-mobile-shell.desktop" << 'AUTOSTART'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Mobile Shell
+Exec=budgie-panel
+X-GNOME-Autostart-enabled=true
+AUTOSTART
+
+  # ── WinApps / Windows Workspace is a desktop-only feature ───────────────
+  # Deliberately never referenced anywhere in this function. It lives in
+  # customize_airootfs.sh (desktop/laptop ISO path) exclusively -- WinApps
+  # depends on a local Docker/libvirt Windows VM for RDP passthrough,
+  # which has no sane story on phone hardware. If a future edit of this
+  # function starts pulling in kibaos-winapps-* anything, that's a bug.
+
+  # ══════════════════════════════════════════════════════════════════════
+  # Mobile OOBE — Android-style first-boot flow (Vala/GTK4/libadwaita,
+  # same stack as the desktop OOBE installer). No disk partitioning, no
+  # GRUB/systemd-boot NVRAM step -- GSI + this rootfs are already flashed
+  # by the time this ever runs. Flow: Welcome -> Language/Region -> Wi-Fi
+  # -> SIM/carrier via ofono -> account step (mandatory) -> done. Gated
+  # by a marker file so it only ever runs once, same idea as Android's
+  # own SetupWizard.
+  # ══════════════════════════════════════════════════════════════════════
+  pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
+    gtk4 libadwaita vala meson ninja glib2 networkmanager
+
+  mkdir -p "${_root}/root/kibaos-mobile-oobe/src"
+
+  cat > "${_root}/root/kibaos-mobile-oobe/meson.build" << 'MESONBUILD'
+project('kibaos-mobile-oobe', 'vala', 'c')
+gtk_dep = dependency('gtk4')
+adw_dep = dependency('libadwaita-1')
+gio_dep = dependency('gio-2.0')
+executable('kibaos-mobile-oobe', 'src/main.vala',
+  dependencies: [gtk_dep, adw_dep, gio_dep],
+  install: true)
+MESONBUILD
+
+  # ── Mobile OOBE stylesheet ────────────────────────────────────────────
+  # Same design language as the desktop installer (oobe.css: #0071e3
+  # accent, pill buttons, step dots, easeOutQuint card-ins) carried over
+  # to a phone screen, with Material 3 shape/elevation layered on top
+  # where a touch UI actually benefits from it: bigger corner radii on
+  # touch targets (Material's "extra-large" 28px shape scale vs desktop's
+  # 18-20px), real elevation shadows on the Wi-Fi list instead of a flat
+  # bordered row (fingers need a stronger affordance than a mouse cursor
+  # does), and a top linear progress track like Android's own
+  # SetupWizard/LineageOS SetupWizard use instead of relying on step dots
+  # alone -- dots stay too, just demoted to a secondary indicator under
+  # the header the way Material stepper components use both together.
+  mkdir -p "${_root}/usr/share/kibaos-mobile-oobe"
+  cat > "${_root}/usr/share/kibaos-mobile-oobe/oobe.css" << 'MOBILEOOBECSS'
+/* ═══════════════════════════════════════════════════════════════════════
+ * KibaOS Mobile OOBE — desktop oobe.css tokens + Material 3 shape/elevation.
+ * Timing: settle cubic-bezier(0.22,1,0.36,1) / spring cubic-bezier(0.34,1.56,0.64,1)
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+window.kibaos-oobe-window { background: transparent; }
+
+.oobe-background {
+    background: #ffffff;
+    transition: background 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+window.dark .oobe-background { background: #12161d; }
+
+/* ── Top app bar: brand + corner toggles, Material top-app-bar height ── */
+.oobe-topbar { min-height: 56px; padding: 8px 14px; }
+.oobe-brand {
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    color: rgba(15,23,42,0.80);
+}
+window.dark .oobe-brand { color: rgba(255,255,255,0.75); }
+
+.oobe-corner-button {
+    background:    rgba(15,23,42,0.05);
+    color:         #334155;
+    border:        1px solid rgba(15,23,42,0.10);
+    border-radius: 999px;
+    min-width:     48px;
+    min-height:    48px;
+    padding:       8px;
+    font-size:     15px;
+    font-weight:   650;
+    transition:
+        background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform         120ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.oobe-corner-button:hover  { background: rgba(15,23,42,0.09); }
+.oobe-corner-button:active { transform: scale(0.92); transition-duration: 70ms; }
+window.dark .oobe-corner-button {
+    background: rgba(30,41,59,0.65);
+    color:      #e2e8f0;
+    border-color: rgba(255,255,255,0.12);
+}
+window.dark .oobe-corner-button:hover { background: rgba(51,65,85,0.85); }
+
+/* ── Top linear progress (Material stepper / Android SetupWizard style) ── */
+.oobe-linear-progress { min-height: 4px; }
+.oobe-linear-progress trough {
+    background:    rgba(15,23,42,0.08);
+    border-radius: 999px;
+    min-height:    4px;
+}
+.oobe-linear-progress progress {
+    background:    linear-gradient(90deg, #0071e3, #409cff);
+    border-radius: 999px;
+    transition:    all 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+window.dark .oobe-linear-progress trough { background: rgba(255,255,255,0.10); }
+
+/* ── Step dots (secondary indicator, sits under the linear track) ──── */
+.oobe-step-dot {
+    min-width: 6px; min-height: 6px;
+    border-radius: 999px;
+    background: rgba(0,0,0,0.15);
+    transition: all 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oobe-step-dot-active { min-width: 18px; background: #0071e3; }
+window.dark .oobe-step-dot { background: rgba(255,255,255,0.18); }
+window.dark .oobe-step-dot-active { background: #409cff; }
+.oobe-step-label {
+    font-size: 12px; font-weight: 600;
+    color: rgba(0,0,0,0.38); letter-spacing: 0.2px;
+}
+window.dark .oobe-step-label { color: rgba(255,255,255,0.40); }
+
+/* ── Card: Material "extra-large" 28px shape scale, real elevation ──
+ * Phones don't get the desktop's borderless full-bleed treatment --
+ * there's no cursor/hover state to carry hierarchy on touch, so the
+ * card boundary + soft elevation shadow is doing that work instead. */
+.oobe-card {
+    background:    #ffffff;
+    border:        1px solid rgba(15,23,42,0.06);
+    border-radius: 28px;
+    box-shadow:    0 1px 2px rgba(15,23,42,0.04), 0 8px 24px rgba(15,23,42,0.08);
+    animation: card-in 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+window.dark .oobe-card {
+    background:    #1a2029;
+    border-color:  rgba(255,255,255,0.06);
+    box-shadow:    0 1px 2px rgba(0,0,0,0.3), 0 8px 24px rgba(0,0,0,0.35);
+}
+@keyframes card-in {
+    from { opacity: 0; transform: translateY(18px) scale(0.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.oobe-inner { padding: 20px 20px 16px; }
+
+/* ── Page icon: one big, friendly, unmistakable symbolic icon per
+ *    screen. A single large icon reads instantly without reading a
+ *    word of text -- the whole point of "simple enough for anyone",
+ *    so every page gets one before the title, never buried in a
+ *    paragraph. Rendered as a themed Gtk.Image (pixel_size set in
+ *    code), deliberately not an emoji glyph, so it renders consistently
+ *    regardless of what emoji coverage the device's font stack has. ── */
+.oobe-page-icon {
+    color: #0071e3;
+    margin-bottom: 4px;
+    animation: pop-in 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+window.dark .oobe-page-icon { color: #4d9fff; }
+
+/* ── Typography -- sized for a hand held at arm's length, not a desk
+ *    monitor: bigger everything, shorter lines, nothing squints. ───── */
+.oobe-welcome-greeting {
+    font-size: 36px; font-weight: 750; color: #1d1d1f;
+    letter-spacing: -0.3px; margin-top: 4px; line-height: 1.15;
+    animation: fade-up 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+window.dark .oobe-welcome-greeting { color: #f1f5f9; }
+.oobe-title {
+    font-size: 28px; font-weight: 750; color: #0f172a;
+    letter-spacing: -0.3px; line-height: 1.2; margin-bottom: 4px;
+    animation: fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 60ms both;
+}
+.oobe-subtitle {
+    font-size: 16px; color: #64748b; line-height: 1.5;
+    animation: fade-up 380ms cubic-bezier(0.22, 1, 0.36, 1) 100ms both;
+}
+@keyframes fade-up { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+window.dark .oobe-title    { color: #f1f5f9; }
+window.dark .oobe-subtitle { color: #94a3b8; }
+.oobe-error {
+    font-size: 15px; color: #dc2626; line-height: 1.5;
+    animation: fade-up 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+window.dark .oobe-error { color: #f87171; }
+
+/* ── Skip: a plain text link, not a bordered button -- there should only
+ *    ever be ONE strongly-weighted action on screen (the big accent
+ *    button). A second bordered button competes with it visually and
+ *    is exactly the kind of "which one do I press" ambiguity a
+ *    dog-simple flow can't have. ─────────────────────────────────────── */
+.oobe-skip-link {
+    background: transparent;
+    color: #94a3b8;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    padding: 12px;
+    min-height: 44px;
+}
+.oobe-skip-link:hover { color: #64748b; }
+window.dark .oobe-skip-link { color: #64748b; }
+window.dark .oobe-skip-link:hover { color: #94a3b8; }
+
+/* ── Language rows: code badge + name, one tap, no dropdown. A dropdown
+ *    needs opening then a second tap to choose -- two motions where one
+ *    obvious list of big rows only needs one, same reasoning as the
+ *    Wi-Fi list already uses tap-to-select rows instead of a picker.
+ *    Plain-text code badge (EN-US, ES, ...) rather than a flag emoji --
+ *    see build_language_page for why. Class name kept as oobe-lang-flag
+ *    to avoid churning every reference below; it's just a badge now. ── */
+.oobe-lang-flag { font-size: 15px; font-weight: 700; min-width: 40px; color: #0071e3; }
+window.dark .oobe-lang-flag { color: #4d9fff; }
+.oobe-lang-name { font-size: 17px; font-weight: 600; }
+window.dark .oobe-lang-name { color: #f1f5f9; }
+
+/* ── Wi-Fi list: Material elevated list items, ripple-ish press state ── */
+.oobe-signal-glyph {
+    font-family: monospace; font-size: 15px; font-weight: 700;
+    color: #0071e3; min-width: 32px;
+}
+window.dark .oobe-signal-glyph { color: #409cff; }
+
+.oobe-list row, listview > row {
+    background:    #f8fafc;
+    border:        1px solid rgba(0,0,0,0.06);
+    border-radius: 20px;
+    margin:        6px 0;
+    padding:       18px 18px;
+    color:         #1e293b;
+    transition:
+        background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color     160ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow       160ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform         90ms cubic-bezier(0.22, 1, 0.36, 1);
+    animation: fade-up 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.oobe-list row:hover    { background: #f0f9ff; border-color: rgba(0,113,227,0.25); }
+.oobe-list row:active   { transform: scale(0.98); transition-duration: 60ms; }
+.oobe-list row:selected {
+    background:  rgba(0,113,227,0.10);
+    border-color: rgba(0,113,227,0.55);
+    box-shadow:  0 0 0 3px rgba(0,113,227,0.14);
+}
+window.dark .oobe-list row, window.dark listview > row {
+    background: #212836; border-color: rgba(255,255,255,0.07); color: #e2e8f0;
+}
+window.dark .oobe-list row:hover    { background: rgba(0,113,227,0.16); border-color: rgba(0,113,227,0.4); }
+window.dark .oobe-list row:selected { background: rgba(0,113,227,0.22); border-color: rgba(0,113,227,0.6); }
+
+/* ── Done check: pop-in, spring easing. Rendered as a themed Gtk.Image
+ *    symbolic icon (pixel_size set in code), not a unicode check
+ *    glyph, to stay consistent with the rest of the wizard's icons. ── */
+.oobe-done-check {
+    color: #0071e3;
+    animation: pop-in 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+window.dark .oobe-done-check { color: #4d9fff; }
+@keyframes pop-in { from { opacity: 0; transform: scale(0.4); } to { opacity: 1; transform: scale(1); } }
+
+/* ── Buttons: fully-rounded pill, Material state-layer press feedback ── */
+.oobe-primary-button {
+    background:    #0071e3;
+    color:         #ffffff;
+    border:        none;
+    border-radius: 999px;
+    padding:       18px 32px;
+    font-weight:   700;
+    font-size:     17px;
+    min-height:    60px;
+    box-shadow:    0 1px 2px rgba(15,23,42,0.14), 0 3px 8px rgba(0,113,227,0.18);
+    transition:
+        background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow       140ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform          90ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oobe-primary-button:hover  { background: #0077ed; }
+.oobe-primary-button:active {
+    background: #0068d6; transform: scale(0.97);
+    box-shadow: 0 1px 3px rgba(0,113,227,0.20);
+    transition-duration: 70ms;
+}
+.oobe-primary-button:disabled {
+    background: rgba(15,23,42,0.12); color: rgba(15,23,42,0.35); box-shadow: none;
+}
+window.dark .oobe-primary-button:disabled { background: rgba(255,255,255,0.10); color: rgba(255,255,255,0.30); }
+
+.oobe-secondary-button {
+    background:    transparent;
+    color:         #475569;
+    border:        1px solid rgba(0,0,0,0.14);
+    border-radius: 999px;
+    padding:       18px 28px;
+    font-size:     17px;
+    min-height:    60px;
+    transition:
+        background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+        border-color     140ms cubic-bezier(0.22, 1, 0.36, 1),
+        transform          90ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.oobe-secondary-button:hover  { background: #f1f5f9; border-color: rgba(0,0,0,0.22); }
+.oobe-secondary-button:active { background: #e2e8f0; transform: scale(0.97); transition-duration: 70ms; }
+window.dark .oobe-secondary-button { color: #cbd5e1; border-color: rgba(255,255,255,0.16); }
+window.dark .oobe-secondary-button:hover  { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.26); }
+window.dark .oobe-secondary-button:active { background: rgba(255,255,255,0.14); }
+
+.oobe-nav-row { margin-top: 8px; }
+
+/* ── Form entries: Material filled-field look (tonal fill vs desktop's
+ *    outline-first treatment -- reads better against the card's own
+ *    28px-radius background on a small screen) ─────────────────────── */
+entry, row.entry {
+    background:    #f1f5f9;
+    border:        1px solid transparent;
+    border-radius: 16px;
+    color:         #0f172a;
+    min-height:    56px;
+    font-size:     17px;
+    transition:
+        border-color     160ms cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow        160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+entry:focus-within, row.entry:focus-within {
+    border-color: #0071e3;
+    background:   #ffffff;
+    box-shadow:   0 0 0 3px rgba(0,113,227,0.16);
+}
+window.dark entry, window.dark row.entry { background: rgba(255,255,255,0.06); color: #f1f5f9; }
+window.dark entry:focus-within, window.dark row.entry:focus-within { background: rgba(255,255,255,0.09); }
+
+/* ── Bottom-sheet password dialog: Material bottom-sheet shape --
+ *    rounded top corners only, flush to the bottom edge, matching how
+ *    Android/LineageOS present the Wi-Fi password prompt as a sheet
+ *    sliding up rather than a centered desktop-style dialog. ───────── */
+.oobe-sheet {
+    border-radius: 28px 28px 0 0;
+    background: #ffffff;
+}
+window.dark .oobe-sheet { background: #1a2029; }
+MOBILEOOBECSS
+
+  cat > "${_root}/root/kibaos-mobile-oobe/src/main.vala" << 'OOBEVALA'
+/*
+ * KibaOS Mobile OOBE -- first-boot wizard.
+ * Marker-gated (runs once), no disk-partitioning step: this only ever
+ * runs after the GSI + rootfs are already flashed onto the phone.
+ * Pages: Welcome -> Language/Region -> Wi-Fi -> SIM/Carrier (ofono) ->
+ * Account (mandatory) -> Done.
+ *
+ * Design language: same tokens as the desktop installer's oobe.css
+ * (#0071e3 accent, pill buttons, easeOutQuint card-ins, step dots) laid
+ * over Material 3 shape + elevation for the touch surface specifically
+ * -- 28px "extra-large" card radius instead of desktop's borderless
+ * full-bleed page, a top linear progress track like Android/LineageOS
+ * SetupWizard use, filled-tonal form fields, and a bottom-sheet Wi-Fi
+ * password prompt instead of a centered dialog. See oobe.css for the
+ * actual values; this file just wires widgets to those CSS classes.
+ */
+public class KibaMobileOobe : Adw.Application {
+    const string MARKER = "/var/lib/kibaos/.oobe-done";
+    const string CSS_PATH = "/usr/share/kibaos-mobile-oobe/oobe.css";
+
+    // Steps shown in the top progress track + dots. "done" is
+    // deliberately excluded -- same convention as the desktop OOBE and
+    // Android's own SetupWizard, where the final celebratory screen
+    // drops the step chrome entirely rather than showing "6 of 6".
+    const string[] STEPS = { "welcome", "language", "wifi", "sim", "account" };
+
+    Adw.ApplicationWindow window;
+    Gtk.Stack stack;
+    Gtk.ProgressBar top_progress;
+    Gtk.Box dots_row;
+    Gtk.Label wifi_status_label;
+    Gtk.Label sim_status_label;
+    bool dark_mode = false;
+    string display_name = "";
+
+    public KibaMobileOobe () {
+        Object (application_id: "com.wolftechinnovations.kibaos.MobileOobe");
+    }
+
+    protected override void activate () {
+        if (FileUtils.test (MARKER, FileTest.EXISTS)) {
+            // already ran -- get out of the way, let the normal session
+            // (budgie-panel) take over instead of showing the wizard again
+            this.quit ();
+            return;
+        }
+
+        var provider = new Gtk.CssProvider ();
+        provider.load_from_path (CSS_PATH);
+        Gtk.StyleContext.add_provider_for_display (
+            Gdk.Display.get_default (), provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+
+        window = new Adw.ApplicationWindow (this) {
+            default_width = 480,
+            default_height = 854,
+            fullscreened = true,
+            deletable = false
+        };
+        window.add_css_class ("kibaos-oobe-window");
+        // No window-close escape hatch: the account step is mandatory
+        // (see build_account_page), so block any close request until
+        // finish_oobe has actually written the marker file. Without
+        // this, deletable=false alone still leaves things like Alt+F4
+        // or a compositor-level close gesture able to tear the window
+        // down mid-wizard.
+        window.close_request.connect (() => {
+            return !FileUtils.test (MARKER, FileTest.EXISTS);
+        });
+
+        var root = new Gtk.Box (Gtk.Orientation.VERTICAL, 0);
+        root.add_css_class ("oobe-background");
+
+        // ── top bar: brand + language/dark-mode corner toggles ──────────
+        var topbar = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8);
+        topbar.add_css_class ("oobe-topbar");
+        var brand = new Gtk.Label ("KIBAOS MOBILE") { xalign = 0, hexpand = true };
+        brand.add_css_class ("oobe-brand");
+        var lang_btn = corner_button ("preferences-desktop-locale-symbolic");
+        lang_btn.clicked.connect (() => stack.visible_child_name = "language");
+        var dark_btn = corner_button ("weather-clear-night-symbolic");
+        dark_btn.clicked.connect (toggle_dark_mode);
+        topbar.append (brand);
+        topbar.append (lang_btn);
+        topbar.append (dark_btn);
+        root.append (topbar);
+
+        // ── linear progress + step dots (Material stepper pairing) ──────
+        top_progress = new Gtk.ProgressBar ();
+        top_progress.add_css_class ("oobe-linear-progress");
+        root.append (top_progress);
+
+        dots_row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 6) {
+            halign = Gtk.Align.CENTER, margin_top = 10, margin_bottom = 4
+        };
+        root.append (dots_row);
+
+        stack = new Gtk.Stack () {
+            transition_type = Gtk.StackTransitionType.SLIDE_LEFT_RIGHT,
+            vexpand = true
+        };
+
+        stack.add_named (build_welcome_page (), "welcome");
+        stack.add_named (build_language_page (), "language");
+        stack.add_named (build_wifi_page (), "wifi");
+        stack.add_named (build_sim_page (), "sim");
+        stack.add_named (build_account_page (), "account");
+        stack.add_named (build_done_page (), "done");
+        stack.notify["visible-child-name"].connect (update_progress);
+        stack.visible_child_name = "welcome";
+        update_progress ();
+
+        root.append (stack);
+
+        var toolbar_view = new Adw.ToolbarView ();
+        toolbar_view.content = root;
+        window.content = toolbar_view;
+        window.present ();
+    }
+
+    Gtk.Button corner_button (string icon_name) {
+        var btn = new Gtk.Button ();
+        btn.icon_name = icon_name;
+        btn.add_css_class ("oobe-corner-button");
+        return btn;
+    }
+
+    void toggle_dark_mode () {
+        dark_mode = !dark_mode;
+        if (dark_mode) {
+            window.add_css_class ("dark");
+        } else {
+            window.remove_css_class ("dark");
+        }
+    }
+
+    // Updates both the top linear track and the dot row to reflect
+    // wherever the stack currently is. Pages outside STEPS (just "done")
+    // push the track to full and clear the dots, matching the desktop
+    // OOBE's own summary/done page treatment.
+    void update_progress () {
+        var current = stack.visible_child_name;
+        int idx = -1;
+        for (int i = 0; i < STEPS.length; i++) {
+            if (STEPS[i] == current) { idx = i; break; }
+        }
+
+        while (dots_row.get_first_child () != null) {
+            dots_row.remove (dots_row.get_first_child ());
+        }
+
+        if (idx < 0) {
+            top_progress.fraction = 1.0;
+            return;
+        }
+
+        top_progress.fraction = (double) (idx + 1) / STEPS.length;
+        for (int i = 0; i < STEPS.length; i++) {
+            var dot = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0);
+            dot.add_css_class ("oobe-step-dot");
+            if (i == idx) dot.add_css_class ("oobe-step-dot-active");
+            dots_row.append (dot);
+        }
+    }
+
+    // ── page builders ───────────────────────────────────────────────────
+    // Every page follows the same "dog simple" rule: one big icon so the
+    // page reads before any text is parsed, one short line of title, one
+    // short line of subtitle, and exactly one strongly-weighted action.
+    // Selections that can safely auto-advance (language, a successful
+    // Wi-Fi connect) do -- fewer taps beats a technically-more-complete
+    // flow every time here.
+
+    Gtk.Widget build_welcome_page () {
+        var box = wizard_box ("start-here-symbolic", "Welcome to\nKibaOS Mobile",
+            "Switch to simple -- now in your pocket.", true);
+        box.append (nav_row (null, next_button ("Get started", "language")));
+        return box;
+    }
+
+    // Big tap-anywhere rows instead of a dropdown -- picking a language
+    // is a single decision, so it gets a single tap. Selecting a row
+    // both sets the language AND advances to Wi-Fi; Back still works if
+    // someone taps the wrong flag.
+    Gtk.Widget build_language_page () {
+        var box = wizard_box ("preferences-desktop-locale-symbolic", "Language & Region",
+            "Tap the one that feels like home.", false);
+
+        var list = new Gtk.ListBox ();
+        list.add_css_class ("oobe-list");
+        list.selection_mode = Gtk.SelectionMode.NONE;
+
+        // Plain-text language/region codes instead of flag emoji -- a
+        // flag glyph also conflates "country" with "language" (English
+        // isn't only spoken in the US/UK), and emoji flag rendering is
+        // spotty on minimal mobile font stacks. A short code badge reads
+        // reliably everywhere.
+        string[,] langs = {
+            {"EN-US", "English (US)"}, {"EN-UK", "English (UK)"},
+            {"ES", "Español"}, {"FR", "Français"}, {"DE", "Deutsch"}
+        };
+        for (int i = 0; i < langs.length[0]; i++) {
+            var row_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 12) {
+                margin_top = 4, margin_bottom = 4, margin_start = 6, margin_end = 6
+            };
+            var code = new Gtk.Label (langs[i, 0]);
+            code.add_css_class ("oobe-lang-flag");
+            var name = new Gtk.Label (langs[i, 1]) { xalign = 0, hexpand = true };
+            name.add_css_class ("oobe-lang-name");
+            row_box.append (code);
+            row_box.append (name);
+            var row = new Gtk.ListBoxRow () { child = row_box };
+            list.append (row);
+        }
+        list.row_activated.connect ((row) => {
+            // language choice itself isn't wired to a locale backend
+            // yet -- this is a first-boot cosmetic pick until that lands
+            stack.visible_child_name = "wifi";
+        });
+        box.append (list);
+        box.append (nav_row (back_button ("welcome"), null));
+        return box;
+    }
+
+    Gtk.Widget build_wifi_page () {
+        var box = wizard_box ("network-wireless-symbolic", "Connect to Wi-Fi",
+            "Needed for setup and updates.", false);
+
+        var list = new Gtk.ListBox ();
+        list.add_css_class ("oobe-list");
+        list.selection_mode = Gtk.SelectionMode.SINGLE;
+        list.row_activated.connect (on_wifi_row_activated);
+        wifi_status_label = new Gtk.Label ("Scanning...") { xalign = 0 };
+        wifi_status_label.add_css_class ("oobe-step-label");
+        box.append (wifi_status_label);
+        box.append (list);
+        refresh_wifi_list.begin (list);
+
+        var skip = new Gtk.Button.with_label ("Skip for now");
+        skip.add_css_class ("oobe-skip-link");
+        skip.halign = Gtk.Align.CENTER;
+        skip.clicked.connect (() => stack.visible_child_name = "sim");
+        box.append (nav_row (back_button ("language"), null));
+        box.append (skip);
+        return box;
+    }
+
+    async void refresh_wifi_list (Gtk.ListBox list) {
+        // shells out to nmcli rather than talking to NetworkManager's
+        // D-Bus API directly -- nmcli's terse output is plenty for a
+        // pick-a-network list and keeps this file from ballooning with
+        // GDBus proxy boilerplate for a first-boot wizard.
+        try {
+            var proc = new Subprocess (SubprocessFlags.STDOUT_PIPE,
+                "nmcli", "-t", "-f", "SSID,SIGNAL,SECURITY", "device", "wifi", "list");
+            var stdout_pipe = proc.get_stdout_pipe ();
+            var dis = new DataInputStream (stdout_pipe);
+            string? line;
+            wifi_status_label.label = "Available networks:";
+            while ((line = yield dis.read_line_async ()) != null) {
+                if (line.strip () == "") continue;
+                var parts = line.split (":");
+                var ssid = parts.length > 0 && parts[0] != "" ? parts[0] : "(hidden)";
+                var secured = parts.length > 2 && parts[2] != "" && parts[2] != "--";
+
+                var row_box = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 8) {
+                    margin_top = 6, margin_bottom = 6, margin_start = 8, margin_end = 8
+                };
+                row_box.append (new Gtk.Label (ssid) { xalign = 0, hexpand = true });
+                if (secured) {
+                    row_box.append (new Gtk.Image.from_icon_name ("network-wireless-encrypted-symbolic"));
+                }
+                var row = new Gtk.ListBoxRow ();
+                row.child = row_box;
+                row.set_data<string> ("ssid", ssid);
+                row.set_data<bool> ("secured", secured);
+                list.append (row);
+            }
+        } catch (Error e) {
+            wifi_status_label.label = "Couldn't scan for networks: %s".printf (e.message);
+        }
+    }
+
+    void on_wifi_row_activated (Gtk.ListBoxRow row) {
+        var ssid = row.get_data<string> ("ssid");
+        var secured = row.get_data<bool> ("secured");
+        if (secured) {
+            prompt_wifi_password (ssid);
+        } else {
+            connect_wifi.begin (ssid, null);
+        }
+    }
+
+    // Material bottom-sheet shape (rounded top corners only, flush to
+    // the bottom edge via .oobe-sheet) rather than a centered desktop
+    // dialog -- matches how Android/LineageOS present the Wi-Fi password
+    // prompt as a sheet sliding up from the keyboard's own edge.
+    void prompt_wifi_password (string ssid) {
+        var dialog = new Adw.AlertDialog (
+            "Connect to %s".printf (ssid), null);
+        dialog.add_css_class ("oobe-sheet");
+
+        var pw_entry = new Gtk.PasswordEntry () { show_peek_icon = true };
+        pw_entry.add_css_class ("entry");
+        dialog.set_extra_child (pw_entry);
+        dialog.add_response ("cancel", "Cancel");
+        dialog.add_response ("connect", "Connect");
+        dialog.set_response_appearance ("connect", Adw.ResponseAppearance.SUGGESTED);
+        dialog.default_response = "connect";
+        dialog.response.connect ((response) => {
+            if (response == "connect") {
+                connect_wifi.begin (ssid, pw_entry.text);
+            }
+        });
+        dialog.present (window);
+    }
+
+    async void connect_wifi (string ssid, string? password) {
+        wifi_status_label.label = "Connecting to %s...".printf (ssid);
+        try {
+            string[] argv = password != null
+                ? { "nmcli", "device", "wifi", "connect", ssid, "password", password }
+                : { "nmcli", "device", "wifi", "connect", ssid };
+            var proc = new Subprocess.newv (argv,
+                SubprocessFlags.STDOUT_PIPE | SubprocessFlags.STDERR_PIPE);
+            yield proc.wait_async ();
+            if (proc.get_successful ()) {
+                wifi_status_label.label = "Connected to %s.".printf (ssid);
+                // auto-advance -- a successful connect needs no further
+                // confirmation tap, same reasoning as the language rows
+                Timeout.add (700, () => {
+                    if (stack.visible_child_name == "wifi") {
+                        stack.visible_child_name = "sim";
+                    }
+                    return false;
+                });
+            } else {
+                wifi_status_label.label = "Couldn't connect to %s -- check the password.".printf (ssid);
+            }
+        } catch (Error e) {
+            wifi_status_label.label = "Connection failed: %s".printf (e.message);
+        }
+    }
+
+    Gtk.Widget build_sim_page () {
+        var box = wizard_box ("network-cellular-symbolic", "SIM & Carrier", "Checking for a SIM.", false);
+        sim_status_label = new Gtk.Label ("Checking...") { xalign = 0 };
+        sim_status_label.add_css_class ("oobe-subtitle");
+        box.append (sim_status_label);
+        check_sim.begin ();
+        box.append (nav_row (back_button ("wifi"), next_button ("Next", "account")));
+        return box;
+    }
+
+    async void check_sim () {
+        // org.ofono.Manager -> GetModems, then org.ofono.SimManager's
+        // Present/SubscriberIdentity properties on whichever modem shows
+        // up. ofono owns telephony here, same as Calls/Chatty use.
+        try {
+            var conn = yield Bus.get (BusType.SYSTEM);
+            var manager = yield conn.get_proxy<OfonoManagerIface> (
+                "org.ofono", "/");
+            var modems = yield manager.get_modems ();
+            if (modems.length == 0) {
+                sim_status_label.label = "No modem detected.";
+                return;
+            }
+            sim_status_label.label = "Modem found: %s".printf (modems[0]);
+            // deeper SIM-present/carrier-name lookup would proxy
+            // org.ofono.SimManager on this modem path; left as a
+            // follow-up once real hardware is available to test against
+        } catch (Error e) {
+            sim_status_label.label = "No SIM/modem available (%s).".printf (e.message);
+        }
+    }
+
+    // Account is mandatory -- no skip link on this page (unlike wifi's),
+    // matching Android's own SetupWizard, where the Google-account step
+    // has no skip option because it's the anchor the rest of first-run
+    // setup (sync, backup, restore) hangs off of. Next stays disabled
+    // until a non-empty name is entered, and the window itself can't be
+    // closed out from under the wizard (see close_request in activate).
+    Gtk.Widget build_account_page () {
+        var box = wizard_box ("avatar-default-symbolic", "What's your name?",
+            "Shown on your lock screen and in Files.", false);
+
+        var entry = new Gtk.Entry () { placeholder_text = "Your name" };
+        entry.add_css_class ("entry");
+        box.append (entry);
+
+        var hint = new Gtk.Label ("") { xalign = 0 };
+        hint.add_css_class ("oobe-error");
+        hint.visible = false;
+        box.append (hint);
+
+        var next = new Gtk.Button.with_label ("Next");
+        next.add_css_class ("oobe-primary-button");
+        next.sensitive = false;
+        entry.changed.connect (() => {
+            next.sensitive = entry.text.strip () != "";
+            hint.visible = false;
+        });
+        next.clicked.connect (() => {
+            var trimmed = entry.text.strip ();
+            if (trimmed == "") {
+                hint.label = "Enter a name to continue.";
+                hint.visible = true;
+                return;
+            }
+            display_name = trimmed;
+            stack.visible_child_name = "done";
+        });
+        box.append (nav_row (back_button ("sim"), next));
+        return box;
+    }
+
+    Gtk.Widget build_done_page () {
+        var box = wizard_box ("", "You're all set!", "Welcome to KibaOS Mobile.", false);
+
+        var check = new Gtk.Image.from_icon_name ("object-select-symbolic") { halign = Gtk.Align.CENTER };
+        check.pixel_size = 72;
+        check.add_css_class ("oobe-done-check");
+        box.append (check);
+
+        var finish = new Gtk.Button.with_label ("Start using KibaOS");
+        finish.add_css_class ("oobe-primary-button");
+        finish.clicked.connect (finish_oobe);
+        box.append (nav_row (null, finish));
+        return box;
+    }
+
+    void finish_oobe () {
+        try {
+            DirUtils.create_with_parents ("/var/lib/kibaos", 0755);
+            FileUtils.set_contents (MARKER, "1\n");
+        } catch (FileError e) {
+            warning ("couldn't write OOBE marker: %s", e.message);
+        }
+        this.quit ();
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────
+
+    // Wraps every page in the same .oobe-card / .oobe-inner treatment as
+    // the desktop OOBE, just with Material's 28px shape scale + real
+    // elevation instead of desktop's borderless full-bleed page (see
+    // oobe.css for why -- no cursor/hover to carry hierarchy on touch).
+    // is_welcome swaps in the larger .oobe-welcome-greeting title style,
+    // same distinction the desktop installer makes for its first page.
+    // icon_name is a themed/symbolic GTK icon name (e.g.
+    // "network-wireless-symbolic"), never an emoji glyph -- the mobile
+    // OOBE renders every page icon and status mark through Gtk.Image
+    // so the wizard reads cleanly regardless of emoji font support.
+    Gtk.Box wizard_box (string icon_name, string title, string subtitle, bool is_welcome) {
+        var card = new Gtk.Box (Gtk.Orientation.VERTICAL, 14);
+        card.add_css_class ("oobe-card");
+        card.add_css_class ("oobe-inner");
+
+        if (icon_name != "") {
+            var icon_image = new Gtk.Image.from_icon_name (icon_name) { halign = Gtk.Align.START };
+            icon_image.pixel_size = 64;
+            icon_image.add_css_class ("oobe-page-icon");
+            card.append (icon_image);
+        }
+
+        var title_label = new Gtk.Label (title) { xalign = 0, wrap = true };
+        title_label.add_css_class (is_welcome ? "oobe-welcome-greeting" : "oobe-title");
+        var subtitle_label = new Gtk.Label (subtitle) { xalign = 0, wrap = true };
+        subtitle_label.add_css_class ("oobe-subtitle");
+
+        card.append (title_label);
+        card.append (subtitle_label);
+
+        var outer = new Gtk.Box (Gtk.Orientation.VERTICAL, 0) {
+            margin_top = 12, margin_bottom = 24, margin_start = 18, margin_end = 18,
+            vexpand = true, valign = Gtk.Align.FILL
+        };
+        outer.append (card);
+        return outer;
+    }
+
+    // Bottom nav row: back (optional, left) + primary action (right),
+    // pinned to the bottom of the page like Android SetupWizard's own
+    // persistent nav bar rather than inline with the content above it.
+    Gtk.Box nav_row (Gtk.Button? back, Gtk.Button? primary) {
+        var row = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 10) {
+            valign = Gtk.Align.END, vexpand = true, margin_top = 16
+        };
+        row.add_css_class ("oobe-nav-row");
+        if (back != null) {
+            row.append (back);
+        }
+        var spacer = new Gtk.Box (Gtk.Orientation.HORIZONTAL, 0) { hexpand = true };
+        row.append (spacer);
+        if (primary != null) {
+            row.append (primary);
+        }
+        return row;
+    }
+
+    Gtk.Button back_button (string target_page) {
+        var btn = new Gtk.Button.with_label ("Back");
+        btn.add_css_class ("oobe-secondary-button");
+        btn.clicked.connect (() => stack.visible_child_name = target_page);
+        return btn;
+    }
+
+    Gtk.Button next_button (string label, string target_page) {
+        var btn = new Gtk.Button.with_label (label);
+        btn.add_css_class ("oobe-primary-button");
+        btn.clicked.connect (() => stack.visible_child_name = target_page);
+        return btn;
+    }
+
+    public static int main (string[] args) {
+        var app = new KibaMobileOobe ();
+        return app.run (args);
+    }
+}
+
+[DBus (name = "org.ofono.Manager")]
+interface OfonoManagerIface : Object {
+    public abstract async string[] get_modems () throws Error;
+}
+OOBEVALA
+
+  arch-chroot "${_root}" bash -c "
+    cd /root/kibaos-mobile-oobe &&
+    meson setup build &&
+    ninja -C build &&
+    ninja -C build install
+  " || echo "!! kibaos-mobile-oobe failed to build -- check the meson/ninja log above" >&2
+
+  # first-boot autostart -- checks the marker itself (see MARKER in
+  # main.vala) so this is a no-op after the wizard's first successful run
+  cat > "${_root}/etc/xdg/autostart/kibaos-mobile-oobe.desktop" << 'OOBEAUTOSTART'
+[Desktop Entry]
+Type=Application
+Name=KibaOS Mobile Setup
+Exec=kibaos-mobile-oobe
+X-GNOME-Autostart-enabled=true
+OOBEAUTOSTART
+
+  # ── Halium GSI (system.img) -- Halium-boot method ───────────────────────
+  # NOTE ON PATHS THAT USED TO BE HERE: an earlier version of this script
+  # tried a "fast" GSI path through JamiKettunen/cports (hybris branch) --
+  # ./cbuild pkg -a aarch64 user/halium-gsi-X.0 -- which turned out to
+  # produce a Chimera Linux apk/rootfs, not a system.img; wrong tool for
+  # an Arch Linux ARM/pacstrap userspace. After that, this function
+  # switched to building the GSI from source: repo init against
+  # Halium/android, breakfast the generic halium_arm64 target, mka
+  # rawsystemimage -- the "full system image" porting method. That's a
+  # ~150GB+ AOSP repo sync and a multi-hour Soong build just to reproduce
+  # a system.img that's already device-agnostic and publicly hosted --
+  # a lot of build-server time for a file this project has no reason to
+  # compile itself.
+  #
+  # What's actually appropriate here is the Halium-boot method (one of
+  # the three porting methods docs.halium.org/UBports document: full
+  # system image, Halium-boot, and standalone kernel). Since Halium 9 the
+  # GSI is a prebuilt, device-independent artifact by design -- Treble
+  # moved every device-specific bit into the vendor partition, so the
+  # Halium-boot method just fetches the GSI instead of rebuilding it, and
+  # leaves only halium-boot.img (the kernel + Halium ramdisk, genuinely
+  # per-device) to be built or supplied separately -- already handled as
+  # a manual step in README-INSTALL.md below. That's the right split for
+  # this script: it produces the device-agnostic pieces (this rootfs
+  # tarball, and now the GSI fetch), and stays out of the per-device
+  # kernel build entirely.
+  #
+  # Default source is the lolinet mirror (build.lolinet.com/file/halium/GSI),
+  # the same generic Halium arm64 GSI the UBports installer points at --
+  # override KIBA_MOBILE_GSI_URL to pin a specific build/mirror. Set
+  # KIBA_SKIP_GSI_FETCH=1 to skip entirely (e.g. offline CI) and fall
+  # back to the manual pointer in README-INSTALL.md.
+  : "${KIBA_MOBILE_GSI_URL:=https://build.lolinet.com/file/halium/GSI/halium-10.0/arm64ab/halium-generic-arm64ab-ota-latest.zip}"
+  if [ "${KIBA_SKIP_GSI_FETCH:-0}" = "1" ]; then
+    echo "=== KIBA_SKIP_GSI_FETCH=1 -- skipping Halium GSI fetch (see README-INSTALL.md for a manual pointer) ==="
+  else
+    mkdir -p /w/halium-gsi && cd /w/halium-gsi
+    if curl -fL -o gsi-fetch.zip "${KIBA_MOBILE_GSI_URL}"; then
+      # the GSI mirror ships a flashable zip (system image + installer
+      # metadata), not a bare system.img -- unzip and grab the image
+      # itself so kibaos-mobile-gsi-arm64.img is a drop-in next to the
+      # rootfs tarball.
+      unzip -o gsi-fetch.zip -d extracted >/dev/null
+      _gsi_img="$(find extracted -maxdepth 3 \( -iname 'system.img' -o -iname '*.img' \) 2>/dev/null | head -n1)"
+      if [ -n "${_gsi_img}" ] && [ -f "${_gsi_img}" ]; then
+        cp "${_gsi_img}" "${_out}/kibaos-mobile-gsi-arm64.img"
+        sha256sum "${_out}/kibaos-mobile-gsi-arm64.img" > "${_out}/kibaos-mobile-gsi-arm64.img.sha256"
+        echo "=== Fetched Halium GSI: ${_out}/kibaos-mobile-gsi-arm64.img ==="
+      else
+        echo "!! GSI zip downloaded but no .img found inside -- check KIBA_MOBILE_GSI_URL / mirror layout" >&2
+      fi
+    else
+      echo "!! GSI fetch failed (${KIBA_MOBILE_GSI_URL}) -- see README-INSTALL.md for a manual pointer" >&2
+    fi
+    cd "${WORKDIR}"
+  fi
+
+  # ── boot.img repack ingredients (generic Halium ramdisk + magiskboot) ───
+  # Earlier revisions of this tried to pre-build boot.img on the build
+  # host by fetching a "certified GKI boot image" from Google and
+  # assuming that was enough. Checked that against source.android.com and
+  # docs.ubports.com and it doesn't hold up on two counts: (1) Google
+  # doesn't publish a stable download URL for certified GKI images --
+  # they come from a repo-synced source build or a specific numbered
+  # ci.android.com artifact, not a fetchable zip per branch; and (2) even
+  # where the GKI kernel itself genuinely is generic, turning it into a
+  # bootable image still needs the device's own vendor_boot (dtb, base
+  # address, pagesize, cmdline) -- and on Android 13+ the ramdisk isn't
+  # even in boot.img anymore, it's a separate per-partition init_boot.img.
+  # None of that is something a build host can produce without already
+  # knowing the specific device.
+  #
+  # The fix: don't build boot.img on the host at all. Pull it apart and
+  # back together on the *phone*, inside update-binary, where the real
+  # stock boot/init_boot partition for that exact device is sitting right
+  # there. All this pipeline supplies ahead of time is the two pieces
+  # that genuinely are generic -- the Halium ramdisk, and a boot-image
+  # (un)packer -- bundled into the zip so update-binary doesn't need
+  # network access on the phone. The kernel, dtb, and header metadata all
+  # come from the device's own stock image, so they're correct by
+  # construction instead of guessed from a version string.
+  #
+  # For the (un)packer: AOSP's own mkbootimg/unpack_bootimg are Python,
+  # and TWRP's minimal busybox environment doesn't reliably have a
+  # working python3. magiskboot (topjohnwu/Magisk) is the standard
+  # answer to exactly this problem in the wild -- a single static
+  # aarch64 binary, no interpreter, that auto-detects and unpacks/repacks
+  # any Android boot image layout (plain, vendor_boot, GKI header v3/v4)
+  # and is routinely run from inside recovery/TWRP by flashable-zip
+  # installers (that's literally what Magisk's own install script does).
+  # Pulled from the latest Magisk GitHub release rather than vendored, so
+  # this always tracks current boot-image format support.
+  # generic (non-per-device) Halium ramdisk. Note this is genuinely
+  # `initramfs-tools-halium`'s own "continuous" release artifact --
+  # confirmed by reading halium-boot's own get-initrd.sh, which fetches
+  # this exact URL pattern when Android.mk builds halium-boot.img the
+  # "normal" way. It is NOT `Halium/halium-boot` releases -- that repo
+  # doesn't publish a ramdisk artifact at all, it's the bootimg-generator
+  # source, not initramfs content.
+  : "${KIBA_MOBILE_HALIUM_RAMDISK_URL:=https://github.com/halium/initramfs-tools-halium/releases/download/continuous/initrd.img-touch-arm64}"
+
+  echo "=== Fetching boot.img repack ingredients (generic Halium ramdisk + magiskboot) ==="
+  mkdir -p /w/boot-repack-tools && cd /w/boot-repack-tools
+
+  curl -fL -o halium-generic-ramdisk.cpio.gz "${KIBA_MOBILE_HALIUM_RAMDISK_URL}" \
+    || { echo "!! Halium generic ramdisk fetch failed (${KIBA_MOBILE_HALIUM_RAMDISK_URL}) -- see docs.halium.org for the current generic-ramdisk artifact and re-run with a corrected KIBA_MOBILE_HALIUM_RAMDISK_URL. No fallback -- failing the build." >&2; exit 1; }
+
+  _magisk_apk_url="$(curl -fsL https://api.github.com/repos/topjohnwu/Magisk/releases/latest \
+    | jq -r '.assets[] | select(.name | test("\\.apk$")) | .browser_download_url' | head -n1)"
+  [ -n "${_magisk_apk_url}" ] && [ "${_magisk_apk_url}" != "null" ] \
+    || { echo "!! couldn't resolve the latest Magisk release APK via the GitHub API -- can't fetch magiskboot. No fallback -- failing the build." >&2; exit 1; }
+  curl -fL -o magisk-latest.apk "${_magisk_apk_url}" \
+    || { echo "!! Magisk release APK fetch failed (${_magisk_apk_url}) -- can't fetch magiskboot. No fallback -- failing the build." >&2; exit 1; }
+  # an APK is just a zip; magiskboot ships as a native lib so it survives
+  # Play/APK packaging rules -- pull the arm64-v8a build straight out.
+  unzip -o -j magisk-latest.apk 'lib/arm64-v8a/libmagiskboot.so' -d . \
+    || { echo "!! couldn't extract libmagiskboot.so (arm64-v8a) from the Magisk APK -- release layout may have changed. No fallback -- failing the build." >&2; exit 1; }
+  [ -f libmagiskboot.so ] \
+    || { echo "!! Magisk APK didn't contain lib/arm64-v8a/libmagiskboot.so -- can't repack boot images on-device. No fallback -- failing the build." >&2; exit 1; }
+  mv libmagiskboot.so magiskboot
+  chmod 0755 magiskboot
+  echo "=== Bundled magiskboot + generic Halium ramdisk for on-device boot.img repack ==="
+  cd "${WORKDIR}"
+
+  # ── package + ship ───────────────────────────────────────────────────────
+  tar -C "${_root}" --numeric-owner -cpf "${_out}/kibaos-mobile-rootfs.tar" .
+  gzip -9 "${_out}/kibaos-mobile-rootfs.tar"
+  sha256sum "${_out}/kibaos-mobile-rootfs.tar.gz" > "${_out}/kibaos-mobile-rootfs.tar.gz.sha256"
+
+  # ── ext4 rootfs.img, built straight from the rootfs tree ────────────────
+  # halium-boot's initramfs expects a loop-mountable image at
+  # /data/rootfs.img, not a tarball (see docs.halium.org/Distribution.html:
+  # "mount /data/rootfs.img /target && switch_root /target $INIT"). The
+  # community halium-install tool builds this image on the *installer's*
+  # host machine specifically to avoid needing a loop-mount-capable mkfs
+  # inside a phone's recovery environment. We can skip that whole problem
+  # here: this build container already has a real e2fsprogs, and modern
+  # mke2fs can seed a filesystem straight from a directory tree with `-d`,
+  # no loop device or root privileges required. So the image gets built
+  # once, right here, at rootfs-tar time -- not down the line in TWRP.
+  _rootfs_kb="$(du -sk "${_root}" | cut -f1)"
+  _img_kb=$(( _rootfs_kb + (_rootfs_kb / 5) + 262144 ))   # +20% headroom, +256MB floor for OOBE/updates/writes
+  mkfs.ext4 -q -F -L kibaos-rootfs -d "${_root}" -m 0 \
+    "${_out}/kibaos-mobile-rootfs.img" "${_img_kb}K"
+  sha256sum "${_out}/kibaos-mobile-rootfs.img" > "${_out}/kibaos-mobile-rootfs.img.sha256"
+
+  # ── TWRP-flashable installer zip ─────────────────────────────────────────
+  # Real Halium ports overwhelmingly ship a single TWRP-installable zip
+  # rather than making the end user run halium-install by hand (see e.g.
+  # the Redmi 4A Ubuntu Touch port writeup: "the ZIP method is preferred").
+  # There's no single canonical zip-builder upstream for this -- every
+  # port hand-rolls its own META-INF/update-binary -- so this does the
+  # same thing: update-binary here is a shell script (the well-established
+  # SuperSU/AnyKernel3 trick -- TWRP execs it directly off its #!/sbin/sh
+  # shebang instead of treating it as a compiled edify binary, so it
+  # works on any arch without a separate build per device), which copies
+  # kibaos-mobile-rootfs.img to /data/rootfs.img and the fetched GSI to
+  # /data/android-rootfs.img -- filenames per Halium's own documented
+  # rootfs.img mount point plus the android-rootfs.img convention used by
+  # the Halium/android_device_halium_halium_arm64 output and community
+  # install scripts (e.g. JBBgameich's replace-android-image).
+  #
+  # boot.img isn't bundled pre-built anymore -- the ingredients to build
+  # it (magiskboot + the generic Halium ramdisk, fetched a few steps up)
+  # ride along instead, and update-binary below does the actual
+  # unpack/swap-ramdisk/repack against the *device's own* stock boot
+  # (or init_boot, on Android 13+ split-partition devices) at install
+  # time. That's what makes this device-agnostic without needing to know
+  # the target device ahead of time: the kernel/dtb/header always come
+  # from that exact phone's own stock image, never guessed or downloaded.
+  # update-binary still only ever touches a partition it can positively
+  # identify (slot detection, known by-name paths only, hard fallback to
+  # "do it yourself") -- guessing wrong on an unknown device's boot
+  # partition is real bricking risk that /data writes don't carry, and
+  # that safety story doesn't change just because the repack is now
+  # automatic.
+  _zip_root="/w/kibaos-mobile-installer-zip"
+  rm -rf "${_zip_root}"
+  mkdir -p "${_zip_root}/META-INF/com/google/android"
+  cp "${_out}/kibaos-mobile-rootfs.img" "${_zip_root}/rootfs.img"
+  if [ -f "${_out}/kibaos-mobile-gsi-arm64.img" ]; then
+    cp "${_out}/kibaos-mobile-gsi-arm64.img" "${_zip_root}/android-rootfs.img"
+  fi
+  cp /w/boot-repack-tools/magiskboot "${_zip_root}/magiskboot"
+  cp /w/boot-repack-tools/halium-generic-ramdisk.cpio.gz "${_zip_root}/halium-generic-ramdisk.cpio.gz"
+  echo "# this zip is installed by update-binary directly, not parsed as edify" \
+    > "${_zip_root}/META-INF/com/google/android/updater-script"
+  cat > "${_zip_root}/META-INF/com/google/android/update-binary" << 'UPDATEBINARY'
+#!/sbin/sh
+
+# KibaOS Mobile installer -- flashed from TWRP like any other zip.
+# args per the standard flashable-zip contract: $1=recovery API version,
+# $2=output fd (for ui_print), $3=path to this zip on the device.
+OUTFD="$2"
+ZIPFILE="$3"
+
+ui_print() {
+  echo "ui_print $1" >> "/proc/self/fd/${OUTFD}"
+  echo "ui_print" >> "/proc/self/fd/${OUTFD}"
+}
+abort_install() {
+  ui_print "!! $1"
+  exit 1
+}
+
+ui_print "=== KibaOS Mobile installer ==="
+
+# ── boot.img / init_boot.img repack (on-device, per-device-correct) ─────
+# No pre-built boot image ships in this zip. magiskboot + the generic
+# Halium ramdisk (both bundled below) get used right here, against
+# *this* device's own stock boot/init_boot partition, so the kernel,
+# dtb, and header metadata are always the real ones for this exact
+# phone -- never guessed from a version string or downloaded ahead of
+# time on a build host that has no idea what device it's for.
+#
+# Defensive throughout, same posture as the rest of this installer:
+# only known by-name paths are ever read, a full backup of whatever's
+# already on the partition is written to /data/kibaos-boot-backup/
+# before anything is overwritten, and nothing is dd'd back until
+# unpack+repack have both fully succeeded. If this device's boot layout
+# isn't one magiskboot recognizes, the repack is skipped outright and
+# says so -- no guessing on a partition this installer is this careful
+# about everywhere else.
+_slot=""
+if command -v getprop >/dev/null 2>&1; then
+  _slot="$(getprop ro.boot.slot_suffix 2>/dev/null)"
+fi
+
+_find_by_name() {
+  # $1 = partition name, without slot suffix
+  for _cand in \
+    "/dev/block/bootdevice/by-name/$1${_slot}" \
+    "/dev/block/by-name/$1${_slot}" \
+    "/dev/block/platform/*/by-name/$1${_slot}"; do
+    for _p in ${_cand}; do
+      [ -b "${_p}" ] && echo "${_p}" && return 0
+    done
+  done
+  return 1
+}
+
+_boot_dev="$(_find_by_name boot)"
+_init_boot_dev="$(_find_by_name init_boot)"
+_boot_repacked=0
+
+if [ -z "${_boot_dev}" ] && [ -z "${_init_boot_dev}" ]; then
+  ui_print "!! couldn't find a known boot or init_boot partition path on"
+  ui_print "!! this device -- skipping the boot image repack entirely."
+  ui_print "!! Samsung and some other OEMs don't expose these via"
+  ui_print "!! by-name symlinks in recovery; you'll need to sort out"
+  ui_print "!! halium-boot.img by hand for this device."
+else
+  rm -rf /tmp/kibaos-boot && mkdir -p /tmp/kibaos-boot
+  cd /tmp/kibaos-boot || abort_install "no /tmp to stage the boot repack in"
+  unzip -o "${ZIPFILE}" 'magiskboot' 'halium-generic-ramdisk.cpio.gz' -d /tmp/kibaos-boot >/dev/null 2>&1
+  [ -f magiskboot ] || abort_install "magiskboot missing from zip -- can't repack the boot image"
+  chmod 0755 magiskboot
+  gzip -dc halium-generic-ramdisk.cpio.gz > halium-generic-ramdisk.cpio 2>/dev/null \
+    || abort_install "couldn't decompress the bundled Halium ramdisk"
+
+  mkdir -p /data/kibaos-boot-backup
+
+  # Android 13+ devices split the generic ramdisk into its own init_boot
+  # partition and leave boot with just the kernel -- prefer that split
+  # when present so the kernel side is never touched at all. Older/GKI
+  # 1.0-2.0 devices keep ramdisk+kernel together in boot.img.
+  if [ -n "${_init_boot_dev}" ]; then
+    _target_dev="${_init_boot_dev}"
+    _target_name="init_boot"
+  else
+    _target_dev="${_boot_dev}"
+    _target_name="boot"
+  fi
+
+  ui_print "backing up stock ${_target_name} to /data/kibaos-boot-backup/..."
+  dd if="${_target_dev}" of="/data/kibaos-boot-backup/${_target_name}${_slot}.img" bs=4M \
+    || abort_install "couldn't back up ${_target_dev} -- refusing to touch it unbacked-up"
+
+  ui_print "unpacking stock ${_target_name} image..."
+  cp "/data/kibaos-boot-backup/${_target_name}${_slot}.img" ./stock.img
+  ./magiskboot unpack -h stock.img
+  _unpack_rc=$?
+  if [ "${_unpack_rc}" = "2" ]; then
+    ui_print "!! ${_target_name} is a ChromeOS-format image -- magiskboot"
+    ui_print "!! can't repack this layout. Skipping the boot repack;"
+    ui_print "!! sort out halium-boot.img by hand for this device."
+  elif [ ! -f ramdisk.cpio ]; then
+    ui_print "!! no generic ramdisk section found in ${_target_name} --"
+    ui_print "!! this device's boot layout isn't one this installer"
+    ui_print "!! recognizes. Skipping the boot repack; sort out"
+    ui_print "!! halium-boot.img by hand for this device."
+  else
+    ui_print "swapping in the generic Halium ramdisk..."
+    cp halium-generic-ramdisk.cpio ramdisk.cpio
+    ./magiskboot repack stock.img new-boot.img \
+      || abort_install "magiskboot repack failed -- ${_target_name} left untouched"
+    ui_print "flashing repacked ${_target_name} to ${_target_dev}..."
+    dd if=new-boot.img of="${_target_dev}" bs=4M \
+      || abort_install "write failed to ${_target_dev} -- restore from /data/kibaos-boot-backup/${_target_name}${_slot}.img via fastboot if this device won't boot"
+    ui_print "${_target_name} repacked and flashed."
+    _boot_repacked=1
+  fi
+  cd /
+  rm -rf /tmp/kibaos-boot
+fi
+
+mount /data 2>/dev/null
+if ! mountpoint -q /data 2>/dev/null && ! grep -q ' /data ' /proc/mounts; then
+  abort_install "couldn't mount /data -- format it ext4 and unencrypted first"
+fi
+
+ui_print "extracting installer payload..."
+rm -rf /tmp/kibaos-installer
+mkdir -p /tmp/kibaos-installer
+cd /tmp/kibaos-installer || abort_install "no /tmp to stage in"
+unzip -o "${ZIPFILE}" 'rootfs.img' 'android-rootfs.img' -d /tmp/kibaos-installer >/dev/null 2>&1
+
+[ -f /tmp/kibaos-installer/rootfs.img ] || abort_install "rootfs.img missing from zip"
+
+ui_print "writing KibaOS Mobile rootfs to /data/rootfs.img..."
+cp /tmp/kibaos-installer/rootfs.img /data/rootfs.img || abort_install "failed writing rootfs.img"
+
+if [ -f /tmp/kibaos-installer/android-rootfs.img ]; then
+  ui_print "writing Halium GSI to /data/android-rootfs.img..."
+  cp /tmp/kibaos-installer/android-rootfs.img /data/android-rootfs.img || abort_install "failed writing android-rootfs.img"
+else
+  ui_print "!! no GSI bundled in this zip -- push a system image to /data/android-rootfs.img yourself before rebooting"
+fi
+
+touch /data/.writable_image /data/.writable_device_image 2>/dev/null
+
+rm -rf /tmp/kibaos-installer
+
+ui_print "=== done -- reboot into KibaOS Mobile ==="
+if [ "${_boot_repacked}" = "1" ]; then
+  ui_print "(${_target_name} was repacked and flashed by this zip --"
+  ui_print " no separate fastboot step needed. Stock backup is at"
+  ui_print " /data/kibaos-boot-backup/ if you ever need to revert.)"
+else
+  ui_print "(this zip didn't touch the boot partition -- make sure a"
+  ui_print " Halium-compatible boot.img is already flashed separately)"
+fi
+exit 0
+UPDATEBINARY
+  chmod 0755 "${_zip_root}/META-INF/com/google/android/update-binary"
+  ( cd "${_zip_root}" && zip -r -X "${_out}/kibaos-mobile-installer.zip" . >/dev/null )
+  sha256sum "${_out}/kibaos-mobile-installer.zip" > "${_out}/kibaos-mobile-installer.zip.sha256"
+  rm -rf "${_zip_root}"
+
+  # Mobile OOBE (kibaos-mobile-oobe) is built and installed into the
+  # rootfs above -- Android-style first-boot flow, no disk-installer
+  # step, gated by /var/lib/kibaos/.oobe-done so it only ever runs once.
+  cat > "${_out}/README-INSTALL.md" << 'READMEDOC'
+# KibaOS Mobile — install
+
+This is the KibaOS Mobile *userspace only* (Budgie panel/raven on phoc,
+ofono, Calls, Chatty, squeekboard, libgestures, borrowed
+phosh-lockscreen), shipped in three forms:
+
+- `kibaos-mobile-installer.zip` — flash this from TWRP, easiest path.
+- `kibaos-mobile-rootfs.img` — the same thing pre-built as a raw ext4
+  image (what's inside the zip), if you'd rather push it yourself.
+- `kibaos-mobile-rootfs.tar.gz` — the raw tarball, for
+  `halium-install`/manual use if neither of the above fits your setup.
+
+None of these are bootable by themselves. You still need, per your
+device's Halium port status:
+
+1. `boot.img`/`init_boot.img` — repacked automatically, **on the phone,
+   during install** — not pre-built by this pipeline. The zip carries
+   `magiskboot` (a static unpacker/repacker) and a generic Halium
+   ramdisk; update-binary dumps whatever's actually sitting on this
+   device's own `boot`/`init_boot` partition, swaps in the Halium
+   ramdisk, and flashes the result back — so the kernel, dtb, and header
+   metadata always come from *this exact phone's* stock image instead of
+   being downloaded or guessed from a version string. This works
+   regardless of Android version/GKI status, since magiskboot
+   auto-detects the boot image layout (plain boot.img, GKI header v3/v4
+   with a split `init_boot`, etc.) rather than this pipeline assuming one
+   ahead of time.
+
+   Defensive by design: update-binary only ever touches a `boot`/
+   `init_boot` partition it can positively identify via known by-name
+   symlinks with A/B slot-suffix detection, backs up whatever's already
+   there to `/data/kibaos-boot-backup/` *before* writing anything, and
+   skips the repack outright (rather than guessing) if it can't confirm
+   a safe target, if the image is a layout magiskboot doesn't recognize,
+   or if it can't find a generic-ramdisk section to swap. Samsung devices
+   (no fastboot-flashable boot partition) fall through to the manual
+   step regardless. There's no per-device kernel build required either
+   way — if the automatic repack can't proceed on a given device, you're
+   pointed at building/supplying a `halium-boot.img` yourself rather than
+   this silently shipping a broken one.
+2. The Halium GSI `system.img` (arm64) -- fetched via the Halium-boot
+   porting method (prebuilt, device-agnostic GSI, no AOSP repo sync)
+   unless `KIBA_SKIP_GSI_FETCH=1` was set for this run, and already
+   bundled into the installer zip as `android-rootfs.img` if the fetch
+   succeeded. Standalone copy at `kibaos-mobile-gsi-arm64.img`
+   (+ `.sha256`) alongside these files. Source defaults to the lolinet
+   mirror (build.lolinet.com/file/halium/GSI); override
+   `KIBA_MOBILE_GSI_URL` to pin a specific build/mirror. If the fetch was
+   skipped or failed, grab a GSI build manually from the same mirror or
+   devices.ubuntu-touch.io -- the zip will say so on install if it's
+   missing.
+
+## Install steps (recommended: the zip)
+
+1. Boot (not flash) TWRP or another Busybox-capable recovery, and confirm
+   `/data` is unencrypted and formatted ext4 -- wipe/reformat in recovery
+   if it isn't.
+
+2. Push and flash the zip:
+
+       adb push kibaos-mobile-installer.zip /sdcard/
+       adb shell twrp install /sdcard/kibaos-mobile-installer.zip
+
+   (or do the same from TWRP's own UI: Install → pick the zip → swipe).
+   This repacks and flashes `boot`/`init_boot` in place (see item 1
+   above — it'll say plainly in the TWRP log if it couldn't and you need
+   to sort out a `halium-boot.img` by hand instead), writes `rootfs.img`
+   to `/data/rootfs.img`, and writes the bundled GSI to
+   `/data/android-rootfs.img`.
+
+3. Reboot. boot.img's initramfs mounts `/data`, loop-mounts
+   `/data/rootfs.img`, and `switch_root`s into it -- that's KibaOS
+   Mobile's `kibaos-mobile-oobe` first-boot flow starting up, no separate
+   disk installer involved.
+
+## Alternative: halium-install (if the zip doesn't fit your device)
+
+Some devices/recoveries don't play well with the shell-script
+update-binary trick, or you may want image conversion/renaming handled
+for you instead of doing it by hand. `halium-install`
+(https://github.com/jbruechert/halium-install -- stages everything on
+your host machine first, avoiding old-TWRP/no-busybox headaches) does
+the same job from a PC instead of inside recovery:
+
+    git clone https://github.com/jbruechert/halium-install
+    cd halium-install
+    sudo ./halium-install -p none \
+      kibaos-mobile-rootfs.tar.gz kibaos-mobile-gsi-arm64.img
+
+`-p none` tells it this isn't one of Halium's bundled distros
+(reference/neon/ut/debian-pm/etc.) -- just install the tarball as-is.
+`sudo` is required (the script loop-mounts image files via
+qemu-user-static/simg2img). The official on-device installer
+(https://github.com/Halium/halium-scripts, `halium-install` in that
+repo) works too, but runs its steps over adb shell instead of on the
+host, so it depends on the recovery's own userspace being complete
+enough (working busybox etc.).
+
+Full background: docs.ubports.com/en/latest/porting/build_and_boot/Halium_install.html
+READMEDOC
+
+  echo "╔══════════════════════════════════════╗"
+  echo "║  KibaOS Mobile rootfs build complete! ║"
+  echo "║  ${_out}/kibaos-mobile-rootfs.tar.gz  ║"
+  echo "╚══════════════════════════════════════╝"
+}
+
+if [ "${KIBA_ARCH}" = "mobile" ]; then
+  build_kibaos_mobile
+  exit 0
+fi
+
+# try normal archiso.
 # ALARM doesn't have an archiso package period, so aarch64 always takes
 # the scenic route -- specifically JackMyers001/archiso-aarch64, a fork
 # that adds real aarch64 support to mkarchiso itself (uefi-aarch64.
 # systemd-boot.esp/.eltorito bootmodes, an aarch64-aware
 # _make_boot_on_fat_aarch64 that copies /boot/Image* directly instead of
 # a vmlinuz-*, etc). Stock upstream archiso only targets x86_64 -- it has
-# a GRUB arm64-efi bootmode, but that target's grubmodules list still
-# includes at_keyboard, a legacy PC PS/2-keyboard-controller module that
-# never gets built for arm64-efi, so grub-mkstandalone hard-fails on it.
-# The fork sidesteps the whole GRUB-on-arm64 mess by using systemd-boot
-# instead, which is also what ALARM's own install docs lean on. also
-# grabbing python-docutils bc the fork's makefile wants rst2man for the
-# man pages.
+# ARM branch used to detour through JackMyers001/archiso-aarch64 here
+# (ALARM ships no archiso package at all) -- gone along with the rest of
+# the ARM/ISO path. This point in the script is x86_64-only now; mobile
+# already exited via build_kibaos_mobile above before reaching here.
 install_archiso() {
-  if [ "${KIBA_ARCH}" = "x86_64" ]; then
-    if pacman -S --noconfirm --needed archiso; then
-      return 0
-    fi
-    echo "!! stock archiso failed to install on x86_64 -- falling back to source build" >&2
-  fi
-  # except: we're on arm, or x86 face-planted trying to install normally
-  local _src="/tmp/archiso-aarch64-src"
-  rm -rf "${_src}"
-  if ! git clone --depth 1 https://github.com/JackMyers001/archiso-aarch64.git "${_src}"; then
-    echo "FATAL: couldn't fetch JackMyers001/archiso-aarch64 -- check network access to github.com" >&2
-    exit 1
-  fi
-  make -C "${_src}" PREFIX=/usr
-  # make install can faceplant on just the man page and that's fine, we
-  # only actually need mkarchiso itself, not its manual. checking the
-  # binary showed up rather than trusting make's exit code
-  make -C "${_src}" PREFIX=/usr install || \
-    echo "!! 'make install' reported an error (possibly just man page generation) -- checking whether mkarchiso landed anyway" >&2
-  if ! command -v mkarchiso >/dev/null 2>&1; then
-    echo "FATAL: archiso build from source completed but mkarchiso isn't on PATH" >&2
-    exit 1
-  fi
+  pacman -S --noconfirm --needed archiso
 }
 install_archiso
 
