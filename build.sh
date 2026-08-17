@@ -1911,7 +1911,7 @@ OOBEAUTOSTART
   # override KIBA_MOBILE_GSI_URL to pin a specific build/mirror. Set
   # KIBA_SKIP_GSI_FETCH=1 to skip entirely (e.g. offline CI) and fall
   # back to the manual pointer in README-INSTALL.md.
-  : "${KIBA_MOBILE_GSI_URL:=https://build.lolinet.com/file/halium/GSI/halium-10.0/arm64ab/halium-generic-arm64ab-ota-latest.zip}"
+  : "${KIBA_MOBILE_GSI_URL:=https://mirrors.lolinet.com/firmware/halium/GSI/ubports_GSI_installer_v10.zip}"
   if [ "${KIBA_SKIP_GSI_FETCH:-0}" = "1" ]; then
     echo "=== KIBA_SKIP_GSI_FETCH=1 -- skipping Halium GSI fetch (see README-INSTALL.md for a manual pointer) ==="
   else
