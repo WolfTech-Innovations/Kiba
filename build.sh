@@ -167,6 +167,29 @@ PACMANCONF
     mesa vulkan-icd-loader \
     openssh git base-devel
 
+  # ── strip the dead [aur] entry from the TARGET root's own pacman.conf ──
+  # /tmp/mobile-pacman.conf (cleaned of its own dead [aur] section above)
+  # only governs the pacstrap calls themselves -- it's a host-side config
+  # pacstrap reads, never copied into the new root. Once inside the
+  # chroot (arch-chroot below, for makepkg -si), pacman uses the target's
+  # OWN /etc/pacman.conf instead, which comes from the pacman package's
+  # default ALARM template -- and that template ships its own legacy
+  # [aur] section (a leftover from when some ALARM configs pointed it at
+  # a real repo; it doesn't exist as a resolvable repo anymore). Left in
+  # place, every makepkg -si dependency-install below hits "database file
+  # for 'aur' does not exist" / "could not find database" and fails
+  # outright, exactly the same class of problem as the host-side one, just
+  # inside the chroot instead. Delete the [aur] stanza (header line
+  # through whatever it contains, up to the next section) rather than
+  # assuming a fixed line count, since the exact template contents aren't
+  # guaranteed across ALARM base image revisions.
+  awk '
+    /^\[aur\]/ { skip=1; next }
+    skip && /^\[/ { skip=0 }
+    !skip { print }
+  ' "${_root}/etc/pacman.conf" > "${_root}/etc/pacman.conf.new" \
+    && mv "${_root}/etc/pacman.conf.new" "${_root}/etc/pacman.conf"
+
   # ── AUR: ofono, libhybris, gnome-calls (gnome-dialer), chatty,
   #    libgestures, wlrctl ────────────────────────────────────────────────
   # No AUR helper assumed present on a fresh ALARM rootfs -- build each
