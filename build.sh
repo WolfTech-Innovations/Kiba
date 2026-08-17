@@ -29,7 +29,7 @@ echo "=== KibaOS build target: ${KIBA_ARCH} ==="
 # mkarchiso entirely.
 
 # ── speed hack: crank up parallel downloads so pacman isn't crawling ───────
-sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
+sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 5/' /etc/pacman.conf
 
 # ── gotta pre-make the alpm user inside airootfs or pacman throws a fit
 #    when it tries to run inside the chroot later ──────────────────────────
