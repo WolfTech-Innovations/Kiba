@@ -241,77 +241,23 @@ PACMANCONF
     "
   }
 
-  # ── hybris-android-headers: a hard makedepend of libhybris-git ─────────
-  # `makepkg -si` shells out to plain `pacman` to satisfy deps, and pacman
-  # has no concept of the AUR -- it can only ever resolve dependencies that
-  # exist in a configured repo (core/extra/alarm here). hybris-android-headers
-  # is itself AUR-only (no ALARM/official package), so libhybris-git's
-  # makepkg run was failing dependency resolution ("Missing dependencies:
-  # hybris-android-headers") the same way ofono/libhybris did before this
-  # loop existed -- it has to be built+installed manually first, same as
-  # every other AUR-only dependency in this chroot. Hard fail here too:
-  # without it libhybris-git can't build at all, so there's no point
-  # continuing to the mandatory loop below.
-  #
-  # --ignorearch: this PKGBUILD's own arch=() array predates aarch64 and
-  # was never updated for it (upstream is basically abandoned), so
-  # makepkg's pre-flight "X is not available for the 'aarch64'
-  # architecture" check fails it before the build even starts. Safe to
-  # override here specifically because the package is headers-only --
-  # package() just installs static Android/AOSP header files, there's no
-  # compiled/linked binary whose correctness could depend on target arch.
-  _aur_build hybris-android-headers "--ignorearch" || {
-    echo "ERROR: hybris-android-headers AUR build failed -- libhybris-git can't build without it, refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
-    rm -f "${_root}/etc/sudoers.d/builder"
-    arch-chroot "${_root}" userdel -r builder || true
-    exit 1
-  }
-
-  # ofono/libhybris used to come from the plain pacstrap call above with
-  # no fallback -- i.e. the build was already designed to hard-fail if
-  # either was missing, since they're the actual telephony/hybris stack a
-  # "mobile" build exists to ship, not cosmetic AUR extras. Preserving
-  # that: unlike the soft-fail loop below, a failure here aborts the
-  # build instead of shipping a phone image with no modem/SIM support.
-  #
-  # NOTE: the real AUR package is "libhybris-git" (aliased as
-  # "libhybris-ext-git"), NOT plain "libhybris" -- there is no AUR
-  # package under the bare name. `git clone` against a nonexistent AUR
-  # package doesn't error out, it just hands back an empty repo (no
-  # PKGBUILD), which is what was producing the "PKGBUILD does not exist"
-  # makepkg failure. libhybris-git's PKGBUILD declares provides=(libhybris),
-  # so everything downstream that depends on the `libhybris` name still
-  # resolves fine against the -git build.
+  # ofono used to come from the plain pacstrap call above with no
+  # fallback -- i.e. the build was already designed to hard-fail if it
+  # was missing, since it's the actual telephony stack a "mobile" build
+  # exists to ship, not a cosmetic AUR extra. Preserving that: unlike the
+  # soft-fail loop below, a failure here aborts the build instead of
+  # shipping a phone image with no modem/SIM support.
   _aur_build ofono || {
-    echo "ERROR: ofono AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
+    echo "ERROR: ofono AUR build failed -- refusing to ship a mobile rootfs with no working telephony stack. Check the makepkg log above." >&2
     rm -f "${_root}/etc/sudoers.d/builder"
     arch-chroot "${_root}" userdel -r builder || true
     exit 1
   }
 
-  # ── libhybris-git: build from halium/libhybris, not upstream mainline ──
-  # The AUR PKGBUILD's source=() points at libhybris/libhybris (mainline),
-  # which has let its per-Android-version linker namespace hooks bitrot --
-  # LINKER_VERSION_DEFAULT/LINKER_NAME_DEFAULT (needed for Q-era hooks.c)
-  # only exist in Halium's fork, which actually carries the maintained
-  # per-SDK-version linker patches real Halium ports build against.
-  # Rewriting the git source instead of patching hooks.c ourselves so we
-  # stay on a maintained, coherent source tree rather than hand-patching
-  # one symbol and finding the next one bitrotted on the next rebuild.
-  arch-chroot "${_root}" bash -c "
-    su - builder -c '
-      cd /tmp &&
-      git clone --depth 1 https://aur.archlinux.org/libhybris-git.git &&
-      cd libhybris-git &&
-      sed -i \"s#https://github.com/libhybris/libhybris#https://github.com/halium/libhybris#g\" PKGBUILD &&
-      makepkg -si --noconfirm --needed
-    '
-  " || {
-    echo "ERROR: libhybris-git AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
-    rm -f "${_root}/etc/sudoers.d/builder"
-    arch-chroot "${_root}" userdel -r builder || true
-    exit 1
-  }
+  # libhybris itself is NOT built here anymore -- it already ships inside
+  # the built image (the Halium GSI system.img carries it), so compiling
+  # libhybris-git on this build host was just redundant work with none of
+  # its output actually used by the rootfs this function produces.
 
   # gnome-calls (gnome-dialer), chatty, libgestures, wlrctl -- genuinely
   # optional polish; a build can reasonably ship without one of these
