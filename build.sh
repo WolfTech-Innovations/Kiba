@@ -230,12 +230,13 @@ PACMANCONF
 
   _aur_build() {
     local _pkg="$1"
+    local _extra_args="${2:-}"
     arch-chroot "${_root}" bash -c "
       su - builder -c '
         cd /tmp &&
         git clone --depth 1 https://aur.archlinux.org/${_pkg}.git &&
         cd ${_pkg} &&
-        makepkg -si --noconfirm --needed
+        makepkg -si --noconfirm --needed ${_extra_args}
       '
     "
   }
@@ -251,7 +252,15 @@ PACMANCONF
   # every other AUR-only dependency in this chroot. Hard fail here too:
   # without it libhybris-git can't build at all, so there's no point
   # continuing to the mandatory loop below.
-  _aur_build hybris-android-headers || {
+  #
+  # --ignorearch: this PKGBUILD's own arch=() array predates aarch64 and
+  # was never updated for it (upstream is basically abandoned), so
+  # makepkg's pre-flight "X is not available for the 'aarch64'
+  # architecture" check fails it before the build even starts. Safe to
+  # override here specifically because the package is headers-only --
+  # package() just installs static Android/AOSP header files, there's no
+  # compiled/linked binary whose correctness could depend on target arch.
+  _aur_build hybris-android-headers "--ignorearch" || {
     echo "ERROR: hybris-android-headers AUR build failed -- libhybris-git can't build without it, refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
     rm -f "${_root}/etc/sudoers.d/builder"
     arch-chroot "${_root}" userdel -r builder || true
