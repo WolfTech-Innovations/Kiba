@@ -246,7 +246,16 @@ PACMANCONF
   # "mobile" build exists to ship, not cosmetic AUR extras. Preserving
   # that: unlike the soft-fail loop below, a failure here aborts the
   # build instead of shipping a phone image with no modem/SIM support.
-  for _pkg in ofono libhybris; do
+  #
+  # NOTE: the real AUR package is "libhybris-git" (aliased as
+  # "libhybris-ext-git"), NOT plain "libhybris" -- there is no AUR
+  # package under the bare name. `git clone` against a nonexistent AUR
+  # package doesn't error out, it just hands back an empty repo (no
+  # PKGBUILD), which is what was producing the "PKGBUILD does not exist"
+  # makepkg failure. libhybris-git's PKGBUILD declares provides=(libhybris),
+  # so everything downstream that depends on the `libhybris` name still
+  # resolves fine against the -git build.
+  for _pkg in ofono libhybris-git; do
     _aur_build "${_pkg}" || {
       echo "ERROR: ${_pkg} AUR build failed -- refusing to ship a mobile rootfs with no working telephony/hybris stack. Check the makepkg log above." >&2
       rm -f "${_root}/etc/sudoers.d/builder"
@@ -2600,6 +2609,25 @@ chown -R alpm:alpm /var/cache/pacman
 # between x86_64 and aarch64 builds, so check uname -m rather than assume.
 if [ "$(uname -m)" = "x86_64" ]; then
   sed -i '/^#\[multilib\]/,/^#Include/ s/^#//' /etc/pacman.conf
+fi
+
+# ── x86_64 mirror fallback ──────────────────────────────────────────────────
+# The airootfs's /etc/pacman.d/mirrorlist as shipped by mkarchiso only has
+# geo.mirror.pkgbuild.com uncommented -- fine normally, but on an
+# Azure-hosted CI runner a single geo-balanced mirror having a bad day (rate
+# limit, regional outage, TLS hiccup) hard-fails every `pacman -S` in this
+# chroot with no retry target. aarch64 already gets equivalent redundancy
+# for free since ALARM's mirror.archlinuxarm.org rarely wobbles the same
+# way, so only bother with this on x86_64. Order matters -- pacman walks
+# these top to bottom per-download, so keep the geo mirror first and
+# well-known, stable, high-bandwidth mirrors after it as fallback.
+if [ "$(uname -m)" = "x86_64" ]; then
+  cat > /etc/pacman.d/mirrorlist << 'MIRRORLIST'
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirrors.kernel.org/archlinux/$repo/os/$arch
+Server = https://america.mirror.pkgbuild.com/$repo/os/$arch
+Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch
+MIRRORLIST
 fi
 
 # CheckSpace already got disabled for the airootfs pacstrap up in
