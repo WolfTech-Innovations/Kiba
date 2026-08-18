@@ -1944,12 +1944,18 @@ OOBEAUTOSTART
   # tarball, and now the GSI fetch), and stays out of the per-device
   # kernel build entirely.
   #
-  # Default source is the lolinet mirror (build.lolinet.com/file/halium/GSI),
-  # the same generic Halium arm64 GSI the UBports installer points at --
+  # Default source is the lolinet mirror -- this is the ubports_GSI_installer
+  # bundle at mirrors.lolinet.com/firmware/halium/GSI/, confirmed live
+  # (directory listing checked directly). NOTE: an earlier revision of this
+  # default pointed at build.lolinet.com/file/halium/GSI/halium-10.0/arm64ab/
+  # halium-generic-arm64ab-ota-latest.zip -- that path doesn't exist on
+  # lolinet at all (wrong domain AND wrong directory layout; lolinet only
+  # ever served numbered ubports_GSI_installer_vN.zip bundles under
+  # mirrors.lolinet.com/firmware/halium/GSI/), which is why it 404'd.
   # override KIBA_MOBILE_GSI_URL to pin a specific build/mirror. Set
   # KIBA_SKIP_GSI_FETCH=1 to skip entirely (e.g. offline CI) and fall
   # back to the manual pointer in README-INSTALL.md.
-  : "${KIBA_MOBILE_GSI_URL:=https://build.lolinet.com/file/halium/GSI/halium-10.0/arm64ab/halium-generic-arm64ab-ota-latest.zip}"
+  : "${KIBA_MOBILE_GSI_URL:=https://mirrors.lolinet.com/firmware/halium/GSI/ubports_GSI_installer_v10.zip}"
   if [ "${KIBA_SKIP_GSI_FETCH:-0}" = "1" ]; then
     echo "=== KIBA_SKIP_GSI_FETCH=1 -- skipping Halium GSI fetch (see README-INSTALL.md for a manual pointer) ==="
   else
@@ -1966,10 +1972,14 @@ OOBEAUTOSTART
         sha256sum "${_out}/kibaos-mobile-gsi-arm64.img" > "${_out}/kibaos-mobile-gsi-arm64.img.sha256"
         echo "=== Fetched Halium GSI: ${_out}/kibaos-mobile-gsi-arm64.img ==="
       else
-        echo "!! GSI zip downloaded but no .img found inside -- check KIBA_MOBILE_GSI_URL / mirror layout" >&2
+        echo "ERROR: GSI zip downloaded from ${KIBA_MOBILE_GSI_URL} but no .img found inside -- check KIBA_MOBILE_GSI_URL / mirror layout. Refusing to continue with a mobile build that has no bundled GSI (the installer zip stage would fail anyway, just later and with a more confusing error). Set KIBA_SKIP_GSI_FETCH=1 if you intend to ship a thin installer and push the GSI manually per README-INSTALL.md." >&2
+        cd /w
+        return 1
       fi
     else
-      echo "!! GSI fetch failed (${KIBA_MOBILE_GSI_URL}) -- see README-INSTALL.md for a manual pointer" >&2
+      echo "ERROR: GSI fetch failed -- curl could not retrieve ${KIBA_MOBILE_GSI_URL} (bad URL, 404, or network issue). Refusing to continue with a mobile build that has no bundled GSI (the installer zip stage would fail anyway, just later and with a more confusing error). Set KIBA_SKIP_GSI_FETCH=1 if you intend to ship a thin installer and push the GSI manually per README-INSTALL.md." >&2
+      cd /w
+      return 1
     fi
     cd /w
   fi
