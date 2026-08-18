@@ -4,7 +4,7 @@
 
 > [!IMPORTANT]
 >
-> KibaOS only supports UEFI-based systems. Virtual machine installation is currently unsupported because KibaOS is designed to run on physical hardware.
+> KibaOS only supports UEFI-based systems. The mobile version only supports Android devices that support TrebleDroid and have TWRP. it cannot be above or below Android 9 or compatibility will fail.
 
 <div align="center">
 
