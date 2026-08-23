@@ -2,6 +2,12 @@
   <img src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/A25ACB5D-92F7-4408-8972-CBD562BE4898.png?raw=true" width="250" alt="KibaOS Banner">
 </p>
 
+<p align="center">
+  <a href="https://github.com/sponsors/WolfTech-Innovations">
+    <img src="https://img.shields.io/badge/Sponsor-Kiba%20Labs-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor Kiba Labs">
+  </a>
+</p>
+
 > [!IMPORTANT]
 >
 > KibaOS only supports UEFI-based systems. The mobile version only supports Android devices that support TrebleDroid and have TWRP. it cannot be above or below Android 9 or compatibility will fail.
