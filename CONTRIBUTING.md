@@ -1,7 +1,7 @@
 # Contributing to KibaOS
 
 <p align="center">
-  <img src="../branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="/branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
 </p>
 
 <p align="center">
@@ -109,6 +109,6 @@ By contributing to KibaOS, you agree that your contributions will be licensed un
 
 ## Related Reading
 
-- [**Build System**](./build-system.md)
-- [**Architecture**](./architecture.md)
-- [**FAQ**](./faq.md)
+- [**Build System**](docs/build-system.md)
+- [**Architecture**](docs/architecture.md)
+- [**FAQ**](docs/faq.md)
