@@ -2564,14 +2564,11 @@ noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 bluez-utils
-gnome-weather
-gnome-clocks
-gnome-calculator
+kwin
 sof-firmware
 thermald
 xorg-xwayland
 layer-shell-qt
-budgie-session
 gcc
 debugedit
 base-devel
@@ -10901,7 +10898,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=budgie-desktop
+Session=cutefish-session
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
