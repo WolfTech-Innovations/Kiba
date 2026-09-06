@@ -182,7 +182,7 @@ docker run --rm --privileged \
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
-- **Organization:** [WolfTech Innovations](https://github.com/WolfTech-Innovations)
+- **Organization:** [Kiba Labs, LLC](https://github.com/WolfTech-Innovations)
 - **Acknowledgments:** [Community & FOSS](./ACKNOWLEDGMENTS.md)
 
 ---

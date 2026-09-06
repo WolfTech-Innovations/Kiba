@@ -13,7 +13,7 @@ KibaOS is currently in active development. We support the latest release on the 
 If you discover a security vulnerability within KibaOS, please report it by:
 
 1. **Opening a private security advisory** on GitHub (preferred method)
-2. **Contacting WolfTech Innovations** directly via the issues tracker for further instructions
+2. **Contacting Kiba Labs, LLC** directly via the issues tracker for further instructions
 
 We aim to:
 - Acknowledge all reports within **48 hours**

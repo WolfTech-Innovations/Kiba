@@ -68,7 +68,7 @@ KibaOS is built and maintained by **Kiba Labs, LLC**.
   - [Step 4: Install KibaOS](#step-4-install-kibaos)
 - [System Requirements](#system-requirements)
 - [Everyday Use](#everyday-use)
-  - [Managing Apps with kibapkg](#managing-apps-with-kibapkg)
+  - [Managing Apps with pacman](#managing-apps-with-pacman)
   - [Running Windows Programs with Windows Workspace](#running-windows-programs-with-windows-workspace)
   - [Automatic Updates](#automatic-updates)
 - [Building KibaOS Yourself](#building-kibaos-yourself)
@@ -86,10 +86,10 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 | Feature | What it means for you |
 | --- | --- |
 | **A solid foundation** | Built on Arch Linux, a well-respected base known for staying current and supporting the newest hardware. |
-| **A clean, familiar desktop** | The Budgie desktop environment provides a taskbar, a centered dock, and a clock applet, laid out so everything is easy to find. |
+| **A clean, familiar desktop** | The Cutefish OS desktop environment provides a taskbar, a centered dock, and a clock applet, laid out so everything is easy to find. |
 | **Everyday apps, already installed** | A file manager (Nemo), a web browser, a calculator, a calendar, email (Geary), notes, music, and a to-do list app — all picked or relabeled so they read as plain, simple tools instead of a pile of separately-branded software. |
 | **A simple terminal, when you need it** | The built-in terminal is deliberately minimal — one window, no tabs, no menus — for the rare moments you need it, without it ever feeling like the "real" way to use the computer. |
-| **`kiba`, a friendly app manager** | Install, remove, and update software with plain-language commands instead of memorizing package-manager flags. See [Managing Apps with kibapkg](#managing-apps-with-kibapkg). |
+| **`kiba`, a friendly app manager** | Install, remove, and update software with plain-language commands instead of memorizing package-manager flags. See [Managing Apps with pacman](#managing-apps-with-pacman). |
 | **A guided setup experience** | KibaOS's own built-in installer (the OOBE app, short for "Out-Of-Box Experience") asks you one simple question at a time. |
 | **A calm, uncluttered live session** | The trial/install session never dims, locks, or falls asleep on you mid-setup, and stays free of raw system dialogs, developer tools, and other things you'd never need to see. |
 | **Windows Workspace** | A real Windows environment runs alongside KibaOS and opens full-screen with one click — Office, Photoshop, and most other Windows programs work as they normally would. |
@@ -102,7 +102,7 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 
 ## Design & Theming
 
-KibaOS's look isn't an afterthought bolted onto stock Arch + Budgie — every visual layer is deliberately chosen so the system feels like one coherent product, not a collection of default Linux app icons and system dialogs.
+KibaOS's look isn't an afterthought bolted onto stock Arch + Cutefish OS — every visual layer is deliberately chosen so the system feels like one coherent product, not a collection of default Linux app icons and system dialogs.
 
 | Layer | What's used | Why |
 | --- | --- | --- |
@@ -188,7 +188,7 @@ Once installation finishes, restart your computer, remove the USB drive, and Kib
 
 ## Everyday Use
 
-### Managing Apps with kibapkg
+### Managing Apps with pacman
 
 KibaOS includes **KibaStore** (Bazaar) as the primary graphical app store for managing Flatpaks. For terminal users, **pacman** is configured as the primary package manager with helpful aliases.
 
@@ -295,7 +295,7 @@ Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://
 
 ## License
 
-KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Budgie, Docker, Numix, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
+KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Cutefish OS, Docker, Kora, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
