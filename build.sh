@@ -11172,10 +11172,18 @@ echo "=== Taskbar launcher icon: KibaOS boot-logo badge installed ==="
 # ══════════════════════════════════════════════════════════════════════════
 # GTK THEME — system-wide Adwaita-dark base + KibaOS rounded-rectangle panel override
 # ══════════════════════════════════════════════════════════════════════════
+mkdir -p /usr/share/themes/KibaOS/gtk-3.0
+mkdir -p /usr/share/themes/KibaOS/gtk-4.0
+
+# Copy KibaOS GTK theme files from assets
+cp -r /assets/themes/kibaos-themes/gtk-3.0/* /usr/share/themes/KibaOS/gtk-3.0/
+cp -r /assets/themes/kibaos-themes/gtk-4.0/* /usr/share/themes/KibaOS/gtk-4.0/
+
+# Set up GTK 3.0 settings to use KibaOS theme
 mkdir -p /etc/gtk-3.0
 cat > /etc/gtk-3.0/settings.ini << 'GTK3RC'
 [Settings]
-gtk-theme-name=Adwaita-dark
+gtk-theme-name=KibaOS
 gtk-icon-theme-name=Numix-Circle
 gtk-font-name=Noto Sans 11
 gtk-cursor-theme-size=24
@@ -11184,6 +11192,18 @@ gtk-xft-hinting=1
 gtk-xft-hintstyle=hintslight
 gtk-xft-rgba=rgb
 GTK3RC
+
+# QT THEME - Install KibaOS custom Qt theme
+mkdir -p /usr/share/Kvantum/KibaOS/config
+mkdir -p /usr/share/Kvantum/KibaOS/Translations
+cp -r /assets/themes/kibaos-themes/qt/kvantum/KibaOS/config/* /usr/share/Kvantum/KibaOS/config/
+cp /assets/themes/kibaos-themes/qt/kvantum/KibaOS/KibaOS.svg /usr/share/Kvantum/KibaOS/
+cp /assets/themes/kibaos-themes/qt/kvantum/KibaOS/Translations/* /usr/share/Kvantum/KibaOS/Translations/
+chmod -R 755 /usr/share/Kvantum/KibaOS
+
+# Set default Kvantum theme
+echo "[General]
+Theme=KibaOS" > /etc/xdg/kvantum.kvconfig
 
 # ── GTK3 rounded-rectangle panel CSS — KibaOS's own theming, applied directly ─
 # This overrides just the Budgie panel to be a floating liquid glass rounded rectangle.
@@ -13679,6 +13699,23 @@ chmod 750 /home/liveuser
 # desktop live/install image the way it'd be for a server image.
 
 # ══════════════════════════════════════════════════════════════════════════
+# WELCOME APP - Install KibaOS welcome application
+mkdir -p /usr/local/bin
+mkdir -p /usr/share/kibaos-welcome
+
+# Copy welcome app files from assets
+cp /assets/welcome-app/main.vala /usr/local/bin/kibaos-welcome.vala
+cp /assets/welcome-app/meson.build /usr/local/bin/meson.build
+cp /assets/welcome-app/welcome.css /usr/share/kibaos-welcome/
+cp /assets/welcome-app/README.md /usr/share/kibaos-welcome/
+
+# Copy desktop files
+cp /assets/welcome-app/kibaos-welcome.desktop /usr/share/applications/
+cp /assets/welcome-app/welcome.desktop /usr/share/applications/
+
+# Update GTK_THEME in environment to use KibaOS
+sed -i 's/GTK_THEME=Adwaita-dark/GTK_THEME=KibaOS/' /etc/environment
+
 # DESKTOP SHORTCUTS
 # ══════════════════════════════════════════════════════════════════════════
 mkdir -p /usr/share/applications /etc/skel/Desktop /etc/skel/Documents \
