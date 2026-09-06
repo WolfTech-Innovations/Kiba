@@ -43,8 +43,6 @@
   <img width="1000" alt="KibaOS Desktop Screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/branding/IMG_0168.png" />
 </p>
 
-<img width="1000" alt="Desktop screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/IMG_0168.png" />
-
 ---
 
 KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Cutefish OS** desktop environment and is designed so that anyone can sit down and use it immediately, without having to configure anything first.
