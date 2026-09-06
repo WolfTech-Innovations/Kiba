@@ -6022,18 +6022,34 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # pacman (which is all makepkg's own --syncdeps step can call) returns
   # "target not found" on every one of them. yay resolves AUR-depends-on-
   # AUR chains recursively; bare makepkg does not.
-  # Uses libcutefish-git, NOT plain libcutefish: the regular AUR package's
-  # PKGBUILD pins a sha512sum against a release tarball that no longer
-  # matches what GitHub actually serves for that tag (stale/broken AUR
-  # page -- "sha512sums... FAILED" in CI, not a network/mirror problem).
-  # libcutefish-git builds straight from the current git HEAD instead of a
-  # checksummed tarball, so there's nothing to go stale, and it
-  # Provides/Conflicts: libcutefish, so cutefish-meta's plain "libcutefish"
-  # dependency still resolves against it below.
-  runuser -u builduser -- yay -S --noconfirm --needed --removemake libcutefish-git
+  # Back to plain libcutefish (NOT -git): libcutefish-git's current HEAD has
+  # already moved its CMakeLists.txt over to Qt6 tooling (fails looking for
+  # qtpaths6), but that AUR package is unmaintained and still only pulls
+  # Qt5 deps (qt5-sensors, kio5, bluez-qt5, ...) -- PKGBUILD and upstream
+  # source have drifted apart, so building HEAD is a dead end here.
+  # Regular libcutefish (0.7-6) is still Qt5-consistent; its only problem
+  # was a stale sha512sum on the release tarball (GitHub re-packing the
+  # same tag can shift tarball bytes without the AUR maintainer re-cutting
+  # checksums -- a known AUR annoyance, not tampering). --skipinteg via
+  # --mflags skips just that checksum step for this one build.
+  runuser -u builduser -- yay -S --noconfirm --needed --removemake \
+    --mflags "--skipinteg" libcutefish
   echo "=== libcutefish installed manually via yay (x86_64) ==="
 
-  runuser -u builduser -- yay -S --noconfirm --needed --removemake cutefish-meta
+  # --skipinteg applied here too, not just libcutefish above: every
+  # regular (non -git) cutefish-* AUR package -- fishui, cutefish-core,
+  # cutefish-launcher, cutefish-settings, cutefish-statusbar,
+  # cutefish-terminal, cutefish-calculator, cutefish-screenlocker,
+  # cutefish-dock, cutefish-filemanager, cutefish-icons,
+  # cutefish-wallpapers, cutefish-qt-plugins, cutefish-screenshot, and
+  # cutefish-meta itself -- pulls source from the same
+  # github.com/cutefishos/<repo>/archive/<tag>/<name>-<tag>.tar.gz pattern
+  # that hit the sha512sum mismatch on libcutefish. Scoping the skip to
+  # only the standalone libcutefish call above would just relocate the
+  # same stale-checksum failure to whichever of the other dozen packages
+  # in this batch hits it next.
+  runuser -u builduser -- yay -S --noconfirm --needed --removemake \
+    --mflags "--skipinteg" cutefish-meta
   echo "=== cutefish-meta installed via yay (x86_64) ==="
 fi
 
