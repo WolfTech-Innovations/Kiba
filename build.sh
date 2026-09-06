@@ -4512,7 +4512,7 @@ KORTEX_NOTIFIER_PY
 #     out again at the PicomPlacementRules docstring.
 # ══════════════════════════════════════════════════════════════════════════
 echo "=== Installing kortexd picom integration ==="
-cat > /usr/lib/kortex/kortexd/picom_bridge.py << 'KORTEX_LABWC_BRIDGE_PY'
+cat > /usr/lib/kortex/kortexd/picom_bridge.py << 'KORTEX_PICOM_BRIDGE_PY'
 """
 kortexd.picom_bridge
 ---------------------
@@ -4830,7 +4830,7 @@ def resolve_monitor_origin(monitor_name: str):
             except ValueError:
                 return None
     return None
-KORTEX_LABWC_BRIDGE_PY
+KORTEX_PICOM_BRIDGE_PY
 
 cat > /usr/lib/kortex/kortexd/core.py << 'KORTEX_CORE_PY'
 """
