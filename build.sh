@@ -414,8 +414,8 @@ PACMANCONF
 [SddmGreeterTheme]
 Name=KibaOS
 Description=KibaOS frosted-glass greeter
-Author=WolfTech Innovations
-Copyright=2026, WolfTech Innovations
+Author=Kiba Labs, LLC
+Copyright=2026, Kiba Labs, LLC
 License=GPLv3
 Type=sddm-theme
 Version=1.0
@@ -2470,8 +2470,8 @@ cat > "${PROFILE}/profiledef.sh" << 'PROFILEDEF'
 #!/usr/bin/env bash
 iso_name="kibaos"
 iso_label="KIBAOS"
-iso_publisher="WolfTech Innovations <https://github.com/WolfTech-Innovations>"
-iso_application="KibaOS — A friendly general OS for all users"
+iso_publisher="Kiba Labs, LLC <https://github.com/WolfTech-Innovations>"
+iso_application="KibaOS — A friendly OS"
 iso_version="$(date +%Y.%m)"
 install_dir="arch"
 buildmodes=('iso')
@@ -2579,14 +2579,6 @@ python
 pyalpm
 parted
 gptfdisk
-# memdiskfind (mkinitcpio's [memdisk] hook needs it at initramfs-build time,
-# for RAM-loading the live ISO) ships in this package -- NOT pulled in for
-# BIOS/isolinux boot itself, that's GRUB/UEFI-only and staying that way.
-# Easy to conflate the two: ${PROFILE}/syslinux (the isolinux config dir,
-# removed further down when BIOS boot got dropped) and this `syslinux`
-# pacman package are different things, and only the config dir should
-# have gone. Without this, mkinitcpio logs "ERROR: binary not found:
-# 'memdiskfind'" and ships an incomplete initramfs.
 syslinux
 pv
 lib32-mesa
@@ -2594,21 +2586,7 @@ lib32-vulkan-icd-loader
 pkg-config
 labwc
 sddm
-# "budgie" used to resolve to a single package; it's now a pacman GROUP
-# (budgie-backgrounds, budgie-control-center, budgie-desktop,
-# budgie-desktop-services, budgie-desktop-view, budgie-session), and
-# resolving a group during pacstrap prompts interactively for a member
-# selection ("Enter a selection (default=all):") -- which just hangs/
-# fails under non-interactive CI. Spelling out the concrete package
-# names below gets the same "all members" result as the group would,
-# without the prompt. budgie-desktop-view and budgie-desktop-services
-# were already listed explicitly; adding the three the bare "budgie"
-# line used to stand in for.
-budgie-desktop
-budgie-backgrounds
-budgie-control-center
-budgie-desktop-view
-budgie-desktop-services
+cutefish-meta
 swaybg
 grim
 slurp
@@ -2622,12 +2600,6 @@ wlopm
 wlr-randr
 nemo
 nemo-fileroller
-gnome-console
-gnome-disk-utility
-gnome-backgrounds
-gnome-keyring
-gnome-settings-daemon
-gnome-control-center
 gvfs
 gvfs-mtp
 gvfs-smb
@@ -2645,14 +2617,6 @@ vulkan-headers
 vulkan-icd-loader
 wayland
 wayland-protocols
-# Arch's wlroots is soname-versioned (wlroots0.17/0.18/0.19/0.20...) and
-# old sonames get dropped from the repos once nothing depends on them --
-# this was wlroots0.19 as of the last time this list was touched; that's
-# gone now, current is wlroots0.20. This line will need bumping again
-# whenever Arch cuts the next wlroots ABI break and drops this one; if
-# labwc/phoc/etc. later require a wlroots version this pin doesn't
-# provide, that'll surface as an unrelated dependency error at pacstrap
-# time, not here.
 wlroots0.20
 cairo
 pango
@@ -2701,10 +2665,6 @@ xdotool
 v4l2loopback-dkms
 xdg-utils
 gawk
-gnome-calendar
-gnome-notes
-gnome-music
-gnome-todo
 totem
 gstreamer
 gst-plugins-base
@@ -2714,11 +2674,6 @@ plymouth
 squashfs-tools
 
 # ── Windows app support (WinApps) ────────────────────────────────────────
-# Runtime deps per https://github.com/winapps-org/winapps. curl, git,
-# libnotify already pulled in above for other reasons. Arch's "freerdp"
-# package is already v3+, unlike Debian which needs the freerdp3-x11 split.
-# pciutils (lspci) is for kibaos-winapps-setup's automatic NVIDIA GPU
-# passthrough detection -- not a WinApps dependency itself.
 freerdp
 docker
 docker-compose
@@ -2733,18 +2688,6 @@ apparmor
 firejail
 
 # ── Storage/initcpio support ─────────────────────────────────────────────
-# lvm2: not used for LVM itself here, but this is what actually ships
-# /usr/lib/initcpio/udev/11-dm-initramfs.rules (device-mapper's initcpio
-# integration). On x86_64 this arrives for free as a dependency of the
-# official mkinitcpio-archiso package. On aarch64 that package is
-# deliberately skipped (see the packages.aarch64 swap below -- the fork's
-# own mkarchiso bakes the archiso/archiso_kms hook files onto the
-# airootfs directly, bypassing pacman dependency resolution entirely), so
-# without this explicit line the archiso build hook fails with
-# "file not found: '/usr/lib/initcpio/udev/11-dm-initramfs.rules'" since
-# nothing else ever pulls lvm2 in on that arch. Listed here (not just
-# under the aarch64 branch) so x86_64 keeps getting it the same explicit
-# way instead of silently relying on a transitive dependency.
 lvm2
 
 # ── System tuning/maintenance ────────────────────────────────────────────
@@ -11994,7 +11937,7 @@ Rectangle {
 }
 SDDMQML
 
-# ── Wayland session — back to stock Budgie-on-labwc ─────────────────────
+# ── Wayland session — back to stock Cutefish-on-labwc ─────────────────────
 # so, funny enough, this is actually going BACK to how Budgie wants to run.
 # Budgie 10.10's own package already ships /usr/share/wayland-sessions/
 # budgie-desktop.desktop with Exec=labwc baked in — labwc is Budgie's
@@ -12026,7 +11969,7 @@ Current=kibaos
 
 [Autologin]
 User=liveuser
-Session=budgie-desktop
+Session=cutefish-session
 SDDMCONF
 
 mkdir -p /var/lib/sddm
@@ -14290,9 +14233,9 @@ done
 # SYSTEM ENVIRONMENT
 # ══════════════════════════════════════════════════════════════════════════
 cat > /etc/environment << 'ENV'
-DESKTOP_SESSION=budgie-desktop
-XDG_CURRENT_DESKTOP=Budgie:GNOME
-XDG_SESSION_DESKTOP=budgie-desktop
+DESKTOP_SESSION=
+XDG_CURRENT_DESKTOP=Cutefish:KDE
+XDG_SESSION_DESKTOP=cutefish-session
 XDG_SESSION_TYPE=wayland
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
@@ -14305,7 +14248,7 @@ ELECTRON_OZONE_PLATFORM_HINT=wayland
 CLUTTER_BACKEND=wayland
 SDL_VIDEODRIVER=wayland
 KIBAOS_VERSION=rolling
-KIBAOS_VENDOR="WolfTech Innovations"
+KIBAOS_VENDOR="Kiba Labs, LLC"
 ENV
 
 cat > /etc/issue << 'ISSUE'
