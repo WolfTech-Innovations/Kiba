@@ -5987,6 +5987,26 @@ pacman -S --noconfirm --needed \
   ki18n kio kservice kpackage kdeclarative \
   kiconthemes kwidgetsaddons
 
+
+# ── cutefish-meta (AUR, via yay) — x86_64 only ──────────────────────────────
+# $KIBA_ARCH isn't visible inside this chroot (same reasoning as the
+# aarch64 keyring check above), so detect via uname -m instead. No ALARM
+# binary AUR repo exists for aarch64 (see build_kibaos_mobile's mirrorlist
+# note), and yay itself has no reason to be dragged onto the aarch64
+# desktop image, so this whole block is skipped there.
+if [ "$(uname -m)" = "x86_64" ]; then
+  YAY_BUILD=/tmp/yay-bin
+  rm -rf "${YAY_BUILD}"
+  runuser -u builduser -- git clone --depth 1 \
+    https://aur.archlinux.org/yay-bin.git "${YAY_BUILD}"
+  chown -R builduser:builduser "${YAY_BUILD}"
+  runuser -u builduser -- bash -c "cd '${YAY_BUILD}' && makepkg -si --noconfirm --needed"
+  rm -rf "${YAY_BUILD}"
+
+  runuser -u builduser -- yay -S --noconfirm --needed --removemake cutefish-meta
+  echo "=== cutefish-meta installed via yay (x86_64) ==="
+fi
+
 cd /
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
