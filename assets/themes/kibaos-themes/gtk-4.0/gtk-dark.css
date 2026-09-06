@@ -1,0 +1,18 @@
+/* KibaOS Dark Theme Variant
+ * This is the default dark variant of the KibaOS theme
+ * All the same styling as gtk.css but explicitly for dark mode
+ */
+
+@import url("gtk.css");
+
+/* Ensure dark mode is applied */
+window {
+    color-scheme: dark;
+}
+
+/* Override any light mode preferences */
+@media (prefers-color-scheme: light) {
+    window {
+        color-scheme: dark;
+    }
+}

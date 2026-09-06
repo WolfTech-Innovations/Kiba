@@ -1,0 +1,14 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Welcome to KibaOS
+Comment=Get started with KibaOS and discover what you can do
+Exec=kibaos-welcome
+Icon=start-here-symbolic
+Terminal=false
+Categories=System;Settings;GTK;
+StartupNotify=true
+X-GNOME-Autostart-enabled=true
+X-GNOME-SingleWindow=true
+X-GNOME-UsesNotifications=false
+X-KibaOS-WelcomeApp=true

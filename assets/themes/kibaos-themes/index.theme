@@ -1,0 +1,28 @@
+[Icon Theme]
+Name=KibaOS
+Comment=A unified icon theme for KibaOS based on Kora
+Inherits=Kora,Adwaita,hicolor
+
+[Desktop Entry]
+Type=Icon Theme
+Name=KibaOS
+Comment=A unified icon theme for KibaOS based on Kora
+Encoding=UTF-8
+
+[X-KDE-PluginInfo-Name]
+name=KibaOS
+
+[X-KDE-PluginInfo-Category]
+X-KDE-Library=kiconloader
+
+[X-KDE-PluginInfo-Version]
+version=1.0.0
+
+[X-KDE-PluginInfo-Website]
+website=https://github.com/WolfTech-Innovations/Kiba
+
+[X-KDE-PluginInfo-License]
+license=MIT
+
+[X-KDE-PluginInfo-Copyright]
+copyright=2026 Kiba Labs, LLC

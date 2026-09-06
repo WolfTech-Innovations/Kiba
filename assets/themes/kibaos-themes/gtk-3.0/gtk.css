@@ -1,0 +1,575 @@
+/* KibaOS Unified GTK 3.0 Theme
+ * A polished, coherent dark theme based on Dracula palette
+ * with improved readability and user-friendly aesthetics
+ * 
+ * Color Palette:
+ * - Background: #0d1b2a (Deep navy - easy on eyes)
+ * - Surface: #1a2029 (Slightly lighter for cards)
+ * - Primary: #0071e3 (KibaOS blue accent)
+ * - Secondary: #409cff (Lighter blue for highlights)
+ * - Success: #10b981 (Green for positive actions)
+ * - Warning: #f59e0b (Amber for attention)
+ * - Error: #ef4444 (Red for critical issues)
+ * - Text Primary: #f1f5f9 (Light gray for main text)
+ * - Text Secondary: #94a3b8 (Medium gray for secondary text)
+ * - Text Tertiary: #64748b (Dark gray for subtle text)
+ */
+
+/* Base colors */
+@define-color bg_color #0d1b2a;
+@define-color surface_color #1a2029;
+@define-color card_color #1e293b;
+@define-color primary_color #0071e3;
+@define-color primary_hover #0077ed;
+@define-color primary_active #0068d6;
+@define-color accent_color #409cff;
+@define-color success_color #10b981;
+@define-color warning_color #f59e0b;
+@define-color error_color #ef4444;
+@define-color text_primary #f1f5f9;
+@define-color text_secondary #94a3b8;
+@define-color text_tertiary #64748b;
+@define-color border_color rgba(255, 255, 255, 0.08);
+@define-color border_hover rgba(255, 255, 255, 0.16);
+
+/* Window and background */
+window.frame {
+    background-color: @bg_color;
+    border-color: @border_color;
+}
+
+/* Default styling */
+* {
+    background-color: @bg_color;
+    color: @text_primary;
+}
+
+/* Buttons */
+button {
+    background-color: @primary_color;
+    color: white;
+    border-radius: 999px;
+    border: none;
+    padding: 12px 24px;
+    font-weight: 600;
+    font-size: 14px;
+    min-height: 44px;
+    min-width: 120px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 1px 2px rgba(0, 113, 227, 0.2), 
+                0 3px 8px rgba(0, 113, 227, 0.18);
+}
+
+button:hover {
+    background-color: @primary_hover;
+    box-shadow: 0 1px 3px rgba(0, 113, 227, 0.25), 
+                0 4px 12px rgba(0, 113, 227, 0.22);
+}
+
+button:active {
+    background-color: @primary_active;
+    transform: scale(0.97);
+    box-shadow: 0 1px 3px rgba(0, 113, 227, 0.20);
+    transition-duration: 70ms;
+}
+
+button:disabled {
+    background-color: rgba(15, 23, 42, 0.2);
+    color: rgba(255, 255, 255, 0.35);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+button.flat {
+    background-color: transparent;
+    color: @text_secondary;
+    border: 1px solid @border_color;
+    box-shadow: none;
+}
+
+button.flat:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: @border_hover;
+    color: @text_primary;
+}
+
+button.flat:active {
+    background-color: rgba(255, 255, 255, 0.12);
+    transform: scale(0.97);
+}
+
+/* Entry fields */
+entry {
+    background-color: @surface_color;
+    color: @text_primary;
+    border: 1px solid @border_color;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: all 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+entry:focus {
+    outline: none;
+    border-color: @primary_color;
+    background-color: @card_color;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16);
+}
+
+entry:disabled {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: @text_tertiary;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+entry.error {
+    border-color: @error_color;
+}
+
+/* Text styling */
+label {
+    color: @text_primary;
+    font-size: 14px;
+}
+
+label.secondary {
+    color: @text_secondary;
+}
+
+label.tertiary {
+    color: @text_tertiary;
+}
+
+label.title {
+    font-size: 20px;
+    font-weight: 600;
+    color: @text_primary;
+    margin-bottom: 4px;
+}
+
+label.subtitle {
+    font-size: 14px;
+    color: @text_secondary;
+}
+
+/* List boxes and rows */
+listbox {
+    background-color: @bg_color;
+    border: none;
+    padding: 0;
+}
+
+listbox row {
+    background-color: @surface_color;
+    color: @text_primary;
+    border: 1px solid @border_color;
+    border-radius: 8px;
+    margin: 2px 0;
+    padding: 8px 12px;
+    transition: all 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+listbox row:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: @border_hover;
+}
+
+listbox row:selected {
+    background-color: rgba(0, 113, 227, 0.12);
+    border-color: @primary_color;
+    color: @text_primary;
+}
+
+listbox row:selected:hover {
+    background-color: rgba(0, 113, 227, 0.16);
+}
+
+/* Switches */
+switch {
+    background-color: @surface_color;
+    border: 1px solid @border_color;
+    border-radius: 999px;
+    padding: 2px;
+    min-width: 44px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+switch:checked {
+    background-color: @primary_color;
+    border-color: @primary_color;
+}
+
+switch slider {
+    background-color: white;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+switch:checked slider {
+    transform: translateX(20px);
+}
+
+/* Check and radio buttons */
+checkbutton {
+    background-color: transparent;
+    border: 1px solid @border_color;
+    border-radius: 4px;
+    padding: 4px;
+    min-width: 20px;
+    min-height: 20px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+checkbutton:checked {
+    background-color: @primary_color;
+    border-color: @primary_color;
+}
+
+checkbutton:checked:active {
+    background-color: @primary_active;
+}
+
+checkbutton label {
+    color: @text_secondary;
+    padding-left: 8px;
+}
+
+checkbutton:checked label {
+    color: @text_primary;
+}
+
+radiobutton {
+    background-color: transparent;
+    border: 1px solid @border_color;
+    border-radius: 50%;
+    padding: 4px;
+    min-width: 20px;
+    min-height: 20px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+radiobutton:checked {
+    background-color: @primary_color;
+    border-color: @primary_color;
+}
+
+radiobutton:checked:active {
+    background-color: @primary_active;
+}
+
+radiobutton label {
+    color: @text_secondary;
+    padding-left: 8px;
+}
+
+radiobutton:checked label {
+    color: @text_primary;
+}
+
+/* Scrollbars */
+scrollbar {
+    background-color: transparent;
+    border: none;
+}
+
+scrollbar trough {
+    background-color: @surface_color;
+    border-radius: 999px;
+}
+
+scrollbar slider {
+    background-color: @text_tertiary;
+    border-radius: 999px;
+    min-width: 6px;
+    min-height: 6px;
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+scrollbar slider:hover {
+    background-color: @text_secondary;
+}
+
+scrollbar slider:active {
+    background-color: @text_primary;
+}
+
+/* Progress bars */
+progressbar {
+    background-color: @surface_color;
+    border-radius: 999px;
+    min-height: 4px;
+    border: none;
+}
+
+progressbar trough {
+    background-color: @surface_color;
+    border-radius: 999px;
+}
+
+progressbar progress {
+    background: linear-gradient(90deg, @primary_color, @accent_color);
+    border-radius: 999px;
+    transition: width 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Notebooks and tabs */
+notebook {
+    background-color: @bg_color;
+}
+
+notebook header {
+    background-color: @surface_color;
+    border-bottom: 1px solid @border_color;
+}
+
+notebook tab {
+    background-color: transparent;
+    color: @text_secondary;
+    border: none;
+    padding: 8px 16px;
+    font-weight: 500;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    border-bottom: 2px solid transparent;
+}
+
+notebook tab:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: @text_primary;
+}
+
+notebook tab:checked {
+    background-color: @surface_color;
+    color: @text_primary;
+    border-bottom-color: @primary_color;
+}
+
+/* Info bars */
+.infoline {
+    background-color: @surface_color;
+    border: 1px solid @border_color;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: @text_secondary;
+    font-size: 13px;
+}
+
+.infoline.error {
+    border-color: @error_color;
+    color: @error_color;
+}
+
+.infoline.warning {
+    border-color: @warning_color;
+    color: @warning_color;
+}
+
+.infoline.success {
+    border-color: @success_color;
+    color: @success_color;
+}
+
+/* Cards */
+.card {
+    background-color: @surface_color;
+    border: 1px solid @border_color;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 
+                0 4px 12px rgba(0, 0, 0, 0.2);
+    padding: 16px;
+}
+
+/* Tooltips */
+.tooltip {
+    background-color: @card_color;
+    color: @text_primary;
+    border: 1px solid @border_color;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Status bar */
+.statusbar {
+    background-color: @surface_color;
+    border-top: 1px solid @border_color;
+    padding: 8px 16px;
+}
+
+/* Menu styling */
+.menu {
+    background-color: @surface_color;
+    border: 1px solid @border_color;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px;
+}
+
+.menuitem {
+    background-color: transparent;
+    color: @text_secondary;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.menuitem:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: @text_primary;
+}
+
+.menuitem:active {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Separators */
+separator {
+    background-color: @border_color;
+    margin: 8px 0;
+}
+
+/* Animation timing functions */
+* {
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Focus styling */
+:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2);
+}
+
+/* Selection styling */
+selection {
+    background-color: rgba(0, 113, 227, 0.2);
+    color: @text_primary;
+}
+
+/* Header bars */
+.header-bar {
+    background-color: @surface_color;
+    border-bottom: 1px solid @border_color;
+    padding: 8px 16px;
+    min-height: 48px;
+}
+
+.header-bar button {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 999px;
+    background-color: transparent;
+    color: @text_secondary;
+    border: none;
+    box-shadow: none;
+}
+
+.header-bar button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: @text_primary;
+}
+
+.header-bar button:active {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Light theme variant */
+@media (prefers-color-scheme: light) {
+    @define-color bg_color #f8fafc;
+    @define-color surface_color #ffffff;
+    @define-color card_color #f1f5f9;
+    @define-color text_primary #0f172a;
+    @define-color text_secondary #64748b;
+    @define-color text_tertiary #94a3b8;
+    @define-color border_color rgba(0, 0, 0, 0.12);
+    @define-color border_hover rgba(0, 0, 0, 0.24);
+
+    * {
+        background-color: @bg_color;
+        color: @text_primary;
+    }
+    
+    entry {
+        background-color: @surface_color;
+        color: @text_primary;
+        border-color: @border_color;
+    }
+    
+    entry:focus {
+        border-color: @primary_color;
+        background-color: @card_color;
+        box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16);
+    }
+    
+    button {
+        background-color: @primary_color;
+        color: white;
+        box-shadow: 0 1px 2px rgba(0, 113, 227, 0.2), 
+                    0 3px 8px rgba(0, 113, 227, 0.18);
+    }
+    
+    button:hover {
+        background-color: @primary_hover;
+    }
+    
+    button.flat {
+        background-color: transparent;
+        color: @text_secondary;
+        border-color: @border_color;
+    }
+    
+    button.flat:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+        color: @text_primary;
+    }
+    
+    listbox row {
+        background-color: @surface_color;
+        color: @text_primary;
+        border-color: @border_color;
+    }
+    
+    listbox row:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+        border-color: @border_hover;
+    }
+    
+    listbox row:selected {
+        background-color: rgba(0, 113, 227, 0.12);
+        border-color: @primary_color;
+    }
+    
+    switch {
+        background-color: @surface_color;
+        border-color: @border_color;
+    }
+    
+    switch:checked {
+        background-color: @primary_color;
+        border-color: @primary_color;
+    }
+    
+    checkbutton {
+        background-color: transparent;
+        border-color: @border_color;
+    }
+    
+    checkbutton:checked {
+        background-color: @primary_color;
+        border-color: @primary_color;
+    }
+    
+    radiobutton {
+        background-color: transparent;
+        border-color: @border_color;
+    }
+    
+    radiobutton:checked {
+        background-color: @primary_color;
+        border-color: @primary_color;
+    }
+}

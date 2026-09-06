@@ -1,0 +1,50 @@
+{
+    "name": "KibaOS",
+    "description": "A polished, coherent dark theme for KibaOS with Dracula-inspired colors",
+    "author": "Kiba Labs, LLC",
+    "version": "1.0.0",
+    "license": "MIT",
+    "gtk-versions": ["4.0"],
+    "styles": [
+        {
+            "name": "dark",
+            "css": ["gtk-dark.css"]
+        },
+        {
+            "name": "light",
+            "css": ["gtk.css"]
+        }
+    ],
+    "color-schemes": {
+        "dark": {
+            "bg-color": "#0d1b2a",
+            "surface-color": "#1a2029",
+            "card-color": "#1e293b",
+            "primary-color": "#0071e3",
+            "primary-hover": "#0077ed",
+            "primary-active": "#0068d6",
+            "accent-color": "#409cff",
+            "success-color": "#10b981",
+            "warning-color": "#f59e0b",
+            "error-color": "#ef4444",
+            "text-primary": "#f1f5f9",
+            "text-secondary": "#94a3b8",
+            "text-tertiary": "#64748b"
+        },
+        "light": {
+            "bg-color": "#f8fafc",
+            "surface-color": "#ffffff",
+            "card-color": "#f1f5f9",
+            "primary-color": "#0071e3",
+            "primary-hover": "#0077ed",
+            "primary-active": "#0068d6",
+            "accent-color": "#409cff",
+            "success-color": "#10b981",
+            "warning-color": "#f59e0b",
+            "error-color": "#ef4444",
+            "text-primary": "#0f172a",
+            "text-secondary": "#64748b",
+            "text-tertiary": "#94a3b8"
+        }
+    }
+}

@@ -1,0 +1,811 @@
+/* KibaOS Unified GTK Theme
+ * A polished, coherent dark theme based on Dracula palette
+ * with improved readability and user-friendly aesthetics
+ * 
+ * Color Palette:
+ * - Background: #0d1b2a (Deep navy - easy on eyes)
+ * - Surface: #1a2029 (Slightly lighter for cards)
+ * - Primary: #0071e3 (KibaOS blue accent)
+ * - Secondary: #409cff (Lighter blue for highlights)
+ * - Success: #10b981 (Green for positive actions)
+ * - Warning: #f59e0b (Amber for attention)
+ * - Error: #ef4444 (Red for critical issues)
+ * - Text Primary: #f1f5f9 (Light gray for main text)
+ * - Text Secondary: #94a3b8 (Medium gray for secondary text)
+ * - Text Tertiary: #64748b (Dark gray for subtle text)
+ */
+
+/* Base colors */
+@define-color bg-color #0d1b2a;
+@define-color surface-color #1a2029;
+@define-color card-color #1e293b;
+@define-color primary-color #0071e3;
+@define-color primary-hover #0077ed;
+@define-color primary-active #0068d6;
+@define-color accent-color #409cff;
+@define-color success-color #10b981;
+@define-color warning-color #f59e0b;
+@define-color error-color #ef4444;
+@define-color text-primary #f1f5f9;
+@define-color text-secondary #94a3b8;
+@define-color text-tertiary #64748b;
+@define-color border-color rgba(255, 255, 255, 0.08);
+@define-color border-hover rgba(255, 255, 255, 0.16);
+
+/* Window and background */
+window.background-color: @bg-color;
+window.color: @text-primary;
+window.frame {
+    background-color: @bg-color;
+    border-color: @border-color;
+}
+
+/* View and container backgrounds */
+view {
+    background-color: @bg-color;
+}
+
+box {
+    background-color: @bg-color;
+}
+
+/* Frame styling */
+frame {
+    background-color: @surface-color;
+    border-radius: 12px;
+    border-width: 1px;
+    border-color: @border-color;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 
+                0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Buttons */
+button {
+    background-color: @primary-color;
+    color: white;
+    border-radius: 999px;
+    border: none;
+    padding: 12px 24px;
+    font-weight: 600;
+    font-size: 14px;
+    min-height: 44px;
+    min-width: 120px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 1px 2px rgba(0, 113, 227, 0.2), 
+                0 3px 8px rgba(0, 113, 227, 0.18);
+}
+
+button:hover {
+    background-color: @primary-hover;
+    box-shadow: 0 1px 3px rgba(0, 113, 227, 0.25), 
+                0 4px 12px rgba(0, 113, 227, 0.22);
+}
+
+button:active {
+    background-color: @primary-active;
+    transform: scale(0.97);
+    box-shadow: 0 1px 3px rgba(0, 113, 227, 0.20);
+    transition-duration: 70ms;
+}
+
+button:disabled {
+    background-color: rgba(15, 23, 42, 0.2);
+    color: rgba(255, 255, 255, 0.35);
+    box-shadow: none;
+    cursor: not-allowed;
+}
+
+button.flat {
+    background-color: transparent;
+    color: @text-secondary;
+    border: 1px solid @border-color;
+    box-shadow: none;
+}
+
+button.flat:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: @border-hover;
+    color: @text-primary;
+}
+
+button.flat:active {
+    background-color: rgba(255, 255, 255, 0.12);
+    transform: scale(0.97);
+}
+
+/* Secondary button style */
+button.secondary {
+    background-color: @surface-color;
+    color: @text-primary;
+    border: 1px solid @border-color;
+    box-shadow: none;
+}
+
+button.secondary:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: @border-hover;
+}
+
+button.secondary:active {
+    background-color: rgba(255, 255, 255, 0.14);
+    transform: scale(0.97);
+}
+
+/* Destructive button */
+button.destructive {
+    background-color: @error-color;
+    color: white;
+}
+
+button.destructive:hover {
+    background-color: #dc2626;
+}
+
+button.destructive:active {
+    background-color: #b91c1c;
+}
+
+/* Entry fields */
+entry {
+    background-color: @surface-color;
+    color: @text-primary;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    transition: all 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+entry:focus {
+    outline: none;
+    border-color: @primary-color;
+    background-color: @card-color;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16);
+}
+
+entry:disabled {
+    background-color: rgba(255, 255, 255, 0.04);
+    color: @text-tertiary;
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+entry.error {
+    border-color: @error-color;
+}
+
+/* Text styling */
+label {
+    color: @text-primary;
+    font-size: 14px;
+}
+
+label.secondary {
+    color: @text-secondary;
+}
+
+label.tertiary {
+    color: @text-tertiary;
+}
+
+label.title {
+    font-size: 20px;
+    font-weight: 600;
+    color: @text-primary;
+    margin-bottom: 4px;
+}
+
+label.subtitle {
+    font-size: 14px;
+    color: @text-secondary;
+}
+
+/* Header bars */
+headerbar {
+    background-color: @surface-color;
+    border-bottom: 1px solid @border-color;
+    padding: 8px 16px;
+    min-height: 48px;
+}
+
+headerbar button {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0;
+    border-radius: 999px;
+    background-color: transparent;
+    color: @text-secondary;
+    border: none;
+    box-shadow: none;
+}
+
+headerbar button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: @text-primary;
+}
+
+headerbar button:active {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+/* List boxes and rows */
+listbox {
+    background-color: @bg-color;
+    border: none;
+    padding: 0;
+}
+
+listbox row {
+    background-color: @surface-color;
+    color: @text-primary;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    margin: 2px 0;
+    padding: 8px 12px;
+    transition: all 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+listbox row:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    border-color: @border-hover;
+}
+
+listbox row:selected {
+    background-color: rgba(0, 113, 227, 0.12);
+    border-color: @primary-color;
+    color: @text-primary;
+}
+
+listbox row:selected:hover {
+    background-color: rgba(0, 113, 227, 0.16);
+}
+
+/* Switches */
+switch {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 999px;
+    padding: 2px;
+    min-width: 44px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+switch:checked {
+    background-color: @primary-color;
+    border-color: @primary-color;
+}
+
+switch slider {
+    background-color: white;
+    border-radius: 999px;
+    width: 20px;
+    height: 20px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+switch:checked slider {
+    transform: translateX(20px);
+}
+
+/* Check and radio buttons */
+checkbutton {
+    background-color: transparent;
+    border: 1px solid @border-color;
+    border-radius: 4px;
+    padding: 4px;
+    min-width: 20px;
+    min-height: 20px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+checkbutton:checked {
+    background-color: @primary-color;
+    border-color: @primary-color;
+}
+
+checkbutton:checked:active {
+    background-color: @primary-active;
+}
+
+checkbutton label {
+    color: @text-secondary;
+    padding-left: 8px;
+}
+
+checkbutton:checked label {
+    color: @text-primary;
+}
+
+radiobutton {
+    background-color: transparent;
+    border: 1px solid @border-color;
+    border-radius: 50%;
+    padding: 4px;
+    min-width: 20px;
+    min-height: 20px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+radiobutton:checked {
+    background-color: @primary-color;
+    border-color: @primary-color;
+}
+
+radiobutton:checked:active {
+    background-color: @primary-active;
+}
+
+radiobutton label {
+    color: @text-secondary;
+    padding-left: 8px;
+}
+
+radiobutton:checked label {
+    color: @text-primary;
+}
+
+/* Scrollbars */
+scrollbar {
+    background-color: transparent;
+    border: none;
+}
+
+scrollbar trough {
+    background-color: @surface-color;
+    border-radius: 999px;
+}
+
+scrollbar slider {
+    background-color: @text-tertiary;
+    border-radius: 999px;
+    min-width: 6px;
+    min-height: 6px;
+    transition: background-color 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+scrollbar slider:hover {
+    background-color: @text-secondary;
+}
+
+scrollbar slider:active {
+    background-color: @text-primary;
+}
+
+/* Progress bars */
+progressbar {
+    background-color: @surface-color;
+    border-radius: 999px;
+    min-height: 4px;
+    border: none;
+}
+
+progressbar trough {
+    background-color: @surface-color;
+    border-radius: 999px;
+}
+
+progressbar progress {
+    background: linear-gradient(90deg, @primary-color, @accent-color);
+    border-radius: 999px;
+    transition: width 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Notebooks and tabs */
+notebook {
+    background-color: @bg-color;
+}
+
+notebook header {
+    background-color: @surface-color;
+    border-bottom: 1px solid @border-color;
+}
+
+notebook tab {
+    background-color: transparent;
+    color: @text-secondary;
+    border: none;
+    padding: 8px 16px;
+    font-weight: 500;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+    border-bottom: 2px solid transparent;
+}
+
+notebook tab:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: @text-primary;
+}
+
+notebook tab:checked {
+    background-color: @surface-color;
+    color: @text-primary;
+    border-bottom-color: @primary-color;
+}
+
+/* Info bars */
+infoline {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: @text-secondary;
+    font-size: 13px;
+}
+
+infoline.error {
+    border-color: @error-color;
+    color: @error-color;
+}
+
+infoline.warning {
+    border-color: @warning-color;
+    color: @warning-color;
+}
+
+infoline.success {
+    border-color: @success-color;
+    color: @success-color;
+}
+
+/* Cards */
+card {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 
+                0 4px 12px rgba(0, 0, 0, 0.2);
+    padding: 16px;
+}
+
+/* Tooltips */
+.tooltip {
+    background-color: @card-color;
+    color: @text-primary;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* Status bar */
+statusbar {
+    background-color: @surface-color;
+    border-top: 1px solid @border-color;
+    padding: 8px 16px;
+}
+
+/* Menu styling */
+menu {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px;
+}
+
+menuitem {
+    background-color: transparent;
+    color: @text-secondary;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+menuitem:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: @text-primary;
+}
+
+menuitem:active {
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+/* Separators */
+separator {
+    background-color: @border-color;
+    margin: 8px 0;
+}
+
+/* Calendar and date pickers */
+calendar {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+calendar header {
+    color: @text-secondary;
+    font-weight: 600;
+    padding: 4px 8px;
+}
+
+calendar day {
+    color: @text-primary;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+calendar day:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+calendar day:selected {
+    background-color: @primary-color;
+    color: white;
+}
+
+calendar day:selected:hover {
+    background-color: @primary-hover;
+}
+
+/* Spin buttons */
+spinbutton {
+    background-color: @surface-color;
+    color: @text-primary;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 4px 8px;
+    min-width: 80px;
+}
+
+spinbutton:focus {
+    border-color: @primary-color;
+    background-color: @card-color;
+}
+
+spinbutton button {
+    background-color: transparent;
+    color: @text-secondary;
+    border: none;
+    padding: 0;
+    min-width: 24px;
+    min-height: 24px;
+}
+
+spinbutton button:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: @text-primary;
+}
+
+spinbutton button:active {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+/* File chooser */
+filechooser {
+    background-color: @bg-color;
+}
+
+filechooser pathbar {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 4px 8px;
+}
+
+filechooser sidebar {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+}
+
+/* Tree and column views */
+treeview {
+    background-color: @bg-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+}
+
+treeview header {
+    background-color: @surface-color;
+    color: @text-secondary;
+    font-weight: 600;
+    padding: 4px 8px;
+}
+
+treeview row {
+    background-color: @surface-color;
+    color: @text-primary;
+    padding: 4px 8px;
+    transition: all 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+treeview row:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+}
+
+treeview row:selected {
+    background-color: rgba(0, 113, 227, 0.12);
+    color: @text-primary;
+}
+
+/* Popover menus */
+popovermenu {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    padding: 4px;
+}
+
+/* Color chooser */
+colorchooser {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* Font chooser */
+fontchooser {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* Dialog styling */
+dialog {
+    background-color: @bg-color;
+}
+
+/* About dialog */
+aboutdialog {
+    background-color: @bg-color;
+}
+
+aboutdialog logo {
+    background-color: @surface-color;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* Preferences window */
+preferenceswindow {
+    background-color: @bg-color;
+}
+
+preferenceswindow sidebar {
+    background-color: @surface-color;
+    border: 1px solid @border-color;
+}
+
+preferenceswindow content {
+    background-color: @bg-color;
+}
+
+/* Animation timing functions */
+* {
+    transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Focus styling */
+:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2);
+}
+
+/* Selection styling */
+selection {
+    background-color: rgba(0, 113, 227, 0.2);
+    color: @text-primary;
+}
+
+/* Override for dark theme preference */
+@media (prefers-color-scheme: dark) {
+    window.background-color: @bg-color;
+    view.background-color: @bg-color;
+}
+
+/* Light theme variant */
+@media (prefers-color-scheme: light) {
+    /* Light theme colors */
+    @define-color bg-color #f8fafc;
+    @define-color surface-color #ffffff;
+    @define-color card-color #f1f5f9;
+    @define-color primary-color #0071e3;
+    @define-color primary-hover #0077ed;
+    @define-color primary-active #0068d6;
+    @define-color accent-color #409cff;
+    @define-color success-color #10b981;
+    @define-color warning-color #f59e0b;
+    @define-color error-color #ef4444;
+    @define-color text-primary #0f172a;
+    @define-color text-secondary #64748b;
+    @define-color text-tertiary #94a3b8;
+    @define-color border-color rgba(0, 0, 0, 0.12);
+    @define-color border-hover rgba(0, 0, 0, 0.24);
+
+    window.background-color: @bg-color;
+    window.color: @text-primary;
+    
+    frame {
+        background-color: @surface-color;
+        border-color: @border-color;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 
+                    0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+    
+    entry {
+        background-color: @surface-color;
+        color: @text-primary;
+        border-color: @border-color;
+    }
+    
+    entry:focus {
+        border-color: @primary-color;
+        background-color: @card-color;
+        box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16);
+    }
+    
+    button {
+        background-color: @primary-color;
+        color: white;
+        box-shadow: 0 1px 2px rgba(0, 113, 227, 0.2), 
+                    0 3px 8px rgba(0, 113, 227, 0.18);
+    }
+    
+    button:hover {
+        background-color: @primary-hover;
+    }
+    
+    button.flat {
+        background-color: transparent;
+        color: @text-secondary;
+        border-color: @border-color;
+    }
+    
+    button.flat:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+        color: @text-primary;
+    }
+    
+    listbox row {
+        background-color: @surface-color;
+        color: @text-primary;
+        border-color: @border-color;
+    }
+    
+    listbox row:hover {
+        background-color: rgba(0, 0, 0, 0.04);
+        border-color: @border-hover;
+    }
+    
+    listbox row:selected {
+        background-color: rgba(0, 113, 227, 0.12);
+        border-color: @primary-color;
+    }
+    
+    switch {
+        background-color: @surface-color;
+        border-color: @border-color;
+    }
+    
+    switch:checked {
+        background-color: @primary-color;
+        border-color: @primary-color;
+    }
+    
+    checkbutton {
+        background-color: transparent;
+        border-color: @border-color;
+    }
+    
+    checkbutton:checked {
+        background-color: @primary-color;
+        border-color: @primary-color;
+    }
+    
+    radiobutton {
+        background-color: transparent;
+        border-color: @border-color;
+    }
+    
+    radiobutton:checked {
+        background-color: @primary-color;
+        border-color: @primary-color;
+    }
+}
