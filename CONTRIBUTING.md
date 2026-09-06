@@ -1,33 +1,64 @@
 # Contributing to KibaOS
 
 <p align="center">
-  <img src="/branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
+  <img src="branding/kibaos_banner.png" alt="KibaOS Banner" width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Status-Welcome-success?style=for-the-badge" alt="Welcome">
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/Questions-GitHub_Discussions-ff79c6?style=for-the-badge&logo=github" alt="Discussions">
 </p>
 
 ---
 
-First of all, thank you for your interest in contributing to KibaOS! We welcome contributions from developers, designers, and documentation enthusiasts.
+Thank you for your interest in contributing to KibaOS! We welcome contributions from developers, designers, documentation enthusiasts, and community members.
 
 ---
 
-## Developer Quick Start
+## Table of Contents
 
-To begin contributing to the KibaOS build system or customization hooks, follow these steps:
+- [Getting Started](#getting-started)
+- [How to Contribute](#how-to-contribute)
+  - [Reporting Bugs](#reporting-bugs)
+  - [Suggesting Features](#suggesting-features)
+  - [Submitting Pull Requests](#submitting-pull-requests)
+- [Development Guidelines](#development-guidelines)
+- [Project Structure](#project-structure)
+- [Automated Triage](#automated-triage)
+- [License](#license)
+- [Related Reading](#related-reading)
 
-1. **Fork the Repo:** Create your own fork of [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba).
-2. **Setup Environment:** Ensure you have **Docker** installed on a Linux host.
-3. **Local Build:** Run a local build to ensure your environment is working:
+---
 
+## Getting Started
+
+### Prerequisites
+
+To contribute to KibaOS development, you'll need:
+
+- A Linux system (preferably Arch-based or Debian/Ubuntu)
+- **Docker** installed and running
+- At least **15 GB** of free disk space
+- Git installed
+
+### Local Development Setup
+
+1. **Fork the Repository:** Create your own fork of [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba)
+
+2. **Clone your fork:**
    ```bash
    git clone https://github.com/YOUR_USERNAME/Kiba
    cd Kiba
+   ```
+
+3. **Run a local build to verify your environment:**
+   ```bash
    docker run --rm --privileged -v "$PWD:/w" -e RUN_NUM=local archlinux:latest /w/build.sh
    ```
+
+> [!TIP]
+> The build process may take 30-60 minutes depending on your hardware and internet connection speed.
 
 ---
 
@@ -35,59 +66,87 @@ To begin contributing to the KibaOS build system or customization hooks, follow 
 
 ### Reporting Bugs
 
-If you find a bug, please open an issue on our [GitHub repository](https://github.com/WolfTech-Innovations/Kiba/issues). Provide as much detail as possible, including:
+If you find a bug, please open an issue on our [GitHub Issues](https://github.com/WolfTech-Innovations/Kiba/issues). Provide as much detail as possible, including:
 
-- A clear and descriptive title.
-- Steps to reproduce the bug.
-- Expected and actual behavior.
-- Screenshots or logs if applicable.
+- A clear and descriptive title
+- Steps to reproduce the bug
+- Expected behavior vs. actual behavior
+- Screenshots or logs if applicable
+- Your system information (KibaOS version, hardware specs)
+
+**Before reporting:**
+- Check if the issue already exists in the issue tracker
+- Try reproducing the bug in a fresh live session
+- Include relevant log files (`/var/log/` or journalctl output)
 
 ### Suggesting Features
 
-We are always looking for ways to improve KibaOS. If you have an idea for a new feature, please open an issue and describe:
+We're always looking for ways to improve KibaOS. If you have an idea for a new feature:
 
-- The problem your feature would solve.
-- How the feature would work.
-- Any alternative solutions you've considered.
+1. **Check existing issues:** See if your feature has already been requested
+2. **Open a discussion:** Start a conversation in [GitHub Discussions](https://github.com/WolfTech-Innovations/Kiba/discussions) to gather community feedback
+3. **Create a feature request:** Open an issue with the `enhancement` label
+
+Please include:
+- The problem your feature would solve
+- How the feature would work
+- Any alternative solutions you've considered
+- How it aligns with KibaOS's philosophy of "modern simplicity"
 
 ### Submitting Pull Requests
 
 If you're ready to contribute code or documentation:
 
-1. **Fork the repository** and create your branch from `main`.
-2. **Follow the coding style** used in the project.
-3. **Verify your changes** by running relevant build scripts or tests.
-4. **Submit a pull request** with a clear description of your changes and reference any related issues.
-   If you find a bug, please open an issue. Provide:
+1. **Create a branch:** Work on a descriptive branch name (e.g., `feature/custom-icons`, `fix/installer-bug`)
+2. **Follow the coding style:** Use consistent indentation, clear variable names, and follow existing patterns
+3. **Test your changes:** Always run a local build to verify your changes don't break the ISO generation
+4. **Commit messages:** Follow conventional commit messages (e.g., `feat: add custom icons`, `fix: installer crash on UEFI`)
+5. **Submit a pull request:** Provide a clear description of your changes and reference any related issues
 
-- Steps to reproduce.
-- Expected vs. Actual behavior.
-- System logs or screenshots.
+> [!IMPORTANT]
+> Always test your changes by running a local build before submitting a PR. The GitHub Actions CI will also run tests on your PR.
 
-### Suggesting Features (Community)
+---
 
-We love new ideas! Please open an issue to discuss significant features before implementation. This ensures they align with the KibaOS philosophy of "modern simplicity."
+## Development Guidelines
 
-### Submitting Pull Requests (Process)
+### Code Style
 
-- **Branching:** Work on a descriptive branch name (e.g., `feature/custom-icons`).
-- **Commits:** Follow conventional commit messages.
-- **Testing:** Always run a local build (see above) to verify your changes don't break the ISO generation.
+- Use **2-space indentation** for shell scripts
+- Use **4-space indentation** for Python code
+- Follow **shellcheck** recommendations for shell scripts
+- Include comments for non-obvious logic
+- Keep commits atomic and focused on a single change
+
+### Build System
+
+The KibaOS build system is primarily configured in:
+- `.github/workflows/kiba.yml` - Main CI/CD pipeline
+- `build.sh` - Main build script (generated by CI)
+- Custom hooks in `config/hooks/` - System customization logic
+
+> [!TIP]
+> Most of the system customization logic resides in the **`build.sh`** generation block within **`.github/workflows/kiba.yml`**. Look for the `cat > config/hooks/live/...` sections.
+
+### Testing
+
+- Always test changes in a clean environment
+- Verify that the ISO boots and the installer works
+- Test on both BIOS and UEFI systems when possible
+- Check that all customizations are applied correctly
 
 ---
 
 ## Project Structure
 
-| Directory               | Purpose                                         |
-| :---------------------- | :---------------------------------------------- |
-| **`.github/workflows`** | GitHub Actions build and release orchestration. |
-| **`branding/`**         | Visual assets (banners, logos).                 |
-| **`docs/`**             | Technical documentation.                        |
-| **`README.md`**         | Main project entry point.                       |
-| **`WIKI.md`**           | Detailed technical manual.                      |
-
-> [!TIP]
-> Most of the system customization logic resides in the **`build.sh`** generation block within **`.github/workflows/kiba.yml`**. Look for the `cat > config/hooks/live/...` sections.
+| Directory | Purpose |
+| :-------- | :------ |
+| `.github/workflows/` | GitHub Actions build and release orchestration |
+| `branding/` | Visual assets (banners, logos, icons) |
+| `docs/` | Technical documentation |
+| `README.md` | Main project entry point |
+| `WIKI.md` | Detailed technical manual |
+| `CONTRIBUTING.md` | This file |
 
 ---
 
@@ -95,20 +154,25 @@ We love new ideas! Please open an issue to discuss significant features before i
 
 We use automated workflows to help manage the project:
 
-- **Labeler:** Automatically labels PRs based on changed files.
-- **Issue Triage:** Auto-labels new issues based on keywords (`bug`, `feature`, etc.).
-- **Stale:** Automatically closes inactive issues after a period of time.
+- **Labeler:** Automatically labels PRs based on changed files
+- **Issue Triage:** Auto-labels new issues based on keywords (`bug`, `feature`, `enhancement`, etc.)
+- **Stale:** Automatically closes inactive issues and PRs after a period of time
+- **Dependency Review:** Scans for vulnerable dependencies
+- **CodeQL:** Static code analysis for security vulnerabilities
 
 ---
 
 ## License
 
-By contributing to KibaOS, you agree that your contributions will be licensed under the **MIT License**.
+By contributing to KibaOS, you agree that your contributions will be licensed under the **MIT License**. All contributions must be original work or properly attributed to their original authors.
 
 ---
 
 ## Related Reading
 
-- [**Build System**](docs/build-system.md)
-- [**Architecture**](docs/architecture.md)
+- [**Build System Documentation**](docs/build-system.md)
+- [**Architecture Deep-Dive**](docs/architecture.md)
+- [**UX & Design**](docs/ux-design.md)
+- [**Software Management**](docs/software-management.md)
 - [**FAQ**](docs/faq.md)
+- [**Wiki**](WIKI.md)

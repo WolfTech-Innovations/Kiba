@@ -6,10 +6,10 @@
 
 <p align="center">
   <a href="https://github.com/WolfTech-Innovations/Kiba/actions/workflows/kiba.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main`&label=Build&style=for-the-badge" alt="Build Status">
+    <img src="https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/kiba.yml?branch=main&label=Build&style=for-the-badge" alt="Build Status">
   </a>
   <img src="https://img.shields.io/badge/License-MIT-purple?style=for-the-badge" alt="License">
-  <img src="https://img.shields.io/badge/Status-Stable-success?style=for-the-badge" alt="Status">
+  <img src="https://img.shields.io/badge/Status-Active-success?style=for-the-badge" alt="Status">
 </p>
 
 Welcome to the official **KibaOS Wiki**. This document provides an exhaustive deep-dive into the internals, design philosophy, and technical implementation of KibaOS.
@@ -18,29 +18,29 @@ Welcome to the official **KibaOS Wiki**. This document provides an exhaustive de
 
 ## Table of Contents
 
-- [Extended Documentation](#-extended-documentation)
-- [Architecture & Core Components](#-architecture--core-components)
+- [Extended Documentation](#extended-documentation)
+- [Architecture & Core Components](#architecture--core-components)
   - [Base System](#base-system)
   - [Extreme Minimization](#extreme-minimization)
-- [User Experience (UX) & Design](#-user-experience-ux--design)
+- [User Experience (UX) & Design](#user-experience-ux--design)
   - [Visual Identity](#visual-identity)
   - [Shell Experience](#shell-experience)
   - [Boot & Branding](#boot--branding)
-- [Software Management](#-software-management)
+- [Software Management](#software-management)
   - [KibaStore](#kibastore)
   - [Repositories & Packages](#repositories--packages)
-- [Security & Compliance](#-security--compliance)
+- [Security & Compliance](#security--compliance)
   - [California AADC (AB 2273)](#california-aadc-ab-2273)
-- [Build Infrastructure](#-build-infrastructure)
+- [Build Infrastructure](#build-infrastructure)
   - [Build Pipeline](#build-pipeline)
   - [Image Optimization](#image-optimization)
-- [Build Locally](#-build-locally)
-- [Community & Support](#-community--support)
-- [License](#-license)
+- [Build Locally](#build-locally)
+- [Community & Support](#community--support)
+- [License](#license)
 
 ---
 
-## 📖 Extended Documentation
+## Extended Documentation
 
 For more specific details on the various components of KibaOS, please refer to the following documents:
 
@@ -51,6 +51,7 @@ For more specific details on the various components of KibaOS, please refer to t
 - [**Build Infrastructure & Automation**](./docs/build-system.md)
 - [**Contributing Guidelines**](./docs/contributing.md)
 - [**Frequently Asked Questions**](./docs/faq.md)
+- [**Manual Compilation Guide**](./docs/manual-compilation.md)
 
 ---
 
@@ -58,64 +59,64 @@ For more specific details on the various components of KibaOS, please refer to t
 
 ### Base System
 
-KibaOS is built upon the **Arch Linux base (Rolling)** testing branch, providing a modern yet stable foundation intended for use until at least 2030.
+KibaOS is built upon the **Arch Linux base (Rolling)** testing branch, providing a modern yet stable foundation.
 
-- **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance).
-- **Init System:** **Systemd**.
-- **Display Server:** **Wayland** (default) with **X11** fallback.
-- **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems).
+- **Kernel:** **CachyOS Kernel** (optimized for desktop responsiveness and performance)
+- **Init System:** **Systemd**
+- **Display Server:** **Wayland** (default) with **X11** fallback via XWayland
+- **Bootloader:** **GRUB** (provides hybrid support for BIOS and UEFI systems)
 
 ### Extreme Minimization
 
 The system undergoes aggressive footprint reduction during the build process:
 
-- **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed.
-- **Locale Optimization:** Only `en` and `en_US` locales are preserved.
-- **Dependency Pruning:** Meta-packages like `kde-plasma-desktop` are avoided in favor of a minimal `plasma-bigscreen` + `plasma-workspace` combination.
-- **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage.
+- **Documentation Stripping:** All `/usr/share/doc`, `/usr/share/man`, and `/usr/share/info` files are removed
+- **Locale Optimization:** Only `en` and `en_US` locales are preserved
+- **Dependency Pruning:** Meta-packages are avoided in favor of minimal component combinations
+- **Binary Compression:** ELF binaries are compressed using **UPX** (best mode, excluding critical system components) to reduce disk usage
 
 ---
 
-## 🎨 User Experience (UX) & Design
+## User Experience (UX) & Design
 
 ### Visual Identity
 
 KibaOS follows the **Dracula** color palette for system-wide visual consistency.
 
-| Component               | Choice               |
-| ----------------------- | -------------------- |
+| Component | Choice |
+| --------- | ------ |
 | **Desktop Environment** | **Cutefish OS** |
-| **Global Theme**        | **Ant-Dark**         |
-| **Color Scheme**        | **Dracula**          |
-| **Icon Theme**          | **Kora**             |
-| **Cursor Theme**        | **Vimix**            |
-| **System Font**         | **Inter**            |
-| **Monospace Font**      | **JetBrains Mono**   |
+| **Global Theme** | **Ant-Dark** |
+| **Color Scheme** | **Dracula** |
+| **Icon Theme** | **Kora** |
+| **Cursor Theme** | **Vimix** |
+| **System Font** | **Inter** |
+| **Monospace Font** | **JetBrains Mono** |
 
 ### Shell Experience
 
 **Zsh** is the default shell for all users, including `root`.
 
-- **Prompt:** **Starship** (Pre-configured with a minimalist Dracula theme).
-- **Plugins:** Autosuggestions and Syntax Highlighting are enabled by default.
+- **Prompt:** **Starship** (pre-configured with a minimalist Dracula theme)
+- **Plugins:** Autosuggestions and Syntax Highlighting are enabled by default
 - **Modern CLI Tools:**
-  - `pacman` (Beautiful frontend for `pacman`)
-  - `eza` (Modern `ls` replacement)
-  - `bat` (Syntax-highlighting `cat`)
-  - `fastfetch` (System information)
-  - `btop` (Resource monitor)
-  - `ripgrep` (Fast search)
-  - `fd-find` (Fast file finder)
+  - `pacman` (beautiful frontend for `pacman`)
+  - `eza` (modern `ls` replacement)
+  - `bat` (syntax-highlighting `cat`)
+  - `fastfetch` (system information)
+  - `btop` (resource monitor)
+  - `ripgrep` (fast search)
+  - `fd-find` (fast file finder)
   - `tealdeer` (`tldr` implementation)
 
 ### Boot & Branding
 
-- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo.
-- **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners.
+- **Plymouth:** Custom "kibaos-spinner" theme with a Dracula-themed progress bar and logo
+- **Boot Menu:** Branded **GRUB** menu with plain-English options for beginners
 
 ---
 
-## 📦 Software Management
+## Software Management
 
 ### KibaStore
 
@@ -123,9 +124,9 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 
 ### Repositories & Packages
 
-- **Ungoogled Chromium:** Provided via OBS (Open Build Service) repository.
-- **Flatpak:** Integrated by default with the **Flathub** remote.
-- **Nala:** Configured as the primary package manager frontend with system-wide aliases (`pacman` -> `pacman`).
+- **Ungoogled Chromium:** Provided via OBS (Open Build Service) repository
+- **Flatpak:** Integrated by default with the **Flathub** remote
+- **Pacman:** Configured as the primary package manager with system-wide aliases
 
 ---
 
@@ -135,8 +136,8 @@ KibaOS features **KibaStore**, which is a native build of **Bazaar**. It serves 
 
 KibaOS includes a custom **Age Verification** module within the **Calamares** installer to comply with the **California Age-Appropriate Design Code Act**.
 
-- **Implementation:** A Python-based view module in the installer.
-- **Privacy:** Data is stored **locally only** at `/etc/kibatv/age-verify` and is never transmitted to external servers.
+- **Implementation:** A Python-based view module in the installer
+- **Privacy:** Data is stored **locally only** at `/etc/kibatv/age-verify` and is never transmitted to external servers
 
 ---
 
@@ -146,15 +147,15 @@ KibaOS uses a highly automated CI/CD pipeline.
 
 ### Build Pipeline
 
-1. **Tooling:** Built using **live-build** (lb).
-2. **Environment:** **Docker** container running **Arch Linux Rolling**.
-3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`).
-4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds.
+1. **Tooling:** Built using **live-build** (lb)
+2. **Environment:** **Docker** container running **Arch Linux Rolling**
+3. **Orchestration:** **GitHub Actions** (`.github/workflows/kiba.yml`)
+4. **Caching:** Extensive stage caching (bootstrap, chroot, rootfs, binary) for fast builds
 
 ### Image Optimization
 
-- **Compression:** The SquashFS filesystem is repacked with **Zstd** (compression level 19) for maximum space efficiency and decompression speed.
-- **Initramfs:** Configured with `zstd -19` for faster boot times.
+- **Compression:** The SquashFS filesystem is repacked with **Zstd** (compression level 19) for maximum space efficiency and decompression speed
+- **Initramfs:** Configured with `zstd -19` for faster boot times
 
 ---
 
@@ -177,7 +178,7 @@ docker run --rm --privileged \
 
 ---
 
-## 🤝 Community & Support
+## Community & Support
 
 - **Repository:** [GitHub](https://github.com/WolfTech-Innovations/Kiba)
 - **Downloads:** [SourceForge](https://sourceforge.net/projects/kibaos/)
@@ -191,4 +192,4 @@ docker run --rm --privileged \
 KibaOS is a distribution composed of many independent components. While each component carries its own license, the build scripts, configurations, and original tooling in this repository are licensed under the [**MIT License**](./LICENSE).
 
 > [!NOTE]
-> KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged.
+> KibaOS is a community-driven project. Contributions in the form of code, documentation, or bug reports are highly encouraged. Please see our [Contributing Guide](CONTRIBUTING.md) for more information.

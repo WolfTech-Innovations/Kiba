@@ -1,44 +1,51 @@
-# Bug Report Template
+---
+name: Bug report
+description: Create a report to help us improve KibaOS
+title: "[Bug] "
+labels: bug
+assignees: ''
 
 ---
 
-name: Bug report
-description: Create a report to help us improve
-about: Create a report to help us improve
-title: ""
-labels: ""
+# Bug Report
 
-## Assignees
+Thank you for reporting an issue with KibaOS! Please fill out the template below to help us understand and reproduce the problem.
 
-**Describe the bug**
+## Describe the Bug
 A clear and concise description of what the bug is.
 
-**To Reproduce**
+## To Reproduce
 Steps to reproduce the behavior:
-
 1. Go to '...'
 2. Click on '....'
 3. Scroll down to '....'
 4. See error
 
-**Expected behavior**
+## Expected Behavior
 A clear and concise description of what you expected to happen.
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+## Screenshots/Logs
+If applicable, add screenshots or log output to help explain your problem.
 
-**Desktop (please complete the following information):**
+## Environment
+Please provide the following information:
 
-- OS: [e.g., iOS]
-- Browser [e.g., chrome, safari]
-- Version [e.g., 22]
+- **KibaOS Version:** [e.g., 1.0, latest ISO from SourceForge]
+- **Installation Type:** [Live session / Installed to disk]
+- **Hardware:** [Laptop/Desktop, CPU, RAM, Storage type]
+- **Boot Mode:** [BIOS/Legacy or UEFI]
+- **Graphics:** [Integrated/Dedicated, GPU model if known]
 
-**Smartphone (please complete the following information):**
+## Additional Context
+Add any other context about the problem here. This could include:
+- Workarounds you've tried
+- Similar issues you've found
+- Whether this occurs consistently or intermittently
 
-- Device: [e.g., iPhone6]
-- OS: [e.g., iOS8.1]
-- Browser [e.g., stock browser, safari]
-- Version [e.g., 22]
+---
 
-**Additional context**
-Add any other context about the problem here.
+> [!TIP]
+> For installation issues, please include a screenshot of the error message and check the installer logs at `/var/log/calamares.log`
+
+> [!NOTE]
+> If you're reporting a bug in a specific application (e.g., KibaStore, terminal), please also note the application version if available.
