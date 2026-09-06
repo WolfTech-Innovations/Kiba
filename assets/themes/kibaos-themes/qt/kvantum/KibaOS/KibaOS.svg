@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <!-- KibaOS Theme SVG for Kvantum -->
+  <!-- This SVG provides the base colors and gradients for the theme -->
+  
+  <defs>
+    <!-- Color Definitions matching GTK theme -->
+    <color id="bg-color" rgb="13,27,42"/>
+    <color id="surface-color" rgb="26,32,41"/>
+    <color id="card-color" rgb="30,41,59"/>
+    <color id="primary-color" rgb="0,113,227"/>
+    <color id="primary-hover" rgb="0,119,237"/>
+    <color id="primary-active" rgb="0,104,214"/>
+    <color id="accent-color" rgb="64,156,255"/>
+    <color id="success-color" rgb="16,185,129"/>
+    <color id="warning-color" rgb="245,158,11"/>
+    <color id="error-color" rgb="239,68,68"/>
+    <color id="text-primary" rgb="241,245,249"/>
+    <color id="text-secondary" rgb="148,163,184"/>
+    <color id="text-tertiary" rgb="100,116,139"/>
+    <color id="border-color" rgb="255,255,255" alpha="0.08"/>
+    <color id="border-hover" rgb="255,255,255" alpha="0.16"/>
+    
+    <!-- Gradients -->
+    <linearGradient id="primary-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" color="primary-color"/>
+      <stop offset="100%" color="accent-color"/>
+    </linearGradient>
+    
+    <linearGradient id="button-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" color="primary-color"/>
+      <stop offset="100%" color="primary-active"/>
+    </linearGradient>
+    
+    <linearGradient id="surface-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" color="surface-color"/>
+      <stop offset="100%" color="bg-color"/>
+    </linearGradient>
+    
+    <!-- Shadows as filters -->
+    <filter id="window-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2" result="blur1"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4" result="blur2"/>
+      <feOffset in="blur1" dx="0" dy="1" result="offset1"/>
+      <feOffset in="blur2" dx="0" dy="4" result="offset2"/>
+      <feComposite in="offset1" in2="offset2" operator="over" result="shadow"/>
+      <feFlood flood-color="rgba(0,0,0,0.3)" result="color1"/>
+      <feFlood flood-color="rgba(0,0,0,0.2)" result="color2"/>
+      <feComposite in="color1" in2="shadow" operator="in" result="colored1"/>
+      <feComposite in="color2" in2="shadow" operator="in" result="colored2"/>
+      <feComposite in="colored1" in2="colored2" operator="over" result="final-shadow"/>
+      <feComposite in="SourceGraphic" in2="final-shadow" operator="over"/>
+    </filter>
+    
+    <filter id="button-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur1"/>
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="blur2"/>
+      <feOffset in="blur1" dx="0" dy="1" result="offset1"/>
+      <feOffset in="blur2" dx="0" dy="3" result="offset2"/>
+      <feComposite in="offset1" in2="offset2" operator="over" result="shadow"/>
+      <feFlood flood-color="rgba(0,113,227,0.2)" result="color1"/>
+      <feFlood flood-color="rgba(0,113,227,0.18)" result="color2"/>
+      <feComposite in="color1" in2="shadow" operator="in" result="colored1"/>
+      <feComposite in="color2" in2="shadow" operator="in" result="colored2"/>
+      <feComposite in="colored1" in2="colored2" operator="over" result="final-shadow"/>
+      <feComposite in="SourceGraphic" in2="final-shadow" operator="over"/>
+    </filter>
+    
+    <!-- Rounded rectangle definition -->
+    <rect id="rounded-rect" width="100" height="100" rx="12" ry="12"/>
+    <rect id="pill-rect" width="100" height="44" rx="999" ry="999"/>
+    <rect id="entry-rect" width="100" height="36" rx="8" ry="8"/>
+    <rect id="checkbox-rect" width="20" height="20" rx="4" ry="4"/>
+    <circle id="radio-circle" cx="10" cy="10" r="10"/>
+  </defs>
+  
+  <!-- Theme preview elements -->
+  <g transform="translate(10,10)">
+    <!-- Window background -->
+    <rect width="80" height="80" fill="bg-color" rx="12" ry="12"/>
+    
+    <!-- Surface/Frame -->
+    <rect x="5" y="5" width="70" height="70" fill="surface-color" rx="8" ry="8"/>
+    
+    <!-- Primary button -->
+    <rect x="10" y="10" width="28" height="14" fill="primary-color" rx="999" ry="999"/>
+    
+    <!-- Entry field -->
+    <rect x="42" y="10" width="28" height="14" fill="card-color" rx="8" ry="8"/>
+    
+    <!-- Checkbox -->
+    <rect x="10" y="28" width="8" height="8" fill="surface-color" rx="4" ry="4"/>
+    <rect x="11" y="29" width="6" height="6" fill="primary-color" rx="2" ry="2"/>
+    
+    <!-- Radio button -->
+    <circle cx="22" cy="34" r="5" fill="surface-color"/>
+    <circle cx="22" cy="34" r="3" fill="primary-color"/>
+    
+    <!-- Progress bar -->
+    <rect x="10" y="42" width="28" height="4" fill="surface-color" rx="999" ry="999"/>
+    <rect x="10" y="42" width="18" height="4" fill="primary-color" rx="999" ry="999"/>
+    
+    <!-- Scrollbar -->
+    <rect x="42" y="28" width="6" height="18" fill="text-tertiary" rx="999" ry="999"/>
+  </g>
+  
+  <!-- Metadata for Kvantum -->
+  <metadata>
+    <kvantum>
+      <theme name="KibaOS" version="1.0.0"/>
+      <colors>
+        <bg>13,27,42</bg>
+        <surface>26,32,41</surface>
+        <primary>0,113,227</primary>
+        <text>241,245,249</text>
+      </colors>
+    </kvantum>
+  </metadata>
+</svg>
