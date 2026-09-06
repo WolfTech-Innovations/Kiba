@@ -6014,14 +6014,16 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # Building + installing libcutefish here on its own, standalone, means
   # it's a real installed pacman package by the time the yay batch runs
   # below, so nothing downstream can fail checkdeps against it.
-  LCF_BUILD=/tmp/libcutefish-build
-  rm -rf "${LCF_BUILD}"
-  runuser -u builduser -- git clone --depth 1 \
-    https://aur.archlinux.org/libcutefish.git "${LCF_BUILD}"
-  chown -R builduser:builduser "${LCF_BUILD}"
-  runuser -u builduser -- bash -c "cd '${LCF_BUILD}' && makepkg -si --noconfirm --needed"
-  rm -rf "${LCF_BUILD}"
-  echo "=== libcutefish installed manually (x86_64) ==="
+  #
+  # Must go through yay here, NOT a bare `makepkg -si`: libcutefish's own
+  # deps (bluez-qt5, libkscreen5, networkmanager-qt5, qt5-sensors,
+  # qt5-quickcontrols2, kio5) are themselves AUR-only packages now --
+  # Arch's official repos dropped Qt5/KF5 in favor of Qt6/KF6, so plain
+  # pacman (which is all makepkg's own --syncdeps step can call) returns
+  # "target not found" on every one of them. yay resolves AUR-depends-on-
+  # AUR chains recursively; bare makepkg does not.
+  runuser -u builduser -- yay -S --noconfirm --needed --removemake libcutefish
+  echo "=== libcutefish installed manually via yay (x86_64) ==="
 
   runuser -u builduser -- yay -S --noconfirm --needed --removemake cutefish-meta
   echo "=== cutefish-meta installed via yay (x86_64) ==="
