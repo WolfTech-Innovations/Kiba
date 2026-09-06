@@ -6022,7 +6022,15 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # pacman (which is all makepkg's own --syncdeps step can call) returns
   # "target not found" on every one of them. yay resolves AUR-depends-on-
   # AUR chains recursively; bare makepkg does not.
-  runuser -u builduser -- yay -S --noconfirm --needed --removemake libcutefish
+  # Uses libcutefish-git, NOT plain libcutefish: the regular AUR package's
+  # PKGBUILD pins a sha512sum against a release tarball that no longer
+  # matches what GitHub actually serves for that tag (stale/broken AUR
+  # page -- "sha512sums... FAILED" in CI, not a network/mirror problem).
+  # libcutefish-git builds straight from the current git HEAD instead of a
+  # checksummed tarball, so there's nothing to go stale, and it
+  # Provides/Conflicts: libcutefish, so cutefish-meta's plain "libcutefish"
+  # dependency still resolves against it below.
+  runuser -u builduser -- yay -S --noconfirm --needed --removemake libcutefish-git
   echo "=== libcutefish installed manually via yay (x86_64) ==="
 
   runuser -u builduser -- yay -S --noconfirm --needed --removemake cutefish-meta
