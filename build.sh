@@ -169,13 +169,13 @@ PACMANCONF
   # into the AUR build loop below alongside the other AUR-only packages.
   pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
     base sudo networkmanager \
-    budgie-desktop labwc-is-not-used-placeholder 2>/dev/null || true
+     labwc-is-not-used-placeholder 2>/dev/null || true
 
   # (real pacstrap call -- the line above is deliberately allowed to
   # partially fail on the placeholder package name and retried clean here)
   pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
     base sudo networkmanager dbus polkit \
-    budgie-desktop budgie-control-center \
+     budgie-control-center \
     phoc squeekboard waybar wtype \
     bluez bluez-utils upower \
     wireplumber pipewire pipewire-pulse \
@@ -11122,7 +11122,7 @@ echo "=== Junction: installed via flatpak (re.sonny.Junction) ==="
 # TASKBAR LAUNCHER ICON — replace the default Budgie Menu (start button) icon
 # ══════════════════════════════════════════════════════════════════════════
 # The Budgie Menu applet's default icon name is "start-here-symbolic"
-# (solus-project/budgie-desktop#457). Numix-Circle is an APP icon theme only
+# (solus-project/#457). Numix-Circle is an APP icon theme only
 # (see note above) and doesn't cover the "places" category that icon lives
 # in, so the lookup falls through to adwaita-icon-theme — which means the
 # taskbar launcher button would otherwise show Adwaita's literal "GNOME
@@ -11956,7 +11956,7 @@ SDDMQML
 # ── Wayland session — back to stock Cutefish-on-labwc ─────────────────────
 # so, funny enough, this is actually going BACK to how Budgie wants to run.
 # Budgie 10.10's own package already ships /usr/share/wayland-sessions/
-# budgie-desktop.desktop with Exec=labwc baked in — labwc is Budgie's
+# .desktop with Exec=labwc baked in — labwc is Budgie's
 # official recommended/default Wayland compositor as of 10.10 (see
 # buddiesofbudgie.org/blog/budgie-10-10-released). I'd previously deleted
 # that stock file and dropped in my own budgie-wayfire.desktop to force
@@ -12139,7 +12139,7 @@ chmod +x /usr/local/bin/kibaos-apply-output-scale
 # set until way later in the script, so under `set -ex` (no -u) it just
 # silently expanded to an empty string here, and the config was written to
 # /.config instead of /etc/skel/.config — meaning nobody actually got it,
-# nothing autostarted budgie-desktop, gray screen and giant cursor on a
+# nothing autostarted , gray screen and giant cursor on a
 # bare compositor. The later "SKELETON" section still re-assigns
 # SKEL="/etc/skel" too — redundant now, but harmless, so left as-is.
 SKEL="/etc/skel"
@@ -12215,7 +12215,7 @@ LABWCTHEME
 cat > "${SKEL}/.config/labwc/autostart" << 'LABWCAUTOSTART'
 #!/bin/bash
 kibaos-apply-output-scale &
-budgie-desktop &
+cutefish-session &
 LABWCAUTOSTART
 chmod +x "${SKEL}/.config/labwc/autostart"
 
