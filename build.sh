@@ -2586,7 +2586,6 @@ lib32-vulkan-icd-loader
 pkg-config
 labwc
 sddm
-cutefish-meta
 swaybg
 grim
 slurp
