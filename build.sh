@@ -6032,9 +6032,43 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # same tag can shift tarball bytes without the AUR maintainer re-cutting
   # checksums -- a known AUR annoyance, not tampering). --skipinteg via
   # --mflags skips just that checksum step for this one build.
+  #
+  # SECOND, independent problem layered on top of the sha512 one above:
+  # upstream renamed the GitHub repo libcutefish -> cutefish-framework.
+  # The AUR source= line still names the DOWNLOADED FILE
+  # libcutefish-0.7.tar.gz (via foo::url renaming), but that only renames
+  # the file -- not the directory baked inside the tarball, which is
+  # cutefish-framework-0.7/ now (confirmed by inspecting the archive
+  # directly: 217 files under cutefish-framework-0.7/, zero under
+  # libcutefish-0.7/). The PKGBUILD's prepare()/build() still cd's into
+  # $srcdir/libcutefish-0.7, which no longer exists, so it fails with
+  # "No such file or directory" even past --skipinteg. Work around it by
+  # resolving deps via yay (still needed for the AUR-only dep chain --
+  # bluez-qt5, libkscreen5, networkmanager-qt5, qt5-sensors,
+  # qt5-quickcontrols2, kio5) but building libcutefish itself by hand so
+  # we can symlink the real extracted dir to the name the PKGBUILD
+  # expects. NOTE: this is a temporary upstream-drift workaround, same
+  # spirit as the --skipinteg fix above -- if the AUR maintainer ever
+  # updates the PKGBUILD to match the rename, this symlink becomes a
+  # harmless no-op.
   runuser -u builduser -- yay -S --noconfirm --needed --removemake \
-    --mflags "--skipinteg" libcutefish
-  echo "=== libcutefish installed manually via yay (x86_64) ==="
+    --mflags "--skipinteg" --deponly libcutefish
+  echo "=== libcutefish AUR deps resolved via yay (x86_64) ==="
+
+  LIBCUTEFISH_BUILD=/tmp/libcutefish-build
+  rm -rf "${LIBCUTEFISH_BUILD}"
+  runuser -u builduser -- git clone --depth 1 \
+    https://aur.archlinux.org/libcutefish.git "${LIBCUTEFISH_BUILD}"
+  runuser -u builduser -- bash -c "
+    set -ex
+    cd '${LIBCUTEFISH_BUILD}'
+    rm -rf src pkg
+    makepkg --skipinteg --nobuild --noconfirm
+    ln -sfn cutefish-framework-0.7 src/libcutefish-0.7
+    makepkg -si --skipinteg --noextract --noconfirm --needed
+  "
+  rm -rf "${LIBCUTEFISH_BUILD}"
+  echo "=== libcutefish installed manually via patched makepkg (x86_64) ==="
 
   # --skipinteg applied here too, not just libcutefish above: every
   # regular (non -git) cutefish-* AUR package -- fishui, cutefish-core,
