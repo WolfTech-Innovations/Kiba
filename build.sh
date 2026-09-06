@@ -6000,6 +6000,29 @@ if [ "$(uname -m)" = "x86_64" ]; then
   runuser -u builduser -- bash -c "cd '${YAY_BUILD}' && makepkg -si --noconfirm --needed"
   rm -rf "${YAY_BUILD}"
 
+  # ── manual libcutefish install, standalone, BEFORE the yay batch ──────────
+  # yay -S cutefish-meta below pulls in a pile of interdependent AUR
+  # packages (libcutefish, fishui, cutefish-core, cutefish-dock, ...) and
+  # builds them all before installing any of them. makepkg's own checkdeps
+  # step for each package runs against what's ACTUALLY installed on the
+  # system at that moment -- not against other packages still sitting as
+  # unbuilt-but-not-yet-installed results earlier in the same batch.
+  # That's exactly what CI hit: libcutefish failed outright, and every
+  # package declaring it as a dependency (cutefish-core, cutefish-screenshot,
+  # cutefish-calculator, cutefish-screenlocker, etc.) then failed checkdeps
+  # too, since libcutefish was never actually installed for them to see.
+  # Building + installing libcutefish here on its own, standalone, means
+  # it's a real installed pacman package by the time the yay batch runs
+  # below, so nothing downstream can fail checkdeps against it.
+  LCF_BUILD=/tmp/libcutefish-build
+  rm -rf "${LCF_BUILD}"
+  runuser -u builduser -- git clone --depth 1 \
+    https://aur.archlinux.org/libcutefish.git "${LCF_BUILD}"
+  chown -R builduser:builduser "${LCF_BUILD}"
+  runuser -u builduser -- bash -c "cd '${LCF_BUILD}' && makepkg -si --noconfirm --needed"
+  rm -rf "${LCF_BUILD}"
+  echo "=== libcutefish installed manually (x86_64) ==="
+
   runuser -u builduser -- yay -S --noconfirm --needed --removemake cutefish-meta
   echo "=== cutefish-meta installed via yay (x86_64) ==="
 fi
