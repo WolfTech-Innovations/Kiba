@@ -2571,6 +2571,7 @@ thermald
 xorg-xwayland
 layer-shell-qt
 gcc
+cmake
 debugedit
 base-devel
 python
