@@ -2571,14 +2571,6 @@ thermald
 xorg-xwayland
 layer-shell-qt
 gcc
-extra-cmake-modules
-cmake
-kwayland
-pkgconf
-qt6-base
-qt6-declarative
-qt6-tools
-wayland
 debugedit
 base-devel
 python
@@ -6072,6 +6064,33 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # installed -- it loads filemanager's desktop-icons QML plugin at
   # runtime via org.cutefish.filemanager.desktop, and doesn't reference
   # cutefish-framework directly at all).
+  # ── extra-cmake-modules + qtpaths6 shim ────────────────────────────────
+  # Arch's qt6-base/qt6-tools packages don't ship a qtpaths6 binary at all
+  # (checked: qt6-base only has qmake6/androiddeployqt6/wasmdeployqt6, and
+  # qt6-tools only has qtdiag6/lupdate6/etc -- no qtpaths6 in either, unlike
+  # Debian which ships a dedicated qtpaths6 package via qt6-tools-dev-tools).
+  # cutefish-framework/cmake/CutefishFrameworkQml.cmake calls
+  # find_program(qtpaths6) via KDE's ECMQueryQt module to resolve
+  # QT_INSTALL_QML and friends, so without it CMake configure fails outright
+  # with "Could not find QT_PATHS_EXECUTABLE using the following names:
+  # qtpaths6". extra-cmake-modules itself was also missing from this script's
+  # package list even though cutefish-framework's own README lists it as a
+  # build dependency. qmake6 (already installed via qt6-base) answers the
+  # same -query keys qtpaths6 would, so shim qtpaths6 as a thin wrapper
+  # around it rather than pulling in an AUR build just for one tool.
+  pacman -S --noconfirm --needed extra-cmake-modules
+
+  cat > /usr/local/bin/qtpaths6 << 'QTPATHS6'
+#!/bin/bash
+if [ "$1" = "--query" ] && [ -n "$2" ]; then
+  exec qmake6 -query "$2"
+else
+  exec qmake6 -query
+fi
+QTPATHS6
+  chmod +x /usr/local/bin/qtpaths6
+  echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
+
   for _repo in fishui filemanager settings shell; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
