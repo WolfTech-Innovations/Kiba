@@ -6099,10 +6099,10 @@ QTPATHS6
   chmod +x /usr/local/bin/qtpaths6
   echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
 
-  for _repo in fishui filemanager settings core shell; do
+  for _repo in fishui filemanager settings core shell terminal launcher screenshot terminal kwin-plugins; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
-
+    
     # cutefish-settings/src/language.cpp ends up pulling in ICU symbols
     # (via Qt6/KI18n's ICU-backed QLocale/QCollator) but neither its own
     # CMakeLists.txt nor Qt6::Core's public link interface exposes
@@ -6130,7 +6130,7 @@ QTPATHS6
 
   rm -rf "${CUTEFISH_SRC}"
   echo "=== Cutefish desktop stack installed from source (x86_64) ==="
-
+  git clone --depth 1 https://github.com/xarblu/kwin-effects-better-blur-dx /tmp/bbdx && cd /tmp/bbdx && ./build.sh && kwriteconfig6 --file /etc/xdg/kwinrc --group Plugins --key better-blur-dxEnabled true && kwriteconfig6 --file /etc/xdg/kwinrc --group Plugins --key blurEnabled false
   # ── cutefish-session wayland-sessions entry ───────────────────────────────
   # Confirmed via shell's own README: cutefish-shell is a plain Qt Wayland
   # client, not a compositor, and its dock/status-bar window-list, focus,
@@ -6154,11 +6154,13 @@ QTPATHS6
   mkdir -p /usr/share/wayland-sessions
   cat > /usr/share/wayland-sessions/cutefish-session.desktop << 'CUTEFISHSESSION'
 [Desktop Entry]
-Name=Cutefish
-Comment=Cutefish desktop shell (fishui + filemanager + shell) on KWin Wayland
-Exec=kwin_wayland --xwayland /usr/bin/cutefish-session
+Name=Cutefish (KWin Wayland)
+Comment=Cutefish desktop session on KWin Wayland
+Exec=/usr/bin/cutefish-wayland-session
+TryExec=/usr/bin/kwin_wayland_wrapper
 Type=Application
-DesktopNames=Cutefish
+DesktopNames=Cutefish;KDE;
+X-GDM-SessionRegisters=true
 CUTEFISHSESSION
   echo "=== cutefish-session.desktop written (KWin Wayland, not picom) ==="
 
@@ -14475,15 +14477,13 @@ done
 # SYSTEM ENVIRONMENT
 # ══════════════════════════════════════════════════════════════════════════
 cat > /etc/environment << 'ENV'
-DESKTOP_SESSION=
-XDG_CURRENT_DESKTOP=Cutefish:KDE
-XDG_SESSION_DESKTOP=cutefish-session
+DESKTOP_SESSION=Cutefish
+XDG_CURRENT_DESKTOP=Cutefish
+XDG_SESSION_DESKTOP=Cutefish
 XDG_SESSION_TYPE=wayland
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-GTK_THEME=Adwaita-dark
 QT_STYLE_OVERRIDE=kvantum
-XCURSOR_THEME=Adwaita
 XCURSOR_SIZE=24
 MOZ_ENABLE_WAYLAND=1
 ELECTRON_OZONE_PLATFORM_HINT=wayland
