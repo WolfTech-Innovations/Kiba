@@ -6046,7 +6046,7 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # if it can't find libzip -- it's used for browsing/extracting archive
   # contents in the file manager, and wasn't previously in this package list.
   pacman -S --noconfirm --needed \
-    qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat qt5-base qt5-quickcontrols2 \
+    qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat qt5-base qt5-tools qt5-quickcontrols2 \
     kwayland kguiaddons kwindowsystem ki18n kio kservice kpackage \
     kdeclarative kiconthemes kwidgetsaddons kcoreaddons \
     networkmanager-qt modemmanager-qt kpmcore python python-yaml \
