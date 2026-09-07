@@ -2557,6 +2557,7 @@ zram-generator
 nano
 curl
 wget
+deepin-control-center
 git
 mesa
 power-profiles-daemon
@@ -6097,7 +6098,7 @@ QTPATHS6
   chmod +x /usr/local/bin/qtpaths6
   echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
 
-  for _repo in fishui filemanager settings shell; do
+  for _repo in fishui filemanager shell; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
     cmake -S "${CUTEFISH_SRC}/${_repo}" -B "${CUTEFISH_SRC}/${_repo}/build" \
