@@ -6043,22 +6043,49 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # libcutefish-0.7/). The PKGBUILD's prepare()/build() still cd's into
   # $srcdir/libcutefish-0.7, which no longer exists, so it fails with
   # "No such file or directory" even past --skipinteg. Work around it by
-  # resolving deps via yay (still needed for the AUR-only dep chain --
-  # bluez-qt5, libkscreen5, networkmanager-qt5, qt5-sensors,
-  # qt5-quickcontrols2, kio5) but building libcutefish itself by hand so
-  # we can symlink the real extracted dir to the name the PKGBUILD
-  # expects. NOTE: this is a temporary upstream-drift workaround, same
+  # cloning the AUR repo ourselves, resolving its dep chain from its own
+  # .SRCINFO (still via yay -S --asdeps, since bluez-qt5, libkscreen5,
+  # networkmanager-qt5, qt5-sensors, qt5-quickcontrols2, kio5 are
+  # themselves AUR-only and need yay's recursive AUR resolution -- bare
+  # pacman/makepkg --syncdeps can't fetch those), and only then building
+  # libcutefish itself by hand so we can symlink the real extracted dir
+  # to the name the PKGBUILD expects.
+  #
+  # NOTE on --deponly: earlier drafts of this passed `yay -S --deponly` to
+  # get JUST the deps installed. That's not a real yay flag -- --deponly
+  # belongs to makepkg (skip building the target itself), and yay -S
+  # rejects it outright with "invalid option 'deponly'". Reading the dep
+  # list straight out of .SRCINFO and asking for exactly those package
+  # names instead sidesteps the whole issue and needs no flag yay doesn't
+  # have.
+  #
+  # NOTE: this whole block is a temporary upstream-drift workaround, same
   # spirit as the --skipinteg fix above -- if the AUR maintainer ever
-  # updates the PKGBUILD to match the rename, this symlink becomes a
+  # updates the PKGBUILD to match the rename, the symlink below becomes a
   # harmless no-op.
-  runuser -u builduser -- yay -S --noconfirm --needed --removemake \
-    --mflags "--skipinteg" --deponly libcutefish
-  echo "=== libcutefish AUR deps resolved via yay (x86_64) ==="
-
   LIBCUTEFISH_BUILD=/tmp/libcutefish-build
   rm -rf "${LIBCUTEFISH_BUILD}"
   runuser -u builduser -- git clone --depth 1 \
     https://aur.archlinux.org/libcutefish.git "${LIBCUTEFISH_BUILD}"
+
+  # pull (make)depends out of .SRCINFO and strip version constraints
+  # (e.g. "foo>=1.2" -> "foo") -- .SRCINFO is committed alongside every
+  # AUR PKGBUILD specifically so tooling doesn't have to source the
+  # PKGBUILD itself just to read its metadata.
+  mapfile -t _libcutefish_deps < <(
+    grep -E '^\s*(depends|makedepends) = ' "${LIBCUTEFISH_BUILD}/.SRCINFO" \
+      | sed -E 's/^\s*[a-z]+\s*=\s*//; s/[<>=].*$//' \
+      | sort -u
+  )
+  if [ "${#_libcutefish_deps[@]}" -eq 0 ]; then
+    echo "ERROR: could not read libcutefish depends from .SRCINFO" >&2
+    exit 1
+  fi
+  echo "=== libcutefish deps from .SRCINFO: ${_libcutefish_deps[*]} ==="
+  runuser -u builduser -- yay -S --noconfirm --needed --removemake --asdeps \
+    --mflags "--skipinteg" "${_libcutefish_deps[@]}"
+  echo "=== libcutefish AUR deps resolved via yay (x86_64) ==="
+
   runuser -u builduser -- bash -c "
     set -ex
     cd '${LIBCUTEFISH_BUILD}'
