@@ -6099,7 +6099,7 @@ QTPATHS6
   chmod +x /usr/local/bin/qtpaths6
   echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
 
-  for _repo in fishui filemanager settings core icons cutefish-framework shell; do
+  for _repo in fishui filemanager settings core icons shell; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
 
