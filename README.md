@@ -55,6 +55,8 @@ KibaOS is built and maintained by **Kiba Labs, LLC**.
 > New to Linux? A "distribution" (or "distro") is just a complete, ready-to-install version of the Linux operating system, bundled with a desktop environment, apps, and settings. KibaOS is one such distribution.
 ---
 
+<img width="2172" height="724" alt="Kiba Labs banner" src="https://github.com/user-attachments/assets/0dfcfaf9-1fbc-4fd4-88d2-addd1bb46507" />
+
 ## Table of Contents
 
 - [What KibaOS Includes](#what-kibaos-includes)
