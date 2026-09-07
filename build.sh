@@ -658,8 +658,9 @@ SDDMQML
 
   # ── phoc wayland session + mobile sddm config ────────────────────────────
   # Desktop's own /etc/sddm.conf.d/kibaos.conf hardcodes
-  # CompositorCommand=picom, which is desktop-only (Budgie-on-picom) and
-  # would just fail to start anything on a phone -- mobile runs
+  # CompositorCommand=kwin_wayland (needed for cutefish-shell's Plasma
+  # Window Management protocol use), which is desktop-only and would just
+  # fail to start anything on a phone -- mobile runs
   # Budgie's panel/raven on top of phoc instead (see the phoc.ini block
   # above), so it needs its own session file and its own sddm.conf.d
   # entry pointing at phoc, not desktop's.
@@ -5973,196 +5974,179 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
-# AUR PACKAGES
+# CUTEFISH DESKTOP STACK — built from source, Qt6/KF6, no AUR
 # ══════════════════════════════════════════════════════════════════════════
-useradd -m -s /bin/bash builduser 2>/dev/null || true
-echo 'builduser ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builduser
-sed -i 's/^CheckSpace/#CheckSpace/' /etc/pacman.conf
-pacman -S --noconfirm --needed \
-  kpmcore python python-yaml python-jsonschema \
-  qt5-wayland qt5-xmlpatterns solid kcoreaddons \
-  ki18n kio kservice kpackage kdeclarative \
-  kiconthemes kwidgetsaddons
-
-
-# ── cutefish-meta (AUR, via yay) — x86_64 only ──────────────────────────────
-# $KIBA_ARCH isn't visible inside this chroot (same reasoning as the
-# aarch64 keyring check above), so detect via uname -m instead. No ALARM
-# binary AUR repo exists for aarch64 (see build_kibaos_mobile's mirrorlist
-# note), and yay itself has no reason to be dragged onto the aarch64
-# desktop image, so this whole block is skipped there.
+# The old cutefish-meta AUR chain (yay + libcutefish + a dozen
+# interdependent cutefish-* AUR packages) is gone. Checked upstream
+# directly: cutefishos quietly migrated core/launcher/dock/statusbar,
+# libcutefish, filemanager, and settings to Qt6 + KDE Frameworks 6, and
+# restructured how the pieces depend on each other:
+#
+#   - core + launcher + dock + statusbar were consolidated into a single
+#     `shell` repo, one process (cutefish-shell). This is why
+#     cutefish-core/-launcher/-dock/-statusbar don't get built below --
+#     they don't exist as separate targets upstream anymore.
+#   - libcutefish was renamed cutefish-framework, and is no longer an
+#     installable library package at all. filemanager and settings each
+#     pull it in as a SIBLING SOURCE CHECKOUT via
+#     `add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../cutefish-framework/...)`
+#     and build it in-tree -- so it just needs to sit on disk next to
+#     them at the right relative path, not be pacman/AUR-installed.
+#
+# Net effect: the entire qt5-*/kio5/bluez-qt5/kwin-x11/polkit-qt5/
+# xorg-server-devel AUR dependency chain that used to break here (stale
+# libcutefish sha512sum, the libcutefish->cutefish-framework directory
+# rename breaking makepkg's prepare(), checkdeps-ordering failures across
+# the yay batch, "target not found" on every Qt5/KF5-only AUR dep) is
+# gone. Qt6 + KF6 are Arch's native official-repo packages -- no AUR, no
+# yay, no builduser/sudoers dance, for any of this.
+#
+# RESOLVED (was an open question): `shell` itself never installs a
+# /usr/share/wayland-sessions/*.desktop entry -- confirmed against its
+# actual CMakeLists.txt, its only install(FILES ...) target under
+# applications/ is the app-menu launcher, not a session file. That used
+# to come from the old cutefish-core AUR package and had no replacement.
+# Also confirmed via shell's own README: cutefish-shell is a plain Qt
+# Wayland client (not a compositor) whose dock/status-bar rely on KDE's
+# Plasma Window Management protocol, which only kwin_wayland speaks --
+# picom (used elsewhere in this image for Budgie) doesn't implement it.
+# Both are handled below: a hand-written cutefish-session.desktop whose
+# Exec= passes kwin_wayland a wrapper script (kibaos-start-cutefish-shell)
+# as its client, rather than cutefish-shell directly -- that wrapper is
+# also where graphical-session.target actually gets started (with the
+# session's Wayland/dbus env vars exported first), which is what makes
+# the XDG autostart entries under ~/.config/autostart/ (including
+# kibaos-oem-finish) and the WantedBy=graphical-session.target systemd
+# --user services (kortexd, kortex-authd) actually run -- none of that
+# fires from a bare kwin_wayland invocation on its own. kibaos-apply-
+# output-scale, defined later in this script, is launched from that same
+# wrapper; it's a plain executable on PATH by the time anyone runs it, so
+# it doesn't matter that it's written to disk after this point runs.
+#
+# NOTE: this makes the LABWC-CONFIG-labeled block further down (rc.xml,
+# themerc, autostart, environment -- all real labwc config, despite the
+# "picom" naming throughout that section's prose) partially superseded:
+# CompositorCommand there is updated below to match this same
+# kwin_wayland swap, and the old `cutefish-session &` line in its
+# autostart file is removed since the session .desktop above already
+# launches kwin_wayland + cutefish-shell directly. What's NOT migrated
+# here: rc.xml's screenshot keybindings (Print / Shift+Print /
+# Super+Shift+Print) are labwc-format and KWin doesn't read them --
+# those need a real KWin-native home (kglobalshortcutsrc). Border/window
+# theming is out of scope here -- Kvantum (KibaOS theme, already set up
+# elsewhere in this script) covers Qt widget styling; themerc's colors
+# were window-decoration-level labwc config, a separate concern from
+# Kvantum, and aren't ported.
 if [ "$(uname -m)" = "x86_64" ]; then
-  YAY_BUILD=/tmp/yay-bin
-  rm -rf "${YAY_BUILD}"
-  runuser -u builduser -- git clone --depth 1 \
-    https://aur.archlinux.org/yay-bin.git "${YAY_BUILD}"
-  chown -R builduser:builduser "${YAY_BUILD}"
-  runuser -u builduser -- bash -c "cd '${YAY_BUILD}' && makepkg -si --noconfirm --needed"
-  rm -rf "${YAY_BUILD}"
+  pacman -S --noconfirm --needed \
+    qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat \
+    kwayland kguiaddons kwindowsystem ki18n kio kservice kpackage \
+    kdeclarative kiconthemes kwidgetsaddons kcoreaddons \
+    networkmanager-qt modemmanager-qt kpmcore python python-yaml \
+    python-jsonschema
 
-  # ── manual libcutefish install, standalone, BEFORE the yay batch ──────────
-  # yay -S cutefish-meta below pulls in a pile of interdependent AUR
-  # packages (libcutefish, fishui, cutefish-core, cutefish-dock, ...) and
-  # builds them all before installing any of them. makepkg's own checkdeps
-  # step for each package runs against what's ACTUALLY installed on the
-  # system at that moment -- not against other packages still sitting as
-  # unbuilt-but-not-yet-installed results earlier in the same batch.
-  # That's exactly what CI hit: libcutefish failed outright, and every
-  # package declaring it as a dependency (cutefish-core, cutefish-screenshot,
-  # cutefish-calculator, cutefish-screenlocker, etc.) then failed checkdeps
-  # too, since libcutefish was never actually installed for them to see.
-  # Building + installing libcutefish here on its own, standalone, means
-  # it's a real installed pacman package by the time the yay batch runs
-  # below, so nothing downstream can fail checkdeps against it.
-  #
-  # Must go through yay here, NOT a bare `makepkg -si`: libcutefish's own
-  # deps (bluez-qt5, libkscreen5, networkmanager-qt5, qt5-sensors,
-  # qt5-quickcontrols2, kio5) are themselves AUR-only packages now --
-  # Arch's official repos dropped Qt5/KF5 in favor of Qt6/KF6, so plain
-  # pacman (which is all makepkg's own --syncdeps step can call) returns
-  # "target not found" on every one of them. yay resolves AUR-depends-on-
-  # AUR chains recursively; bare makepkg does not.
-  # Back to plain libcutefish (NOT -git): libcutefish-git's current HEAD has
-  # already moved its CMakeLists.txt over to Qt6 tooling (fails looking for
-  # qtpaths6), but that AUR package is unmaintained and still only pulls
-  # Qt5 deps (qt5-sensors, kio5, bluez-qt5, ...) -- PKGBUILD and upstream
-  # source have drifted apart, so building HEAD is a dead end here.
-  # Regular libcutefish (0.7-6) is still Qt5-consistent; its only problem
-  # was a stale sha512sum on the release tarball (GitHub re-packing the
-  # same tag can shift tarball bytes without the AUR maintainer re-cutting
-  # checksums -- a known AUR annoyance, not tampering). --skipinteg via
-  # --mflags skips just that checksum step for this one build.
-  #
-  # SECOND, independent problem layered on top of the sha512 one above:
-  # upstream renamed the GitHub repo libcutefish -> cutefish-framework.
-  # The AUR source= line still names the DOWNLOADED FILE
-  # libcutefish-0.7.tar.gz (via foo::url renaming), but that only renames
-  # the file -- not the directory baked inside the tarball, which is
-  # cutefish-framework-0.7/ now (confirmed by inspecting the archive
-  # directly: 217 files under cutefish-framework-0.7/, zero under
-  # libcutefish-0.7/). The PKGBUILD's prepare()/build() still cd's into
-  # $srcdir/libcutefish-0.7, which no longer exists, so it fails with
-  # "No such file or directory" even past --skipinteg. Work around it by
-  # cloning the AUR repo ourselves, resolving its dep chain from its own
-  # .SRCINFO (still via yay -S --asdeps, since bluez-qt5, libkscreen5,
-  # networkmanager-qt5, qt5-sensors, qt5-quickcontrols2, kio5 are
-  # themselves AUR-only and need yay's recursive AUR resolution -- bare
-  # pacman/makepkg --syncdeps can't fetch those), and only then building
-  # libcutefish itself by hand so we can symlink the real extracted dir
-  # to the name the PKGBUILD expects.
-  #
-  # NOTE on --deponly: earlier drafts of this passed `yay -S --deponly` to
-  # get JUST the deps installed. That's not a real yay flag -- --deponly
-  # belongs to makepkg (skip building the target itself), and yay -S
-  # rejects it outright with "invalid option 'deponly'". Reading the dep
-  # list straight out of .SRCINFO and asking for exactly those package
-  # names instead sidesteps the whole issue and needs no flag yay doesn't
-  # have.
-  #
-  # NOTE: this whole block is a temporary upstream-drift workaround, same
-  # spirit as the --skipinteg fix above -- if the AUR maintainer ever
-  # updates the PKGBUILD to match the rename, the symlink below becomes a
-  # harmless no-op.
-  LIBCUTEFISH_BUILD=/tmp/libcutefish-build
-  rm -rf "${LIBCUTEFISH_BUILD}"
-  runuser -u builduser -- git clone --depth 1 \
-    https://aur.archlinux.org/libcutefish.git "${LIBCUTEFISH_BUILD}"
+  CUTEFISH_SRC=/tmp/cutefish-src
+  rm -rf "${CUTEFISH_SRC}"
+  mkdir -p "${CUTEFISH_SRC}"
 
-  # pull (make)depends out of .SRCINFO and strip version constraints
-  # (e.g. "foo>=1.2" -> "foo") -- .SRCINFO is committed alongside every
-  # AUR PKGBUILD specifically so tooling doesn't have to source the
-  # PKGBUILD itself just to read its metadata.
-  mapfile -t _libcutefish_deps < <(
-    grep -E '^\s*(depends|makedepends) = ' "${LIBCUTEFISH_BUILD}/.SRCINFO" \
-      | sed -E 's/^\s*[a-z]+\s*=\s*//; s/[<>=].*$//' \
-      | sort -u
-  )
-  if [ "${#_libcutefish_deps[@]}" -eq 0 ]; then
-    echo "ERROR: could not read libcutefish depends from .SRCINFO" >&2
-    exit 1
-  fi
-  echo "=== libcutefish deps from .SRCINFO: ${_libcutefish_deps[*]} ==="
-  runuser -u builduser -- yay -S --noconfirm --needed --removemake --asdeps \
-    --mflags "--skipinteg" "${_libcutefish_deps[@]}"
-  echo "=== libcutefish AUR deps resolved via yay (x86_64) ==="
+  # cutefish-framework: sibling checkout only, never built/installed
+  # standalone -- filemanager and settings each add_subdirectory() into
+  # it directly as part of their own build. It just needs to exist here,
+  # next to the four repos below, at ../cutefish-framework relative to
+  # each of them.
+  git clone --depth 1 https://github.com/cutefishos/cutefish-framework.git \
+    "${CUTEFISH_SRC}/cutefish-framework"
 
-  # IMPORTANT: `makepkg -o/--nobuild` does NOT stop before prepare() --
-  # confirmed the hard way: it still runs prepare(), which is exactly the
-  # step that cd's into the missing libcutefish-0.7 dir and dies before
-  # a symlink fix-up placed after it ever gets a chance to run. So we
-  # can't let makepkg touch this package at all until the rename is
-  # already patched around. Instead: source the PKGBUILD ourselves
-  # (standard makepkg-adjacent technique -- it's just a bash script) to
-  # get $pkgver/$source reliably, download+extract by hand, symlink the
-  # ACTUAL extracted dir (read back from disk, not hardcoded, so this
-  # keeps working across version bumps even if upstream renames again),
-  # then hand off to makepkg with --noextract so it goes straight to
-  # prepare()/build()/package() against our pre-arranged src/ tree.
-  cat > /tmp/libcutefish-manual-build.sh << 'MANUALBUILD'
+  # Build order matters: fishui first (no cutefish-framework dependency),
+  # then filemanager (pulls cutefish-framework in via add_subdirectory
+  # and builds it in-tree), then settings (same sibling-checkout
+  # dependency), then shell last (needs fishui + filemanager already
+  # installed -- it loads filemanager's desktop-icons QML plugin at
+  # runtime via org.cutefish.filemanager.desktop, and doesn't reference
+  # cutefish-framework directly at all).
+  for _repo in fishui filemanager settings shell; do
+    git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
+      "${CUTEFISH_SRC}/${_repo}"
+    cmake -S "${CUTEFISH_SRC}/${_repo}" -B "${CUTEFISH_SRC}/${_repo}/build" \
+      -GNinja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+    cmake --build "${CUTEFISH_SRC}/${_repo}/build"
+    cmake --install "${CUTEFISH_SRC}/${_repo}/build"
+    echo "=== ${_repo} built + installed from source (x86_64, Qt6/KF6) ==="
+  done
+
+  rm -rf "${CUTEFISH_SRC}"
+  echo "=== Cutefish desktop stack installed from source (x86_64) ==="
+
+  # ── cutefish-session wayland-sessions entry ───────────────────────────────
+  # Confirmed via shell's own README: cutefish-shell is a plain Qt Wayland
+  # client, not a compositor, and its dock/status-bar window-list, focus,
+  # close, and maximize/minimize/restore all go over KDE's Plasma Window
+  # Management protocol (org_kde_plasma_window_management) -- a KWin-Wayland-
+  # specific extension picom has no notion of at all. So this session HAS to
+  # run under kwin_wayland, not the picom/labwc setup used elsewhere in this
+  # image for Budgie -- those two are unrelated and this doesn't touch that.
+  # kwin_wayland's own CLI accepts a command to launch as a client inside the
+  # compositor it starts (documented KWin usage, same pattern nested/
+  # standalone KWin sessions have always used); --xwayland because Xwayland
+  # is already pulled in via packages.x86_64 and cutefish-shell/filemanager
+  # may still spawn legacy X11-only helpers.
+  # Filename has to be cutefish-session.desktop exactly -- SDDM's
+  # Session=cutefish-session (set further down for both the OEM and normal
+  # autologin configs) resolves against the basename of a file under
+  # /usr/share/wayland-sessions/, and nothing else in this script ever wrote
+  # one -- it used to ship inside the old cutefish-core AUR package, which no
+  # longer exists as a separate build target upstream (see the note at the
+  # top of this block).
+  mkdir -p /usr/share/wayland-sessions
+  cat > /usr/share/wayland-sessions/cutefish-session.desktop << 'CUTEFISHSESSION'
+[Desktop Entry]
+Name=Cutefish
+Comment=Cutefish desktop shell (fishui + filemanager + shell) on KWin Wayland
+Exec=kwin_wayland --xwayland /usr/local/bin/kibaos-start-cutefish-shell
+Type=Application
+DesktopNames=Cutefish
+CUTEFISHSESSION
+  echo "=== cutefish-session.desktop written (KWin Wayland, not picom) ==="
+
+  # ── kibaos-start-cutefish-shell — what kwin_wayland actually execs ───────
+  # Passed to kwin_wayland as its client argument (kwin_wayland's own CLI
+  # runs whatever command is given as a direct child once the compositor
+  # is up), so everything in here runs WITH the Wayland env vars kwin
+  # sets for its own children -- unlike a sibling process launched from
+  # outside kwin_wayland's process tree, which would NOT reliably see
+  # WAYLAND_DISPLAY.
+  #
+  # This is also where the *other* autostart mechanisms actually get
+  # kicked off -- previously an open gap, not something the earlier
+  # picom-labeled labwc autostart script ever did either: the XDG-spec
+  # entries under ~/.config/autostart/ (nemo-desktop, kibaos-configure,
+  # kibaos-oem-finish, kibaos-winapps-firstrun, kibaos-install-launch,
+  # polkit-agent, kibaos-first-login-setup) and the WantedBy=
+  # graphical-session.target systemd --user units (kortexd,
+  # kortex-authd) both need graphical-session.target actually started,
+  # with the session's env vars exported to systemd/dbus activation
+  # first -- systemd's own xdg-desktop-autostart-generator (systemd
+  # >=248) is what turns each ~/.config/autostart/*.desktop into a unit
+  # under that target automatically; nothing here hand-parses those
+  # .desktop files itself.
+  cat > /usr/local/bin/kibaos-start-cutefish-shell << 'STARTCUTEFISH'
 #!/bin/bash
-set -ex
-cd /tmp/libcutefish-build
-rm -rf src pkg
-mkdir -p src
-source ./PKGBUILD
-for _src in "${source[@]}"; do
-  case "${_src}" in
-    *::*)
-      _fname="${_src%%::*}"
-      _url="${_src#*::}"
-      [ -f "${_fname}" ] || curl -fsSL -o "${_fname}" "${_url}"
-      case "${_fname}" in
-        *.tar.gz|*.tgz|*.tar.xz|*.tar.bz2) bsdtar -xf "${_fname}" -C src ;;
-      esac
-      ;;
-    *)
-      # local files tracked directly in the AUR git repo (e.g. patches)
-      # -- nothing to download, makepkg will pick these up from cwd
-      # itself during prepare()/build().
-      ;;
-  esac
-done
-_extracted_dir="$(find src -mindepth 1 -maxdepth 1 -type d | head -n1)"
-if [ -z "${_extracted_dir}" ]; then
-  echo "ERROR: nothing extracted into src/ -- check source= entries" >&2
-  exit 1
+export XDG_CURRENT_DESKTOP=Cutefish
+systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null || true
+if command -v dbus-update-activation-environment >/dev/null 2>&1; then
+  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null || true
 fi
-_expected_dir="${pkgname}-${pkgver}"
-if [ "$(basename "${_extracted_dir}")" != "${_expected_dir}" ]; then
-  echo "=== libcutefish: symlinking $(basename "${_extracted_dir}") -> ${_expected_dir} (upstream dir-name drift) ==="
-  ln -sfn "$(basename "${_extracted_dir}")" "src/${_expected_dir}"
-fi
-makepkg -si --skipinteg --noextract --noconfirm --needed
-MANUALBUILD
-  chmod +x /tmp/libcutefish-manual-build.sh
-  chown builduser:builduser /tmp/libcutefish-manual-build.sh
-  runuser -u builduser -- /tmp/libcutefish-manual-build.sh
-  rm -f /tmp/libcutefish-manual-build.sh
-  rm -rf "${LIBCUTEFISH_BUILD}"
-  echo "=== libcutefish installed manually via patched makepkg (x86_64) ==="
-
-  # --skipinteg applied here too, not just libcutefish above: every
-  # regular (non -git) cutefish-* AUR package -- fishui, cutefish-core,
-  # cutefish-launcher, cutefish-settings, cutefish-statusbar,
-  # cutefish-terminal, cutefish-calculator, cutefish-screenlocker,
-  # cutefish-dock, cutefish-filemanager, cutefish-icons,
-  # cutefish-wallpapers, cutefish-qt-plugins, cutefish-screenshot, and
-  # cutefish-meta itself -- pulls source from the same
-  # github.com/cutefishos/<repo>/archive/<tag>/<name>-<tag>.tar.gz pattern
-  # that hit the sha512sum mismatch on libcutefish. Scoping the skip to
-  # only the standalone libcutefish call above would just relocate the
-  # same stale-checksum failure to whichever of the other dozen packages
-  # in this batch hits it next.
-  runuser -u builduser -- yay -S --noconfirm --needed --removemake \
-    --mflags "--skipinteg" cutefish-meta
-  echo "=== cutefish-meta installed via yay (x86_64) ==="
+systemctl --user start graphical-session.target 2>/dev/null || true
+kibaos-apply-output-scale &
+exec /usr/bin/cutefish-shell
+STARTCUTEFISH
+  chmod +x /usr/local/bin/kibaos-start-cutefish-shell
+  echo "=== kibaos-start-cutefish-shell wrapper written ==="
 fi
 
 cd /
-userdel -r builduser 2>/dev/null || true
-rm -f /etc/sudoers.d/builduser
 pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
-echo "=== AUR packages installed ==="
+echo "=== Cutefish desktop stack step complete ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # KIBAOS OOBE INSTALLER — fullscreen, one-step-per-screen Vala/GTK4 app.
@@ -12152,7 +12136,7 @@ cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 DisplayServer=wayland
 
 [Wayland]
-CompositorCommand=picom
+CompositorCommand=kwin_wayland --xwayland
 
 [Theme]
 Current=kibaos
@@ -12386,18 +12370,32 @@ LABWCTHEME
 # deliberately never invoked anywhere in this image, so idle/DPMS
 # blanking mid-install just isn't a thing that can happen. simplest fix
 # available: don't run the thing that would cause the problem.
+#
+# NOT wired up anymore: this file used to launch `cutefish-session &`
+# itself, on the assumption that SDDM only ever starts a bare compositor
+# binary and leaves the actual desktop launch to this autostart script.
+# That's superseded -- /usr/share/wayland-sessions/cutefish-session.desktop
+# (written earlier in this script, in the CUTEFISH DESKTOP STACK section)
+# has its own Exec= that starts kwin_wayland with cutefish-shell as its
+# client directly, plus kibaos-apply-output-scale inline. Leaving both
+# in place would start cutefish-shell twice. This file, along with
+# rc.xml/themerc, is a labwc-format config (despite the "picom" naming
+# throughout this section) that KWin doesn't read at all -- kept here
+# only as reference/history, not something anything actually sources for
+# the Cutefish session anymore. The screenshot keybindings in rc.xml and
+# the border colors in themerc still need a real KWin-native home
+# (kglobalshortcutsrc, kwinrc/kdecoration) -- not done in this pass.
 cat > "${SKEL}/.config/picom/autostart" << 'LABWCAUTOSTART'
 #!/bin/bash
-kibaos-apply-output-scale &
-cutefish-session &
+# superseded by cutefish-session.desktop's Exec= -- see note above.
 LABWCAUTOSTART
 chmod +x "${SKEL}/.config/picom/autostart"
 
-# environment — plain KEY=VALUE, sourced into the session before autostart
-# runs. wayfire.ini had no equivalent of this since it was one flat INI
-# file; picom splits config into rc.xml/environment/autostart on purpose.
+# environment — superseded the same way: XDG_CURRENT_DESKTOP is Cutefish,
+# not Budgie, on this branch, and nothing sources this file for the
+# Cutefish session anymore (see note above).
 cat > "${SKEL}/.config/picom/environment" << 'LABWCENV'
-XDG_CURRENT_DESKTOP=Budgie:GNOME
+XDG_CURRENT_DESKTOP=Cutefish
 LABWCENV
 
 # ══════════════════════════════════════════════════════════════════════════
