@@ -6038,12 +6038,17 @@ fi
 # were window-decoration-level labwc config, a separate concern from
 # Kvantum, and aren't ported.
 if [ "$(uname -m)" = "x86_64" ]; then
+  # libzip added below: cutefishos/filemanager's own CMakeLists.txt hard-fails
+  # configure ("libzip development files are required to build filemanager")
+  # if it can't find libzip -- it's used for browsing/extracting archive
+  # contents in the file manager, and wasn't previously in this package list.
   pacman -S --noconfirm --needed \
     qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat \
     kwayland kguiaddons kwindowsystem ki18n kio kservice kpackage \
     kdeclarative kiconthemes kwidgetsaddons kcoreaddons \
     networkmanager-qt modemmanager-qt kpmcore python python-yaml \
-    python-jsonschema
+    python-jsonschema \
+    libzip
 
   CUTEFISH_SRC=/tmp/cutefish-src
   rm -rf "${CUTEFISH_SRC}"
