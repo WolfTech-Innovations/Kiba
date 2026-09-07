@@ -13,7 +13,7 @@
 
 <div align="center">
 
-# KibaOS
+# [KibaOS](https://kibaos.com)
 ### An OS by Kiba Labs, LLC
 
 <p align="center">
