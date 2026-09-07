@@ -2569,6 +2569,7 @@ kwin
 sof-firmware
 thermald
 xorg-xwayland
+icu
 layer-shell-qt
 gcc
 debugedit
