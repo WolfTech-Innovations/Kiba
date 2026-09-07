@@ -6120,6 +6120,33 @@ QTPATHS6
       _extra_cmake_args=(-DCMAKE_EXE_LINKER_FLAGS=-licuuc\ -licui18n\ -licudata)
     fi
 
+    # ── cutefish-terminal: broken qt5_create_translation() call ────────────
+    # Its CMakeLists.txt calls `qt5_create_translation(QM_FILES ${TS_FILES})`
+    # -- passing only the .ts files themselves as the macro's positional
+    # "source files to scan" argument, with no actual sources (and no
+    # ${CMAKE_SOURCE_DIR} anchor) given at all. Out-of-tree with Ninja, that
+    # produces an empty generated source-list file, so every per-locale
+    # lupdate invocation gets called as `lupdate @ -ts ...` (blank list-file
+    # path) and fails with "List file '' is not readable." for all ~148
+    # locales. This is the exact same bug already hit -- and already fixed
+    # upstream -- in cutefish-statusbar (github.com/cutefishos/statusbar#1,
+    # fixed by felixonmars: "Fix missing ${CMAKE_SOURCE_DIR} in
+    # qt5_create_translation"). cutefish-terminal never got the equivalent
+    # fix, so patch it here the same way: point the macro at
+    # ${CMAKE_SOURCE_DIR}/src (where main.cpp/processhelper.cpp/etc. actually
+    # live) instead of leaving that argument slot empty.
+    if [ "${_repo}" = "terminal" ]; then
+      sed -i \
+        's|qt5_create_translation(QM_FILES ${TS_FILES})|qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR}/src ${TS_FILES})|' \
+        "${CUTEFISH_SRC}/${_repo}/CMakeLists.txt"
+      grep -q 'qt5_create_translation(QM_FILES ${CMAKE_SOURCE_DIR}/src ${TS_FILES})' \
+        "${CUTEFISH_SRC}/${_repo}/CMakeLists.txt" || {
+        echo "ERROR: cutefish-terminal's qt5_create_translation patch didn't apply -- upstream CMakeLists.txt has likely changed shape. Check ${CUTEFISH_SRC}/${_repo}/CMakeLists.txt by hand." >&2
+        exit 1
+      }
+      echo "=== Patched cutefish-terminal's qt5_create_translation() (missing \${CMAKE_SOURCE_DIR}/src arg) ==="
+    fi
+
     cmake -S "${CUTEFISH_SRC}/${_repo}" -B "${CUTEFISH_SRC}/${_repo}/build" \
       -GNinja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
       "${_extra_cmake_args[@]}"
