@@ -2566,7 +2566,6 @@ noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 bluez-utils
-kwin
 sof-firmware
 thermald
 xorg-xwayland
