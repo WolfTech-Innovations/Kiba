@@ -2573,6 +2573,12 @@ layer-shell-qt
 gcc
 extra-cmake-modules
 cmake
+kwayland
+pkgconf
+qt6-base
+qt6-declarative
+qt6-tools
+wayland
 debugedit
 base-devel
 python
