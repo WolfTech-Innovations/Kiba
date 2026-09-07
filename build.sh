@@ -2557,8 +2557,8 @@ zram-generator
 nano
 curl
 wget
-deepin-control-center
 git
+kwin
 mesa
 power-profiles-daemon
 xdg-user-dirs
@@ -6099,7 +6099,7 @@ QTPATHS6
   chmod +x /usr/local/bin/qtpaths6
   echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
 
-  for _repo in fishui filemanager shell; do
+  for _repo in fishui filemanager settings core shell; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
     cmake -S "${CUTEFISH_SRC}/${_repo}" -B "${CUTEFISH_SRC}/${_repo}/build" \
@@ -6137,7 +6137,7 @@ QTPATHS6
 [Desktop Entry]
 Name=Cutefish
 Comment=Cutefish desktop shell (fishui + filemanager + shell) on KWin Wayland
-Exec=kwin_wayland --xwayland /usr/local/bin/kibaos-start-cutefish-shell
+Exec=kwin_wayland --xwayland /usr/bin/cutefish-session
 Type=Application
 DesktopNames=Cutefish
 CUTEFISHSESSION
@@ -6173,7 +6173,7 @@ if command -v dbus-update-activation-environment >/dev/null 2>&1; then
 fi
 systemctl --user start graphical-session.target 2>/dev/null || true
 kibaos-apply-output-scale &
-exec /usr/bin/cutefish-shell
+exec /usr/bin/cutefish-session
 STARTCUTEFISH
   chmod +x /usr/local/bin/kibaos-start-cutefish-shell
   echo "=== kibaos-start-cutefish-shell wrapper written ==="
