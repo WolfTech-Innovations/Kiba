@@ -6046,7 +6046,7 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # if it can't find libzip -- it's used for browsing/extracting archive
   # contents in the file manager, and wasn't previously in this package list.
   pacman -S --noconfirm --needed \
-    qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat \
+    qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat qt5-base qt5-quickcontrols2 \
     kwayland kguiaddons kwindowsystem ki18n kio kservice kpackage \
     kdeclarative kiconthemes kwidgetsaddons kcoreaddons \
     networkmanager-qt modemmanager-qt kpmcore python python-yaml \
@@ -6099,7 +6099,7 @@ QTPATHS6
   chmod +x /usr/local/bin/qtpaths6
   echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
 
-  for _repo in fishui filemanager settings core shell; do
+  for _repo in fishui filemanager settings core shell terminal launcher statusbar dock; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
     
@@ -13051,6 +13051,7 @@ gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
 
 gsettings set org.gnome.desktop.background picture-uri      'file:///usr/share/kibaos/wallpaper.jpg'
 gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.jpg'
+swww img /usr/share/kibaos/wallpaper.jpg
 gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
