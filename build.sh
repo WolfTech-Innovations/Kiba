@@ -6102,8 +6102,27 @@ QTPATHS6
   for _repo in fishui filemanager settings core icons cutefish-framework shell; do
     git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
       "${CUTEFISH_SRC}/${_repo}"
+
+    # cutefish-settings/src/language.cpp ends up pulling in ICU symbols
+    # (via Qt6/KI18n's ICU-backed QLocale/QCollator) but neither its own
+    # CMakeLists.txt nor Qt6::Core's public link interface exposes
+    # libicuuc/libicui18n/libicudata directly -- they're only NEEDED
+    # transitively. Modern binutils ld defaults to --as-needed and no
+    # longer resolves symbols out of indirect (not-directly-linked) DSOs,
+    # so the final link fails with "undefined reference to
+    # icu_78::Locale::~Locale()" / "DSO missing from command line" for
+    # libicuuc.so.78 even though ICU is installed. Force ICU onto the
+    # link line explicitly for this one target rather than patching
+    # upstream's CMakeLists.txt.
+    _extra_cmake_args=()
+    if [ "${_repo}" = "settings" ]; then
+      pacman -S --noconfirm --needed icu
+      _extra_cmake_args=(-DCMAKE_EXE_LINKER_FLAGS=-licuuc\ -licui18n\ -licudata)
+    fi
+
     cmake -S "${CUTEFISH_SRC}/${_repo}" -B "${CUTEFISH_SRC}/${_repo}/build" \
-      -GNinja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
+      -GNinja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
+      "${_extra_cmake_args[@]}"
     cmake --build "${CUTEFISH_SRC}/${_repo}/build"
     cmake --install "${CUTEFISH_SRC}/${_repo}/build"
     echo "=== ${_repo} built + installed from source (x86_64, Qt6/KF6) ==="
