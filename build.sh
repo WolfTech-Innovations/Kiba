@@ -2574,6 +2574,7 @@ layer-shell-qt
 gcc
 debugedit
 base-devel
+qt6-base
 python
 pyalpm
 parted
@@ -2599,6 +2600,7 @@ wlr-randr
 nemo
 nemo-fileroller
 gvfs
+qt6-tools
 gvfs-mtp
 gvfs-smb
 file-roller
