@@ -6156,6 +6156,7 @@ QTPATHS6
   done
 
   rm -rf "${CUTEFISH_SRC}"
+  install -Dm644 /dev/stdin /etc/systemd/user/cutefish-shell.service <<< $'[Unit]\nDescription=KibaOS Cutefish Shell\nAfter=graphical-session.target\n\n[Service]\nExecStart=/bin/sh -c \'cutefish-filemanager & cutefish-dock & cutefish-statusbar & swww-daemon & if [ ! -f "$HOME/.config/kibaos-wallpaper-set" ]; then sleep 1; swww img /usr/share/kibaos/wallpaper.jpg && mkdir -p "$HOME/.config" && touch "$HOME/.config/kibaos-wallpaper-set"; fi\'\nRestart=on-failure\n\n[Install]\nWantedBy=graphical-session.target'; systemctl --global enable cutefish-shell.service
   echo "=== Cutefish desktop stack installed from source (x86_64) ==="
   # Confirmed via shell's own README: cutefish-shell is a plain Qt Wayland
   # client, not a compositor, and its dock/status-bar window-list, focus,
