@@ -6130,8 +6130,6 @@ QTPATHS6
 
   rm -rf "${CUTEFISH_SRC}"
   echo "=== Cutefish desktop stack installed from source (x86_64) ==="
-  git clone --depth 1 https://github.com/xarblu/kwin-effects-better-blur-dx /tmp/bbdx && cd /tmp/bbdx && ./build.sh && kwriteconfig6 --file /etc/xdg/kwinrc --group Plugins --key better-blur-dxEnabled true && kwriteconfig6 --file /etc/xdg/kwinrc --group Plugins --key blurEnabled false
-  # ── cutefish-session wayland-sessions entry ───────────────────────────────
   # Confirmed via shell's own README: cutefish-shell is a plain Qt Wayland
   # client, not a compositor, and its dock/status-bar window-list, focus,
   # close, and maximize/minimize/restore all go over KDE's Plasma Window
