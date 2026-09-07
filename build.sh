@@ -6086,14 +6086,58 @@ if [ "$(uname -m)" = "x86_64" ]; then
     --mflags "--skipinteg" "${_libcutefish_deps[@]}"
   echo "=== libcutefish AUR deps resolved via yay (x86_64) ==="
 
-  runuser -u builduser -- bash -c "
-    set -ex
-    cd '${LIBCUTEFISH_BUILD}'
-    rm -rf src pkg
-    makepkg --skipinteg --nobuild --noconfirm
-    ln -sfn cutefish-framework-0.7 src/libcutefish-0.7
-    makepkg -si --skipinteg --noextract --noconfirm --needed
-  "
+  # IMPORTANT: `makepkg -o/--nobuild` does NOT stop before prepare() --
+  # confirmed the hard way: it still runs prepare(), which is exactly the
+  # step that cd's into the missing libcutefish-0.7 dir and dies before
+  # a symlink fix-up placed after it ever gets a chance to run. So we
+  # can't let makepkg touch this package at all until the rename is
+  # already patched around. Instead: source the PKGBUILD ourselves
+  # (standard makepkg-adjacent technique -- it's just a bash script) to
+  # get $pkgver/$source reliably, download+extract by hand, symlink the
+  # ACTUAL extracted dir (read back from disk, not hardcoded, so this
+  # keeps working across version bumps even if upstream renames again),
+  # then hand off to makepkg with --noextract so it goes straight to
+  # prepare()/build()/package() against our pre-arranged src/ tree.
+  cat > /tmp/libcutefish-manual-build.sh << 'MANUALBUILD'
+#!/bin/bash
+set -ex
+cd /tmp/libcutefish-build
+rm -rf src pkg
+mkdir -p src
+source ./PKGBUILD
+for _src in "${source[@]}"; do
+  case "${_src}" in
+    *::*)
+      _fname="${_src%%::*}"
+      _url="${_src#*::}"
+      [ -f "${_fname}" ] || curl -fsSL -o "${_fname}" "${_url}"
+      case "${_fname}" in
+        *.tar.gz|*.tgz|*.tar.xz|*.tar.bz2) bsdtar -xf "${_fname}" -C src ;;
+      esac
+      ;;
+    *)
+      # local files tracked directly in the AUR git repo (e.g. patches)
+      # -- nothing to download, makepkg will pick these up from cwd
+      # itself during prepare()/build().
+      ;;
+  esac
+done
+_extracted_dir="$(find src -mindepth 1 -maxdepth 1 -type d | head -n1)"
+if [ -z "${_extracted_dir}" ]; then
+  echo "ERROR: nothing extracted into src/ -- check source= entries" >&2
+  exit 1
+fi
+_expected_dir="${pkgname}-${pkgver}"
+if [ "$(basename "${_extracted_dir}")" != "${_expected_dir}" ]; then
+  echo "=== libcutefish: symlinking $(basename "${_extracted_dir}") -> ${_expected_dir} (upstream dir-name drift) ==="
+  ln -sfn "$(basename "${_extracted_dir}")" "src/${_expected_dir}"
+fi
+makepkg -si --skipinteg --noextract --noconfirm --needed
+MANUALBUILD
+  chmod +x /tmp/libcutefish-manual-build.sh
+  chown builduser:builduser /tmp/libcutefish-manual-build.sh
+  runuser -u builduser -- /tmp/libcutefish-manual-build.sh
+  rm -f /tmp/libcutefish-manual-build.sh
   rm -rf "${LIBCUTEFISH_BUILD}"
   echo "=== libcutefish installed manually via patched makepkg (x86_64) ==="
 
