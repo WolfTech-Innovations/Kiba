@@ -12012,10 +12012,7 @@ mkdir -p /usr/share/wayland-sessions
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [General]
-DisplayServer=wayland
-
-[Wayland]
-CompositorCommand=kwin_wayland --xwayland
+DisplayServer=x11
 
 [Autologin]
 User=liveuser
