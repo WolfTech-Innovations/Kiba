@@ -12009,10 +12009,6 @@ SDDMQML
 # above for the OEM-mode counterpart) -- both point at deepin-session,
 # written in the DEEPIN DESKTOP STACK section earlier in this script.
 mkdir -p /usr/share/wayland-sessions
-git clone https://aur.archlinux.org/yay-bin.git
-cd yay-bin
-makepkg -si   
-yay -S sddm-silent-theme
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [General]
@@ -12020,9 +12016,6 @@ DisplayServer=wayland
 
 [Wayland]
 CompositorCommand=kwin_wayland --xwayland
-
-[Theme]
-Current=silent
 
 [Autologin]
 User=liveuser
