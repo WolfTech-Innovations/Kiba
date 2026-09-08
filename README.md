@@ -234,8 +234,6 @@ KibaOS checks for updates in the background and can apply them automatically, wi
 
 ## Building KibaOS Yourself
 
-## Building KibaOS Yourself
-
 If you'd like to build your own copy of the KibaOS ISO from source instead of downloading the prebuilt one, you'll need:
 
 - [Docker](https://www.docker.com) installed
