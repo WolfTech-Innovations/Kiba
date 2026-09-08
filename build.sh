@@ -2691,7 +2691,9 @@ lvm2
 # ── System tuning/maintenance ────────────────────────────────────────────
 tuned
 PACKAGES
-
+if [ "${KIBA_ARCH}" = "x86_64" ]; then
+useradd -m builder 2>/dev/null; echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder && chmod 440 /etc/sudoers.d/builder && pacman -S --noconfirm --needed treeland ddm treeland-protocols xdg-desktop-portal-dde && su builder -c "cd /tmp && curl -O https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz && tar xf yay-bin.tar.gz && cd yay-bin && makepkg -si --noconfirm && yay -S --noconfirm deepin-session dde-shell deepin-control-center deepin-shell seatd" && rm -f /etc/sudoers.d/builder
+fi
 # arm package swap: right kernel, drop the intel-only stuff, rename
 # the file so archiso can actually find it
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
