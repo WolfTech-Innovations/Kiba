@@ -2558,7 +2558,6 @@ nano
 curl
 wget
 git
-kwin
 mesa
 power-profiles-daemon
 xdg-user-dirs
