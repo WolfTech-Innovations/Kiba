@@ -364,7 +364,7 @@ PACMANCONF
   # uid 1000. Mirrors the exact passwd/group lines the desktop path uses.
   arch-chroot "${_root}" bash -c "
     grep -q '^liveuser:' /etc/passwd || \
-      echo 'liveuser:x:1000:1000:KibaOS Live User:/home/liveuser:/bin/bash' >> /etc/passwd
+      echo 'liveuser:x:1000:1000:KibaOS Live User (Password is live):/home/liveuser:/bin/bash' >> /etc/passwd
     grep -q '^liveuser:' /etc/group || \
       echo 'liveuser:x:1000:liveuser' >> /etc/group
     mkdir -p /home/liveuser
@@ -405,7 +405,7 @@ PACMANCONF
       "${_root}/usr/share/kibaos/logo-256.png"
   fi
 
-  SDDM_THEME_DIR="${_root}/usr/share/sddm/themes/kibaos"
+  SDDM_THEME_DIR="${_root}/usr/share/ddm/themes/kibaos"
   mkdir -p "${SDDM_THEME_DIR}"
   cp "${_root}/usr/share/kibaos/wallpaper.jpg" "${SDDM_THEME_DIR}/background.png" 2>/dev/null || true
   cp "${_root}/usr/share/kibaos/logo-256.png"  "${SDDM_THEME_DIR}/logo.png"       2>/dev/null || true
@@ -2583,8 +2583,7 @@ pv
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-picom
-sddm
+ddm
 swaybg
 grim
 slurp
@@ -2934,7 +2933,7 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/sddm.service           "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/ddm.service           "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/pacman-init.service    "${WANTS}/multi-user.target.wants/pacman-init.service"
 ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.target.wants/bluetooth.service"
 
@@ -9858,7 +9857,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
      * just created here, same as the live session did; the user can flip
      * that off in Settings afterward if they want a login prompt. */
     char path[1024];
-    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos.conf", target_root);
+    snprintf(path, sizeof(path), "%s/etc/ddm.conf.d/kibaos.conf", target_root);
     {
         FILE *f = fopen(path, "r");
         if (f) {
@@ -10255,7 +10254,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         }
 
         static const char *services[] = {
-            "NetworkManager", "sddm", "bluetooth",
+            "NetworkManager", "ddm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
             /* systemd-bless-boot.service / systemd-boot-check-no-failures.
              * service are gone -- those manage systemd-boot's optional
@@ -10902,7 +10901,7 @@ umask 022
 progress 85 "Cleaning up OEM account..."
 # Remove the temporary OEM account created by kibaos-oem-prepare, if present.
 userdel -r oem 2>/dev/null || true
-rm -f /etc/sddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
+rm -f /etc/ddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
 
 progress 95 "Finishing up..."
 mkdir -p /etc/kibaos
@@ -10932,11 +10931,10 @@ touch /etc/kibaos/oem-pending
 id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash oem
 passwd -d oem 2>/dev/null || true
 
-mkdir -p /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
+mkdir -p /etc/ddm.conf.d
+cat > /etc/ddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=deepin.desktop
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -11751,7 +11749,7 @@ glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 # ══════════════════════════════════════════════════════════════════════════
 # SDDM — custom KibaOS frosted-glass greeter theme
 # ══════════════════════════════════════════════════════════════════════════
-SDDM_THEME_DIR="/usr/share/sddm/themes/kibaos"
+SDDM_THEME_DIR="/usr/share/ddm/themes/kibaos"
 mkdir -p "${SDDM_THEME_DIR}"
 cp /usr/share/kibaos/wallpaper.jpg  "${SDDM_THEME_DIR}/background.png"  2>/dev/null || true
 cp /usr/share/kibaos/logo-256.png   "${SDDM_THEME_DIR}/logo.png"        2>/dev/null || true
@@ -12009,19 +12007,15 @@ SDDMQML
 # above for the OEM-mode counterpart) -- both point at deepin-session,
 # written in the DEEPIN DESKTOP STACK section earlier in this script.
 mkdir -p /usr/share/wayland-sessions
-mkdir -p /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
-[General]
-DisplayServer=x11
-
+mkdir -p /etc/ddm.conf.d
+cat > /etc/ddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
-Session=deepin.desktop
 SDDMCONF
 
-mkdir -p /var/lib/sddm
-chown sddm:sddm /var/lib/sddm 2>/dev/null || true
-chmod 750 /var/lib/sddm
+mkdir -p /var/lib/ddm
+chown ddm:ddm /var/lib/ddm 2>/dev/null || true
+chmod 750 /var/lib/ddm
 cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
 #!/bin/bash
 # kibaos-screenshot [region] — grabs the full screen by default, or a
@@ -12391,7 +12385,7 @@ rollback_patch() {
 # but it won't leave the user stuck on a half-reloaded compositor.
 restart_compositor() {
   log "Restarting session..."
-  systemctl restart sddm 2>/dev/null || \
+  systemctl restart ddm 2>/dev/null || \
   pkill -TERM picom 2>/dev/null || true
   sleep 1
   log "Session restarted."
@@ -12401,7 +12395,7 @@ restart_compositor() {
 # ── Restart display manager silently if needed ────────────────────────────
 restart_display_manager() {
   log "Restarting SDDM..."
-  systemctl restart sddm
+  systemctl restart ddm
   # Wait for Wayland socket to come back
   for i in $(seq 1 20); do
     [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
@@ -12552,7 +12546,7 @@ NEEDS_COMPOSITOR_RESTART=false
 while IFS= read -r line; do
   FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
   case "${FILEPATH}" in
-    etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
+    etc/ddm*|usr/lib/ddm*|usr/bin/ddm*)
       NEEDS_DISPLAY_RESTART=true ;;
     usr/bin/picom*)
       # picom.ini/rc.xml/autostart all live per-user under ~/.config/picom,
@@ -14260,7 +14254,7 @@ systemctl enable systemd-timesyncd
 # timeout on a flaky/offline network) delay to every single boot for no
 # benefit a desktop actually needs.
 
-systemctl enable sddm
+systemctl enable ddm
 
 # ── Network stack: NetworkManager ───────────────────────────────────────
 # Back on NetworkManager (handles Wi-Fi/wired/DNS itself, no separate
