@@ -45,7 +45,7 @@
 
 ---
 
-KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Cutefish OS** desktop environment and is designed so that anyone can sit down and use it immediately, without having to configure anything first.
+KibaOS is built on **Arch Linux** (the "Rolling" release, meaning it's always kept up to date rather than released in big yearly versions). It uses the **Deepin OS** desktop environment and is designed so that anyone can sit down and use it immediately, without having to configure anything first.
 
 Every piece of it — the installer, the app icons, the terminal, even the boot screen — is chosen or built with one rule in mind: **nothing should look or feel like it's still showing you the plumbing.**
 
@@ -86,7 +86,7 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 | Feature | What it means for you |
 | --- | --- |
 | **A solid foundation** | Built on Arch Linux, a well-respected base known for staying current and supporting the newest hardware. |
-| **A clean, familiar desktop** | The Cutefish OS desktop environment provides a taskbar, a centered dock, and a clock applet, laid out so everything is easy to find. |
+| **A clean, familiar desktop** | The Deepin OS desktop environment provides a taskbar, a centered dock, and a clock applet, laid out so everything is easy to find. |
 | **Everyday apps, already installed** | A file manager (Nemo), a web browser, a calculator, a calendar, email (Geary), notes, music, and a to-do list app — all picked or relabeled so they read as plain, simple tools instead of a pile of separately-branded software. |
 | **A simple terminal, when you need it** | The built-in terminal is deliberately minimal — one window, no tabs, no menus — for the rare moments you need it, without it ever feeling like the "real" way to use the computer. |
 | **`kiba`, a friendly app manager** | Install, remove, and update software with plain-language commands instead of memorizing package-manager flags. See [Managing Apps with pacman](#managing-apps-with-pacman). |
@@ -102,7 +102,7 @@ KibaOS aims to work well right out of the box, so there's no need to spend an af
 
 ## Design & Theming
 
-KibaOS's look isn't an afterthought bolted onto stock Arch + Cutefish OS — every visual layer is deliberately chosen so the system feels like one coherent product, not a collection of default Linux app icons and system dialogs.
+KibaOS's look isn't an afterthought bolted onto stock Arch + Deepin OS — every visual layer is deliberately chosen so the system feels like one coherent product, not a collection of default Linux app icons and system dialogs.
 
 | Layer | What's used | Why |
 | --- | --- | --- |
@@ -252,7 +252,7 @@ docker run --rm --privileged \
 ```
 
 > [!NOTE]
-> The `build.sh` script orchestrates the entire build process: it sets up the Arch Linux base, configures the Cutefish OS desktop with Dracula theme, applies KibaOS customizations, builds KibaStore, and packages everything into a bootable ISO file. The official KibaOS releases on SourceForge are built automatically using this exact same script via GitHub Actions every time changes are pushed to the project.
+> The `build.sh` script orchestrates the entire build process: it sets up the Arch Linux base, configures the Deepin OS desktop with Dracula theme, applies KibaOS customizations, builds KibaStore, and packages everything into a bootable ISO file. The official KibaOS releases on SourceForge are built automatically using this exact same script via GitHub Actions every time changes are pushed to the project.
 
 ---
 
@@ -295,7 +295,7 @@ Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://
 
 ## License
 
-KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Cutefish OS, Docker, Kora, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
+KibaOS is a distribution, not a single piece of software — it bundles together many separate projects (the Linux kernel, Deepin OS, Docker, Kora, and more), each with its own license. The build scripts and configuration files in this repository are released under the **MIT License**.
 
 ---
 
