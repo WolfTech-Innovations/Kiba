@@ -10936,7 +10936,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=deepin
+Session=deepin.desktop
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -12019,43 +12019,12 @@ CompositorCommand=kwin_wayland --xwayland
 
 [Autologin]
 User=liveuser
-Session=deepin
+Session=deepin.desktop
 SDDMCONF
 
 mkdir -p /var/lib/sddm
 chown sddm:sddm /var/lib/sddm 2>/dev/null || true
 chmod 750 /var/lib/sddm
-
-# ══════════════════════════════════════════════════════════════════════════
-# LABWC CONFIG
-# ══════════════════════════════════════════════════════════════════════════
-# using picom as's own officially-supported/default compositor,
-# so this gets the real integration bridge (keybinding + theme sync) that
-# Wayfire never had, and it's just a way better-tested combo overall.
-#
-# what this costs us, said plainly: picom has NO wobbly/jelly window
-# physics and NO real compositor blur plugin, full stop — that's not a
-# config knob I'm missing, it's an intentional design choice on picom's
-# end (they keep animation out of the compositor on purpose). rather than
-# fake it or leave dangling references to plugins that don't exist here,
-# both features are just gone: the GTK theme's motion-language comment
-# above already flags where wobbly used to hook in, and the login/Raven
-# glass effects fall back to the plain translucent-fill version instead
-# of real Kawase blur. Kortex's compositor IPC bridge is also gone for
-# the same reason — see the note where WAYFIRE IPC used to be, now
-# replaced with a graceful no-op instead of a hard build/crash.
-#
-# unlike Wayfire, picom reads a system-wide config from /etc/xdg/picom
-# as a fallback, but per-user ~/.config/picom still wins, so — same as
-# before — the actual default config gets dropped into /etc/skel and
-# copied into every new user's home (liveuser, and whoever the OOBE
-# installer creates).
-# ── Screenshot + screenshot-OCR ──────────────────────────────────────────
-# bound to Print/Shift+Print/Super+Shift+Print down in rc.xml's <keyboard>
-# section below. all three copy straight to the clipboard via wl-copy (so
-# paste-anywhere just works right away) as well as saving a file, and pop
-# a toast to confirm — don't want a keypress silently doing something and
-# leaving you wondering if it worked.
 cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
 #!/bin/bash
 # kibaos-screenshot [region] — grabs the full screen by default, or a
@@ -12076,7 +12045,6 @@ wl-copy < "$FILE"
 notify-send -i "$FILE" "Screenshot saved" "Copied to clipboard · $(basename "$FILE")"
 SCREENSHOT
 chmod +x /usr/local/bin/kibaos-screenshot
-
 cat > /usr/local/bin/kibaos-screenshot-ocr << 'SCREENSHOTOCR'
 #!/bin/bash
 # kibaos-screenshot-ocr — select a region, extract its text with Tesseract,
@@ -12098,16 +12066,6 @@ PREVIEW=$(printf '%s' "$TEXT" | head -c 120)
 notify-send "Text copied to clipboard" "${PREVIEW}$([ ${#TEXT} -gt 120 ] && echo …)"
 SCREENSHOTOCR
 chmod +x /usr/local/bin/kibaos-screenshot-ocr
-
-# ── Output scale: real per-monitor DPI via wlr-randr ──────────────────────
-# picom doesn't do auto-DPI either -- outputs just default to scale 1
-# unless something explicitly sets them, same story as before. runs on
-# every session start (wired into the picom autostart file below) so it
-# re-applies correctly on dock/undock and monitor hotplug too, not just
-# at first login. scale gets worked out from actual DPI (px / physical
-# size in inches) when the monitor reports its physical dimensions over
-# EDID, and falls back to a plain resolution heuristic when it doesn't
-# (common on some external monitors and pretty much all VMs).
 cat > /usr/local/bin/kibaos-apply-output-scale << 'OUTPUTSCALE'
 #!/bin/bash
 # Give the compositor a moment to enumerate outputs on cold start.
@@ -12165,24 +12123,8 @@ apply_scale
 rm -f /tmp/.kiba-outputs
 OUTPUTSCALE
 chmod +x /usr/local/bin/kibaos-apply-output-scale
-
-# SKEL gets defined here (instead of waiting for the "SKELETON" section
-# further down) because this is its first real use: the picom config gets
-# written to /etc/skel so it's copied into every new user's home
-# (liveuser, and anyone the OOBE installer creates). SKEL used to not get
-# set until way later in the script, so under `set -ex` (no -u) it just
-# silently expanded to an empty string here, and the config was written to
-# /.config instead of /etc/skel/.config — meaning nobody actually got it,
-# nothing autostarted , gray screen and giant cursor on a
-# bare compositor. The later "SKELETON" section still re-assigns
-# SKEL="/etc/skel" too — redundant now, but harmless, so left as-is.
 SKEL="/etc/skel"
 mkdir -p "${SKEL}/.config/picom"
-
-# rc.xml — picom's main config: window rules, theme geometry, keybinds.
-# no [core] plugin list like wayfire.ini had, because picom doesn't have
-# plugins at all — it's one static binary with a fixed feature set, on
-# purpose. virtual desktop count replaces Wayfire's vwidth/vheight grid.
 cat > "${SKEL}/.config/picom/rc.xml" << 'LABWCRC'
 <?xml version="1.0"?>
 <picom_config>
@@ -12274,51 +12216,7 @@ chmod +x "${SKEL}/.config/picom/autostart"
 cat > "${SKEL}/.config/picom/environment" << 'LABWCENV'
 XDG_CURRENT_DESKTOP=Deepin
 LABWCENV
-
-# ══════════════════════════════════════════════════════════════════════════
-# COMPOSITOR IPC — none, on purpose, and that's fine
-# ══════════════════════════════════════════════════════════════════════════
-# this whole section used to be a from-source build of wayfire-plugins-
-# extra (ipc/ipc-rules, AUR-only, plus a pinned wayfire downgrade just to
-# get it compiling) so Kortex could talk to Wayfire's IPC socket via
-# `wfctl` for live window-focus/launch/move events. picom has nothing
-# like that — no IPC socket, no plugin system to add one, nothing to
-# build here at all. so none of that happens anymore: no meson/ninja
-# build, no wayfire version pin, no wfctl pip install.
-#
-# Kortex itself already knows how to handle this gracefully (see
-# WindowEventSource in core.py) — on picom it just detects there's no
-# WAYFIRE_SOCKET/wfctl available, logs that it's running without a
-# compositor event feed, and quietly disables the window-tracking
-# features that depended on it instead of crashing or busy-looping
-# looking for a socket that will never show up. Everything else Kortex
-# does (usage prediction, break reminders, driver/service auto-repair)
-# doesn't touch this and keeps working exactly the same.
 echo "=== Skipping compositor IPC build — picom has no IPC, Kortex degrades gracefully ==="
-
-# ══════════════════════════════════════════════════════════════════════════
-# A/B ROOT + SYSUPDATE INFRASTRUCTURE — stays removed; OTA is back, but
-# as a file-level live patcher, not a root-image swap
-# ══════════════════════════════════════════════════════════════════════════
-# Used to live here: a systemd-repart rule carving a second root-b
-# partition out of space the installer reserved for it, systemd-sysupdate
-# config pointing at signed root images, kibaos-uki-slot-sync building a
-# per-slot UKI, and kibaos-sysupdate-apply running inside
-# system-update.target to do the atomic root-b write + slot flip. That
-# whole design is still gone -- the installer gives root all the space
-# on the disk (see the root_sectors comment in
-# kibaos_oobe_backend_main.c's erase-mode branch), there's no root-b to
-# repart into existence, and no per-slot UKI naming (just plain
-# kibaos+3.efi now).
-#
-# What's back below is the older, simpler kibaos-ota: it doesn't touch
-# partitions or UKIs at all -- it downloads a signed tarball of changed
-# files, verifies it, and replaces them on the live root one at a time,
-# keeping a backup of whatever it overwrote so kortex's rollback_config
-# action (see kortex-helper) can undo the last patch on request. No
-# slot to flip, no second root to keep in sync -- just files going in
-# and a copy of the old ones sitting in /var/lib/kibaos-ota if something
-# needs to come back.
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
 OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
