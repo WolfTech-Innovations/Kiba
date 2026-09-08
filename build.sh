@@ -10935,6 +10935,7 @@ mkdir -p /etc/ddm.conf.d
 cat > /etc/ddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
+Session=treeland.desktop
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -12011,6 +12012,7 @@ mkdir -p /etc/ddm.conf.d
 cat > /etc/ddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
+Session=treeland.desktop
 SDDMCONF
 
 mkdir -p /var/lib/ddm
