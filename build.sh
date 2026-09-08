@@ -6013,6 +6013,7 @@ fi
 # rather than asserting it's confirmed to work.
 if [ "$(uname -m)" = "x86_64" ]; then
   pacman -S --noconfirm --needed deepin deepin-extra gsettings-qt
+  install -Dm644 /dev/stdin /etc/systemd/user/kibaos-wallpaper.service <<< $'[Unit]\nDescription=KibaOS First Start Wallpaper\nAfter=graphical-session.target\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -c \'if [ ! -f "$HOME/.config/kibaos-wallpaper-set" ]; then mkdir -p "$HOME/.config"; gsettings set com.deepin.wrap.gnome.desktop.background picture-uri "file:///usr/share/kibaos/wallpaper.jpg"; gsettings set com.deepin.wrap.gnome.desktop.background picture-uri-dark "file:///usr/share/kibaos/wallpaper.jpg"; touch "$HOME/.config/kibaos-wallpaper-set"; fi\'\n\n[Install]\nWantedBy=graphical-session.target'; systemctl --global enable kibaos-wallpaper.service
   echo "=== Deepin Desktop Environment (DDE) installed from official Arch [extra] (x86_64) ==="
 
   # Filename has to be deepin-session.desktop exactly -- SDDM's
