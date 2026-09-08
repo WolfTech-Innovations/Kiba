@@ -6023,19 +6023,6 @@ if [ "$(uname -m)" = "x86_64" ]; then
   # session files assume startdde driving Treeland or an X11 session via
   # deepin-kwin, neither of which this image uses) -- so it's
   # hand-written here, same pattern as the cutefish-session.desktop it
-  # replaces.
-  mkdir -p /usr/share/wayland-sessions
-  cat > /usr/share/wayland-sessions/deepin-session.desktop << 'DEEPINSESSION'
-[Desktop Entry]
-Name=Deepin (KWin Wayland)
-Comment=Deepin Desktop Environment session on KWin Wayland
-Exec=/usr/bin/kibaos-start-deepin-shell
-TryExec=/usr/bin/kwin_wayland_wrapper
-Type=Application
-DesktopNames=Deepin;KDE;
-X-GDM-SessionRegisters=true
-DEEPINSESSION
-  echo "=== deepin-session.desktop written (KWin Wayland, not picom) ==="
 
   # ── kibaos-start-deepin-shell — what kwin_wayland actually execs ────────
   # Same role as kibaos-start-cutefish-shell before it: passed to
@@ -6045,19 +6032,7 @@ DEEPINSESSION
   # first), which is what makes the XDG autostart entries under
   # ~/.config/autostart/ and the WantedBy=graphical-session.target
   # systemd --user services (kortexd, kortex-authd) actually run.
-  cat > /usr/local/bin/kibaos-start-deepin-shell << 'STARTDEEPIN'
-#!/bin/bash
-export XDG_CURRENT_DESKTOP=Deepin
-systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null || true
-if command -v dbus-update-activation-environment >/dev/null 2>&1; then
-  dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null || true
-fi
-systemctl --user start graphical-session.target 2>/dev/null || true
-kibaos-apply-output-scale &
-exec /usr/bin/startdde
-STARTDEEPIN
-  chmod +x /usr/local/bin/kibaos-start-deepin-shell
-  echo "=== kibaos-start-deepin-shell wrapper written ==="
+
 
   # Unlike cutefish-session (which needed a manual belt-and-suspenders
   # systemd unit here because its internal autostart didn't reliably
@@ -10961,7 +10936,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=deepin-session
+Session=deepin
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -12034,7 +12009,10 @@ SDDMQML
 # above for the OEM-mode counterpart) -- both point at deepin-session,
 # written in the DEEPIN DESKTOP STACK section earlier in this script.
 mkdir -p /usr/share/wayland-sessions
-
+git clone https://aur.archlinux.org/yay-bin.git
+cd yay-bin
+makepkg -si   
+yay -S sddm-silent-theme
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [General]
@@ -12044,11 +12022,11 @@ DisplayServer=wayland
 CompositorCommand=kwin_wayland --xwayland
 
 [Theme]
-Current=kibaos
+Current=silent
 
 [Autologin]
 User=liveuser
-Session=deepin-session
+Session=deepin
 SDDMCONF
 
 mkdir -p /var/lib/sddm
