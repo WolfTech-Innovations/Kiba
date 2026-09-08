@@ -658,8 +658,8 @@ SDDMQML
 
   # ── phoc wayland session + mobile sddm config ────────────────────────────
   # Desktop's own /etc/sddm.conf.d/kibaos.conf hardcodes
-  # CompositorCommand=kwin_wayland (needed for cutefish-shell's Plasma
-  # Window Management protocol use), which is desktop-only and would just
+  # CompositorCommand=kwin_wayland (needed for dde-dock/dde-launcher's
+  # Plasma Window Management protocol use), which is desktop-only and would just
   # fail to start anything on a phone -- mobile runs
   # Budgie's panel/raven on top of phoc instead (see the phoc.ini block
   # above), so it needs its own session file and its own sddm.conf.d
@@ -5977,256 +5977,101 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
-# CUTEFISH DESKTOP STACK — built from source, Qt6/KF6, no AUR
+# DEEPIN DESKTOP STACK (DDE) — official Arch [extra] packages, no AUR, no
+# source build
 # ══════════════════════════════════════════════════════════════════════════
-# The old cutefish-meta AUR chain (yay + libcutefish + a dozen
-# interdependent cutefish-* AUR packages) is gone. Checked upstream
-# directly: cutefishos quietly migrated core/launcher/dock/statusbar,
-# libcutefish, filemanager, and settings to Qt6 + KDE Frameworks 6, and
-# restructured how the pieces depend on each other:
+# Replaces the Cutefish stack that used to live here. Cutefish was built
+# from source (cutefishos/{fishui,filemanager,settings,core,shell,
+# terminal,launcher,statusbar,dock,wallpapers,icons} + the cutefish-
+# framework sibling checkout) because it was never packaged for Arch at
+# all, AUR included. DDE doesn't have that problem: `deepin` and
+# `deepin-extra` are real, actively-packaged groups in Arch's own [extra]
+# repo (archlinux.org/packages/extra/x86_64/deepin-appearance and
+# siblings) -- no git clone, no cmake/ninja build step, no sibling-
+# checkout dance, just pacman.
 #
-#   - core + launcher + dock + statusbar were consolidated into a single
-#     `shell` repo, one process (cutefish-shell). This is why
-#     cutefish-core/-launcher/-dock/-statusbar don't get built below --
-#     they don't exist as separate targets upstream anymore.
-#   - libcutefish was renamed cutefish-framework, and is no longer an
-#     installable library package at all. filemanager and settings each
-#     pull it in as a SIBLING SOURCE CHECKOUT via
-#     `add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../cutefish-framework/...)`
-#     and build it in-tree -- so it just needs to sit on disk next to
-#     them at the right relative path, not be pacman/AUR-installed.
+# Known going in, not something this build script can fix, so noting it
+# rather than letting it be a surprise later: Arch's own DDE packages lag
+# upstream (Arch forum reports of packages up to ~2 years stale), and
+# openSUSE's security team has publicly described Deepin as "lacking
+# security culture" and doesn't recommend it. Weigh that against wanting
+# Deepin specifically.
 #
-# Net effect: the entire qt5-*/kio5/bluez-qt5/kwin-x11/polkit-qt5/
-# xorg-server-devel AUR dependency chain that used to break here (stale
-# libcutefish sha512sum, the libcutefish->cutefish-framework directory
-# rename breaking makepkg's prepare(), checkdeps-ordering failures across
-# the yay batch, "target not found" on every Qt5/KF5-only AUR dep) is
-# gone. Qt6 + KF6 are Arch's native official-repo packages -- no AUR, no
-# yay, no builduser/sudoers dance, for any of this.
-#
-# RESOLVED (was an open question): `shell` itself never installs a
-# /usr/share/wayland-sessions/*.desktop entry -- confirmed against its
-# actual CMakeLists.txt, its only install(FILES ...) target under
-# applications/ is the app-menu launcher, not a session file. That used
-# to come from the old cutefish-core AUR package and had no replacement.
-# Also confirmed via shell's own README: cutefish-shell is a plain Qt
-# Wayland client (not a compositor) whose dock/status-bar rely on KDE's
-# Plasma Window Management protocol, which only kwin_wayland speaks --
-# picom (used elsewhere in this image for Budgie) doesn't implement it.
-# Both are handled below: a hand-written cutefish-session.desktop whose
-# Exec= passes kwin_wayland a wrapper script (kibaos-start-cutefish-shell)
-# as its client, rather than cutefish-shell directly -- that wrapper is
-# also where graphical-session.target actually gets started (with the
-# session's Wayland/dbus env vars exported first), which is what makes
-# the XDG autostart entries under ~/.config/autostart/ (including
-# kibaos-oem-finish) and the WantedBy=graphical-session.target systemd
-# --user services (kortexd, kortex-authd) actually run -- none of that
-# fires from a bare kwin_wayland invocation on its own. kibaos-apply-
-# output-scale, defined later in this script, is launched from that same
-# wrapper; it's a plain executable on PATH by the time anyone runs it, so
-# it doesn't matter that it's written to disk after this point runs.
-#
-# NOTE: this makes the LABWC-CONFIG-labeled block further down (rc.xml,
-# themerc, autostart, environment -- all real labwc config, despite the
-# "picom" naming throughout that section's prose) partially superseded:
-# CompositorCommand there is updated below to match this same
-# kwin_wayland swap, and the old `cutefish-session &` line in its
-# autostart file is removed since the session .desktop above already
-# launches kwin_wayland + cutefish-shell directly. What's NOT migrated
-# here: rc.xml's screenshot keybindings (Print / Shift+Print /
-# Super+Shift+Print) are labwc-format and KWin doesn't read them --
-# those need a real KWin-native home (kglobalshortcutsrc). Border/window
-# theming is out of scope here -- Kvantum (KibaOS theme, already set up
-# elsewhere in this script) covers Qt widget styling; themerc's colors
-# were window-decoration-level labwc config, a separate concern from
-# Kvantum, and aren't ported.
+# Compositor caveat, carried over unchanged from the Cutefish setup this
+# replaces (not independently re-verified against DDE's own Wayland
+# integration code): DDE's own upstream Wayland session (V23+) runs on
+# Treeland, Deepin's own wlroots-based compositor, not KWin. This image
+# keeps kwin_wayland instead, on the same theory that made Cutefish work
+# here -- dde-dock/dde-launcher, like cutefish-shell before them, are
+# plain Qt6 Wayland clients, and kwin_wayland is the one compositor on
+# this image that speaks the KDE Plasma Window Management protocol
+# (org_kde_plasma_window_management) their window-list/focus/close/
+# minimize handling is built on. picom/labwc (used elsewhere on this
+# image, for Budgie) doesn't implement that protocol at all. If DDE's
+# dock/launcher turn out to hard-require a Treeland-specific protocol
+# extension instead, this needs revisiting -- flagging that honestly
+# rather than asserting it's confirmed to work.
 if [ "$(uname -m)" = "x86_64" ]; then
-  # libzip added below: cutefishos/filemanager's own CMakeLists.txt hard-fails
-  # configure ("libzip development files are required to build filemanager")
-  # if it can't find libzip -- it's used for browsing/extracting archive
-  # contents in the file manager, and wasn't previously in this package list.
-  pacman -S --noconfirm --needed \
-    qt6-base qt6-declarative qt6-wayland qt6-svg qt6-5compat qt5-base qt5-tools qt5-quickcontrols2 \
-    kwayland kguiaddons kwindowsystem ki18n kio kservice kpackage \
-    kdeclarative kiconthemes kwidgetsaddons kcoreaddons \
-    networkmanager-qt modemmanager-qt kpmcore python python-yaml \
-    python-jsonschema \
-    libzip
+  pacman -S --noconfirm --needed deepin deepin-extra gsettings-qt
+  echo "=== Deepin Desktop Environment (DDE) installed from official Arch [extra] (x86_64) ==="
 
-  CUTEFISH_SRC=/tmp/cutefish-src
-  rm -rf "${CUTEFISH_SRC}"
-  mkdir -p "${CUTEFISH_SRC}"
-
-  # cutefish-framework: sibling checkout only, never built/installed
-  # standalone -- filemanager and settings each add_subdirectory() into
-  # it directly as part of their own build. It just needs to exist here,
-  # next to the four repos below, at ../cutefish-framework relative to
-  # each of them.
-  git clone --depth 1 https://github.com/cutefishos/cutefish-framework.git \
-    "${CUTEFISH_SRC}/cutefish-framework"
-
-  # Build order matters: fishui first (no cutefish-framework dependency),
-  # then filemanager (pulls cutefish-framework in via add_subdirectory
-  # and builds it in-tree), then settings (same sibling-checkout
-  # dependency), then shell last (needs fishui + filemanager already
-  # installed -- it loads filemanager's desktop-icons QML plugin at
-  # runtime via org.cutefish.filemanager.desktop, and doesn't reference
-  # cutefish-framework directly at all).
-  # ── extra-cmake-modules + qtpaths6 shim ────────────────────────────────
-  # Arch's qt6-base/qt6-tools packages don't ship a qtpaths6 binary at all
-  # (checked: qt6-base only has qmake6/androiddeployqt6/wasmdeployqt6, and
-  # qt6-tools only has qtdiag6/lupdate6/etc -- no qtpaths6 in either, unlike
-  # Debian which ships a dedicated qtpaths6 package via qt6-tools-dev-tools).
-  # cutefish-framework/cmake/CutefishFrameworkQml.cmake calls
-  # find_program(qtpaths6) via KDE's ECMQueryQt module to resolve
-  # QT_INSTALL_QML and friends, so without it CMake configure fails outright
-  # with "Could not find QT_PATHS_EXECUTABLE using the following names:
-  # qtpaths6". extra-cmake-modules itself was also missing from this script's
-  # package list even though cutefish-framework's own README lists it as a
-  # build dependency. qmake6 (already installed via qt6-base) answers the
-  # same -query keys qtpaths6 would, so shim qtpaths6 as a thin wrapper
-  # around it rather than pulling in an AUR build just for one tool.
-  pacman -S --noconfirm --needed extra-cmake-modules
-
-  cat > /usr/local/bin/qtpaths6 << 'QTPATHS6'
-#!/bin/bash
-if [ "$1" = "--query" ] && [ -n "$2" ]; then
-  exec qmake6 -query "$2"
-else
-  exec qmake6 -query
-fi
-QTPATHS6
-  chmod +x /usr/local/bin/qtpaths6
-  echo "=== qtpaths6 shim installed (wraps qmake6 -query) ==="
-
-  for _repo in fishui filemanager settings core shell terminal launcher statusbar dock wallpapers icons; do
-    git clone --depth 1 "https://github.com/cutefishos/${_repo}.git" \
-      "${CUTEFISH_SRC}/${_repo}"
-    
-    # cutefish-settings/src/language.cpp ends up pulling in ICU symbols
-    # (via Qt6/KI18n's ICU-backed QLocale/QCollator) but neither its own
-    # CMakeLists.txt nor Qt6::Core's public link interface exposes
-    # libicuuc/libicui18n/libicudata directly -- they're only NEEDED
-    # transitively. Modern binutils ld defaults to --as-needed and no
-    # longer resolves symbols out of indirect (not-directly-linked) DSOs,
-    # so the final link fails with "undefined reference to
-    # icu_78::Locale::~Locale()" / "DSO missing from command line" for
-    # libicuuc.so.78 even though ICU is installed. Force ICU onto the
-    # link line explicitly for this one target rather than patching
-    # upstream's CMakeLists.txt.
-    _extra_cmake_args=()
-    if [ "${_repo}" = "settings" ]; then
-      pacman -S --noconfirm --needed icu
-      _extra_cmake_args=(-DCMAKE_EXE_LINKER_FLAGS=-licuuc\ -licui18n\ -licudata)
-    fi
-
-    cmake -S "${CUTEFISH_SRC}/${_repo}" -B "${CUTEFISH_SRC}/${_repo}/build" \
-      -GNinja -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release \
-      "${_extra_cmake_args[@]}"
-    cmake --build "${CUTEFISH_SRC}/${_repo}/build"
-    cmake --install "${CUTEFISH_SRC}/${_repo}/build"
-    echo "=== ${_repo} built + installed from source (x86_64, Qt6/KF6) ==="
-  done
-
-  rm -rf "${CUTEFISH_SRC}"
-  echo "=== Cutefish desktop stack installed from source (x86_64) ==="
-  # Confirmed via shell's own README: cutefish-shell is a plain Qt Wayland
-  # client, not a compositor, and its dock/status-bar window-list, focus,
-  # close, and maximize/minimize/restore all go over KDE's Plasma Window
-  # Management protocol (org_kde_plasma_window_management) -- a KWin-Wayland-
-  # specific extension picom has no notion of at all. So this session HAS to
-  # run under kwin_wayland, not the picom/labwc setup used elsewhere in this
-  # image for Budgie -- those two are unrelated and this doesn't touch that.
-  # kwin_wayland's own CLI accepts a command to launch as a client inside the
-  # compositor it starts (documented KWin usage, same pattern nested/
-  # standalone KWin sessions have always used); --xwayland because Xwayland
-  # is already pulled in via packages.x86_64 and cutefish-shell/filemanager
-  # may still spawn legacy X11-only helpers.
-  # Filename has to be cutefish-session.desktop exactly -- SDDM's
-  # Session=cutefish-session (set further down for both the OEM and normal
+  # Filename has to be deepin-session.desktop exactly -- SDDM's
+  # Session=deepin-session (set further down for both the OEM and normal
   # autologin configs) resolves against the basename of a file under
-  # /usr/share/wayland-sessions/, and nothing else in this script ever wrote
-  # one -- it used to ship inside the old cutefish-core AUR package, which no
-  # longer exists as a separate build target upstream (see the note at the
-  # top of this block).
+  # /usr/share/wayland-sessions/, and the deepin package itself doesn't
+  # ship one that targets kwin_wayland the way this image needs (its own
+  # session files assume startdde driving Treeland or an X11 session via
+  # deepin-kwin, neither of which this image uses) -- so it's
+  # hand-written here, same pattern as the cutefish-session.desktop it
+  # replaces.
   mkdir -p /usr/share/wayland-sessions
-  cat > /usr/share/wayland-sessions/cutefish-session.desktop << 'CUTEFISHSESSION'
+  cat > /usr/share/wayland-sessions/deepin-session.desktop << 'DEEPINSESSION'
 [Desktop Entry]
-Name=Cutefish (KWin Wayland)
-Comment=Cutefish desktop session on KWin Wayland
-Exec=/usr/bin/cutefish-wayland-session
+Name=Deepin (KWin Wayland)
+Comment=Deepin Desktop Environment session on KWin Wayland
+Exec=/usr/bin/kibaos-start-deepin-shell
 TryExec=/usr/bin/kwin_wayland_wrapper
 Type=Application
-DesktopNames=Cutefish;KDE;
+DesktopNames=Deepin;KDE;
 X-GDM-SessionRegisters=true
-CUTEFISHSESSION
-  echo "=== cutefish-session.desktop written (KWin Wayland, not picom) ==="
+DEEPINSESSION
+  echo "=== deepin-session.desktop written (KWin Wayland, not picom) ==="
 
-  # ── kibaos-start-cutefish-shell — what kwin_wayland actually execs ───────
-  # Passed to kwin_wayland as its client argument (kwin_wayland's own CLI
-  # runs whatever command is given as a direct child once the compositor
-  # is up), so everything in here runs WITH the Wayland env vars kwin
-  # sets for its own children -- unlike a sibling process launched from
-  # outside kwin_wayland's process tree, which would NOT reliably see
-  # WAYLAND_DISPLAY.
-  #
-  # This is also where the *other* autostart mechanisms actually get
-  # kicked off -- previously an open gap, not something the earlier
-  # picom-labeled labwc autostart script ever did either: the XDG-spec
-  # entries under ~/.config/autostart/ (nemo-desktop, kibaos-configure,
-  # kibaos-oem-finish, kibaos-winapps-firstrun, kibaos-install-launch,
-  # polkit-agent, kibaos-first-login-setup) and the WantedBy=
-  # graphical-session.target systemd --user units (kortexd,
-  # kortex-authd) both need graphical-session.target actually started,
-  # with the session's env vars exported to systemd/dbus activation
-  # first -- systemd's own xdg-desktop-autostart-generator (systemd
-  # >=248) is what turns each ~/.config/autostart/*.desktop into a unit
-  # under that target automatically; nothing here hand-parses those
-  # .desktop files itself.
-  cat > /usr/local/bin/kibaos-start-cutefish-shell << 'STARTCUTEFISH'
+  # ── kibaos-start-deepin-shell — what kwin_wayland actually execs ────────
+  # Same role as kibaos-start-cutefish-shell before it: passed to
+  # kwin_wayland as its client argument, so everything here runs WITH the
+  # Wayland env vars kwin sets for its own children. Also where
+  # graphical-session.target actually gets started (env vars exported
+  # first), which is what makes the XDG autostart entries under
+  # ~/.config/autostart/ and the WantedBy=graphical-session.target
+  # systemd --user services (kortexd, kortex-authd) actually run.
+  cat > /usr/local/bin/kibaos-start-deepin-shell << 'STARTDEEPIN'
 #!/bin/bash
-export XDG_CURRENT_DESKTOP=Cutefish
+export XDG_CURRENT_DESKTOP=Deepin
 systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null || true
 if command -v dbus-update-activation-environment >/dev/null 2>&1; then
   dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DISPLAY 2>/dev/null || true
 fi
 systemctl --user start graphical-session.target 2>/dev/null || true
 kibaos-apply-output-scale &
-exec /usr/bin/cutefish-session
-STARTCUTEFISH
-  chmod +x /usr/local/bin/kibaos-start-cutefish-shell
-  echo "=== kibaos-start-cutefish-shell wrapper written ==="
+exec /usr/bin/startdde
+STARTDEEPIN
+  chmod +x /usr/local/bin/kibaos-start-deepin-shell
+  echo "=== kibaos-start-deepin-shell wrapper written ==="
 
-  # ── manual dock/statusbar/filemanager spawn ─────────────────────────────
-  # cutefish-session (built above) is supposed to start these itself --
-  # per its own README, it "starts the retained services daemon, waits
-  # for its D-Bus service to register, and then starts the desktop
-  # components." In practice that internal autostart isn't bringing up
-  # the dock, statusbar, or file manager on this image (only cutefish-
-  # shell's own desktop-icons QML layer renders). Rather than depend on
-  # whatever config/mechanism cutefish-session uses internally to decide
-  # what to launch -- undocumented, and not something this build script
-  # controls -- just spawn the three components directly as a --global
-  # user unit after the graphical session is up.
-  install -Dm644 /dev/stdin /etc/systemd/user/cutefish-shell.service << 'CUTEFISHCOMPONENTS'
-[Unit]
-Description=KibaOS Cutefish Shell Components
-After=graphical-session.target
-
-[Service]
-ExecStart=/bin/sh -c 'cutefish-filemanager & cutefish-dock & cutefish-statusbar & wait'
-Restart=on-failure
-
-[Install]
-WantedBy=graphical-session.target
-CUTEFISHCOMPONENTS
-  systemctl --global enable cutefish-shell.service
-  echo "=== cutefish-shell.service (manual dock/statusbar/filemanager spawn) enabled ==="
+  # Unlike cutefish-session (which needed a manual belt-and-suspenders
+  # systemd unit here because its internal autostart didn't reliably
+  # bring up the dock/statusbar/file manager in practice), startdde's
+  # entire documented job is bringing up dde-dock, the desktop-icons
+  # view, and the rest of DDE's session components -- so no equivalent
+  # manual-spawn unit is added here. If startdde turns out to have the
+  # same gap on this image, add one the same way cutefish-shell.service
+  # used to.
 fi
 
 cd /
 pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
-echo "=== Cutefish desktop stack step complete ==="
+echo "=== Deepin desktop stack step complete ==="
 
 # ══════════════════════════════════════════════════════════════════════════
 # KIBAOS OOBE INSTALLER — fullscreen, one-step-per-screen Vala/GTK4 app.
@@ -11116,7 +10961,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=cutefish-session
+Session=deepin-session
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -12184,23 +12029,10 @@ Rectangle {
 }
 SDDMQML
 
-# ── Wayland session — back to stock Cutefish-on-picom ─────────────────────
-# so, funny enough, this is actually going BACK to how Budgie wants to run.
-# Budgie 10.10's own package already ships /usr/share/wayland-sessions/
-# .desktop with Exec=picom baked in — picom is
-# official recommended/default Wayland compositor as of 10.10 (see
-# buddiesofbudgie.org/blog/budgie-10-10-released). I'd previously deleted
-# that stock file and dropped in my own budgie-wayfire.desktop to force
-# Wayfire instead, chasing real compositor-level wobbly window physics
-# that picom just doesn't have (it's a deliberate design choice on their
-# end — no compositor animation, period). Ripping that back out now: no
-# more deleting the stock session file, no more custom .desktop, we just
-# let Budgie's own packaged session do its thing.
-#
-# net effect: wobbly window drag and the real Kawase blur plugin are both
-# gone, and there's no picom equivalent for either — see LABWC CONFIG
-# below for how that's handled (short version: gracefully dropped, not
-# faked, nothing crashes because of it).
+# ── Wayland session — kwin_wayland + Deepin (DDE) ──────────────────────────
+# This is the live/normal-user autologin config (see kibaos-oem-prepare
+# above for the OEM-mode counterpart) -- both point at deepin-session,
+# written in the DEEPIN DESKTOP STACK section earlier in this script.
 mkdir -p /usr/share/wayland-sessions
 
 mkdir -p /etc/sddm.conf.d
@@ -12216,7 +12048,7 @@ Current=kibaos
 
 [Autologin]
 User=liveuser
-Session=cutefish-session
+Session=deepin-session
 SDDMCONF
 
 mkdir -p /var/lib/sddm
@@ -12444,31 +12276,32 @@ LABWCTHEME
 # blanking mid-install just isn't a thing that can happen. simplest fix
 # available: don't run the thing that would cause the problem.
 #
-# NOT wired up anymore: this file used to launch `cutefish-session &`
-# itself, on the assumption that SDDM only ever starts a bare compositor
-# binary and leaves the actual desktop launch to this autostart script.
-# That's superseded -- /usr/share/wayland-sessions/cutefish-session.desktop
-# (written earlier in this script, in the CUTEFISH DESKTOP STACK section)
-# has its own Exec= that starts kwin_wayland with cutefish-shell as its
-# client directly, plus kibaos-apply-output-scale inline. Leaving both
-# in place would start cutefish-shell twice. This file, along with
+# NOT wired up anymore: this file used to launch a desktop session
+# directly (`cutefish-session &`, before that), on the assumption that
+# SDDM only ever starts a bare compositor binary and leaves the actual
+# desktop launch to this autostart script. That's superseded --
+# /usr/share/wayland-sessions/deepin-session.desktop (written earlier in
+# this script, in the DEEPIN DESKTOP STACK section) has its own Exec=
+# that starts kwin_wayland with kibaos-start-deepin-shell (-> startdde)
+# as its client directly, plus kibaos-apply-output-scale inline. Leaving
+# both in place would start the session twice. This file, along with
 # rc.xml/themerc, is a labwc-format config (despite the "picom" naming
 # throughout this section) that KWin doesn't read at all -- kept here
 # only as reference/history, not something anything actually sources for
-# the Cutefish session anymore. The screenshot keybindings in rc.xml and
+# the Deepin session anymore. The screenshot keybindings in rc.xml and
 # the border colors in themerc still need a real KWin-native home
 # (kglobalshortcutsrc, kwinrc/kdecoration) -- not done in this pass.
 cat > "${SKEL}/.config/picom/autostart" << 'LABWCAUTOSTART'
 #!/bin/bash
-# superseded by cutefish-session.desktop's Exec= -- see note above.
+# superseded by deepin-session.desktop's Exec= -- see note above.
 LABWCAUTOSTART
 chmod +x "${SKEL}/.config/picom/autostart"
 
-# environment — superseded the same way: XDG_CURRENT_DESKTOP is Cutefish,
+# environment — superseded the same way: XDG_CURRENT_DESKTOP is Deepin,
 # not Budgie, on this branch, and nothing sources this file for the
-# Cutefish session anymore (see note above).
+# Deepin session anymore (see note above).
 cat > "${SKEL}/.config/picom/environment" << 'LABWCENV'
-XDG_CURRENT_DESKTOP=Cutefish
+XDG_CURRENT_DESKTOP=Deepin
 LABWCENV
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -14502,9 +14335,9 @@ done
 # SYSTEM ENVIRONMENT
 # ══════════════════════════════════════════════════════════════════════════
 cat > /etc/environment << 'ENV'
-DESKTOP_SESSION=Cutefish
-XDG_CURRENT_DESKTOP=Cutefish
-XDG_SESSION_DESKTOP=Cutefish
+DESKTOP_SESSION=Deepin
+XDG_CURRENT_DESKTOP=Deepin
+XDG_SESSION_DESKTOP=Deepin
 XDG_SESSION_TYPE=wayland
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
