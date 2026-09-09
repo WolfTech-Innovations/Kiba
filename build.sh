@@ -2577,6 +2577,8 @@ qt6-base
 python
 pyalpm
 parted
+budgie-desktop
+budgie-session
 gptfdisk
 syslinux
 pv
@@ -10957,7 +10959,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=budgie-desktop-wayland.desktop
+Session=budgie.desktop
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -12034,7 +12036,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
-Session=budgie-desktop-wayland.desktop
+Session=budgie.desktop
 SDDMCONF
 
 mkdir -p /var/lib/sddm
