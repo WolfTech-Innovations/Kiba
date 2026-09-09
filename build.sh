@@ -169,7 +169,7 @@ PACMANCONF
   # into the AUR build loop below alongside the other AUR-only packages.
   pacstrap -C /tmp/mobile-pacman.conf -c -G "${_root}" \
     base sudo networkmanager \
-     picom-is-not-used-placeholder 2>/dev/null || true
+     labwc-is-not-used-placeholder 2>/dev/null || true
 
   # (real pacstrap call -- the line above is deliberately allowed to
   # partially fail on the placeholder package name and retried clean here)
@@ -382,8 +382,8 @@ PACMANCONF
   # itself is screen-size-aware (see its own `isPhone` check), so the
   # exact same file already renders touch-friendly on a phone panel and
   # unchanged on a desktop one -- no separate mobile QML needed.
-  KIBA_WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/wallpapers/wallpaper.png?raw=true"
-  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/splash/splash.png?raw=true"
+  KIBA_WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
+  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
   mkdir -p "${_root}/usr/share/kibaos"
 
   curl -fL --retry 5 --retry-delay 3 -o "${_root}/usr/share/kibaos/wallpaper.jpg" \
@@ -524,7 +524,7 @@ Rectangle {
         color: "#101828"
         opacity: 0.001
         // emulated glass: just a solid translucent fill, no real blur.
-        // picom/phoc don't have a blur plugin at all (Wayfire did, sorta
+        // labwc/phoc don't have a blur plugin at all (Wayfire did, sorta
         // — see LABWC CONFIG notes for the full story on why I dropped
         // it), so this fake-glass approach is doing all the work here
         // now, not just backstopping a spot where real blur wouldn't
@@ -2538,7 +2538,7 @@ linux-firmware
 # i915/*_huc_*.bin) out into their own package -- stock `linux` doesn't
 # pull it in as a dependency itself, so it has to be listed explicitly
 # here or i915 loads and modesets simpledrm's fbdev fine, but GuC init
-# fails and wlroots/picom can never get a working renderer: compositor
+# fails and wlroots/labwc can never get a working renderer: compositor
 # reports "loaded" (it genuinely is), but the display stays black since
 # there's no accelerated render node.
 linux-firmware-intel
@@ -2577,8 +2577,6 @@ qt6-base
 python
 pyalpm
 parted
-budgie-desktop
-budgie-session
 gptfdisk
 syslinux
 pv
@@ -2586,6 +2584,9 @@ lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
 sddm
+budgie-desktop
+budgie-session
+labwc
 swaybg
 grim
 slurp
@@ -2694,14 +2695,59 @@ lvm2
 tuned
 PACKAGES
 if [ "${KIBA_ARCH}" = "x86_64" ]; then
-useradd -m builder 2>/dev/null; echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder && chmod 440 /etc/sudoers.d/builder && pacman -S --noconfirm budgie-desktop && su builder -c "cd /tmp && curl -O https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz && tar xf yay-bin.tar.gz && cd yay-bin && makepkg -si --noconfirm && yay -S --noconfirm deepin-control-center sddm-silent-theme eww" && rm -f /etc/sudoers.d/builder
+# ══════════════════════════════════════════════════════════════════════════
+# AUR installs via yay — sddm-silent-theme, eww
+# ══════════════════════════════════════════════════════════════════════════
+# This used to be a single &&-chained one-liner: any one failing step
+# (useradd already existing from a re-run, a download hiccup, a build
+# failure) silently no-op'd everything after it in the chain, with
+# nothing printed to say which step it was or that it happened at all --
+# which is almost certainly why nothing was landing. Two concrete,
+# confirmed-real failure modes that would do exactly that here:
+#   1. eww's AUR package requires gtk-layer-shell, which needs
+#      g-ir-compiler (GObject Introspection) to generate its typelib --
+#      and g-ir-compiler talks to D-Bus via GIO. Plain arch-chroot does
+#      NOT start a D-Bus session on its own, so that step fails with a
+#      GVFS-WARNING/GDBus.Error inside a bare chroot (confirmed against
+#      a real gtk-layer-shell-git build-failure report showing exactly
+#      that error). Fixed here by wrapping the build in
+#      `dbus-run-session --` so a session bus actually exists.
+#   2. sddm-silent-theme pulls in the AUR package redhat-fonts as a
+#      build dependency, which has its own user-reported history of
+#      failing specifically "within a chroot environment" (comments on
+#      the sddm-silent-theme AUR page). dbus-run-session may not fix
+#      this one too -- flagging it now rather than assuming it's
+#      solved, so if sddm-silent-theme is still the one failing after
+#      this change, that's why, and it needs its own look.
+# Also: yay resolves every target passed to one invocation as a single
+# transaction, so a bad target used to take the whole install down with
+# it -- eww included, even though eww's dependency chain has nothing to
+# do with fonts. Each package now gets its own yay call so a failure is
+# contained and printed instead of silently eating everything after it.
+id -u builder &>/dev/null || useradd -m builder
+echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
+chmod 440 /etc/sudoers.d/builder
+pacman -S --noconfirm --needed budgie-desktop
+
+su builder -c "cd /tmp && curl -fL -O https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz && tar xf yay-bin.tar.gz && cd yay-bin && dbus-run-session -- makepkg -si --noconfirm"
+if ! command -v yay &>/dev/null; then
+  echo "!!! yay itself failed to build/install -- check the makepkg output above, nothing AUR-side can install without it" >&2
+fi
+
+for aur_pkg in sddm-silent-theme eww; do
+  echo "=== yay: installing ${aur_pkg} ==="
+  su builder -c "dbus-run-session -- yay -S --noconfirm --needed ${aur_pkg}" \
+    || echo "!!! yay failed to install ${aur_pkg} -- continuing rather than aborting the whole ISO build over one AUR package" >&2
+done
+
+rm -f /etc/sudoers.d/builder
 fi
 # arm package swap: right kernel, drop the intel-only stuff, rename
 # the file so archiso can actually find it
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
   # intel gpu firmware -- arm doesn't have an intel gpu to feed it to
   sed -i '/^linux-firmware-intel$/d' "${PROFILE}/packages.x86_64"
-  sed -i '/^# linux-firmware split the Intel GuC\/HuC blobs/,/^# fails and wlroots\/picom can never get a working renderer/d' \
+  sed -i '/^# linux-firmware split the Intel GuC\/HuC blobs/,/^# fails and wlroots\/labwc can never get a working renderer/d' \
     "${PROFILE}/packages.x86_64"
   # thermald: Intel-specific thermal daemon, doesn't exist for ARM
   sed -i '/^thermald$/d' "${PROFILE}/packages.x86_64"
@@ -3102,11 +3148,11 @@ echo "=== Installing Kortex build + runtime dependencies ==="
 # without an AUR helper. Installing via pip avoids that dependency entirely.
 pacman -S --noconfirm --needed gtk4 gtk4-layer-shell python-gobject patchelf python-pip
 pip install --break-system-packages --no-cache-dir nuitka
-# pywayland: real client bindings for the picom integration (WindowEventSource
+# pywayland: real client bindings for the labwc integration (WindowEventSource
 # below talks to zwlr_foreign_toplevel_manager_v1 directly instead of
-# shelling out — picom's wlrctl build has no watch/event-stream mode
+# shelling out — labwc's wlrctl build has no watch/event-stream mode
 # and no move/resize actions, so a CLI wrapper isn't an option here, see
-# kortexd/picom_bridge.py for the full rationale). Same story as nuitka
+# kortexd/labwc_bridge.py for the full rationale). Same story as nuitka
 # above: python-pywayland is AUR-only, pip sidesteps that. Its cffi
 # extension builds against libwayland-client, whose headers already come
 # from the "wayland" package pulled in earlier for the compositor itself.
@@ -3399,10 +3445,10 @@ class Store:
     def get_last_placement_monitor(self, app):
         """Most-recently-updated monitor with a learned placement for this
         app, or None. Used as a fallback when the window-event backend
-        can't report which monitor a launch happened on — the picom
+        can't report which monitor a launch happened on — the labwc
         bridge, notably, since zwlr_foreign_toplevel_manager_v1 has no
         output info available at launch time (see WindowEventSource /
-        picom_bridge.py docstrings).
+        labwc_bridge.py docstrings).
         """
         with self.cursor() as c:
             c.execute(
@@ -4469,11 +4515,11 @@ KORTEX_NOTIFIER_PY
 
 # ══════════════════════════════════════════════════════════════════════════
 # KORTEX LABWC BRIDGE — replaces the old Wayfire/wfctl WindowEventSource
-# backend with a real one for picom.
+# backend with a real one for labwc.
 #
-# What picom actually exposes, and what that does and doesn't buy us:
+# What labwc actually exposes, and what that does and doesn't buy us:
 #
-#   - zwlr_foreign_toplevel_manager_v1 (picom >=2.1.0) gives us, per
+#   - zwlr_foreign_toplevel_manager_v1 (labwc >=2.1.0) gives us, per
 #     toplevel: app_id, title, output_enter/leave, and a `state` event
 #     whose bitset includes "activated" — i.e. focus tracking and launch
 #     detection are both real and event-driven, no polling. This is the
@@ -4483,11 +4529,11 @@ KORTEX_NOTIFIER_PY
 #   - That protocol has NO geometry/rectangle event on the toplevel
 #     handle — title/app_id/state/output/done/closed, nothing else. So
 #     there is no way to observe where the user drags or resizes a
-#     window under picom, at all, with anything currently implemented.
-#     Wayfire's IPC (the old backend) did expose this; picom doesn't.
+#     window under labwc, at all, with anything currently implemented.
+#     Wayfire's IPC (the old backend) did expose this; labwc doesn't.
 #     on_window_moved() — the *learning* half of placement — has no data
 #     source here and stays a documented no-op, same as the whole class
-#     used to be pre-bridge. If picom's foreign-toplevel implementation
+#     used to be pre-bridge. If labwc's foreign-toplevel implementation
 #     ever grows a geometry event, or ext-foreign-toplevel-list gains
 #     one, this is the only place that needs to change.
 #
@@ -4496,45 +4542,45 @@ KORTEX_NOTIFIER_PY
 #     have one either — see wlrctl(1): minimize/maximize/fullscreen/
 #     focus/find/wait/waitfor, that's the complete list, no move/resize.
 #     In Wayland generally, compositors don't take positioning requests
-#     from arbitrary external clients over IPC; the one place picom
+#     from arbitrary external clients over IPC; the one place labwc
 #     *does* accept a position is a windowRule's <action name="MoveTo">/
-#     <action name="ResizeTo">, applied by picom itself as a window
+#     <action name="ResizeTo">, applied by labwc itself as a window
 #     maps, and reloadable at runtime via SIGHUP.
 #
 #     So the *application* half of placement (move_window, below) works,
 #     but the mechanism is different in kind from the old wfctl one: it
 #     doesn't reach in and shove a live window to a new spot, it writes
-#     a rule that picom applies the next time that app_id maps. Since
+#     a rule that labwc applies the next time that app_id maps. Since
 #     KortexDaemon.on_window_launch already only ever calls move_window
 #     right as a launch is detected — never on an already-settled window
 #     — the practical behavior converges anyway, with one caveat: the
 #     rule has to exist *before* that particular instance maps to catch
 #     it. A launch is detected via toplevel_created, which only fires
 #     after mapping, so the instance that triggered the rule write is
-#     itself too late — it'll be positioned by whatever picom/the app
+#     itself too late — it'll be positioned by whatever labwc/the app
 #     picked by default. The next launch of that app_id (including the
 #     very common case of quit/relaunch) picks the rule up correctly.
 #     This is a one-launch lag, not a missing feature, and it's called
-#     out again at the PicomPlacementRules docstring.
+#     out again at the LabwcPlacementRules docstring.
 # ══════════════════════════════════════════════════════════════════════════
-echo "=== Installing kortexd picom integration ==="
-cat > /usr/lib/kortex/kortexd/picom_bridge.py << 'KORTEX_PICOM_BRIDGE_PY'
+echo "=== Installing kortexd labwc integration ==="
+cat > /usr/lib/kortex/kortexd/labwc_bridge.py << 'KORTEX_LABWC_BRIDGE_PY'
 """
-kortexd.picom_bridge
+kortexd.labwc_bridge
 ---------------------
-Real WindowEventSource backend for picom. See the build script's banner
+Real WindowEventSource backend for labwc. See the build script's banner
 comment above this file's install step for the full rationale; short
 version: focus/launch tracking is real and event-driven (foreign-toplevel
 protocol), placement learning (on_window_moved) has no protocol source and
 is a documented no-op, and placement application (move_window) works by
-writing a picom windowRule + SIGHUP reload rather than a live move, which
+writing a labwc windowRule + SIGHUP reload rather than a live move, which
 takes effect on that app_id's *next* launch rather than the one that
 triggered it.
 
 Capability is detected by trying to bind the protocol global itself,
 rather than checking the compositor name — if some other compositor ever
 implements zwlr_foreign_toplevel_manager_v1, this backend works there too
-with zero changes, and if picom ever stops advertising it for any reason,
+with zero changes, and if labwc ever stops advertising it for any reason,
 this degrades the same way the old wfctl path did: log once, no-op.
 """
 
@@ -4545,7 +4591,7 @@ import subprocess
 import threading
 import time
 
-log = logging.getLogger("kortexd.picom_bridge")
+log = logging.getLogger("kortexd.labwc_bridge")
 
 try:
     from pywayland.client import Display
@@ -4564,7 +4610,7 @@ except Exception as e:  # pywayland missing, protocol module missing, etc.
 _STATE_ACTIVATED = 2
 
 
-class PicomToplevelWatcher:
+class LabwcToplevelWatcher:
     """Binds zwlr_foreign_toplevel_manager_v1 and turns its events into the
     same on_focus/on_launch/on_close callback shape WindowEventSource
     already expects from the old wfctl backend, so core.py's KortexDaemon
@@ -4597,14 +4643,14 @@ class PicomToplevelWatcher:
         """
         if not _HAVE_PYWAYLAND:
             log.info(
-                f"PicomToplevelWatcher unavailable: pywayland/protocol "
+                f"LabwcToplevelWatcher unavailable: pywayland/protocol "
                 f"module didn't import ({_IMPORT_ERROR}). Window-event "
                 f"tracking is disabled; everything else in Kortex is "
                 f"unaffected."
             )
             return False
         if not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_RUNTIME_DIR")):
-            log.info("PicomToplevelWatcher unavailable: no Wayland session in env")
+            log.info("LabwcToplevelWatcher unavailable: no Wayland session in env")
             return False
         return True
 
@@ -4615,7 +4661,7 @@ class PicomToplevelWatcher:
             self._display = Display()
             self._display.connect()
         except Exception as e:
-            log.info(f"PicomToplevelWatcher: couldn't connect to compositor: {e}")
+            log.info(f"LabwcToplevelWatcher: couldn't connect to compositor: {e}")
             return False
 
         registry = self._display.get_registry()
@@ -4631,9 +4677,9 @@ class PicomToplevelWatcher:
 
         if found["manager"] is None:
             log.info(
-                "PicomToplevelWatcher: compositor doesn't advertise "
+                "LabwcToplevelWatcher: compositor doesn't advertise "
                 "zwlr_foreign_toplevel_manager_v1 (expected pre-2.1.0 "
-                "picom, or a compositor without this protocol at all). "
+                "labwc, or a compositor without this protocol at all). "
                 "Window-event tracking is disabled; everything else in "
                 "Kortex is unaffected."
             )
@@ -4644,7 +4690,7 @@ class PicomToplevelWatcher:
         self._manager.dispatcher["toplevel"] = self._on_toplevel_created
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
-        log.info("PicomToplevelWatcher started (zwlr_foreign_toplevel_manager_v1)")
+        log.info("LabwcToplevelWatcher started (zwlr_foreign_toplevel_manager_v1)")
         return True
 
     def stop(self):
@@ -4655,7 +4701,7 @@ class PicomToplevelWatcher:
             try:
                 self._display.dispatch(block=True)
             except Exception as e:
-                log.warning(f"picom integration dispatch loop crashed, restarting in 5s: {e}")
+                log.warning(f"labwc integration dispatch loop crashed, restarting in 5s: {e}")
                 time.sleep(5)
                 try:
                     self._display.connect()
@@ -4706,8 +4752,8 @@ def _unpack_states(raw) -> set:
     return set(struct.unpack(f"{n}I", raw[: n * 4]))
 
 
-class PicomPlacementRules:
-    """Applies learned placements the only way picom actually allows:
+class LabwcPlacementRules:
+    """Applies learned placements the only way labwc actually allows:
     a windowRule with MoveTo/ResizeTo, written into a clearly-delimited
     managed block inside rc.xml, reloaded live via SIGHUP.
 
@@ -4715,7 +4761,7 @@ class PicomPlacementRules:
     the given app_id's window maps, not the instance that was open when
     move_window() was called (see the build script banner comment above
     this file's install step for why: there's no protocol request to
-    reposition an already-mapped window under picom). For an app that
+    reposition an already-mapped window under labwc). For an app that
     gets relaunched routinely — which is the normal case Kortex's
     placement-confidence threshold is built around, since it only fires
     after repeated consistent launches of the *same* app — this reaches
@@ -4731,7 +4777,7 @@ class PicomPlacementRules:
     END_MARKER = "<!-- KORTEX:END -->"
 
     def __init__(self, rc_xml_path=None):
-        self.rc_xml_path = rc_xml_path or os.path.expanduser("~/.config/picom/rc.xml")
+        self.rc_xml_path = rc_xml_path or os.path.expanduser("~/.config/labwc/rc.xml")
         self._rules = {}   # app_id -> (x, y, w, h)
         self._lock = threading.Lock()
 
@@ -4747,13 +4793,13 @@ class PicomPlacementRules:
 
     def _write_and_reload(self):
         if not os.path.isfile(self.rc_xml_path):
-            log.warning(f"PicomPlacementRules: no rc.xml at {self.rc_xml_path}, skipping")
+            log.warning(f"LabwcPlacementRules: no rc.xml at {self.rc_xml_path}, skipping")
             return
         try:
             with open(self.rc_xml_path, "r") as f:
                 content = f.read()
         except OSError as e:
-            log.warning(f"PicomPlacementRules: couldn't read rc.xml: {e}")
+            log.warning(f"LabwcPlacementRules: couldn't read rc.xml: {e}")
             return
 
         block_lines = [self.BEGIN_MARKER, "<windowRules>"]
@@ -4771,11 +4817,11 @@ class PicomPlacementRules:
             pre = content.split(self.BEGIN_MARKER)[0]
             post = content.split(self.END_MARKER)[1]
             new_content = pre + block + post
-        elif "</picom_config>" in content:
-            new_content = content.replace("</picom_config>", block + "\n</picom_config>")
+        elif "</labwc_config>" in content:
+            new_content = content.replace("</labwc_config>", block + "\n</labwc_config>")
         else:
             log.warning(
-                "PicomPlacementRules: rc.xml has no </picom_config> closing "
+                "LabwcPlacementRules: rc.xml has no </labwc_config> closing "
                 "tag and no existing managed block — refusing to guess "
                 "where to insert, leaving rc.xml untouched"
             )
@@ -4787,22 +4833,22 @@ class PicomPlacementRules:
                 f.write(new_content)
             os.replace(tmp_path, self.rc_xml_path)
         except OSError as e:
-            log.warning(f"PicomPlacementRules: couldn't write rc.xml: {e}")
+            log.warning(f"LabwcPlacementRules: couldn't write rc.xml: {e}")
             return
 
-        self._reload_picom()
+        self._reload_labwc()
 
-    def _reload_picom(self):
+    def _reload_labwc(self):
         # Same-user SIGHUP — kortexd runs as a per-user systemd service,
         # same UID as the compositor it's reconfiguring, so this needs
         # no privilege escalation (unlike kortex-helper's repair actions).
         try:
-            r = subprocess.run(["pgrep", "-x", "picom"], capture_output=True, text=True)
+            r = subprocess.run(["pgrep", "-x", "labwc"], capture_output=True, text=True)
             pids = [p for p in r.stdout.split() if p]
             for pid in pids:
                 os.kill(int(pid), 1)  # SIGHUP
         except Exception as e:
-            log.warning(f"PicomPlacementRules: couldn't SIGHUP picom: {e}")
+            log.warning(f"LabwcPlacementRules: couldn't SIGHUP labwc: {e}")
 
 
 def resolve_monitor_origin(monitor_name: str):
@@ -4836,7 +4882,7 @@ def resolve_monitor_origin(monitor_name: str):
             except ValueError:
                 return None
     return None
-KORTEX_PICOM_BRIDGE_PY
+KORTEX_LABWC_BRIDGE_PY
 
 cat > /usr/lib/kortex/kortexd/core.py << 'KORTEX_CORE_PY'
 """
@@ -4849,8 +4895,8 @@ thread on most platforms).
 Window-focus/launch/move events used to come from Wayfire's IPC (the
 `ipc`/`ipc-rules` plugins from wayfire-plugins-extra, built from source
 since that package was AUR-only on Arch), read here via the `wfctl` CLI.
-Now that the build's back on picom, that whole compositor IPC layer
-doesn't exist anymore — picom has no plugin system and nothing like it.
+Now that the build's back on labwc, that whole compositor IPC layer
+doesn't exist anymore — labwc has no plugin system and nothing like it.
 WindowEventSource below still exists and still gets wired up the same
 way, it just detects there's no `wfctl` binary to talk to, logs that
 once, and turns itself into a no-op instead of ever starting a watcher
@@ -4871,7 +4917,7 @@ from .storage import Store
 from . import models
 from .repair import RepairEngine, watch_journal
 from .notifier import KortexNotifier
-from .picom_bridge import PicomToplevelWatcher, PicomPlacementRules, resolve_monitor_origin
+from .labwc_bridge import LabwcToplevelWatcher, LabwcPlacementRules, resolve_monitor_origin
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s kortexd: %(message)s")
 log = logging.getLogger("kortexd")
@@ -4895,10 +4941,10 @@ class WindowEventSource:
     tried in order, so KortexDaemon's call sites never need to know or
     care which one is live:
 
-      1. picom, via PicomToplevelWatcher (kortexd.picom_bridge) — real,
+      1. labwc, via LabwcToplevelWatcher (kortexd.labwc_bridge) — real,
          event-driven, talks to zwlr_foreign_toplevel_manager_v1
          directly. This is the current image's compositor and the
-         primary path now. See picom_bridge.py's module docstring and
+         primary path now. See labwc_bridge.py's module docstring and
          the build script's banner comment above its install step for
          exactly what this protocol does and doesn't expose — short
          version: focus/launch/close are real, live window geometry
@@ -4909,8 +4955,8 @@ class WindowEventSource:
 
       2. wfctl / Wayfire IPC (pip: wfctl, github.com/killown/wfctl) —
          the original backend, from when this image ran Wayfire instead
-         of picom. Left in as a fallback purely in case this ever runs
-         on a Wayfire session again; on a picom-only image it will
+         of labwc. Left in as a fallback purely in case this ever runs
+         on a Wayfire session again; on a labwc-only image it will
          simply never find `wfctl` on $PATH and get skipped.
 
       3. True no-op — if neither backend is available (unknown
@@ -4940,20 +4986,20 @@ class WindowEventSource:
         self.on_launch = on_launch
         self._known_views = set()   # wfctl path: view ids seen -> mapped vs re-mapped
         self._view_apps = {}        # wfctl path: view id -> app-id, for move_window
-        self._backend = None        # "picom", "wfctl", or None
-        self._picom_watcher = None
-        self._picom_rules = PicomPlacementRules()
+        self._backend = None        # "labwc", "wfctl", or None
+        self._labwc_watcher = None
+        self._labwc_rules = LabwcPlacementRules()
 
     def start(self):
-        watcher = PicomToplevelWatcher(
+        watcher = LabwcToplevelWatcher(
             on_focus=self.on_focus,
             on_launch=lambda app: self.on_launch and self.on_launch(app, None, None),
             on_close=lambda app: None,  # on_window_close isn't wired to a source yet either backend
         )
         if watcher.start():
-            self._picom_watcher = watcher
-            self._backend = "picom"
-            log.info("WindowEventSource started (picom integration, zwlr_foreign_toplevel_manager_v1)")
+            self._labwc_watcher = watcher
+            self._backend = "labwc"
+            log.info("WindowEventSource started (labwc integration, zwlr_foreign_toplevel_manager_v1)")
             return
 
         if shutil.which("wfctl") is not None:
@@ -4963,7 +5009,7 @@ class WindowEventSource:
             return
 
         log.info(
-            "WindowEventSource: no working backend (neither the picom "
+            "WindowEventSource: no working backend (neither the labwc "
             "bridge nor wfctl came up). Window-event tracking is "
             "disabled; everything else in Kortex is unaffected."
         )
@@ -5036,25 +5082,25 @@ class WindowEventSource:
         for Kortex-initiated shifts and for reverting one via the Undo
         button) — same as it always did.
 
-        picom backend: NOT a live move — see this class's and
-        picom_bridge.PicomPlacementRules's docstrings for why one isn't
-        possible under picom's currently-implemented protocol set. This
+        labwc backend: NOT a live move — see this class's and
+        labwc_bridge.LabwcPlacementRules's docstrings for why one isn't
+        possible under labwc's currently-implemented protocol set. This
         writes/refreshes a windowRule (MoveTo/ResizeTo) for `app` and
-        SIGHUPs picom to reload it, which then applies the next time
+        SIGHUPs labwc to reload it, which then applies the next time
         `app` maps a window — not necessarily the instance open right
         now. `monitor` is treated as an output *name* (matching
         wlr-randr's naming) and resolved to a global-coordinate origin
-        that x/y get added to, since picom's MoveTo takes coordinates in
+        that x/y get added to, since labwc's MoveTo takes coordinates in
         the full multi-output layout space, not per-output-relative
         ones — if `monitor` doesn't resolve to a known output, x/y are
         used as-is on the assumption they're already global.
         """
-        if self._backend == "picom":
+        if self._backend == "labwc":
             ox, oy = 0, 0
             origin = resolve_monitor_origin(monitor) if monitor else None
             if origin:
                 ox, oy = origin
-            self._picom_rules.set_rule(app, int(x) + ox, int(y) + oy, int(w), int(h))
+            self._labwc_rules.set_rule(app, int(x) + ox, int(y) + oy, int(w), int(h))
             return
 
         if self._backend == "wfctl":
@@ -5078,14 +5124,14 @@ class WindowEventSource:
 
     def clear_placement(self, app):
         """Stops applying a learned placement for `app` going forward.
-        Only meaningful for the picom backend, where "undo" without a
+        Only meaningful for the labwc backend, where "undo" without a
         known prior position means removing the windowRule rather than
         moving anywhere (see KortexDaemon._undo_shift) — the wfctl
         backend always has a real old_xywh to move back to instead, so
         this is never reached on that path.
         """
-        if self._backend == "picom":
-            self._picom_rules.clear_rule(app)
+        if self._backend == "labwc":
+            self._labwc_rules.clear_rule(app)
 
 
 class KortexDaemon:
@@ -5149,7 +5195,7 @@ class KortexDaemon:
         under the user's cursor. This is the only place a learned placement
         actually gets applied.
 
-        Under the picom backend, `monitor` and `current_xywh` both arrive
+        Under the labwc backend, `monitor` and `current_xywh` both arrive
         as None — zwlr_foreign_toplevel_manager_v1 doesn't hand back
         geometry or (at launch time) even a resolved output, so there's
         nothing to fill them in with. Falls back to the most-recently-
@@ -5174,7 +5220,7 @@ class KortexDaemon:
         if current_xywh is not None and learned[:4] == current_xywh:
             return  # already there (only knowable on backends with live geometry)
 
-        old_xywh = current_xywh  # may be None under picom — _undo_shift handles that
+        old_xywh = current_xywh  # may be None under labwc — _undo_shift handles that
         new_xywh = learned[:4]
         self.window_source.move_window(app, monitor, *new_xywh)
         self.notifier.on_preference_shift(
@@ -5182,7 +5228,7 @@ class KortexDaemon:
         )
 
     def _undo_shift(self, app, monitor, old_xywh):
-        # Move it back — or, under picom when old_xywh is unknown (see
+        # Move it back — or, under labwc when old_xywh is unknown (see
         # on_window_launch), just stop applying the learned rule going
         # forward rather than moving to a position we never actually
         # observed. Either way this is "undo the automatic behavior,"
@@ -5333,8 +5379,8 @@ KORTEX_SERVICE_UNIT
 echo "=== Compiling kortexd (Nuitka -> native x86_64 binary) ==="
 # --include-package=pywayland: needed explicitly, unlike kortexd's own
 # submodules — pywayland isn't imported unconditionally at module scope
-# (picom_bridge.py wraps the import in try/except so the daemon still
-# runs on non-picom/non-Wayland sessions), and Nuitka's static import
+# (labwc_bridge.py wraps the import in try/except so the daemon still
+# runs on non-labwc/non-Wayland sessions), and Nuitka's static import
 # scan can miss packages that are only ever reached through a guarded
 # import. --include-package-data pulls in pywayland's bundled protocol
 # XML/cffi build artifacts alongside it.
@@ -5343,7 +5389,7 @@ echo "=== Compiling kortexd (Nuitka -> native x86_64 binary) ==="
 # through a cffi extension module (_ffi), and cffi extensions inside a
 # Nuitka --onefile binary are a known rough edge — the onefile bootstrap
 # unpacks to a temp dir at runtime and dynamic/cffi-loaded .so files
-# don't always resolve correctly from there. If kortexd's picom integration
+# don't always resolve correctly from there. If kortexd's labwc integration
 # comes up as unavailable in a compiled build despite working fine when
 # run straight from `python -m kortexd`, this is the first place to
 # check — --standalone (non-onefile) sidesteps the temp-unpack step
@@ -5979,97 +6025,45 @@ else
 fi
 
 # ══════════════════════════════════════════════════════════════════════════
-# DEEPIN DESKTOP STACK (DDE) — official Arch [extra] packages, no AUR, no
-# source build
+# DEEPIN (DDE) — removed
 # ══════════════════════════════════════════════════════════════════════════
-# Replaces the Cutefish stack that used to live here. Cutefish was built
-# from source (cutefishos/{fishui,filemanager,settings,core,shell,
-# terminal,launcher,statusbar,dock,wallpapers,icons} + the cutefish-
-# framework sibling checkout) because it was never packaged for Arch at
-# all, AUR included. DDE doesn't have that problem: `deepin` and
-# `deepin-extra` are real, actively-packaged groups in Arch's own [extra]
-# repo (archlinux.org/packages/extra/x86_64/deepin-appearance and
-# siblings) -- no git clone, no cmake/ninja build step, no sibling-
-# checkout dance, just pacman.
-#
-# Known going in, not something this build script can fix, so noting it
-# rather than letting it be a surprise later: Arch's own DDE packages lag
-# upstream (Arch forum reports of packages up to ~2 years stale), and
-# openSUSE's security team has publicly described Deepin as "lacking
-# security culture" and doesn't recommend it. Weigh that against wanting
-# Deepin specifically.
-#
-# Compositor caveat, carried over unchanged from the Cutefish setup this
-# replaces (not independently re-verified against DDE's own Wayland
-# integration code): DDE's own upstream Wayland session (V23+) runs on
-# Treeland, Deepin's own wlroots-based compositor, not KWin. This image
-# keeps kwin_wayland instead, on the same theory that made Cutefish work
-# here -- dde-dock/dde-launcher, like cutefish-shell before them, are
-# plain Qt6 Wayland clients, and kwin_wayland is the one compositor on
-# this image that speaks the KDE Plasma Window Management protocol
-# (org_kde_plasma_window_management) their window-list/focus/close/
-# minimize handling is built on. picom/labwc (used elsewhere on this
-# image, for Budgie) doesn't implement that protocol at all. If DDE's
-# dock/launcher turn out to hard-require a Treeland-specific protocol
-# extension instead, this needs revisiting -- flagging that honestly
-# rather than asserting it's confirmed to work.
-if [ "$(uname -m)" = "x86_64" ]; then
-  pacman -S --noconfirm --needed deepin deepin-extra gsettings-qt
-  install -Dm644 /dev/stdin /etc/systemd/user/kibaos-wallpaper.service <<< $'[Unit]\nDescription=KibaOS First Start Wallpaper\nAfter=graphical-session.target\n\n[Service]\nType=oneshot\nExecStart=/bin/sh -c \'if [ ! -f "$HOME/.config/kibaos-wallpaper-set" ]; then mkdir -p "$HOME/.config"; gsettings set com.deepin.wrap.gnome.desktop.background picture-uri "file:///usr/share/kibaos/wallpaper.jpg"; gsettings set com.deepin.wrap.gnome.desktop.background picture-uri-dark "file:///usr/share/kibaos/wallpaper.jpg"; touch "$HOME/.config/kibaos-wallpaper-set"; fi\'\n\n[Install]\nWantedBy=graphical-session.target'; systemctl --global enable kibaos-wallpaper.service
-  echo "=== Deepin Desktop Environment (DDE) installed from official Arch [extra] (x86_64) ==="
-
-  # Filename has to be deepin-session.desktop exactly -- SDDM's
-  # Session=deepin-session (set further down for both the OEM and normal
-  # autologin configs) resolves against the basename of a file under
-  # /usr/share/wayland-sessions/, and the deepin package itself doesn't
-  # ship one that targets kwin_wayland the way this image needs (its own
-  # session files assume startdde driving Treeland or an X11 session via
-  # deepin-kwin, neither of which this image uses) -- so it's
-  # hand-written here, same pattern as the cutefish-session.desktop it
-
-  # ── kibaos-start-deepin-shell — what kwin_wayland actually execs ────────
-  # Same role as kibaos-start-cutefish-shell before it: passed to
-  # kwin_wayland as its client argument, so everything here runs WITH the
-  # Wayland env vars kwin sets for its own children. Also where
-  # graphical-session.target actually gets started (env vars exported
-  # first), which is what makes the XDG autostart entries under
-  # ~/.config/autostart/ and the WantedBy=graphical-session.target
-  # systemd --user services (kortexd, kortex-authd) actually run.
-
-
-  # Unlike cutefish-session (which needed a manual belt-and-suspenders
-  # systemd unit here because its internal autostart didn't reliably
-  # bring up the dock/statusbar/file manager in practice), startdde's
-  # entire documented job is bringing up dde-dock, the desktop-icons
-  # view, and the rest of DDE's session components -- so no equivalent
-  # manual-spawn unit is added here. If startdde turns out to have the
-  # same gap on this image, add one the same way cutefish-shell.service
-  # used to.
-fi
+# This section used to pacman -S --needed the `deepin`/`deepin-extra`
+# groups plus gsettings-qt, and installed a kibaos-wallpaper.service that
+# set the wallpaper via com.deepin.wrap.gnome.desktop.background. All of
+# it is gone now, packages included -- Budgie (budgie-desktop +
+# budgie-session, now in the main package list above) is the only
+# desktop this image installs. Nothing here ever actually got a
+# deepin-session.desktop or kibaos-start-deepin-shell written to disk
+# either (search for them -- there's no cat/heredoc for either one
+# anywhere in this script, only comments describing what they'd do), so
+# there was no working DDE session to unwind, just the packages and the
+# wallpaper service. Wallpaper is Budgie's own org.gnome.desktop.background
+# gsettings, already set in kibaos-first-login further down -- no
+# replacement service needed here.
 
 cd /
 pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
-echo "=== Deepin desktop stack step complete ==="
+echo "=== Budgie desktop stack step complete ==="
 
 # ══════════════════════════════════════════════════════════════════════════
-# dde-dock is NOT the taskbar anymore
+# The dock is Budgie's own panel, not dde-dock
 # ══════════════════════════════════════════════════════════════════════════
-# The previous pass here forced dde-dock/dde-control-center into a dark,
-# fully-opaque, Cutefish-styled floating dock (KWin blurEnabled=false,
-# a kwinrulesrc opacity=100 rule on both wmclasses, plus
-# com.deepin.dde.dock/appearance gsettings). All of that is gone --
-# Autologin's Session= (see the kibaos.conf/kibaos-oem-autologin.conf
-# writes later in this script) has said "budgie-desktop-wayland.desktop"
-# this whole time, which is budgie-desktop's OWN Wayland session file
-# (ships with the package, never hand-written here) -- so dde-dock was
-# never actually the thing rendering the taskbar on a real boot in the
-# first place, regardless of what the DDE-section comments above assumed.
-# The real, already-working dock is Budgie's own panel + icon-tasklist
-# applet, provisioned by kibaos-first-login further down (see "Centered
-# dock: applets + pinned launchers" below) -- that's the one this image
-# actually boots into. deepin/deepin-extra stay installed (still useful
-# for dde-control-center/other DDE apps if you want them), just nothing
-# forces them into the dock/statusbar role anymore.
+# A previous pass here forced dde-dock/dde-control-center into a dark,
+# fully-opaque, Cutefish-styled floating dock (KWin blurEnabled=false, a
+# kwinrulesrc opacity=100 rule, com.deepin.dde.dock/appearance gsettings).
+# All of that -- and the deepin/deepin-extra packages it was styling --
+# is gone now (see "DEEPIN (DDE) — removed" above). Autologin's Session=
+# (see the kibaos.conf/kibaos-oem-autologin.conf writes later in this
+# script) has said "budgie-desktop.desktop" this whole time anyway --
+# that's budgie-desktop's real Wayland session filename, confirmed
+# against the Arch package's own file list (it ships
+# usr/share/wayland-sessions/budgie-desktop.desktop, not
+# "budgie-desktop-wayland.desktop" -- that name never existed on disk,
+# fixed everywhere it was referenced) -- so dde-dock was never actually
+# the thing rendering the taskbar on a real boot in the first place. The
+# real dock is Budgie's
+# own panel + icon-tasklist applet, provisioned by kibaos-first-login
+# further down (see "Centered dock: applets + pinned launchers" below).
 
 # ══════════════════════════════════════════════════════════════════════════
 # KIBAOS OOBE INSTALLER — fullscreen, one-step-per-screen Vala/GTK4 app.
@@ -9871,7 +9865,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
      * the installed target untouched, and since liveuser gets userdel'd
      * a few lines below, SDDM was left trying to autologin a user that
      * no longer exists -- which is what was actually causing the
-     * installed system to come up with no desktop at all (picom/Budgie
+     * installed system to come up with no desktop at all (labwc/Budgie
      * were never the problem; SDDM never got that far).
      * Fix: swap just the "User=liveuser" value to the real account name,
      * in place, rather than re-writing the whole file from a hardcoded
@@ -10959,7 +10953,7 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
-Session=budgie.desktop
+Session=budgie-desktop.desktop
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -11302,10 +11296,10 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
  *
  * Caveat: this only governs GTK widget-state transitions — it's NOT doing
  * compositor-level window drag physics. that used to be Wayfire's wobbly
- * plugin, but picom has no wobbly equivalent (see the LABWC CONFIG
+ * plugin, but labwc has no wobbly equivalent (see the LABWC CONFIG
  * section for the whole story on that), so window dragging is back to
  * flat/rigid movement for now — nothing to verify here, it's just gone
- * until/unless a picom plugin fills that gap. Raven/the Budgie Menu's
+ * until/unless a labwc plugin fills that gap. Raven/the Budgie Menu's
  * open/close slide is still Budgie's own compiled animation code, not GTK
  * CSS — the opacity transitions below are best-effort and may be
  * superseded by that native motion. Verify visually.
@@ -11895,7 +11889,7 @@ Rectangle {
         color: "#101828"
         opacity: 0.001
         // emulated glass: just a solid translucent fill, no real blur.
-        // picom/phoc don't have a blur plugin at all (Wayfire did, sorta
+        // labwc/phoc don't have a blur plugin at all (Wayfire did, sorta
         // — see LABWC CONFIG notes for the full story on why I dropped
         // it), so this fake-glass approach is doing all the work here
         // now, not just backstopping a spot where real blur wouldn't
@@ -12027,16 +12021,17 @@ Rectangle {
 }
 SDDMQML
 
-# ── Wayland session — kwin_wayland + Deepin (DDE) ──────────────────────────
+# ── Wayland session — budgie-desktop.desktop ────────────────────
 # This is the live/normal-user autologin config (see kibaos-oem-prepare
-# above for the OEM-mode counterpart) -- both point at deepin-session,
-# written in the DEEPIN DESKTOP STACK section earlier in this script.
+# above for the OEM-mode counterpart) -- both point at
+# budgie-desktop.desktop, budgie-desktop's own session file
+# (ships with the package, no session file hand-written for it here).
 mkdir -p /usr/share/wayland-sessions
 mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
-Session=budgie.desktop
+Session=budgie-desktop.desktop
 SDDMCONF
 
 mkdir -p /var/lib/sddm
@@ -12141,10 +12136,10 @@ rm -f /tmp/.kiba-outputs
 OUTPUTSCALE
 chmod +x /usr/local/bin/kibaos-apply-output-scale
 SKEL="/etc/skel"
-mkdir -p "${SKEL}/.config/picom"
-cat > "${SKEL}/.config/picom/rc.xml" << 'LABWCRC'
+mkdir -p "${SKEL}/.config/labwc"
+cat > "${SKEL}/.config/labwc/rc.xml" << 'LABWCRC'
 <?xml version="1.0"?>
-<picom_config>
+<labwc_config>
   <core>
     <gap>0</gap>
   </core>
@@ -12181,59 +12176,62 @@ cat > "${SKEL}/.config/picom/rc.xml" << 'LABWCRC'
       <action name="Execute" command="kibaos-screenshot-ocr"/>
     </keybind>
   </keyboard>
-</picom_config>
+</labwc_config>
 LABWCRC
 
-# themerc-override — picom's flat-file theme knobs, separate from rc.xml.
+# themerc-override — labwc's flat-file theme knobs, separate from rc.xml.
 # this is where the active/inactive titlebar colors actually live (rc.xml
 # only points at a theme NAME). plain hex, no float conversion needed.
-mkdir -p "${SKEL}/.config/picom/themes/kibaos"
-cat > "${SKEL}/.config/picom/themes/kibaos/themerc" << 'LABWCTHEME'
+mkdir -p "${SKEL}/.config/labwc/themes/kibaos"
+cat > "${SKEL}/.config/labwc/themes/kibaos/themerc" << 'LABWCTHEME'
 window.active.border.color: #1a2030
 window.inactive.border.color: #232b3a
 window.active.title.bg.color: #1a2030
 window.inactive.title.bg.color: #232b3a
 LABWCTHEME
 
-# autostart — picom's equivalent of Wayfire's [autostart] section, just a
-# plain shell script picom sources on session start. THIS is what
+# autostart — labwc's equivalent of Wayfire's [autostart] section, just a
+# plain shell script labwc sources on session start. THIS is what
 # actually launches Budgie now instead of Wayfire's autostart_budgie line
-# -- without it, picom boots to a totally empty compositor, same
+# -- without it, labwc boots to a totally empty compositor, same
 # load-bearing deal as before. no [idle] plugin equivalent to disable
-# here, because picom doesn't blank the screen on its own in the first
+# here, because labwc doesn't blank the screen on its own in the first
 # place -- that'd be swayidle's job, and swayidle is installed but
 # deliberately never invoked anywhere in this image, so idle/DPMS
 # blanking mid-install just isn't a thing that can happen. simplest fix
 # available: don't run the thing that would cause the problem.
 #
-# NOT wired up anymore: this file used to launch a desktop session
+# NOT confirmed wired up: this file used to launch a desktop session
 # directly (`cutefish-session &`, before that), on the assumption that
 # SDDM only ever starts a bare compositor binary and leaves the actual
-# desktop launch to this autostart script. That's superseded --
-# /usr/share/wayland-sessions/deepin-session.desktop (written earlier in
-# this script, in the DEEPIN DESKTOP STACK section) has its own Exec=
-# that starts kwin_wayland with kibaos-start-deepin-shell (-> startdde)
-# as its client directly, plus kibaos-apply-output-scale inline. Leaving
-# both in place would start the session twice. This file, along with
-# rc.xml/themerc, is a labwc-format config (despite the "picom" naming
-# throughout this section) that KWin doesn't read at all -- kept here
-# only as reference/history, not something anything actually sources for
-# the Deepin session anymore. The screenshot keybindings in rc.xml and
-# the border colors in themerc still need a real KWin-native home
-# (kglobalshortcutsrc, kwinrc/kdecoration) -- not done in this pass.
-cat > "${SKEL}/.config/picom/autostart" << 'LABWCAUTOSTART'
+# desktop launch to this autostart script. That assumption predates
+# budgie-desktop/budgie-session landing in the main package list --
+# Autologin's Session=budgie-desktop.desktop resolves against
+# budgie-desktop's own upstream session file (ships with the package),
+# not anything hand-written in this script. This tree now at least
+# lives at labwc's real, conventional config path (~/.config/labwc/ --
+# it used to be misfiled under ~/.config/picom/, a naming leftover from
+# whatever this compositor used to be called earlier in this project's
+# history, which meant labwc would never have read it regardless of
+# what upstream's session file does). Whether budgie-desktop's own
+# session file actually launches labwc with THIS user's config (rather
+# than, say, a bundled/vendored labwc invocation of its own) still
+# isn't independently confirmed -- flagging that honestly rather than
+# asserting it works. The screenshot keybindings in rc.xml and the
+# border colors in themerc are at least in the right file now either
+# way.
+cat > "${SKEL}/.config/labwc/autostart" << 'LABWCAUTOSTART'
 #!/bin/bash
-# superseded by deepin-session.desktop's Exec= -- see note above.
+# status unconfirmed -- see note above.
 LABWCAUTOSTART
-chmod +x "${SKEL}/.config/picom/autostart"
+chmod +x "${SKEL}/.config/labwc/autostart"
 
-# environment — superseded the same way: XDG_CURRENT_DESKTOP is Deepin,
-# not Budgie, on this branch, and nothing sources this file for the
-# Deepin session anymore (see note above).
-cat > "${SKEL}/.config/picom/environment" << 'LABWCENV'
-XDG_CURRENT_DESKTOP=Deepin
+# environment — same caveat as above: not confirmed this file is read by
+# whatever actually backs budgie-desktop.desktop's session.
+cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
+XDG_CURRENT_DESKTOP=Budgie
 LABWCENV
-echo "=== Skipping compositor IPC build — picom has no IPC, Kortex degrades gracefully ==="
+echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
 OTA_KEYRING="/etc/kibaos/ota-keyring.gpg"
@@ -12404,7 +12402,7 @@ rollback_patch() {
 }
 
 # ── Restart compositor: full session bounce, not in-place reconfigure ─────
-# picom has no documented "reconfigure" signal we can rely on across every
+# labwc has no documented "reconfigure" signal we can rely on across every
 # plugin/config combination, so — same call the Wayfire build used to make
 # for the same reason — this restarts the whole greeter/session rather than
 # gambling on an in-place reload inside an unattended OTA patcher. Slower,
@@ -12412,7 +12410,7 @@ rollback_patch() {
 restart_compositor() {
   log "Restarting session..."
   systemctl restart sddm 2>/dev/null || \
-  pkill -TERM picom 2>/dev/null || true
+  pkill -TERM labwc 2>/dev/null || true
   sleep 1
   log "Session restarted."
 }
@@ -12574,13 +12572,13 @@ while IFS= read -r line; do
   case "${FILEPATH}" in
     etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
       NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/picom*)
-      # picom.ini/rc.xml/autostart all live per-user under ~/.config/picom,
-      # seeded from /etc/skel at account creation, same story Wayfire's
-      # wayfire.ini used to have. An OTA patch to the skel copy only
-      # affects NEWLY created users from that point on -- it can't
-      # retroactively update already-installed users' own configs. Only
-      # the picom binary itself triggers a restart here.
+    usr/bin/labwc*)
+      # rc.xml/autostart/environment all live per-user under
+      # ~/.config/labwc, seeded from /etc/skel at account creation, same
+      # story Wayfire's wayfire.ini used to have. An OTA patch to the
+      # skel copy only affects NEWLY created users from that point on --
+      # it can't retroactively update already-installed users' own
+      # configs. Only the labwc binary itself triggers a restart here.
       NEEDS_COMPOSITOR_RESTART=true ;;
   esac
 done < "${MANIFEST}"
@@ -12966,7 +12964,7 @@ cat > /usr/local/bin/kibaos-winapps-workspace << 'WORKSPACE'
 # nothing -- same "never dead-end without explanation" rule as before.
 CONF_DIR="${HOME}/.config/winapps"
 COMPOSE_FILE="${CONF_DIR}/compose.yaml"
-RC_XML="${HOME}/.config/picom/rc.xml"
+RC_XML="${HOME}/.config/labwc/rc.xml"
 RC_XML_BAK="${RC_XML}.winapps-workspace-bak"
 TEMPBIND_MARKER="kibaos-winapps-workspace-tempbind"
 HINT_MARKER="${HOME}/.config/kibaos/.winapps-workspace-hint-shown"
@@ -13007,9 +13005,9 @@ if [ -n "${EXISTING_WIN}" ]; then
   exit 0
 fi
 
-reload_picom() {
+reload_labwc() {
   local pid
-  pid="$(pgrep -x picom | head -n1)"
+  pid="$(pgrep -x labwc | head -n1)"
   [ -n "${pid}" ] && kill -HUP "${pid}" 2>/dev/null || true
 }
 
@@ -13018,12 +13016,12 @@ add_keybind() {
   # Super+K minimizes the fullscreen Windows window back to the desktop --
   # bound only while this workspace is actually open, not a permanent
   # shortcut. Backs up rc.xml, patches a keybind in just before the
-  # closing </keyboard> tag, and SIGHUPs picom to pick it up live (same
+  # closing </keyboard> tag, and SIGHUPs labwc to pick it up live (same
   # reload mechanism Kortex's own placement rules use).
   if [ -f "${RC_XML}" ] && ! grep -q "${TEMPBIND_MARKER}" "${RC_XML}"; then
     cp "${RC_XML}" "${RC_XML_BAK}"
     sed -i "s#</keyboard>#  <!-- ${TEMPBIND_MARKER} -->\n    <keybind key=\"W-k\">\n      <action name=\"Iconify\"/>\n    </keybind>\n  </keyboard>#" "${RC_XML}"
-    reload_picom
+    reload_labwc
     KEYBIND_ADDED=1
   fi
 }
@@ -13035,7 +13033,7 @@ add_keybind() {
 cleanup() {
   if [ "${KEYBIND_ADDED}" -eq 1 ] && [ -f "${RC_XML_BAK}" ]; then
     mv "${RC_XML_BAK}" "${RC_XML}"
-    reload_picom
+    reload_labwc
   fi
 }
 trap cleanup EXIT
@@ -14131,7 +14129,7 @@ done
 # NoDisplay) .desktop file just for search indexing (e.g.
 # "gnome-wifi-panel.desktop" launches `gnome-control-center wifi`). a
 # few of those panels are GNOME-Shell-specific and don't mean anything
-# under picom/Budgie, so hide them from search too. this list is a
+# under labwc/Budgie, so hide them from search too. this list is a
 # best-effort starting point based on current upstream panel naming --
 # check `ls /usr/share/applications/gnome-*-panel.desktop` on a built
 # image and extend/trim as needed, since the exact panel-desktop-id
@@ -14187,7 +14185,7 @@ echo 'kernel.sysrq = 0' > /etc/sysctl.d/50-kibaos-disable-sysrq.conf
 
 # ── Restrict virtual-terminal switching: Ctrl+Alt+F2 etc. are handled by
 # the kernel's VT layer, not the compositor, so this can't be blocked
-# from picom config no matter what. instead, remove what's waiting on
+# from labwc config no matter what. instead, remove what's waiting on
 # the other VTs — cap logind to one auto-spawned VT and mask the extra
 # getty units, so Ctrl+Alt+F2-F6 land on an empty console with no login
 # prompt to even reach.
@@ -14221,9 +14219,9 @@ done
 # SYSTEM ENVIRONMENT
 # ══════════════════════════════════════════════════════════════════════════
 cat > /etc/environment << 'ENV'
-DESKTOP_SESSION=Deepin
-XDG_CURRENT_DESKTOP=Deepin
-XDG_SESSION_DESKTOP=Deepin
+DESKTOP_SESSION=Budgie
+XDG_CURRENT_DESKTOP=Budgie
+XDG_SESSION_DESKTOP=Budgie
 XDG_SESSION_TYPE=wayland
 QT_QPA_PLATFORM=wayland
 QT_WAYLAND_SHELL_INTEGRATION=layer-shell
