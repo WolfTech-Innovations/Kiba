@@ -10953,6 +10953,10 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
+
+[Theme]
+Current=silent
+
 Session=budgie-desktop.desktop
 OEMAUTOLOGIN
 
@@ -12031,6 +12035,10 @@ mkdir -p /etc/sddm.conf.d
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
+
+[Theme]
+Current=silent
+
 Session=budgie-desktop.desktop
 SDDMCONF
 
