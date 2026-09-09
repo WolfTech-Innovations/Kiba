@@ -382,8 +382,8 @@ PACMANCONF
   # itself is screen-size-aware (see its own `isPhone` check), so the
   # exact same file already renders touch-friendly on a phone panel and
   # unchanged on a desktop one -- no separate mobile QML needed.
-  KIBA_WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
-  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
+  KIBA_WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/wallpapers/wallpaper.png?raw=true"
+  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/splash/splash.png?raw=true"
   mkdir -p "${_root}/usr/share/kibaos"
 
   curl -fL --retry 5 --retry-delay 3 -o "${_root}/usr/share/kibaos/wallpaper.jpg" \
@@ -12041,7 +12041,35 @@ Current=silent
 
 Session=budgie-desktop.desktop
 SDDMCONF
+rm /etc/sddm.conf.d/default.conf
+rm /usr/lib/sddm.conf.d/default.conf
+cat > /usr/lib/sddm.conf.d/default.conf << 'SDDMCONF'
+[Autologin]
+User=liveuser
 
+[Theme]
+Current=silent
+
+Session=budgie-desktop.desktop
+SDDMCONF
+cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
+[Autologin]
+User=liveuser
+
+[Theme]
+Current=silent
+
+Session=budgie-desktop.desktop
+SDDMCONF
+cat > /usr/lib/sddm.conf.d/kibaos.conf << 'SDDMCONF'
+[Autologin]
+User=liveuser
+
+[Theme]
+Current=silent
+
+Session=budgie-desktop.desktop
+SDDMCONF
 mkdir -p /var/lib/sddm
 chown sddm:sddm /var/lib/sddm 2>/dev/null || true
 chmod 750 /var/lib/sddm
@@ -12145,47 +12173,7 @@ OUTPUTSCALE
 chmod +x /usr/local/bin/kibaos-apply-output-scale
 SKEL="/etc/skel"
 mkdir -p "${SKEL}/.config/labwc"
-cat > "${SKEL}/.config/labwc/rc.xml" << 'LABWCRC'
-<?xml version="1.0"?>
-<labwc_config>
-  <core>
-    <gap>0</gap>
-  </core>
 
-  <desktops>
-    <number>4</number>
-  </desktops>
-
-  <!-- border colors as plain hex, unlike Wayfire's decoration plugin which
-       needed 0.0-1.0 floats -- #1a2030 active, #232b3a inactive, same
-       values as before, just a saner format this time -->
-  <theme>
-    <name>kibaos</name>
-    <titlebar>
-      <height>0</height>
-    </titlebar>
-    <border>
-      <width>1</width>
-    </border>
-  </theme>
-
-  <!-- Print = full-screen screenshot, Shift+Print = region screenshot,
-       both go to the clipboard + ~/Pictures/Screenshots. Super+Shift+Print
-       = region -> OCR -> text on the clipboard (see the two scripts
-       written just above). -->
-  <keyboard>
-    <keybind key="Print">
-      <action name="Execute" command="kibaos-screenshot"/>
-    </keybind>
-    <keybind key="S-Print">
-      <action name="Execute" command="kibaos-screenshot region"/>
-    </keybind>
-    <keybind key="W-S-Print">
-      <action name="Execute" command="kibaos-screenshot-ocr"/>
-    </keybind>
-  </keyboard>
-</labwc_config>
-LABWCRC
 
 # themerc-override — labwc's flat-file theme knobs, separate from rc.xml.
 # this is where the active/inactive titlebar colors actually live (rc.xml
@@ -12802,7 +12790,6 @@ gsettings set org.gnome.desktop.interface text-scaling-factor     1.0
 
 gsettings set org.gnome.desktop.background picture-uri      'file:///usr/share/kibaos/wallpaper.jpg'
 gsettings set org.gnome.desktop.background picture-uri-dark 'file:///usr/share/kibaos/wallpaper.jpg'
-swww img /usr/share/kibaos/wallpaper.jpg
 gsettings set org.gnome.desktop.background picture-options  'zoom'
 gsettings set org.gnome.desktop.background primary-color    '#0d1b2a'
 
