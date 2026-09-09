@@ -392,12 +392,11 @@ PACMANCONF
 
   curl -fL --retry 5 --retry-delay 3 -o /tmp/kiba-boot-splash-raw.png "${KIBA_BOOT_SPLASH_URL}" || true
   if [ -f /tmp/kiba-boot-splash-raw.png ] && file /tmp/kiba-boot-splash-raw.png | grep -qi image; then
-    # same fixed crop box as the desktop branding pass -- see its comment
-    # for why these numbers are what they are (measured against this one
-    # specific source image, centered on the badge, wordmark excluded).
-    magick /tmp/kiba-boot-splash-raw.png -crop 640x640+450+117 +repage /tmp/kiba-logo-raw.png
-    magick /tmp/kiba-logo-raw.png -filter Lanczos -resize 256x256 "${_root}/usr/share/kibaos/logo-256.png"
-    rm -f /tmp/kiba-boot-splash-raw.png /tmp/kiba-logo-raw.png
+    # Source is already a centered square badge, no wordmark to crop out
+    # (unlike the old landscape lockup this used to assume) -- resize
+    # straight through.
+    magick /tmp/kiba-boot-splash-raw.png -filter Lanczos -resize 256x256 "${_root}/usr/share/kibaos/logo-256.png"
+    rm -f /tmp/kiba-boot-splash-raw.png
   else
     magick -size 256x256 xc:none \
       -fill '#0099cc' -draw 'circle 128,128 128,1' \
@@ -405,7 +404,7 @@ PACMANCONF
       "${_root}/usr/share/kibaos/logo-256.png"
   fi
 
-  SDDM_THEME_DIR="${_root}/usr/share/ddm/themes/kibaos"
+  SDDM_THEME_DIR="${_root}/usr/share/sddm/themes/kibaos"
   mkdir -p "${SDDM_THEME_DIR}"
   cp "${_root}/usr/share/kibaos/wallpaper.jpg" "${SDDM_THEME_DIR}/background.png" 2>/dev/null || true
   cp "${_root}/usr/share/kibaos/logo-256.png"  "${SDDM_THEME_DIR}/logo.png"       2>/dev/null || true
@@ -5941,21 +5940,17 @@ systemctl mask sleep.target suspend.target hibernate.target hybrid-sleep.target 
 # ══════════════════════════════════════════════════════════════════════════
 # BRANDING ASSETS
 # ══════════════════════════════════════════════════════════════════════════
-WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
+WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/wallpapers/wallpaper.png?raw=true"
 # One shared source image now backs both the app-icon set (kibaos.png /
-# hicolor icons) and the Plymouth boot splash -- previously LOGO_URL
-# ("boot.png") and BOOT_SPLASH_URL were two separate fetches of two
-# different images. This is the circular "K" badge over "KibaOS" wordmark
-# lockup on a black field, 1536x1024, landscape -- NOT a pre-cropped square
-# icon like the old boot.png was, so it can't just be resized straight into
-# square icon sizes without letterboxing and dragging the wordmark along.
-# Icon generation below crops out just the circular badge first; the boot
-# splash uses the full lockup (wordmark included) unmodified. The OOBE
-# installer logo further below now reuses this same processed boot splash
-# image directly too -- previously its own separate installer.png fetch,
-# which meant two brand assets that had to be kept in sync by hand for no
-# real benefit, since they're meant to be the same mark anyway.
-BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
+# hicolor icons) and the Plymouth boot splash. This asset (unlike the old
+# one this pipeline used to point at) is already a single centered square
+# badge with no separate wordmark -- 1254x1254, transparent/white field,
+# nothing to crop out -- so both the splash and the icon set below just
+# resize it directly rather than cropping a badge out of a landscape
+# lockup. The OOBE installer logo further below reuses this same
+# processed image too, so there's still only one brand asset to keep in
+# sync, just without the crop step the old lockup composition needed.
+BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/splash/splash.png?raw=true"
 WALLPAPER_DEST="/usr/share/kibaos/wallpaper.jpg"
 LOGO_SRC="/usr/share/kibaos/logo-raw.png"
 LOGO_256="/usr/share/kibaos/logo-256.png"
@@ -5971,16 +5966,15 @@ mkdir -p /usr/share/kibaos /usr/share/pixmaps
 curl -fL --retry 5 --retry-delay 3 -o "${BOOT_SPLASH_RAW}" "${BOOT_SPLASH_URL}" || true
 
 if [ -f "${BOOT_SPLASH_RAW}" ] && file "${BOOT_SPLASH_RAW}" | grep -qi 'image'; then
-  # Boot splash: full lockup (badge + wordmark), scaled down, aspect kept.
+  # Boot splash: already square, scaled down, aspect kept.
   magick "${BOOT_SPLASH_RAW}" -filter Lanczos -resize '480x480>' "${BOOT_SPLASH}"
 
-  # App icons: crop out just the circular badge before resizing, so square
-  # icon sizes get a clean centered mark instead of a letterboxed lockup
-  # with the wordmark jammed in. Crop box (640x640, offset 450,117) is a
-  # fixed region measured against this specific source image -- centered on
-  # the badge with even padding on all sides, wordmark excluded. If the
-  # source branding image is ever swapped again, re-measure this box.
-  magick "${BOOT_SPLASH_RAW}" -crop 640x640+450+117 +repage "${LOGO_SRC}"
+  # App icons + taskbar launcher icon: this source is already just the
+  # centered badge, so it goes straight through as the icon source with
+  # no crop -- the old fixed crop box (640x640, offset 450,117) was
+  # measured against the previous landscape lockup image and would slice
+  # this square badge wrong.
+  cp "${BOOT_SPLASH_RAW}" "${LOGO_SRC}"
   rm -f "${BOOT_SPLASH_RAW}"
 fi
 
@@ -11312,26 +11306,20 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 /* === KibaOS: Floating rounded-rectangle panel === */
 .budgie-panel {
     margin: 0 120px 8px 120px;
-    /* 42px panel height (see PANEL_PATH size below) — asymmetric quad
-     * keeps every corner clearly rounded without hitting the ~21px
-     * half-height point where the ends fully round off into a pill. */
-    border-radius: 14px 20px 18px 22px;
-    /* Faint radial bloom in a muted moss green (#7fae86, ~5% opacity),
-     * layered under the existing navy glass — the one deliberate "nature"
-     * accent color in the whole sheet, used nowhere else as a flat fill,
-     * only ever as this kind of soft grown-from-behind glow. */
-    background-image: radial-gradient(ellipse at 30% -40%,
-        rgba(127, 174, 134, 0.05), transparent 65%);
-    background-color: rgba(12, 20, 35, 0.55);
-    border-top: 1px solid rgba(255, 255, 255, 0.18);
-    border-left: 1px solid rgba(255, 255, 255, 0.10);
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.35);
+    /* Uniform 18px radius -- a clean rounded rectangle, not a full pill
+     * (half of the 42px panel height is 21px, so 18px stays short of
+     * that and keeps flat top/bottom edges between the corners). */
+    border-radius: 18px;
+    background-color: #ffffff;
+    /* Dark text/icon color so content stays legible against the now-solid
+     * white background -- the previous navy-glass version relied on the
+     * system dark theme's light-on-dark defaults, which would render
+     * invisible (white-on-white) once the background switched to white. */
+    color: #1a2030;
+    border: 1px solid rgba(0, 0, 0, 0.08);
     box-shadow:
-        0 8px 40px rgba(0, 0, 0, 0.55),
-        0 2px 8px  rgba(0, 0, 0, 0.30),
-        inset 0 1px 0 rgba(255, 255, 255, 0.14),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+        0 8px 40px rgba(0, 0, 0, 0.18),
+        0 2px 8px  rgba(0, 0, 0, 0.10);
     padding: 0 10px;
 }
 .budgie-panel .budgie-applet-button,
@@ -11342,12 +11330,12 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
 }
 .budgie-panel .budgie-applet-button:hover,
 .budgie-panel button.flat:hover {
-    background-color: rgba(255, 255, 255, 0.10);
+    background-color: rgba(0, 0, 0, 0.06);
     transition: background-color 150ms cubic-bezier(0.22, 1, 0.36, 1); /* settle in */
 }
 .budgie-panel .budgie-applet-button:active,
 .budgie-panel button.flat:active {
-    background-color: rgba(0, 153, 204, 0.25);
+    background-color: rgba(0, 153, 204, 0.18);
     transition: background-color 90ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .budgie-panel .launcher:checked,
@@ -12032,6 +12020,12 @@ SDDMQML
 # (ships with the package, no session file hand-written for it here).
 mkdir -p /usr/share/wayland-sessions
 mkdir -p /etc/sddm.conf.d
+mkdir -p /usr/lib/sddm/sddm.conf.d/
+# Arch's system-defaults directory is /usr/lib/sddm/sddm.conf.d/ (note the
+# "sddm/" segment) -- this used to write to /usr/lib/sddm.conf.d/ instead,
+# a path SDDM never reads at all, so that copy of the config was a total
+# no-op. /etc/sddm.conf.d/ (below) is the correct override path and
+# doesn't need the extra segment.
 cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
@@ -12041,26 +12035,7 @@ Current=silent
 
 Session=budgie-desktop.desktop
 SDDMCONF
-mkdir -p /usr/lib/sddm.conf.d/
-cat > /usr/lib/sddm.conf.d/default.conf << 'SDDMCONF'
-[Autologin]
-User=liveuser
-
-[Theme]
-Current=silent
-
-Session=budgie-desktop.desktop
-SDDMCONF
-cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
-[Autologin]
-User=liveuser
-
-[Theme]
-Current=silent
-
-Session=budgie-desktop.desktop
-SDDMCONF
-cat > /usr/lib/sddm.conf.d/kibaos.conf << 'SDDMCONF'
+cat > /usr/lib/sddm/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
 
@@ -12170,62 +12145,6 @@ apply_scale
 rm -f /tmp/.kiba-outputs
 OUTPUTSCALE
 chmod +x /usr/local/bin/kibaos-apply-output-scale
-SKEL="/etc/skel"
-mkdir -p "${SKEL}/.config/labwc"
-
-
-# themerc-override — labwc's flat-file theme knobs, separate from rc.xml.
-# this is where the active/inactive titlebar colors actually live (rc.xml
-# only points at a theme NAME). plain hex, no float conversion needed.
-mkdir -p "${SKEL}/.config/labwc/themes/kibaos"
-cat > "${SKEL}/.config/labwc/themes/kibaos/themerc" << 'LABWCTHEME'
-window.active.border.color: #1a2030
-window.inactive.border.color: #232b3a
-window.active.title.bg.color: #1a2030
-window.inactive.title.bg.color: #232b3a
-LABWCTHEME
-
-# autostart — labwc's equivalent of Wayfire's [autostart] section, just a
-# plain shell script labwc sources on session start. THIS is what
-# actually launches Budgie now instead of Wayfire's autostart_budgie line
-# -- without it, labwc boots to a totally empty compositor, same
-# load-bearing deal as before. no [idle] plugin equivalent to disable
-# here, because labwc doesn't blank the screen on its own in the first
-# place -- that'd be swayidle's job, and swayidle is installed but
-# deliberately never invoked anywhere in this image, so idle/DPMS
-# blanking mid-install just isn't a thing that can happen. simplest fix
-# available: don't run the thing that would cause the problem.
-#
-# NOT confirmed wired up: this file used to launch a desktop session
-# directly (`cutefish-session &`, before that), on the assumption that
-# SDDM only ever starts a bare compositor binary and leaves the actual
-# desktop launch to this autostart script. That assumption predates
-# budgie-desktop/budgie-session landing in the main package list --
-# Autologin's Session=budgie-desktop.desktop resolves against
-# budgie-desktop's own upstream session file (ships with the package),
-# not anything hand-written in this script. This tree now at least
-# lives at labwc's real, conventional config path (~/.config/labwc/ --
-# it used to be misfiled under ~/.config/picom/, a naming leftover from
-# whatever this compositor used to be called earlier in this project's
-# history, which meant labwc would never have read it regardless of
-# what upstream's session file does). Whether budgie-desktop's own
-# session file actually launches labwc with THIS user's config (rather
-# than, say, a bundled/vendored labwc invocation of its own) still
-# isn't independently confirmed -- flagging that honestly rather than
-# asserting it works. The screenshot keybindings in rc.xml and the
-# border colors in themerc are at least in the right file now either
-# way.
-cat > "${SKEL}/.config/labwc/autostart" << 'LABWCAUTOSTART'
-#!/bin/bash
-# status unconfirmed -- see note above.
-LABWCAUTOSTART
-chmod +x "${SKEL}/.config/labwc/autostart"
-
-# environment — same caveat as above: not confirmed this file is read by
-# whatever actually backs budgie-desktop.desktop's session.
-cat > "${SKEL}/.config/labwc/environment" << 'LABWCENV'
-XDG_CURRENT_DESKTOP=Budgie
-LABWCENV
 echo "=== Skipping compositor IPC build — labwc has no IPC, Kortex degrades gracefully ==="
 OTA_PUBKEY_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/ota/ota-public.asc"
 OTA_BASE="https://sourceforge.net/projects/kibaos/files/ota"
@@ -12833,7 +12752,7 @@ fi
 PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
 dconf write "${PANEL_PATH}location"      "'BOTTOM'"
 dconf write "${PANEL_PATH}size"          "42"
-dconf write "${PANEL_PATH}transparency"  "'DYNAMIC'"
+dconf write "${PANEL_PATH}transparency"  "'NONE'"
 dconf write "${PANEL_PATH}enable-shadow" "true"
 
 # ── Centered dock: applets + pinned launchers, matching the mockup's order ─
@@ -12857,7 +12776,9 @@ for ids in \
   "org.gnome.eog.desktop eog.desktop" \
   "org.gnome.Geary.desktop geary.desktop" \
   "org.gnome.Music.desktop gnome-music.desktop" \
-  "org.gnome.Todo.desktop gnome-todo.desktop"
+  "org.gnome.Todo.desktop gnome-todo.desktop" \
+  "org.gnome.Software.desktop gnome-software.desktop" \
+  "gnome-control-center.desktop org.gnome.Settings.desktop"
 do
   FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
 done
@@ -14634,7 +14555,7 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
   PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
   dconf write "${PANEL_PATH}location"      "\"BOTTOM\""
   dconf write "${PANEL_PATH}size"          "42"
-  dconf write "${PANEL_PATH}transparency"  "\"DYNAMIC\""
+  dconf write "${PANEL_PATH}transparency"  "\"NONE\""
   dconf write "${PANEL_PATH}enable-shadow" "true"
 
   MENU_UUID=$(uuidgen)
@@ -14656,7 +14577,9 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
     "kibaos-files.desktop nemo.desktop" \
     "org.gnome.Calendar.desktop gnome-calendar.desktop" \
     "org.gnome.eog.desktop eog.desktop" \
-    "org.gnome.Geary.desktop geary.desktop"
+    "org.gnome.Geary.desktop geary.desktop" \
+    "org.gnome.Software.desktop gnome-software.desktop" \
+    "gnome-control-center.desktop org.gnome.Settings.desktop"
   do
     FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
   done
