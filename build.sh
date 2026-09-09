@@ -382,8 +382,8 @@ PACMANCONF
   # itself is screen-size-aware (see its own `isPhone` check), so the
   # exact same file already renders touch-friendly on a phone panel and
   # unchanged on a desktop one -- no separate mobile QML needed.
-  KIBA_WALLPAPER_URL="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/refs/heads/main/branding/file_00000000718081f5a7295830accc33de.jpg?raw=true"
-  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/76dfc8fa4c96461c42a14f57b46689fec858b735/branding/file_00000000ba3081f7bfd242de31c8979b.png?raw=true"
+  KIBA_WALLPAPER_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/wallpapers/wallpaper.png?raw=true"
+  KIBA_BOOT_SPLASH_URL="https://github.com/WolfTech-Innovations/Kiba/blob/main/assets/splash/splash.png?raw=true"
   mkdir -p "${_root}/usr/share/kibaos"
 
   curl -fL --retry 5 --retry-delay 3 -o "${_root}/usr/share/kibaos/wallpaper.jpg" \
