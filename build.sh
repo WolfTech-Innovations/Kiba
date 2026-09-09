@@ -2582,7 +2582,8 @@ pv
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-sddm
+lightdm
+lightdm-gtk-greeter
 budgie-desktop
 budgie-session
 labwc
@@ -2695,29 +2696,34 @@ tuned
 PACKAGES
 if [ "${KIBA_ARCH}" = "x86_64" ]; then
 # ══════════════════════════════════════════════════════════════════════════
-# AUR installs via yay — sddm-silent-theme, eww
+# AUR installs via yay — eww
 # ══════════════════════════════════════════════════════════════════════════
 # This used to be a single &&-chained one-liner: any one failing step
 # (useradd already existing from a re-run, a download hiccup, a build
 # failure) silently no-op'd everything after it in the chain, with
 # nothing printed to say which step it was or that it happened at all --
-# which is almost certainly why nothing was landing. Two concrete,
-# confirmed-real failure modes that would do exactly that here:
-#   1. eww's AUR package requires gtk-layer-shell, which needs
-#      g-ir-compiler (GObject Introspection) to generate its typelib --
-#      and g-ir-compiler talks to D-Bus via GIO. Plain arch-chroot does
-#      NOT start a D-Bus session on its own, so that step fails with a
-#      GVFS-WARNING/GDBus.Error inside a bare chroot (confirmed against
-#      a real gtk-layer-shell-git build-failure report showing exactly
-#      that error). Fixed here by wrapping the build in
-#      `dbus-run-session --` so a session bus actually exists.
-#   2. sddm-silent-theme pulls in the AUR package redhat-fonts as a
-#      build dependency, which has its own user-reported history of
-#      failing specifically "within a chroot environment" (comments on
-#      the sddm-silent-theme AUR page). dbus-run-session may not fix
-#      this one too -- flagging it now rather than assuming it's
-#      solved, so if sddm-silent-theme is still the one failing after
-#      this change, that's why, and it needs its own look.
+# which is almost certainly why nothing was landing. Confirmed-real
+# failure mode that would do exactly that here:
+#   eww's AUR package requires gtk-layer-shell, which needs
+#   g-ir-compiler (GObject Introspection) to generate its typelib --
+#   and g-ir-compiler talks to D-Bus via GIO. Plain arch-chroot does
+#   NOT start a D-Bus session on its own, so that step fails with a
+#   GVFS-WARNING/GDBus.Error inside a bare chroot (confirmed against
+#   a real gtk-layer-shell-git build-failure report showing exactly
+#   that error). Fixed here by wrapping the build in
+#   `dbus-run-session --` so a session bus actually exists.
+# sddm-silent-theme used to live in this loop too -- dropped along with
+# the rest of SDDM (see the LightDM switch below); there's no SDDM left
+# for it to theme.
+# Note: reflector, thermald, tlp, and powertop are actually official
+# [extra] packages, not AUR -- yay still handles them fine (it falls
+# back to pacman for anything it finds in a synced repo), so leaving
+# them in this loop costs nothing, it's just not technically an AUR
+# install for those four. bbswitch is the genuine AUR-only package here
+# (builds a DKMS kernel module against whatever linux-headers is
+# installed at build time). auto-cpufreq was dropped from this list --
+# it and tlp both fight over CPU frequency scaling if both are enabled,
+# so tlp alone is the one that stays.
 # Also: yay resolves every target passed to one invocation as a single
 # transaction, so a bad target used to take the whole install down with
 # it -- eww included, even though eww's dependency chain has nothing to
@@ -2733,7 +2739,7 @@ if ! command -v yay &>/dev/null; then
   echo "!!! yay itself failed to build/install -- check the makepkg output above, nothing AUR-side can install without it" >&2
 fi
 
-for aur_pkg in sddm-silent-theme eww; do
+for aur_pkg in eww reflector thermald tlp powertop bbswitch; do
   echo "=== yay: installing ${aur_pkg} ==="
   su builder -c "dbus-run-session -- yay -S --noconfirm --needed ${aur_pkg}" \
     || echo "!!! yay failed to install ${aur_pkg} -- continuing rather than aborting the whole ISO build over one AUR package" >&2
@@ -2982,7 +2988,7 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/sddm.service           "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/lightdm.service        "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/pacman-init.service    "${WANTS}/multi-user.target.wants/pacman-init.service"
 ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.target.wants/bluetooth.service"
 
@@ -9854,22 +9860,25 @@ int kiba_install_locale_gen(const char *target_root) {
 
 int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password) {
-    /* The build-time kibaos.conf (customize_airootfs.sh) ships an
-     * [Autologin] block pointing at "liveuser". That block survived on
-     * the installed target untouched, and since liveuser gets userdel'd
-     * a few lines below, SDDM was left trying to autologin a user that
-     * no longer exists -- which is what was actually causing the
-     * installed system to come up with no desktop at all (labwc/Budgie
-     * were never the problem; SDDM never got that far).
-     * Fix: swap just the "User=liveuser" value to the real account name,
-     * in place, rather than re-writing the whole file from a hardcoded
-     * copy of the template -- that copy drifts the moment kibaos.conf
-     * picks up a new key at build time and this function doesn't. Net
-     * effect: the installed system autologins straight to the account
-     * just created here, same as the live session did; the user can flip
-     * that off in Settings afterward if they want a login prompt. */
+    /* The build-time 90-kibaos.conf (customize_airootfs.sh) ships a
+     * [Seat:*] block pointing autologin-user at "liveuser". That block
+     * survived on the installed target untouched, and since liveuser
+     * gets userdel'd a few lines below, LightDM was left trying to
+     * autologin a user that no longer exists -- which is what was
+     * actually causing the installed system to come up with no desktop
+     * at all (labwc/Budgie were never the problem; LightDM never got
+     * that far). This is the same class of bug the SDDM-era code here
+     * used to hit, just against LightDM's config syntax now.
+     * Fix: swap just the "autologin-user=liveuser" value to the real
+     * account name, in place, rather than re-writing the whole file from
+     * a hardcoded copy of the template -- that copy drifts the moment
+     * 90-kibaos.conf picks up a new key at build time and this function
+     * doesn't. Net effect: the installed system autologins straight to
+     * the account just created here, same as the live session did; the
+     * user can flip that off in Settings afterward if they want a login
+     * prompt. */
     char path[1024];
-    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos.conf", target_root);
+    snprintf(path, sizeof(path), "%s/etc/lightdm/lightdm.conf.d/90-kibaos.conf", target_root);
     {
         FILE *f = fopen(path, "r");
         if (f) {
@@ -9882,10 +9891,10 @@ int kiba_install_create_user(const char *target_root, const char *username,
                 buf[got] = 0;
                 fclose(f);
 
-                const char *needle = "User=liveuser";
+                const char *needle = "autologin-user=liveuser";
                 char *pos = strstr(buf, needle);
                 if (pos) {
-                    size_t prefix_len = (size_t)(pos - buf) + strlen("User=");
+                    size_t prefix_len = (size_t)(pos - buf) + strlen("autologin-user=");
                     const char *suffix = pos + strlen(needle);
                     char *out = malloc(prefix_len + strlen(username) + strlen(suffix) + 1);
                     if (out) {
@@ -10251,12 +10260,12 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     if (cb) cb(88, "Turning on background features...", user_data);
     {
-        /* `systemctl enable sddm` below only wires up the
+        /* `systemctl enable lightdm` below only wires up the
          * display-manager.service alias -- it does NOT change
          * default.target. A stock pacstrap install leaves default.target
          * at multi-user.target, so without this explicit set-default the
          * freshly installed system boots straight to a text-mode login
-         * prompt on first boot instead of SDDM's graphical login screen. */
+         * prompt on first boot instead of LightDM's graphical login screen. */
         char *argv_target[] = {
             (char *)"systemctl", (char *)"set-default", (char *)"graphical.target", NULL
         };
@@ -10266,7 +10275,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         }
 
         static const char *services[] = {
-            "NetworkManager", "sddm", "bluetooth",
+            "NetworkManager", "lightdm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
             /* systemd-bless-boot.service / systemd-boot-check-no-failures.
              * service are gone -- those manage systemd-boot's optional
@@ -10913,7 +10922,7 @@ umask 022
 progress 85 "Cleaning up OEM account..."
 # Remove the temporary OEM account created by kibaos-oem-prepare, if present.
 userdel -r oem 2>/dev/null || true
-rm -f /etc/sddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
+rm -f /etc/lightdm/lightdm.conf.d/95-kibaos-oem-autologin.conf 2>/dev/null || true
 
 progress 95 "Finishing up..."
 mkdir -p /etc/kibaos
@@ -10943,15 +10952,13 @@ touch /etc/kibaos/oem-pending
 id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash oem
 passwd -d oem 2>/dev/null || true
 
-mkdir -p /etc/sddm.conf.d
-cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
-[Autologin]
-User=oem
-
-[Theme]
-Current=silent
-
-Session=budgie-desktop.desktop
+mkdir -p /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/95-kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
+[Seat:*]
+autologin-user=oem
+autologin-session=budgie-desktop
+autologin-user-timeout=0
+greeter-session=lightdm-gtk-greeter
 OEMAUTOLOGIN
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
@@ -11019,6 +11026,7 @@ Window.SetBackgroundTopColor(0.043, 0.055, 0.078);
 Window.SetBackgroundBottomColor(0.043, 0.055, 0.078);
 
 logo.image = Image("splash.png");
+logo.image = logo.image.Scale(logo.image.GetWidth() - 6, logo.image.GetHeight() - 6);
 logo.sprite = Sprite(logo.image);
 logo.sprite.SetX(Window.GetWidth() / 2 - logo.image.GetWidth() / 2);
 logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2);
@@ -11758,8 +11766,37 @@ BUDGIEOVERRIDE
 glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 
 # ══════════════════════════════════════════════════════════════════════════
-# SDDM — custom KibaOS frosted-glass greeter theme
+# LightDM — branded greeter (replaces SDDM)
 # ══════════════════════════════════════════════════════════════════════════
+# Swapped off SDDM entirely -- see the build script's history for why
+# (a broken budgie-desktop/labwc rc.xml interaction). LightDM doesn't
+# have an SDDM-style QML theming API, so the old frosted-glass Main.qml
+# greeter (kept below, now dead code, for reference/possible revival on
+# a webkit2 greeter later) doesn't port 1:1. What DOES port cleanly:
+# lightdm-gtk-greeter.conf takes a plain background image directly, so
+# the KibaOS wallpaper is reused as-is. There's no equivalent "logo"
+# slot in lightdm-gtk-greeter -- the frosted-glass panel/logo treatment
+# from the old QML theme is not reproduced here. Revisit with
+# lightdm-webkit2-greeter (AUR) if the fuller branded look matters more
+# than the simpler, zero-AUR-risk swap this does today.
+mkdir -p /etc/lightdm/lightdm-gtk-greeter.conf.d
+cp /usr/share/kibaos/wallpaper.jpg /usr/share/kibaos/lightdm-background.jpg 2>/dev/null || true
+cat > /etc/lightdm/lightdm-gtk-greeter.conf.d/90-kibaos.conf << 'LIGHTDMGREETERCONF'
+[greeter]
+background=/usr/share/kibaos/lightdm-background.jpg
+theme-name=Adwaita-dark
+icon-theme-name=Adwaita
+font-name=Noto Sans 10
+indicators=~host;~spacer;~clock;~spacer;~session;~a11y;~power
+position=50%,center 50%,center
+LIGHTDMGREETERCONF
+
+# ── dead code: the old SDDM frosted-glass QML greeter ───────────────────
+# Left in place (unreferenced -- nothing installs sddm anymore, and
+# nothing points sddm.conf.d/Theme at "kibaos") purely as a reference
+# for a future lightdm-webkit2-greeter port; the QML itself has no
+# runtime target under LightDM.
+: << 'DEAD_SDDM_THEME_BLOCK'
 SDDM_THEME_DIR="/usr/share/sddm/themes/kibaos"
 mkdir -p "${SDDM_THEME_DIR}"
 cp /usr/share/kibaos/wallpaper.jpg  "${SDDM_THEME_DIR}/background.png"  2>/dev/null || true
@@ -12012,41 +12049,30 @@ Rectangle {
     Component.onCompleted: passwordField.forceActiveFocus()
 }
 SDDMQML
+DEAD_SDDM_THEME_BLOCK
 
 # ── Wayland session — budgie-desktop.desktop ────────────────────
 # This is the live/normal-user autologin config (see kibaos-oem-prepare
 # above for the OEM-mode counterpart) -- both point at
 # budgie-desktop.desktop, budgie-desktop's own session file
 # (ships with the package, no session file hand-written for it here).
+# LightDM's autologin-session key wants the session name WITHOUT the
+# ".desktop" suffix (it matches the .desktop filename stem under
+# /usr/share/wayland-sessions), unlike SDDM's Session= key which took
+# the full filename -- that's the one real syntax difference in this
+# port, everything else is a mechanical rename.
 mkdir -p /usr/share/wayland-sessions
-mkdir -p /etc/sddm.conf.d
-mkdir -p /usr/lib/sddm/sddm.conf.d/
-# Arch's system-defaults directory is /usr/lib/sddm/sddm.conf.d/ (note the
-# "sddm/" segment) -- this used to write to /usr/lib/sddm.conf.d/ instead,
-# a path SDDM never reads at all, so that copy of the config was a total
-# no-op. /etc/sddm.conf.d/ (below) is the correct override path and
-# doesn't need the extra segment.
-cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
-[Autologin]
-User=liveuser
-
-[Theme]
-Current=silent
-
-Session=budgie-desktop.desktop
-SDDMCONF
-cat > /usr/lib/sddm/sddm.conf.d/kibaos.conf << 'SDDMCONF'
-[Autologin]
-User=liveuser
-
-[Theme]
-Current=silent
-
-Session=budgie-desktop.desktop
-SDDMCONF
-mkdir -p /var/lib/sddm
-chown sddm:sddm /var/lib/sddm 2>/dev/null || true
-chmod 750 /var/lib/sddm
+mkdir -p /etc/lightdm/lightdm.conf.d
+cat > /etc/lightdm/lightdm.conf.d/90-kibaos.conf << 'LIGHTDMCONF'
+[Seat:*]
+autologin-user=liveuser
+autologin-session=budgie-desktop
+autologin-user-timeout=0
+greeter-session=lightdm-gtk-greeter
+LIGHTDMCONF
+mkdir -p /var/lib/lightdm /var/lib/lightdm-data /var/log/lightdm
+chown lightdm:lightdm /var/lib/lightdm /var/lib/lightdm-data /var/log/lightdm 2>/dev/null || true
+chmod 750 /var/lib/lightdm /var/lib/lightdm-data
 cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
 #!/bin/bash
 # kibaos-screenshot [region] — grabs the full screen by default, or a
@@ -12323,7 +12349,7 @@ rollback_patch() {
 # but it won't leave the user stuck on a half-reloaded compositor.
 restart_compositor() {
   log "Restarting session..."
-  systemctl restart sddm 2>/dev/null || \
+  systemctl restart lightdm 2>/dev/null || \
   pkill -TERM labwc 2>/dev/null || true
   sleep 1
   log "Session restarted."
@@ -12332,14 +12358,14 @@ restart_compositor() {
 
 # ── Restart display manager silently if needed ────────────────────────────
 restart_display_manager() {
-  log "Restarting SDDM..."
-  systemctl restart sddm
+  log "Restarting LightDM..."
+  systemctl restart lightdm
   # Wait for Wayland socket to come back
   for i in $(seq 1 20); do
     [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
     sleep 0.5
   done
-  log "SDDM restarted."
+  log "LightDM restarted."
 }
 
 # ── Post-patch hooks ───────────────────────────────────────────────────────
@@ -12484,7 +12510,7 @@ NEEDS_COMPOSITOR_RESTART=false
 while IFS= read -r line; do
   FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
   case "${FILEPATH}" in
-    etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
+    etc/lightdm*|usr/lib/lightdm*|usr/bin/lightdm*|usr/share/lightdm*)
       NEEDS_DISPLAY_RESTART=true ;;
     usr/bin/labwc*)
       # rc.xml/autostart/environment all live per-user under
@@ -14193,7 +14219,7 @@ systemctl enable systemd-timesyncd
 # timeout on a flaky/offline network) delay to every single boot for no
 # benefit a desktop actually needs.
 
-systemctl enable sddm
+systemctl enable lightdm
 
 # ── Network stack: NetworkManager ───────────────────────────────────────
 # Back on NetworkManager (handles Wi-Fi/wired/DNS itself, no separate
@@ -14598,11 +14624,70 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
 '
 
 # ══════════════════════════════════════════════════════════════════════════
+# FIX: budgie-desktop/labwc rc.xml ships keybinds with <action name="command">
+# ══════════════════════════════════════════════════════════════════════════
+# labwc has no action called "command" -- the only action that runs a
+# shell command is <action name="Execute" command="..." />. Whatever
+# generates budgie-desktop's default keybind set is writing the wrong
+# action name, and labwc rejects every one of them at parse time, which
+# is what "Config errors detected" (labnag) was showing on boot -- one
+# "Invalid action:" / "Invalid argument for action INVALID: 'command'"
+# pair per broken keybind. That parse failure is also the most likely
+# explanation for the blank, undecorated window and missing panel seen
+# right after it: labwc doesn't cleanly fall back to defaults when this
+# many keybinds fail at once, so server-side decoration/layer-shell
+# placement for the panel never got the config it expected.
+#
+# Two-part fix, since we don't control where budgie-desktop's package
+# keeps its own bundled default template:
+#   1. Patch every rc.xml this package ships anywhere under /usr/share
+#      or /etc/xdg in place, so if budgie-desktop's first-login code
+#      copies FROM one of these, the copy is already correct.
+#   2. Pre-seed /etc/skel's copies directly, so any newly created user
+#      (liveuser included, via the cp -aT /etc/skel/ below) gets a
+#      known-good file from the start -- most DE/compositor first-run
+#      seeding (budgie-desktop's included, going by how every other
+#      DE-on-labwc integration behaves) only writes its own default if
+#      the user's file doesn't already exist, so getting there first
+#      wins outright regardless of what the bundled template says.
+# Both files also set <errorCommand>true</errorCommand> under <core> --
+# labwc's documented way to swap out the labnag popup for a no-op -- so
+# any future config mistake fails silently instead of blocking the
+# desktop behind a dialog again. <keyboard><default /></keyboard> keeps
+# labwc's built-in keybindings (Alt-Tab, etc.) since these files replace
+# whatever budgie-desktop/labwc's own defaults would have been.
+echo "=== Patching budgie-desktop/labwc rc.xml action=\"command\" bug ==="
+while IFS= read -r -d '' _rcfile; do
+  if grep -q 'action name="command"' "${_rcfile}" 2>/dev/null; then
+    sed -i 's/action name="command"/action name="Execute"/g; s/action name='"'"'command'"'"'/action name="Execute"/g' "${_rcfile}"
+    echo "  patched: ${_rcfile}"
+  fi
+done < <(find /usr/share /etc/xdg -type f -name 'rc.xml' -print0 2>/dev/null)
+
+for _skel_rc in \
+  /etc/skel/.config/budgie-desktop/labwc/rc.xml \
+  /etc/skel/.config/labwc/rc.xml
+do
+  mkdir -p "$(dirname "${_skel_rc}")"
+  cat > "${_skel_rc}" << 'KIBALABWCRC'
+<?xml version="1.0"?>
+<labwc_config>
+  <core>
+    <errorCommand>true</errorCommand>
+  </core>
+  <keyboard>
+    <default />
+  </keyboard>
+</labwc_config>
+KIBALABWCRC
+done
+
+# ══════════════════════════════════════════════════════════════════════════
 # HIDE UPSTREAM-BRANDED LAUNCHER ENTRIES
 # ══════════════════════════════════════════════════════════════════════════
 # Scoped to /usr/share/applications ONLY -- deliberately not touching
 # /usr/share/wayland-sessions or /usr/share/xsessions, since those are
-# session definitions SDDM reads directly for the login screen's session
+# session definitions LightDM reads directly for the login screen's session
 # picker, not app-menu entries; hiding budgie-desktop.desktop there would
 # break login rather than just tidy the menu.
 #
