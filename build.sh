@@ -12041,8 +12041,8 @@ Current=silent
 
 Session=budgie-desktop.desktop
 SDDMCONF
-rm /etc/sddm.conf.d/default.conf
-rm /usr/lib/sddm.conf.d/default.conf
+rm -f /etc/sddm.conf.d/default.conf
+rm -f /usr/lib/sddm.conf.d/default.conf
 cat > /usr/lib/sddm.conf.d/default.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
