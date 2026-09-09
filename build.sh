@@ -2583,7 +2583,7 @@ pv
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-ddm
+sddm
 swaybg
 grim
 slurp
@@ -2692,7 +2692,7 @@ lvm2
 tuned
 PACKAGES
 if [ "${KIBA_ARCH}" = "x86_64" ]; then
-useradd -m builder 2>/dev/null; echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder && chmod 440 /etc/sudoers.d/builder && pacman -S --noconfirm budgie-desktop && su builder -c "cd /tmp && curl -O https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz && tar xf yay-bin.tar.gz && cd yay-bin && makepkg -si --noconfirm && yay -S --noconfirm deepin-control-center" && rm -f /etc/sudoers.d/builder
+useradd -m builder 2>/dev/null; echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder && chmod 440 /etc/sudoers.d/builder && pacman -S --noconfirm budgie-desktop && su builder -c "cd /tmp && curl -O https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz && tar xf yay-bin.tar.gz && cd yay-bin && makepkg -si --noconfirm && yay -S --noconfirm deepin-control-center sddm-silent-theme eww" && rm -f /etc/sudoers.d/builder
 fi
 # arm package swap: right kernel, drop the intel-only stuff, rename
 # the file so archiso can actually find it
@@ -2935,7 +2935,7 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/ddm.service           "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/sddm.service           "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/pacman-init.service    "${WANTS}/multi-user.target.wants/pacman-init.service"
 ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.target.wants/bluetooth.service"
 
@@ -6048,6 +6048,26 @@ fi
 cd /
 pacman -Qtdq | pacman -Rns --noconfirm - 2>/dev/null || true
 echo "=== Deepin desktop stack step complete ==="
+
+# ══════════════════════════════════════════════════════════════════════════
+# dde-dock is NOT the taskbar anymore
+# ══════════════════════════════════════════════════════════════════════════
+# The previous pass here forced dde-dock/dde-control-center into a dark,
+# fully-opaque, Cutefish-styled floating dock (KWin blurEnabled=false,
+# a kwinrulesrc opacity=100 rule on both wmclasses, plus
+# com.deepin.dde.dock/appearance gsettings). All of that is gone --
+# Autologin's Session= (see the kibaos.conf/kibaos-oem-autologin.conf
+# writes later in this script) has said "budgie-desktop-wayland.desktop"
+# this whole time, which is budgie-desktop's OWN Wayland session file
+# (ships with the package, never hand-written here) -- so dde-dock was
+# never actually the thing rendering the taskbar on a real boot in the
+# first place, regardless of what the DDE-section comments above assumed.
+# The real, already-working dock is Budgie's own panel + icon-tasklist
+# applet, provisioned by kibaos-first-login further down (see "Centered
+# dock: applets + pinned launchers" below) -- that's the one this image
+# actually boots into. deepin/deepin-extra stay installed (still useful
+# for dde-control-center/other DDE apps if you want them), just nothing
+# forces them into the dock/statusbar role anymore.
 
 # ══════════════════════════════════════════════════════════════════════════
 # KIBAOS OOBE INSTALLER — fullscreen, one-step-per-screen Vala/GTK4 app.
@@ -9859,7 +9879,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
      * just created here, same as the live session did; the user can flip
      * that off in Settings afterward if they want a login prompt. */
     char path[1024];
-    snprintf(path, sizeof(path), "%s/etc/ddm.conf.d/kibaos.conf", target_root);
+    snprintf(path, sizeof(path), "%s/etc/sddm.conf.d/kibaos.conf", target_root);
     {
         FILE *f = fopen(path, "r");
         if (f) {
@@ -10256,7 +10276,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         }
 
         static const char *services[] = {
-            "NetworkManager", "ddm", "bluetooth",
+            "NetworkManager", "sddm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
             /* systemd-bless-boot.service / systemd-boot-check-no-failures.
              * service are gone -- those manage systemd-boot's optional
@@ -10903,7 +10923,7 @@ umask 022
 progress 85 "Cleaning up OEM account..."
 # Remove the temporary OEM account created by kibaos-oem-prepare, if present.
 userdel -r oem 2>/dev/null || true
-rm -f /etc/ddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
+rm -f /etc/sddm.conf.d/kibaos-oem-autologin.conf 2>/dev/null || true
 
 progress 95 "Finishing up..."
 mkdir -p /etc/kibaos
@@ -10933,8 +10953,8 @@ touch /etc/kibaos/oem-pending
 id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash oem
 passwd -d oem 2>/dev/null || true
 
-mkdir -p /etc/ddm.conf.d
-cat > /etc/ddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
 [Autologin]
 User=oem
 Session=budgie-desktop-wayland.desktop
@@ -11752,7 +11772,7 @@ glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 # ══════════════════════════════════════════════════════════════════════════
 # SDDM — custom KibaOS frosted-glass greeter theme
 # ══════════════════════════════════════════════════════════════════════════
-SDDM_THEME_DIR="/usr/share/ddm/themes/kibaos"
+SDDM_THEME_DIR="/usr/share/sddm/themes/kibaos"
 mkdir -p "${SDDM_THEME_DIR}"
 cp /usr/share/kibaos/wallpaper.jpg  "${SDDM_THEME_DIR}/background.png"  2>/dev/null || true
 cp /usr/share/kibaos/logo-256.png   "${SDDM_THEME_DIR}/logo.png"        2>/dev/null || true
@@ -12010,16 +12030,16 @@ SDDMQML
 # above for the OEM-mode counterpart) -- both point at deepin-session,
 # written in the DEEPIN DESKTOP STACK section earlier in this script.
 mkdir -p /usr/share/wayland-sessions
-mkdir -p /etc/ddm.conf.d
-cat > /etc/ddm.conf.d/kibaos.conf << 'SDDMCONF'
+mkdir -p /etc/sddm.conf.d
+cat > /etc/sddm.conf.d/kibaos.conf << 'SDDMCONF'
 [Autologin]
 User=liveuser
 Session=budgie-desktop-wayland.desktop
 SDDMCONF
 
-mkdir -p /var/lib/ddm
-chown ddm:ddm /var/lib/ddm 2>/dev/null || true
-chmod 750 /var/lib/ddm
+mkdir -p /var/lib/sddm
+chown sddm:sddm /var/lib/sddm 2>/dev/null || true
+chmod 750 /var/lib/sddm
 cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
 #!/bin/bash
 # kibaos-screenshot [region] — grabs the full screen by default, or a
@@ -12389,7 +12409,7 @@ rollback_patch() {
 # but it won't leave the user stuck on a half-reloaded compositor.
 restart_compositor() {
   log "Restarting session..."
-  systemctl restart ddm 2>/dev/null || \
+  systemctl restart sddm 2>/dev/null || \
   pkill -TERM picom 2>/dev/null || true
   sleep 1
   log "Session restarted."
@@ -12399,7 +12419,7 @@ restart_compositor() {
 # ── Restart display manager silently if needed ────────────────────────────
 restart_display_manager() {
   log "Restarting SDDM..."
-  systemctl restart ddm
+  systemctl restart sddm
   # Wait for Wayland socket to come back
   for i in $(seq 1 20); do
     [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
@@ -12550,7 +12570,7 @@ NEEDS_COMPOSITOR_RESTART=false
 while IFS= read -r line; do
   FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
   case "${FILEPATH}" in
-    etc/ddm*|usr/lib/ddm*|usr/bin/ddm*)
+    etc/sddm*|usr/lib/sddm*|usr/bin/sddm*)
       NEEDS_DISPLAY_RESTART=true ;;
     usr/bin/picom*)
       # picom.ini/rc.xml/autostart all live per-user under ~/.config/picom,
@@ -14258,7 +14278,7 @@ systemctl enable systemd-timesyncd
 # timeout on a flaky/offline network) delay to every single boot for no
 # benefit a desktop actually needs.
 
-systemctl enable ddm
+systemctl enable sddm
 
 # ── Network stack: NetworkManager ───────────────────────────────────────
 # Back on NetworkManager (handles Wi-Fi/wired/DNS itself, no separate
@@ -14607,7 +14627,52 @@ chown -R 1000:1000 /home/liveuser
 
 install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
 runuser -u liveuser -- dbus-run-session -- bash -c '
-  dconf write /com/solus-project/budgie-panel/panels "@as []"
+  # liveuser never gets /etc/skel/.config/autostart copied in (its home
+  # was created earlier in this script, before skel was populated), so
+  # kibaos-configure.desktop -> kibaos-first-login never fires for this
+  # account -- meaning the icon-tasklist panel setup further up (see
+  # "Centered dock: applets + pinned launchers") would otherwise never
+  # run for the live session at all. Provisioning the same real Budgie
+  # panel here, directly, so the live ISO actually boots with its dock
+  # instead of a blank panel list.
+  PANEL_UUID=$(uuidgen)
+  dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\"]"
+  PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
+  dconf write "${PANEL_PATH}location"      "\"BOTTOM\""
+  dconf write "${PANEL_PATH}size"          "42"
+  dconf write "${PANEL_PATH}transparency"  "\"DYNAMIC\""
+  dconf write "${PANEL_PATH}enable-shadow" "true"
+
+  MENU_UUID=$(uuidgen)
+  TASKLIST_UUID=$(uuidgen)
+  CLOCK_UUID=$(uuidgen)
+  dconf write "/com/solus-project/budgie-panel/applets/${MENU_UUID}/name"     "\"budgie-menu\""
+  dconf write "/com/solus-project/budgie-panel/applets/${TASKLIST_UUID}/name" "\"icon-tasklist\""
+  dconf write "/com/solus-project/budgie-panel/applets/${CLOCK_UUID}/name"    "\"clock\""
+  dconf write "${PANEL_PATH}applets" "[\"${MENU_UUID}\", \"${TASKLIST_UUID}\", \"${CLOCK_UUID}\"]"
+
+  find_desktop_id() {
+    for candidate in "$@"; do
+      [ -f "/usr/share/applications/${candidate}" ] && { echo "${candidate}"; return 0; }
+    done
+    return 1
+  }
+  DOCK_LAUNCHERS=()
+  for ids in \
+    "kibaos-files.desktop nemo.desktop" \
+    "org.gnome.Calendar.desktop gnome-calendar.desktop" \
+    "org.gnome.eog.desktop eog.desktop" \
+    "org.gnome.Geary.desktop geary.desktop"
+  do
+    FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
+  done
+  if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
+    LAUNCHERS_GVARIANT=$(printf "\"%s\", " "${DOCK_LAUNCHERS[@]}")
+    dconf write \
+      "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
+      "[${LAUNCHERS_GVARIANT%, }]"
+  fi
+
   # GNOME Console (kgx) is already the simplest terminal available — single
   # window, no tabs UI, no menu bar by design. Just quiet the bell and use
   # its own clean default font instead of inheriting a monospace override.
