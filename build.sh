@@ -2582,8 +2582,7 @@ pv
 lib32-mesa
 lib32-vulkan-icd-loader
 pkg-config
-lightdm
-lightdm-gtk-greeter
+gdm
 budgie-desktop
 budgie-session
 labwc
@@ -2988,7 +2987,7 @@ chmod 0440 "${AIROOTFS}/etc/sudoers.d/liveuser"
 WANTS="${AIROOTFS}/etc/systemd/system"
 mkdir -p "${WANTS}/default.target.wants" "${WANTS}/multi-user.target.wants"
 ln -sf /usr/lib/systemd/system/graphical.target       "${WANTS}/default.target"
-ln -sf /usr/lib/systemd/system/lightdm.service        "${WANTS}/display-manager.service"
+ln -sf /usr/lib/systemd/system/gdm.service             "${WANTS}/display-manager.service"
 ln -sf /usr/lib/systemd/system/pacman-init.service    "${WANTS}/multi-user.target.wants/pacman-init.service"
 ln -sf /usr/lib/systemd/system/bluetooth.service      "${WANTS}/multi-user.target.wants/bluetooth.service"
 
@@ -9860,25 +9859,25 @@ int kiba_install_locale_gen(const char *target_root) {
 
 int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password) {
-    /* The build-time 90-kibaos.conf (customize_airootfs.sh) ships a
-     * [Seat:*] block pointing autologin-user at "liveuser". That block
+    /* The build-time /etc/gdm/custom.conf (customize_airootfs.sh) ships an
+     * [daemon] block pointing AutomaticLogin at "liveuser". That block
      * survived on the installed target untouched, and since liveuser
-     * gets userdel'd a few lines below, LightDM was left trying to
+     * gets userdel'd a few lines below, GDM was left trying to
      * autologin a user that no longer exists -- which is what was
      * actually causing the installed system to come up with no desktop
-     * at all (labwc/Budgie were never the problem; LightDM never got
-     * that far). This is the same class of bug the SDDM-era code here
-     * used to hit, just against LightDM's config syntax now.
-     * Fix: swap just the "autologin-user=liveuser" value to the real
+     * at all (labwc/Budgie were never the problem; GDM never got
+     * that far). This is the same class of bug the LightDM-era code here
+     * used to hit, just against GDM's config syntax now.
+     * Fix: swap just the "AutomaticLogin=liveuser" value to the real
      * account name, in place, rather than re-writing the whole file from
      * a hardcoded copy of the template -- that copy drifts the moment
-     * 90-kibaos.conf picks up a new key at build time and this function
+     * custom.conf picks up a new key at build time and this function
      * doesn't. Net effect: the installed system autologins straight to
      * the account just created here, same as the live session did; the
      * user can flip that off in Settings afterward if they want a login
      * prompt. */
     char path[1024];
-    snprintf(path, sizeof(path), "%s/etc/lightdm/lightdm.conf.d/90-kibaos.conf", target_root);
+    snprintf(path, sizeof(path), "%s/etc/gdm/custom.conf", target_root);
     {
         FILE *f = fopen(path, "r");
         if (f) {
@@ -9891,10 +9890,10 @@ int kiba_install_create_user(const char *target_root, const char *username,
                 buf[got] = 0;
                 fclose(f);
 
-                const char *needle = "autologin-user=liveuser";
+                const char *needle = "AutomaticLogin=liveuser";
                 char *pos = strstr(buf, needle);
                 if (pos) {
-                    size_t prefix_len = (size_t)(pos - buf) + strlen("autologin-user=");
+                    size_t prefix_len = (size_t)(pos - buf) + strlen("AutomaticLogin=");
                     const char *suffix = pos + strlen(needle);
                     char *out = malloc(prefix_len + strlen(username) + strlen(suffix) + 1);
                     if (out) {
@@ -9912,6 +9911,25 @@ int kiba_install_create_user(const char *target_root, const char *username,
             /* f already closed above on the success path */
         }
         /* fopen() failed: f is NULL here, nothing to close */
+    }
+
+    /* GDM has no LightDM-style "autologin-session" key -- it just
+     * autologins into whatever session AccountsService says is that
+     * user's default, falling back to the desktop's listed default
+     * session if nothing is set. liveuser gets that default for free
+     * (there's only one session installed most of the time), but write
+     * it explicitly for the real account too so it's never ambiguous. */
+    {
+        char accts_dir[1024];
+        snprintf(accts_dir, sizeof(accts_dir), "%s/var/lib/AccountsService/users", target_root);
+        mkdir(accts_dir, 0755); /* best-effort; may already exist */
+
+        char accts_path[1024];
+        snprintf(accts_path, sizeof(accts_path), "%s/%s", accts_dir, username);
+        char accts_content[256];
+        snprintf(accts_content, sizeof(accts_content),
+                 "[User]\nSession=budgie-desktop\nXSession=budgie-desktop\nSystemAccount=false\n");
+        write_file(accts_path, accts_content); /* best-effort */
     }
 
     /* Remove the live user -- best effort, ignore failure if absent. */
@@ -10260,12 +10278,12 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
     if (cb) cb(88, "Turning on background features...", user_data);
     {
-        /* `systemctl enable lightdm` below only wires up the
+        /* `systemctl enable gdm` below only wires up the
          * display-manager.service alias -- it does NOT change
          * default.target. A stock pacstrap install leaves default.target
          * at multi-user.target, so without this explicit set-default the
          * freshly installed system boots straight to a text-mode login
-         * prompt on first boot instead of LightDM's graphical login screen. */
+         * prompt on first boot instead of GDM's graphical login screen. */
         char *argv_target[] = {
             (char *)"systemctl", (char *)"set-default", (char *)"graphical.target", NULL
         };
@@ -10275,7 +10293,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
         }
 
         static const char *services[] = {
-            "NetworkManager", "lightdm", "bluetooth",
+            "NetworkManager", "gdm", "bluetooth",
             "systemd-timesyncd", "systemd-time-wait-sync",
             /* systemd-bless-boot.service / systemd-boot-check-no-failures.
              * service are gone -- those manage systemd-boot's optional
@@ -10922,7 +10940,17 @@ umask 022
 progress 85 "Cleaning up OEM account..."
 # Remove the temporary OEM account created by kibaos-oem-prepare, if present.
 userdel -r oem 2>/dev/null || true
-rm -f /etc/lightdm/lightdm.conf.d/95-kibaos-oem-autologin.conf 2>/dev/null || true
+rm -f /var/lib/AccountsService/users/oem 2>/dev/null || true
+# GDM has no LightDM-style conf.d layering to just drop a higher-priority
+# file from -- kibaos-oem-prepare stashed whatever custom.conf looked like
+# before OEM mode (if anything) at custom.conf.pre-oem, so restore that;
+# absent a stashed copy, just delete custom.conf outright so GDM falls
+# back to its own default of no autologin and a normal login screen.
+if [ -f /etc/gdm/custom.conf.pre-oem ]; then
+  mv /etc/gdm/custom.conf.pre-oem /etc/gdm/custom.conf
+else
+  rm -f /etc/gdm/custom.conf 2>/dev/null || true
+fi
 
 progress 95 "Finishing up..."
 mkdir -p /etc/kibaos
@@ -10952,14 +10980,26 @@ touch /etc/kibaos/oem-pending
 id oem &>/dev/null || useradd -m -G wheel,audio,video,input,network,storage,power,docker -s /bin/bash oem
 passwd -d oem 2>/dev/null || true
 
-mkdir -p /etc/lightdm/lightdm.conf.d
-cat > /etc/lightdm/lightdm.conf.d/95-kibaos-oem-autologin.conf << 'OEMAUTOLOGIN'
-[Seat:*]
-autologin-user=oem
-autologin-session=budgie-desktop
-autologin-user-timeout=0
-greeter-session=lightdm-gtk-greeter
-OEMAUTOLOGIN
+mkdir -p /etc/gdm
+# Stash whatever custom.conf looked like before OEM mode (there may be
+# none, if this device never had one) so kibaos-oem-finish can put it
+# back once the temporary "oem" account is gone -- GDM's custom.conf is
+# one flat file, not a conf.d directory to layer a drop-in on top of.
+[ -f /etc/gdm/custom.conf ] && cp -f /etc/gdm/custom.conf /etc/gdm/custom.conf.pre-oem 2>/dev/null || true
+cat > /etc/gdm/custom.conf << 'GDMOEMCONF'
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=oem
+WaylandEnable=true
+GDMOEMCONF
+
+mkdir -p /var/lib/AccountsService/users
+cat > /var/lib/AccountsService/users/oem << 'OEMACCOUNTS'
+[User]
+Session=budgie-desktop
+XSession=budgie-desktop
+SystemAccount=false
+OEMACCOUNTS
 
 # OOBE app autostarts for the oem user too, in OEM-finish mode (the
 # /etc/kibaos/oem-pending marker is what triggers that mode, not the
@@ -11766,30 +11806,44 @@ BUDGIEOVERRIDE
 glib-compile-schemas /usr/share/glib-2.0/schemas/ 2>/dev/null || true
 
 # ══════════════════════════════════════════════════════════════════════════
-# LightDM — branded greeter (replaces SDDM)
+# GDM — branded greeter (replaces LightDM)
 # ══════════════════════════════════════════════════════════════════════════
-# Swapped off SDDM entirely -- see the build script's history for why
-# (a broken budgie-desktop/labwc rc.xml interaction). LightDM doesn't
-# have an SDDM-style QML theming API, so the old frosted-glass Main.qml
-# greeter (kept below, now dead code, for reference/possible revival on
-# a webkit2 greeter later) doesn't port 1:1. What DOES port cleanly:
-# lightdm-gtk-greeter.conf takes a plain background image directly, so
-# the KibaOS wallpaper is reused as-is. There's no equivalent "logo"
-# slot in lightdm-gtk-greeter -- the frosted-glass panel/logo treatment
-# from the old QML theme is not reproduced here. Revisit with
-# lightdm-webkit2-greeter (AUR) if the fuller branded look matters more
-# than the simpler, zero-AUR-risk swap this does today.
-mkdir -p /etc/lightdm/lightdm-gtk-greeter.conf.d
-cp /usr/share/kibaos/wallpaper.jpg /usr/share/kibaos/lightdm-background.jpg 2>/dev/null || true
-cat > /etc/lightdm/lightdm-gtk-greeter.conf.d/90-kibaos.conf << 'LIGHTDMGREETERCONF'
-[greeter]
-background=/usr/share/kibaos/lightdm-background.jpg
-theme-name=Adwaita-dark
-icon-theme-name=Adwaita
-font-name=Noto Sans 10
-indicators=~host;~spacer;~clock;~spacer;~session;~a11y;~power
-position=50%,center 50%,center
-LIGHTDMGREETERCONF
+# GDM has neither LightDM-gtk-greeter's plain "background=" key nor
+# SDDM's QML theming API (see the dead code below, kept for reference) --
+# its login screen is just GNOME Shell running in greeter mode, themed
+# through the "gdm" dconf system db instead of a greeter-specific config
+# file. /etc/dconf/profile/gdm is what tells dconf that the "gdm" system
+# user should read the "gdm" db at all (stock gdm ships a profile
+# pointing at file-db /usr/share/gdm/greeter-dconf-defaults, which is
+# read-only from this package's own defaults -- system-db here layers
+# /etc/dconf/db/gdm.d/* on top of that instead of touching the read-only
+# file-db). background reuses org.gnome.desktop.background, same key
+# the desktop session itself uses; logo is picked up by GDM natively
+# through org.gnome.login-screen -- unlike lightdm-gtk-greeter, there
+# IS a real logo slot here, so the KibaOS mark actually shows on the
+# greeter now instead of being dropped like it was under LightDM.
+mkdir -p /etc/dconf/profile /etc/dconf/db/gdm.d
+cat > /etc/dconf/profile/gdm << 'GDMPROFILE'
+user-db:user
+system-db:gdm
+file-db:/usr/share/gdm/greeter-dconf-defaults
+GDMPROFILE
+
+cp /usr/share/kibaos/wallpaper.jpg /usr/share/kibaos/gdm-background.jpg 2>/dev/null || true
+cat > /etc/dconf/db/gdm.d/01-kibaos << 'GDMDCONF'
+[org/gnome/desktop/background]
+picture-uri='file:///usr/share/kibaos/gdm-background.jpg'
+picture-uri-dark='file:///usr/share/kibaos/gdm-background.jpg'
+picture-options='zoom'
+
+[org/gnome/desktop/interface]
+color-scheme='prefer-dark'
+
+[org/gnome/login-screen]
+logo='/usr/share/kibaos/logo-256.png'
+disable-user-list=false
+GDMDCONF
+dconf update
 
 # ── dead code: the old SDDM frosted-glass QML greeter ───────────────────
 # Left in place (unreferenced -- nothing installs sddm anymore, and
@@ -12056,23 +12110,32 @@ DEAD_SDDM_THEME_BLOCK
 # above for the OEM-mode counterpart) -- both point at
 # budgie-desktop.desktop, budgie-desktop's own session file
 # (ships with the package, no session file hand-written for it here).
-# LightDM's autologin-session key wants the session name WITHOUT the
-# ".desktop" suffix (it matches the .desktop filename stem under
-# /usr/share/wayland-sessions), unlike SDDM's Session= key which took
-# the full filename -- that's the one real syntax difference in this
-# port, everything else is a mechanical rename.
+# GDM has no LightDM-style "autologin-session" key at all: AutomaticLogin
+# in custom.conf only names the USER, and GDM then launches whatever
+# session AccountsService says is that user's default (falling back to
+# the desktop environment's own default .desktop if nothing is set) --
+# so the session choice has to live in an AccountsService user file
+# instead of the display manager's own config, and it wants the .desktop
+# filename stem too (same as LightDM's key did, just in a different
+# file now).
 mkdir -p /usr/share/wayland-sessions
-mkdir -p /etc/lightdm/lightdm.conf.d
-cat > /etc/lightdm/lightdm.conf.d/90-kibaos.conf << 'LIGHTDMCONF'
-[Seat:*]
-autologin-user=liveuser
-autologin-session=budgie-desktop
-autologin-user-timeout=0
-greeter-session=lightdm-gtk-greeter
-LIGHTDMCONF
-mkdir -p /var/lib/lightdm /var/lib/lightdm-data /var/log/lightdm
-chown lightdm:lightdm /var/lib/lightdm /var/lib/lightdm-data /var/log/lightdm 2>/dev/null || true
-chmod 750 /var/lib/lightdm /var/lib/lightdm-data
+mkdir -p /etc/gdm
+cat > /etc/gdm/custom.conf << 'GDMCONF'
+[daemon]
+AutomaticLoginEnable=true
+AutomaticLogin=liveuser
+WaylandEnable=true
+GDMCONF
+mkdir -p /var/lib/AccountsService/users
+cat > /var/lib/AccountsService/users/liveuser << 'LIVEUSERACCOUNTS'
+[User]
+Session=budgie-desktop
+XSession=budgie-desktop
+SystemAccount=false
+LIVEUSERACCOUNTS
+mkdir -p /var/lib/gdm /var/log/gdm
+chown gdm:gdm /var/lib/gdm /var/log/gdm 2>/dev/null || true
+chmod 750 /var/lib/gdm
 cat > /usr/local/bin/kibaos-screenshot << 'SCREENSHOT'
 #!/bin/bash
 # kibaos-screenshot [region] — grabs the full screen by default, or a
@@ -12349,7 +12412,7 @@ rollback_patch() {
 # but it won't leave the user stuck on a half-reloaded compositor.
 restart_compositor() {
   log "Restarting session..."
-  systemctl restart lightdm 2>/dev/null || \
+  systemctl restart gdm 2>/dev/null || \
   pkill -TERM labwc 2>/dev/null || true
   sleep 1
   log "Session restarted."
@@ -12358,14 +12421,14 @@ restart_compositor() {
 
 # ── Restart display manager silently if needed ────────────────────────────
 restart_display_manager() {
-  log "Restarting LightDM..."
-  systemctl restart lightdm
+  log "Restarting GDM..."
+  systemctl restart gdm
   # Wait for Wayland socket to come back
   for i in $(seq 1 20); do
     [ -S "/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}" ] && break
     sleep 0.5
   done
-  log "LightDM restarted."
+  log "GDM restarted."
 }
 
 # ── Post-patch hooks ───────────────────────────────────────────────────────
@@ -12510,7 +12573,7 @@ NEEDS_COMPOSITOR_RESTART=false
 while IFS= read -r line; do
   FILEPATH=$(echo "${line}" | awk '{print $2}' | sed 's|^\./||')
   case "${FILEPATH}" in
-    etc/lightdm*|usr/lib/lightdm*|usr/bin/lightdm*|usr/share/lightdm*)
+    etc/gdm*|usr/lib/gdm*|usr/bin/gdm*|usr/share/gdm*|etc/dconf/db/gdm.d*)
       NEEDS_DISPLAY_RESTART=true ;;
     usr/bin/labwc*)
       # rc.xml/autostart/environment all live per-user under
@@ -14219,7 +14282,7 @@ systemctl enable systemd-timesyncd
 # timeout on a flaky/offline network) delay to every single boot for no
 # benefit a desktop actually needs.
 
-systemctl enable lightdm
+systemctl enable gdm
 
 # ── Network stack: NetworkManager ───────────────────────────────────────
 # Back on NetworkManager (handles Wi-Fi/wired/DNS itself, no separate
@@ -14687,7 +14750,7 @@ done
 # ══════════════════════════════════════════════════════════════════════════
 # Scoped to /usr/share/applications ONLY -- deliberately not touching
 # /usr/share/wayland-sessions or /usr/share/xsessions, since those are
-# session definitions LightDM reads directly for the login screen's session
+# session definitions GDM reads directly for the login screen's session
 # picker, not app-menu entries; hiding budgie-desktop.desktop there would
 # break login rather than just tidy the menu.
 #
