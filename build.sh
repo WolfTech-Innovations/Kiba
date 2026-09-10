@@ -3253,6 +3253,41 @@ cp "${LOGO_48}"  /usr/share/icons/hicolor/48x48/apps/kibaos.png
 cp "${LOGO_32}"  /usr/share/icons/hicolor/32x32/apps/kibaos.png
 gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
 
+# ── Flat-white badge for the top-panel Raven trigger ────────────────────────
+# Panel/status icons are conventionally monochrome ("symbolic") so they
+# read cleanly against a dark bar -- pulling the full two-tone LOGO_256
+# straight onto the panel would look muddy at 16-24px anyway. This
+# recolors the badge's own alpha silhouette solid white rather than
+# hand-drawing a separate glyph, so it always matches whatever the boot
+# splash actually is.
+#
+# RavenTriggerApplet.plugin ships Icon=pane-show-symbolic (confirmed from
+# the plugin's own [Plugin] metadata) with no per-instance icon override
+# in its dconf schema, so the only reliable way to swap it is overriding
+# that icon NAME in the icon theme itself -- same trick used for other
+# fixed-icon system UI below. This does mean anything else on the system
+# that happens to ask for "pane-show-symbolic" gets our badge too, but
+# nothing else in this image does.
+BADGE_WHITE_SRC="/usr/share/kibaos/badge-white.png"
+magick "${LOGO_256}" -alpha extract -threshold 50% /tmp/kiba-badge-alpha.png
+magick -size 256x256 xc:white /tmp/kiba-badge-white.png
+magick /tmp/kiba-badge-white.png /tmp/kiba-badge-alpha.png \
+  -alpha off -compose CopyOpacity -composite "${BADGE_WHITE_SRC}"
+rm -f /tmp/kiba-badge-alpha.png /tmp/kiba-badge-white.png
+
+mkdir -p /usr/share/icons/hicolor/scalable/actions \
+         /usr/share/icons/hicolor/symbolic/actions \
+         /usr/share/icons/hicolor/24x24/actions    \
+         /usr/share/icons/hicolor/22x22/actions     \
+         /usr/share/icons/hicolor/16x16/actions
+for sz in 16 22 24 32 48; do
+  magick "${BADGE_WHITE_SRC}" -filter Lanczos -resize ${sz}x${sz} \
+    "/usr/share/icons/hicolor/${sz}x${sz}/actions/pane-show-symbolic.png"
+done
+cp "${BADGE_WHITE_SRC}" /usr/share/icons/hicolor/scalable/actions/pane-show-symbolic.png
+cp "${BADGE_WHITE_SRC}" /usr/share/icons/hicolor/symbolic/actions/pane-show-symbolic.png
+gtk-update-icon-cache /usr/share/icons/hicolor/ 2>/dev/null || true
+
 # ── OOBE installer logo — same image as the boot splash ─────────────────
 # Reuses the already-processed BOOT_SPLASH file directly (full lockup:
 # badge + "KibaOS" wordmark) instead of fetching/maintaining a second,
@@ -7170,7 +7205,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
         snprintf(accts_path, sizeof(accts_path), "%s/%s", accts_dir, username);
         char accts_content[256];
         snprintf(accts_content, sizeof(accts_content),
-                 "[User]\nSession=budgie-desktop\nXSession=budgie-desktop\nSystemAccount=false\n");
+                 "[User]\nSession=budgie-desktop-kwinwayland\nXSession=budgie-desktop-kwinwayland\nSystemAccount=false\n");
         write_file(accts_path, accts_content); /* best-effort */
     }
 
@@ -8238,8 +8273,8 @@ GDMOEMCONF
 mkdir -p /var/lib/AccountsService/users
 cat > /var/lib/AccountsService/users/oem << 'OEMACCOUNTS'
 [User]
-Session=budgie-desktop
-XSession=budgie-desktop
+Session=budgie-desktop-kwinwayland
+XSession=budgie-desktop-kwinwayland
 SystemAccount=false
 OEMACCOUNTS
 
@@ -8633,6 +8668,20 @@ cat > /etc/gtk-3.0/gtk.css << 'GTK3PANEL'
     border-bottom: 2px solid #0099cc;
     border-radius: 0;
     transition: border-color 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* === KibaOS: top badge pill (dock-mode, shrink-wrapped to one applet) ===
+ * The generic .budgie-panel rule above was sized for the full-width
+ * bottom dock (120px side insets, 8px bottom gap only) -- that doesn't
+ * read right on a panel that's already shrunk to fit a single icon, so
+ * override its margin specifically for the top instance: a small top
+ * gap so it floats off the very edge of the screen, and a small left
+ * inset so it sits near the corner without touching it, matching the
+ * badge's position in the mockup. Radius/background/shadow are all
+ * still inherited from .budgie-panel above -- only the margin changes. */
+.top .budgie-panel.dock-mode {
+    margin: 8px 0 0 24px;
+    padding: 0 6px;
 }
 
 /* === KibaOS: Raven (notification + quick-settings sidebar) as a floating glass card === */
@@ -9349,20 +9398,71 @@ Rectangle {
 SDDMQML
 DEAD_SDDM_THEME_BLOCK
 
-# ── Wayland session — budgie-desktop.desktop ────────────────────
-# This is the live/normal-user autologin config (see kibaos-oem-prepare
-# above for the OEM-mode counterpart) -- both point at
-# budgie-desktop.desktop, budgie-desktop's own session file
-# (ships with the package, no session file hand-written for it here).
-# GDM has no LightDM-style "autologin-session" key at all: AutomaticLogin
-# in custom.conf only names the USER, and GDM then launches whatever
-# session AccountsService says is that user's default (falling back to
-# the desktop environment's own default .desktop if nothing is set) --
-# so the session choice has to live in an AccountsService user file
-# instead of the display manager's own config, and it wants the .desktop
-# filename stem too (same as LightDM's key did, just in a different
-# file now).
+# ── Wayland session — budgie-desktop-kwinwayland.desktop ────────────────
+# budgie-desktop's OWN packaged session file (budgie-desktop.desktop)
+# launches labwc -- that's not something a package swap in the pacman
+# list can change, since it's baked into the .desktop upstream ships,
+# not anything this script writes. Budgie has no supported KWin session
+# of its own (their FAQ: KWin is a maybe-someday Budgie 11 item, not
+# something 10.10 -- what this image installs -- actually has); the
+# only KWin session that exists at all is this one, straight from
+# Buddies of Budgie's own (explicitly UNSUPPORTED/experimental,
+# "no assistance" per that repo's own README) budgie-wayland-session
+# testing repo, verbatim:
+#   https://github.com/BuddiesOfBudgie/budgie-wayland-session
+#   desktop/budgie-desktop-kwinwayland.desktop
+# --exit-with-session is KWin's equivalent of labwc's "-s": start the
+# compositor, run this command as the session, exit when it exits.
+# Caveat worth knowing: Budgie's gsettings→labwc "bridge" (keyboard
+# shortcuts, touchpad, theming sync from Budgie Control Center) has no
+# KWin counterpart, so none of that syncs here -- KWin's own config
+# has to be set directly instead. See KWIN CONFIG note near the
+# top-panel CSS.
 mkdir -p /usr/share/wayland-sessions
+cat > /usr/share/wayland-sessions/budgie-desktop-kwinwayland.desktop << 'KWINSESSION'
+[Desktop Entry]
+Name=Budgie Desktop on KWin Wayland
+Comment=This session logs you into the Budgie Desktop
+Exec=/usr/bin/kwin_wayland --xwayland --no-lockscreen --locale1 --exit-with-session=/usr/bin/budgie-desktop
+TryExec=/usr/bin/kwin_wayland
+Icon=
+Type=Application
+DesktopNames=Budgie;GNOME
+KWINSESSION
+
+# labwc IS still installed -- it's a hard `depends=()` of the
+# budgie-desktop Arch package itself (confirmed straight from the
+# package's own PKGBUILD/dependency list), not something `packages.x86_64`
+# not listing it explicitly can prevent pacman from pulling in. It just
+# never gets LAUNCHED anymore, since GDM now execs the KWin session
+# above instead of budgie-desktop.desktop -- and since nothing ever
+# starts the labwc binary, nothing ever parses rc.xml or throws the
+# "Invalid action... 'command'" labnag popup from the screenshots
+# (that error is labwc's OWN startup log format complaining about its
+# own config -- it can only appear if labwc itself is the thing that
+# ran).
+#
+# What budgie-desktop ALSO ships, though, is an autostart entry
+# (/etc/xdg/autostart/org.buddiesofbudgie.labwc-bridge.desktop) that
+# unconditionally runs usr/lib/budgie-desktop/labwc_bridge.py at every
+# login regardless of which compositor is actually active -- it's what
+# was regenerating rc.xml (with the "command" vs "Execute" action-name
+# bug) fresh on every single login, which is why deleting the file
+# alone never stuck. Harmless with labwc never running (nothing reads
+# what it writes anymore), but pointless busywork every login, so mask
+# it the standard per-user XDG way: a same-filename override in skel's
+# own autostart dir with Hidden=true, which takes priority over the
+# system-wide copy in /etc/xdg/autostart/ for every new account.
+mkdir -p "${SKEL}/.config/autostart"
+cat > "${SKEL}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
+[Desktop Entry]
+Type=Application
+Name=Budgie labwc bridge (disabled — KibaOS runs KWin, not labwc)
+Exec=/bin/true
+Hidden=true
+NOLABWCBRIDGE
+rm -rf "${SKEL}/.config/budgie-desktop/labwc" 2>/dev/null || true
+
 mkdir -p /etc/gdm
 cat > /etc/gdm/custom.conf << 'GDMCONF'
 [daemon]
@@ -9373,8 +9473,8 @@ GDMCONF
 mkdir -p /var/lib/AccountsService/users
 cat > /var/lib/AccountsService/users/liveuser << 'LIVEUSERACCOUNTS'
 [User]
-Session=budgie-desktop
-XSession=budgie-desktop
+Session=budgie-desktop-kwinwayland
+XSession=budgie-desktop-kwinwayland
 SystemAccount=false
 LIVEUSERACCOUNTS
 mkdir -p /var/lib/gdm /var/log/gdm
@@ -10078,16 +10178,37 @@ gsettings set org.nemo.preferences show-location-entry         false
 # — neither that schema nor those key names actually exist upstream, so
 # those dconf writes were almost certainly a silent no-op this whole
 # time, not configuring anything at all.
+#
+# UPDATE — found the actual root cause of the giant-white-panel bug
+# (screenshots showed what should've been a slim floating bar rendering
+# as a near-fullscreen white rectangle, on more than one build/compositor,
+# which never made sense as a compositor issue): pulled the real
+# com.solus-project.budgie-panel.gschema.xml straight from budgie-desktop
+# source. The "location" and "transparency" keys are enums, and GSettings
+# enum nicks are case-sensitive — this whole block was writing 'BOTTOM'/
+# 'TOP'/'NONE' (uppercase) against a schema whose actual nicks are
+# lowercase ('bottom'/'top'/'none'). An enum write that doesn't match any
+# defined nick doesn't error, it just silently falls back to the schema
+# default -- which for "location" is 'none' (no screen edge at all). A
+# panel with no assigned edge has nothing to size itself against, which
+# is exactly the "unconstrained giant rectangle" shape in the photos.
+# Fixed below and on the TOP panel + the liveuser duplicate path further
+# down. (dock-mode, separately: also confirmed for real in that same
+# gschema.xml — type b, default false, "resize to house content" — so
+# that part was already correct.)
 PANEL_UUID=$(gsettings get com.solus-project.budgie-panel panels 2>/dev/null | \
   tr -d "[]' " | cut -d',' -f1)
 if [ -z "${PANEL_UUID}" ]; then
   PANEL_UUID=$(uuidgen)
   dconf write /com/solus-project/budgie-panel/panels "['${PANEL_UUID}']"
 fi
+TOP_PANEL_UUID=$(gsettings get com.solus-project.budgie-panel panels 2>/dev/null | \
+  tr -d "[]' " | cut -d',' -f2)
+[ -z "${TOP_PANEL_UUID}" ] && TOP_PANEL_UUID=$(uuidgen)
 PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
-dconf write "${PANEL_PATH}location"      "'BOTTOM'"
+dconf write "${PANEL_PATH}location"      "'bottom'"
 dconf write "${PANEL_PATH}size"          "42"
-dconf write "${PANEL_PATH}transparency"  "'NONE'"
+dconf write "${PANEL_PATH}transparency"  "'none'"
 dconf write "${PANEL_PATH}enable-shadow" "true"
 
 # ── Centered dock: applets + pinned launchers, matching the mockup's order ─
@@ -10149,6 +10270,27 @@ if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
     "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
     "[${LAUNCHERS_GVARIANT%, }]"
 fi
+
+# ── Second panel: floating top-left badge, opens Raven ──────────────────────
+# Just the KibaOS badge -- no app grid, no workspace numbers, no clock/
+# battery/wifi icons living directly in the bar itself. Clicking it pops
+# Raven open (same "control center" pane shown in the mockup: volume,
+# Wi-Fi, Bluetooth, Night Light, Power Mode), which is exactly what the
+# raven-trigger applet's one job already is -- nothing custom to build
+# here. dock-mode shrinks the panel to fit just that one applet instead
+# of spanning full width, and the .top .budgie-panel.dock-mode CSS rule
+# in gtk-3.0/gtk.css (see KIBAOS ORGANIC MOTION LANGUAGE above) turns
+# that shrink-wrapped bar into the small rounded floating pill.
+dconf write /com/solus-project/budgie-panel/panels "['${PANEL_UUID}', '${TOP_PANEL_UUID}']"
+TOP_PANEL_PATH="/com/solus-project/budgie-panel/panels/${TOP_PANEL_UUID}/"
+dconf write "${TOP_PANEL_PATH}location"      "'top'"
+dconf write "${TOP_PANEL_PATH}size"          "40"
+dconf write "${TOP_PANEL_PATH}transparency"  "'none'"
+dconf write "${TOP_PANEL_PATH}enable-shadow" "true"
+dconf write "${TOP_PANEL_PATH}dock-mode"     "true"
+
+RAVEN_UUID=$(add_applet "raven-trigger")
+dconf write "${TOP_PANEL_PATH}applets" "['${RAVEN_UUID}']"
 
 touch "${STAMP}"
 FIRSTLOGIN
@@ -11898,9 +12040,9 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
   PANEL_UUID=$(uuidgen)
   dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\"]"
   PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
-  dconf write "${PANEL_PATH}location"      "\"BOTTOM\""
+  dconf write "${PANEL_PATH}location"      "\"bottom\""
   dconf write "${PANEL_PATH}size"          "42"
-  dconf write "${PANEL_PATH}transparency"  "\"NONE\""
+  dconf write "${PANEL_PATH}transparency"  "\"none\""
   dconf write "${PANEL_PATH}enable-shadow" "true"
 
   MENU_UUID=$(uuidgen)
@@ -11934,6 +12076,34 @@ runuser -u liveuser -- dbus-run-session -- bash -c '
       "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
       "[${LAUNCHERS_GVARIANT%, }]"
   fi
+
+  # Same floating top badge as the installed-system path above (see
+  # "Second panel: floating top-left badge, opens Raven") -- liveuser
+  # gets its own fresh UUIDs since this whole block is a standalone
+  # provisioning path, not a shared codepath with FIRSTLOGIN.
+  TOP_PANEL_UUID=$(uuidgen)
+  dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\", \"${TOP_PANEL_UUID}\"]"
+  TOP_PANEL_PATH="/com/solus-project/budgie-panel/panels/${TOP_PANEL_UUID}/"
+  dconf write "${TOP_PANEL_PATH}location"      "\"top\""
+  dconf write "${TOP_PANEL_PATH}size"          "40"
+  dconf write "${TOP_PANEL_PATH}transparency"  "\"none\""
+  dconf write "${TOP_PANEL_PATH}enable-shadow" "true"
+  dconf write "${TOP_PANEL_PATH}dock-mode"     "true"
+  RAVEN_UUID=$(uuidgen)
+  dconf write "/com/solus-project/budgie-panel/applets/${RAVEN_UUID}/name" "\"raven-trigger\""
+  dconf write "${TOP_PANEL_PATH}applets" "[\"${RAVEN_UUID}\"]"
+
+  # Same labwc-bridge mask as the installed-system skel path above (see
+  # "labwc IS still installed") -- liveuser needs its own copy since it
+  # never gets skel's autostart dir copied in.
+  mkdir -p "${HOME}/.config/autostart"
+  cat > "${HOME}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
+[Desktop Entry]
+Type=Application
+Name=Budgie labwc bridge (disabled — KibaOS runs KWin, not labwc)
+Exec=/bin/true
+Hidden=true
+NOLABWCBRIDGE
 
   # GNOME Console (kgx) is already the simplest terminal available — single
   # window, no tabs UI, no menu bar by design. Just quiet the bell and use
