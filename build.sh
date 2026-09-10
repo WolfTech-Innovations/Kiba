@@ -2579,7 +2579,7 @@ pkg-config
 gdm
 budgie-desktop
 budgie-session
-mutter
+wayfire
 swaybg
 grim
 slurp
@@ -9364,15 +9364,15 @@ DEAD_SDDM_THEME_BLOCK
 # top-panel CSS.
 mkdir -p /usr/share/wayland-sessions
 rm -rf /usr/share/wayland-sessions/budgie-desktop.desktop
-cat > /usr/share/wayland-sessions/budgie-desktop.desktop << 'KWINSESSION'
+cat > /usr/share/wayland-sessions/budgie-desktop.desktop << 'WFSESSION'
 [Desktop Entry]
-Name=Budgie Desktop on Mutter
+Name=Budgie Desktop on Wayfire
 Comment=This session logs you into the Budgie Desktop
-Exec=mutter --wayland --xwayland & budgie-desktop
+Exec=/usr/bin/wayfire & budgie-desktop
 Icon=
 Type=Application
 DesktopNames=Budgie;GNOME
-KWINSESSION
+WFSESSION
 
 # labwc IS still installed -- it's a hard `depends=()` of the
 # budgie-desktop Arch package itself (confirmed straight from the
@@ -9401,7 +9401,7 @@ mkdir -p "${SKEL}/.config/autostart"
 cat > "${SKEL}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
-Name=Budgie labwc bridge (disabled — KibaOS runs Mutter, not labwc)
+Name=Budgie labwc bridge (disabled — KibaOS runs Wayfire, not labwc)
 Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
@@ -9702,8 +9702,8 @@ rollback_patch() {
 restart_compositor() {
   log "Restarting session..."
   systemctl restart gdm 2>/dev/null || \
-  pkill -TERM mutter 2>/dev/null || \
-  pkill -TERM mutter 2>/dev/null || true
+  pkill -TERM wayfire 2>/dev/null || \
+  pkill -TERM wayfire 2>/dev/null || true
   sleep 1
   log "Session restarted."
 }
@@ -9865,7 +9865,7 @@ while IFS= read -r line; do
   case "${FILEPATH}" in
     etc/gdm*|usr/lib/gdm*|usr/bin/gdm*|usr/share/gdm*|etc/dconf/db/gdm.d*)
       NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/mutter*)
+    usr/bin/wayfire*)
       # kwinrc/autostart/environment all live per-user under
       # ~/.config, seeded from /etc/skel at account creation, same
       # story labwc's rc.xml used to have. An OTA patch to the
@@ -12088,7 +12088,7 @@ mkdir -p /home/liveuser/.config/autostart
 cat > /home/liveuser/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
-Name=Budgie labwc bridge (disabled — KibaOS runs mutter, not labwc)
+Name=Budgie labwc bridge (disabled — KibaOS runs wayfire, not labwc)
 Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
