@@ -3003,6 +3003,13 @@ set -e
 
 rm -f /etc/machine-id
 touch /etc/machine-id
+# dbus-daemon refuses to start at all -- even a private session bus via
+# dbus-run-session -- without a valid /etc/machine-id, and this script
+# later needs a working dbus session (liveuser dconf/panel provisioning
+# further down). Give the chroot a real, temporary machine-id now so
+# everything in between works; it gets blanked again right before this
+# script exits so the shipped image still generates its own on first boot.
+systemd-machine-id-setup
 
 # ── spin up the sysusers.d users (polkitd etc) by hand ─────────────────────
 # normally pacman fires this off as a post-install hook on a live system,
@@ -12190,6 +12197,15 @@ if [ "$(uname -m)" = "aarch64" ]; then
   fi
   mkinitcpio -k "${_kver}" -c /etc/mkinitcpio.conf.d/archiso.conf -g /boot/initramfs-linux.img
 fi
+
+# ── blank the machine-id back out for shipping ───────────────────────────
+# Re-clear the temporary real ID set near the top of this script (needed
+# only so dbus-run-session/dconf calls above had a working session bus
+# during the build) -- a live/installer image should ship with an empty
+# machine-id so systemd generates a fresh, genuinely unique one on each
+# install's first boot instead of every install sharing this build's ID.
+rm -f /etc/machine-id
+touch /etc/machine-id
 
 echo "=== customize_airootfs.sh complete ==="
 CUSTOMIZE
