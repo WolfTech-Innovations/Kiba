@@ -7525,7 +7525,7 @@ int kiba_install_finalize(const char *target_root, const char *disk_path,
 
         static const char *services[] = {
             "NetworkManager", "gdm", "bluetooth",
-            "systemd-timesyncd", "systemd-time-wait-sync", "panelfix",
+            "systemd-timesyncd", "systemd-time-wait-sync", "kibaos-panelfix",
             /* systemd-bless-boot.service / systemd-boot-check-no-failures.
              * service are gone -- those manage systemd-boot's optional
              * tries-left/tries-done boot-counting suffix on an entry's
