@@ -2549,6 +2549,7 @@ earlyoom
 fakeroot
 efibootmgr
 bluez
+kconfig
 nftables
 libnetfilter_queue
 sudo
@@ -11577,10 +11578,7 @@ DESKTOP_SESSION=Budgie
 XDG_CURRENT_DESKTOP=Budgie
 XDG_SESSION_DESKTOP=Budgie
 XDG_SESSION_TYPE=wayland
-QT_QPA_PLATFORM=wayland
-QT_WAYLAND_SHELL_INTEGRATION=layer-shell
-QT_STYLE_OVERRIDE=kvantum
-XCURSOR_SIZE=24
+KWIN_FORCE_SW_CURSOR=1
 MOZ_ENABLE_WAYLAND=1
 ELECTRON_OZONE_PLATFORM_HINT=wayland
 CLUTTER_BACKEND=wayland
@@ -12020,7 +12018,7 @@ dconf write "${PANEL_PATH}location"      "\"bottom\""
 dconf write "${PANEL_PATH}size"          "42"
 dconf write "${PANEL_PATH}transparency"  "\"none\""
 dconf write "${PANEL_PATH}enable-shadow" "true"
-
+kwriteconfig6 --file kwinrc --group Plugins --key shakecursorEnabled false
 MENU_UUID=$(uuidgen)
 TASKLIST_UUID=$(uuidgen)
 dconf write "/com/solus-project/budgie-panel/applets/${MENU_UUID}/name"     "\"budgie-menu\""
@@ -12082,7 +12080,7 @@ Description=KibaOS PanelFix -- Budgie panel/dock first-boot provisioning
 After=graphical-session.target
 
 [Service]
-Type=simple
+Type=oneshot
 ExecStart=/usr/local/bin/kibaos-panelfix
 RemainAfterExit=yes
 
