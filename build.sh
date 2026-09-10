@@ -2695,59 +2695,6 @@ lvm2
 # ── System tuning/maintenance ────────────────────────────────────────────
 tuned
 PACKAGES
-if [ "${KIBA_ARCH}" = "x86_64" ]; then
-# ══════════════════════════════════════════════════════════════════════════
-# AUR installs via yay — eww
-# ══════════════════════════════════════════════════════════════════════════
-# This used to be a single &&-chained one-liner: any one failing step
-# (useradd already existing from a re-run, a download hiccup, a build
-# failure) silently no-op'd everything after it in the chain, with
-# nothing printed to say which step it was or that it happened at all --
-# which is almost certainly why nothing was landing. Confirmed-real
-# failure mode that would do exactly that here:
-#   eww's AUR package requires gtk-layer-shell, which needs
-#   g-ir-compiler (GObject Introspection) to generate its typelib --
-#   and g-ir-compiler talks to D-Bus via GIO. Plain arch-chroot does
-#   NOT start a D-Bus session on its own, so that step fails with a
-#   GVFS-WARNING/GDBus.Error inside a bare chroot (confirmed against
-#   a real gtk-layer-shell-git build-failure report showing exactly
-#   that error). Fixed here by wrapping the build in
-#   `dbus-run-session --` so a session bus actually exists.
-# sddm-silent-theme used to live in this loop too -- dropped along with
-# the rest of SDDM (see the LightDM switch below); there's no SDDM left
-# for it to theme.
-# Note: reflector, thermald, tlp, and powertop are actually official
-# [extra] packages, not AUR -- yay still handles them fine (it falls
-# back to pacman for anything it finds in a synced repo), so leaving
-# them in this loop costs nothing, it's just not technically an AUR
-# install for those four. bbswitch is the genuine AUR-only package here
-# (builds a DKMS kernel module against whatever linux-headers is
-# installed at build time). auto-cpufreq was dropped from this list --
-# it and tlp both fight over CPU frequency scaling if both are enabled,
-# so tlp alone is the one that stays.
-# Also: yay resolves every target passed to one invocation as a single
-# transaction, so a bad target used to take the whole install down with
-# it -- eww included, even though eww's dependency chain has nothing to
-# do with fonts. Each package now gets its own yay call so a failure is
-# contained and printed instead of silently eating everything after it.
-id -u builder &>/dev/null || useradd -m builder
-echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder
-chmod 440 /etc/sudoers.d/builder
-pacman -S --noconfirm --needed budgie-desktop
-
-su builder -c "cd /tmp && curl -fL -O https://aur.archlinux.org/cgit/aur.git/snapshot/yay-bin.tar.gz && tar xf yay-bin.tar.gz && cd yay-bin && dbus-run-session -- makepkg -si --noconfirm"
-if ! command -v yay &>/dev/null; then
-  echo "!!! yay itself failed to build/install -- check the makepkg output above, nothing AUR-side can install without it" >&2
-fi
-
-for aur_pkg in eww reflector thermald tlp powertop bbswitch; do
-  echo "=== yay: installing ${aur_pkg} ==="
-  su builder -c "dbus-run-session -- yay -S --noconfirm --needed ${aur_pkg}" \
-    || echo "!!! yay failed to install ${aur_pkg} -- continuing rather than aborting the whole ISO build over one AUR package" >&2
-done
-
-rm -f /etc/sudoers.d/builder
-fi
 # arm package swap: right kernel, drop the intel-only stuff, rename
 # the file so archiso can actually find it
 if [ "${KIBA_ARCH}" = "aarch64" ]; then
@@ -12034,77 +11981,125 @@ rm -rf /var/lib/pacman/sync/* /tmp/* /var/tmp/* 2>/dev/null || true
 
 chown -R 1000:1000 /home/liveuser
 
-install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
-runuser -u liveuser -- dbus-run-session -- bash -c '
-  # liveuser never gets /etc/skel/.config/autostart copied in (its home
-  # was created earlier in this script, before skel was populated), so
-  # kibaos-configure.desktop -> kibaos-first-login never fires for this
-  # account -- meaning the icon-tasklist panel setup further up (see
-  # "Centered dock: applets + pinned launchers") would otherwise never
-  # run for the live session at all. Provisioning the same real Budgie
-  # panel here, directly, so the live ISO actually boots with its dock
-  # instead of a blank panel list.
-  PANEL_UUID=$(uuidgen)
-  dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\"]"
-  PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
-  dconf write "${PANEL_PATH}location"      "\"bottom\""
-  dconf write "${PANEL_PATH}size"          "42"
-  dconf write "${PANEL_PATH}transparency"  "\"none\""
-  dconf write "${PANEL_PATH}enable-shadow" "true"
+# ── PanelFix: provision liveuser's Budgie panel/dock for real, at real
+# boot, instead of faking a D-Bus session in this chroot ──────────────────
+# The old approach ran `dconf write` through `dbus-run-session` right here
+# at ISO-build time, inside this chroot -- no X11, no logind session, no
+# real session bus, just dbus-run-session trying to cobble one together
+# cold. Most of the time that limped along; sometimes dbus-daemon decided
+# to try autolaunching a bus via X11 anyway ("Cannot autolaunch D-Bus
+# without X11 $DISPLAY"), returned non-zero, and -- because this whole
+# script runs under `set -e` -- took the entire customize_airootfs.sh (and
+# therefore the whole ISO build) down with it.
+#
+# Fix: don't touch dconf in the chroot at all. Ship a script plus a
+# systemd --user unit, and let it run once liveuser's REAL desktop session
+# is up. By the time systemd's user manager reaches graphical-session.target
+# there's an actual, logind-managed session bus at $XDG_RUNTIME_DIR/bus
+# with DBUS_SESSION_BUS_ADDRESS already exported for anything that target
+# pulls in -- so the script below just calls `dconf` directly, no
+# dbus-run-session wrapper, because there's a real bus to talk to this time.
+mkdir -p /usr/local/bin
+cat > /usr/local/bin/kibaos-panelfix << 'PANELFIX'
+#!/usr/bin/env bash
+# Provisions liveuser's Budgie panel/dock. Runs as a systemd --user oneshot
+# (see kibaos-panelfix.service) once graphical-session.target is reached,
+# so a real session bus already exists -- no dbus-run-session needed.
+set -e
+STAMP="${HOME}/.config/.kibaos-panelfix-done"
+[ -f "${STAMP}" ] && exit 0
 
-  MENU_UUID=$(uuidgen)
-  TASKLIST_UUID=$(uuidgen)
-  CLOCK_UUID=$(uuidgen)
-  dconf write "/com/solus-project/budgie-panel/applets/${MENU_UUID}/name"     "\"budgie-menu\""
-  dconf write "/com/solus-project/budgie-panel/applets/${TASKLIST_UUID}/name" "\"icon-tasklist\""
-  dconf write "/com/solus-project/budgie-panel/applets/${CLOCK_UUID}/name"    "\"clock\""
-  dconf write "${PANEL_PATH}applets" "[\"${MENU_UUID}\", \"${TASKLIST_UUID}\", \"${CLOCK_UUID}\"]"
+# liveuser never gets /etc/skel/.config/autostart copied in (its home was
+# created earlier in the build, before skel was populated), so
+# kibaos-configure.desktop -> kibaos-first-login never fires for this
+# account -- meaning the icon-tasklist panel setup in kibaos-first-login
+# would otherwise never run for the live session at all. This provisions
+# the same real Budgie panel, just from a systemd --user unit instead.
+PANEL_UUID=$(uuidgen)
+dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\"]"
+PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
+dconf write "${PANEL_PATH}location"      "\"bottom\""
+dconf write "${PANEL_PATH}size"          "42"
+dconf write "${PANEL_PATH}transparency"  "\"none\""
+dconf write "${PANEL_PATH}enable-shadow" "true"
 
-  find_desktop_id() {
-    for candidate in "$@"; do
-      [ -f "/usr/share/applications/${candidate}" ] && { echo "${candidate}"; return 0; }
-    done
-    return 1
-  }
-  DOCK_LAUNCHERS=()
-  for ids in \
-    "kibaos-files.desktop nemo.desktop" \
-    "org.gnome.Calendar.desktop gnome-calendar.desktop" \
-    "org.gnome.eog.desktop eog.desktop" \
-    "org.gnome.Geary.desktop geary.desktop" \
-    "org.gnome.Software.desktop gnome-software.desktop" \
-    "gnome-control-center.desktop org.gnome.Settings.desktop"
-  do
-    FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
+MENU_UUID=$(uuidgen)
+TASKLIST_UUID=$(uuidgen)
+dconf write "/com/solus-project/budgie-panel/applets/${MENU_UUID}/name"     "\"budgie-menu\""
+dconf write "/com/solus-project/budgie-panel/applets/${TASKLIST_UUID}/name" "\"icon-tasklist\""
+dconf write "${PANEL_PATH}applets" "[\"${MENU_UUID}\", \"${TASKLIST_UUID}\"]"
+
+find_desktop_id() {
+  for candidate in "$@"; do
+    [ -f "/usr/share/applications/${candidate}" ] && { echo "${candidate}"; return 0; }
   done
-  if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
-    LAUNCHERS_GVARIANT=$(printf "\"%s\", " "${DOCK_LAUNCHERS[@]}")
-    dconf write \
-      "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
-      "[${LAUNCHERS_GVARIANT%, }]"
-  fi
+  return 1
+}
+DOCK_LAUNCHERS=()
+for ids in \
+  "kibaos-files.desktop nemo.desktop" \
+  "org.gnome.Calendar.desktop gnome-calendar.desktop" \
+  "org.gnome.eog.desktop eog.desktop" \
+  "org.gnome.Geary.desktop geary.desktop" \
+  "org.gnome.Software.desktop gnome-software.desktop" \
+  "gnome-control-center.desktop org.gnome.Settings.desktop"
+do
+  FOUND=$(find_desktop_id ${ids}) && DOCK_LAUNCHERS+=("${FOUND}")
+done
+if [ "${#DOCK_LAUNCHERS[@]}" -gt 0 ]; then
+  LAUNCHERS_GVARIANT=$(printf "\"%s\", " "${DOCK_LAUNCHERS[@]}")
+  dconf write \
+    "/com/solus-project/budgie-panel/instance/icon-tasklist/${TASKLIST_UUID}/pinned-launchers" \
+    "[${LAUNCHERS_GVARIANT%, }]"
+fi
 
-  # Same floating top badge as the installed-system path above (see
-  # "Second panel: floating top-left badge, opens Raven") -- liveuser
-  # gets its own fresh UUIDs since this whole block is a standalone
-  # provisioning path, not a shared codepath with FIRSTLOGIN.
-  TOP_PANEL_UUID=$(uuidgen)
-  dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\", \"${TOP_PANEL_UUID}\"]"
-  TOP_PANEL_PATH="/com/solus-project/budgie-panel/panels/${TOP_PANEL_UUID}/"
-  dconf write "${TOP_PANEL_PATH}location"      "\"top\""
-  dconf write "${TOP_PANEL_PATH}size"          "40"
-  dconf write "${TOP_PANEL_PATH}transparency"  "\"none\""
-  dconf write "${TOP_PANEL_PATH}enable-shadow" "true"
-  dconf write "${TOP_PANEL_PATH}dock-mode"     "true"
-  RAVEN_UUID=$(uuidgen)
-  dconf write "/com/solus-project/budgie-panel/applets/${RAVEN_UUID}/name" "\"raven-trigger\""
-  dconf write "${TOP_PANEL_PATH}applets" "[\"${RAVEN_UUID}\"]"
+# Second panel: floating top-left badge, opens Raven (same as the
+# installed-system FIRSTLOGIN path -- liveuser gets its own fresh UUIDs
+# since this is a standalone provisioning path, not a shared codepath).
+TOP_PANEL_UUID=$(uuidgen)
+dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\", \"${TOP_PANEL_UUID}\"]"
+TOP_PANEL_PATH="/com/solus-project/budgie-panel/panels/${TOP_PANEL_UUID}/"
+dconf write "${TOP_PANEL_PATH}location"      "\"top\""
+dconf write "${TOP_PANEL_PATH}size"          "40"
+dconf write "${TOP_PANEL_PATH}transparency"  "\"none\""
+dconf write "${TOP_PANEL_PATH}enable-shadow" "true"
+dconf write "${TOP_PANEL_PATH}dock-mode"     "true"
+RAVEN_UUID=$(uuidgen)
+dconf write "/com/solus-project/budgie-panel/applets/${RAVEN_UUID}/name" "\"raven-trigger\""
+dconf write "${TOP_PANEL_PATH}applets" "[\"${RAVEN_UUID}\"]"
 
-  # Same labwc-bridge mask as the installed-system skel path above (see
-  # "labwc IS still installed") -- liveuser needs its own copy since it
-  # never gets skel's autostart dir copied in.
-  mkdir -p "${HOME}/.config/autostart"
-  cat > "${HOME}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
+# GNOME Console (kgx) tweaks -- also needs a real dconf/dbus session.
+dconf write /org/gnome/Console/audible-bell false
+dconf write /org/gnome/Console/custom-font-enabled false
+
+mkdir -p "${STAMP%/*}"
+touch "${STAMP}"
+PANELFIX
+chmod +x /usr/local/bin/kibaos-panelfix
+
+mkdir -p /home/liveuser/.config/systemd/user/graphical-session.target.wants
+cat > /home/liveuser/.config/systemd/user/kibaos-panelfix.service << 'PANELFIXSVC'
+[Unit]
+Description=KibaOS PanelFix -- Budgie panel/dock first-boot provisioning
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/kibaos-panelfix
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical-session.target
+PANELFIXSVC
+ln -sf ../kibaos-panelfix.service \
+  /home/liveuser/.config/systemd/user/graphical-session.target.wants/kibaos-panelfix.service
+
+# Same labwc-bridge mask as the installed-system skel path above (see
+# "labwc IS still installed") -- this is a plain file write, no D-Bus
+# involved, so it stays a direct chroot write rather than moving into
+# kibaos-panelfix.
+mkdir -p /home/liveuser/.config/autostart
+cat > /home/liveuser/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
 Name=Budgie labwc bridge (disabled — KibaOS runs KWin, not labwc)
@@ -12112,12 +12107,8 @@ Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
 
-  # GNOME Console (kgx) is already the simplest terminal available — single
-  # window, no tabs UI, no menu bar by design. Just quiet the bell and use
-  # its own clean default font instead of inheriting a monospace override.
-  dconf write /org/gnome/Console/audible-bell false
-  dconf write /org/gnome/Console/custom-font-enabled false
-'
+install -d -m 755 -o 1000 -g 1000 /home/liveuser/.config/dconf
+chown -R 1000:1000 /home/liveuser/.config
 
 # ══════════════════════════════════════════════════════════════════════════
 # HIDE UPSTREAM-BRANDED LAUNCHER ENTRIES
