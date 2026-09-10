@@ -7091,22 +7091,22 @@ int kiba_install_locale_gen(const char *target_root) {
 int kiba_install_create_user(const char *target_root, const char *username,
                               const char *password) {
     /* The build-time /etc/gdm/custom.conf (customize_airootfs.sh) ships an
-     * [daemon] block pointing AutomaticLogin at "liveuser". That block
-     * survived on the installed target untouched, and since liveuser
-     * gets userdel'd a few lines below, GDM was left trying to
-     * autologin a user that no longer exists -- which is what was
-     * actually causing the installed system to come up with no desktop
-     * at all (KWin/Budgie were never the problem; GDM never got
-     * that far). This is the same class of bug the LightDM-era code here
-     * used to hit, just against GDM's config syntax now.
-     * Fix: swap just the "AutomaticLogin=liveuser" value to the real
-     * account name, in place, rather than re-writing the whole file from
-     * a hardcoded copy of the template -- that copy drifts the moment
-     * custom.conf picks up a new key at build time and this function
-     * doesn't. Net effect: the installed system autologins straight to
-     * the account just created here, same as the live session did; the
-     * user can flip that off in Settings afterward if they want a login
-     * prompt. */
+     * [daemon] block with AutomaticLoginEnable=true / AutomaticLogin=liveuser
+     * -- right for the live session, but an installed system should come up
+     * at a normal password prompt, not autologin straight into whichever
+     * account the installer just created. This used to swap
+     * "AutomaticLogin=liveuser" to the new username in place, which just
+     * moved the autologin target instead of removing it (and, before that
+     * fix existed, left GDM trying to autologin a liveuser account that
+     * userdel below had already removed -- the installed system would come
+     * up with no desktop at all).
+     * That same [daemon] block also carries WaylandEnable=true, which is
+     * what gets GDM to actually offer/launch the KWin Wayland session
+     * instead of falling back to Xorg -- deleting custom.conf outright
+     * would silently take that with it too. So strip just the two
+     * autologin keys, in place, and leave everything else in the file
+     * (WaylandEnable=true, and any key a future build-time change adds
+     * here) untouched. */
     char path[1024];
     snprintf(path, sizeof(path), "%s/etc/gdm/custom.conf", target_root);
     {
@@ -7121,22 +7121,20 @@ int kiba_install_create_user(const char *target_root, const char *username,
                 buf[got] = 0;
                 fclose(f);
 
-                const char *needle = "AutomaticLogin=liveuser";
-                char *pos = strstr(buf, needle);
-                if (pos) {
-                    size_t prefix_len = (size_t)(pos - buf) + strlen("AutomaticLogin=");
-                    const char *suffix = pos + strlen(needle);
-                    char *out = malloc(prefix_len + strlen(username) + strlen(suffix) + 1);
-                    if (out) {
-                        memcpy(out, buf, prefix_len);
-                        strcpy(out + prefix_len, username);
-                        strcat(out, suffix);
-
-                        FILE *fw = fopen(path, "w");
-                        if (fw) { fwrite(out, 1, strlen(out), fw); fclose(fw); }
-                        free(out);
+                static const char *const strip_lines[] = {
+                    "AutomaticLoginEnable=true\n",
+                    "AutomaticLogin=liveuser\n",
+                };
+                for (size_t si = 0; si < sizeof(strip_lines) / sizeof(strip_lines[0]); si++) {
+                    char *pos = strstr(buf, strip_lines[si]);
+                    if (pos) {
+                        size_t line_len = strlen(strip_lines[si]);
+                        memmove(pos, pos + line_len, strlen(pos + line_len) + 1);
                     }
                 }
+
+                FILE *fw = fopen(path, "w");
+                if (fw) { fwrite(buf, 1, strlen(buf), fw); fclose(fw); }
                 free(buf);
             }
             /* f already closed above on the success path */
