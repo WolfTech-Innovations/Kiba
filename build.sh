@@ -657,14 +657,6 @@ Rectangle {
 }
 SDDMQML
 
-  # ── phoc wayland session + mobile sddm config ────────────────────────────
-  # Desktop's own /etc/sddm.conf.d/kibaos.conf hardcodes
-  # CompositorCommand=kwin_wayland (needed for dde-dock/dde-launcher's
-  # Plasma Window Management protocol use), which is desktop-only and would just
-  # fail to start anything on a phone -- mobile runs
-  # Budgie's panel/raven on top of phoc instead (see the phoc.ini block
-  # above), so it needs its own session file and its own sddm.conf.d
-  # entry pointing at phoc, not desktop's.
   mkdir -p "${_root}/usr/share/wayland-sessions"
   cat > "${_root}/usr/share/wayland-sessions/kibaos-mobile.desktop" << 'MOBILESESSION'
 [Desktop Entry]
@@ -2549,7 +2541,6 @@ earlyoom
 fakeroot
 efibootmgr
 bluez
-kconfig
 nftables
 libnetfilter_queue
 sudo
@@ -2588,7 +2579,7 @@ pkg-config
 gdm
 budgie-desktop
 budgie-session
-kwin
+mutter
 swaybg
 grim
 slurp
@@ -7158,7 +7149,7 @@ int kiba_install_create_user(const char *target_root, const char *username,
         snprintf(accts_path, sizeof(accts_path), "%s/%s", accts_dir, username);
         char accts_content[256];
         snprintf(accts_content, sizeof(accts_content),
-                 "[User]\nSession=budgie-desktop-kwinwayland\nXSession=budgie-desktop-kwinwayland\nSystemAccount=false\n");
+                 "[User]\nSession=budgie-desktop\nXSession=budgie-desktop\nSystemAccount=false\n");
         write_file(accts_path, accts_content); /* best-effort */
     }
 
@@ -8226,8 +8217,8 @@ GDMOEMCONF
 mkdir -p /var/lib/AccountsService/users
 cat > /var/lib/AccountsService/users/oem << 'OEMACCOUNTS'
 [User]
-Session=budgie-desktop-kwinwayland
-XSession=budgie-desktop-kwinwayland
+Session=budgie-desktop
+XSession=budgie-desktop
 SystemAccount=false
 OEMACCOUNTS
 
@@ -9372,12 +9363,12 @@ DEAD_SDDM_THEME_BLOCK
 # has to be set directly instead. See KWIN CONFIG note near the
 # top-panel CSS.
 mkdir -p /usr/share/wayland-sessions
-cat > /usr/share/wayland-sessions/budgie-desktop-kwinwayland.desktop << 'KWINSESSION'
+rm -rf /usr/share/wayland-sessions/budgie-desktop.desktop
+cat > /usr/share/wayland-sessions/budgie-desktop.desktop << 'KWINSESSION'
 [Desktop Entry]
-Name=Budgie Desktop on KWin Wayland
+Name=Budgie Desktop on Mutter
 Comment=This session logs you into the Budgie Desktop
-Exec=/usr/bin/kwin_wayland --xwayland --no-lockscreen --locale1 --exit-with-session=/usr/bin/budgie-desktop
-TryExec=/usr/bin/kwin_wayland
+Exec=mutter --wayland --xwayland & budgie-desktop
 Icon=
 Type=Application
 DesktopNames=Budgie;GNOME
@@ -9410,7 +9401,7 @@ mkdir -p "${SKEL}/.config/autostart"
 cat > "${SKEL}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
-Name=Budgie labwc bridge (disabled — KibaOS runs KWin, not labwc)
+Name=Budgie labwc bridge (disabled — KibaOS runs Mutter, not labwc)
 Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
@@ -9426,8 +9417,8 @@ GDMCONF
 mkdir -p /var/lib/AccountsService/users
 cat > /var/lib/AccountsService/users/liveuser << 'LIVEUSERACCOUNTS'
 [User]
-Session=budgie-desktop-kwinwayland
-XSession=budgie-desktop-kwinwayland
+Session=budgie-desktop
+XSession=budgie-desktop
 SystemAccount=false
 LIVEUSERACCOUNTS
 mkdir -p /var/lib/gdm /var/log/gdm
@@ -9711,8 +9702,8 @@ rollback_patch() {
 restart_compositor() {
   log "Restarting session..."
   systemctl restart gdm 2>/dev/null || \
-  pkill -TERM kwin_wayland 2>/dev/null || \
-  pkill -TERM kwin_x11 2>/dev/null || true
+  pkill -TERM mutter 2>/dev/null || \
+  pkill -TERM mutter 2>/dev/null || true
   sleep 1
   log "Session restarted."
 }
@@ -9874,7 +9865,7 @@ while IFS= read -r line; do
   case "${FILEPATH}" in
     etc/gdm*|usr/lib/gdm*|usr/bin/gdm*|usr/share/gdm*|etc/dconf/db/gdm.d*)
       NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/kwin*)
+    usr/bin/mutter*)
       # kwinrc/autostart/environment all live per-user under
       # ~/.config, seeded from /etc/skel at account creation, same
       # story labwc's rc.xml used to have. An OTA patch to the
@@ -12015,10 +12006,9 @@ PANEL_UUID=$(uuidgen)
 dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\"]"
 PANEL_PATH="/com/solus-project/budgie-panel/panels/${PANEL_UUID}/"
 dconf write "${PANEL_PATH}location"      "\"bottom\""
-dconf write "${PANEL_PATH}size"          "42"
+dconf write "${PANEL_PATH}size"          "64"
 dconf write "${PANEL_PATH}transparency"  "\"none\""
 dconf write "${PANEL_PATH}enable-shadow" "true"
-kwriteconfig6 --file kwinrc --group Plugins --key shakecursorEnabled false
 MENU_UUID=$(uuidgen)
 TASKLIST_UUID=$(uuidgen)
 dconf write "/com/solus-project/budgie-panel/applets/${MENU_UUID}/name"     "\"budgie-menu\""
@@ -12056,7 +12046,7 @@ TOP_PANEL_UUID=$(uuidgen)
 dconf write /com/solus-project/budgie-panel/panels "[\"${PANEL_UUID}\", \"${TOP_PANEL_UUID}\"]"
 TOP_PANEL_PATH="/com/solus-project/budgie-panel/panels/${TOP_PANEL_UUID}/"
 dconf write "${TOP_PANEL_PATH}location"      "\"top\""
-dconf write "${TOP_PANEL_PATH}size"          "40"
+dconf write "${TOP_PANEL_PATH}size"          "60"
 dconf write "${TOP_PANEL_PATH}transparency"  "\"none\""
 dconf write "${TOP_PANEL_PATH}enable-shadow" "true"
 dconf write "${TOP_PANEL_PATH}dock-mode"     "true"
@@ -12098,7 +12088,7 @@ mkdir -p /home/liveuser/.config/autostart
 cat > /home/liveuser/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
-Name=Budgie labwc bridge (disabled — KibaOS runs KWin, not labwc)
+Name=Budgie labwc bridge (disabled — KibaOS runs mutter, not labwc)
 Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
