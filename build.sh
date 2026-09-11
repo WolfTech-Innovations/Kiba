@@ -4829,6 +4829,7 @@ WFSESSION
 # it the standard per-user XDG way: a same-filename override in skel's
 # own autostart dir with Hidden=true, which takes priority over the
 # system-wide copy in /etc/xdg/autostart/ for every new account.
+SKEL="/etc/skel"
 mkdir -p "${SKEL}/.config/autostart"
 cat > "${SKEL}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
 [Desktop Entry]
@@ -6017,9 +6018,6 @@ chmod +x "${SKEL}/Desktop/kibaos-winapps-workspace.desktop"
 # own UI off these two prefixes, or none at all. No zenity calls remain
 # anywhere in this script.
 cat > /usr/local/bin/kibaos-winapps-setup << 'WINAPPSSETUP'
-#!/bin/bash
-set -uo pipefail
-
 WINAPPS_SRC="/opt/kibaos/winapps-src"
 CONF_DIR="${HOME}/.config/winapps"
 COMPOSE_FILE="${CONF_DIR}/compose.yaml"
