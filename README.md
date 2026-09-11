@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/branding/A25ACB5D-92F7-4408-8972-CBD562BE4898.png" width="250" alt="KibaOS Banner">
+  <img src="https://raw.githubusercontent.com/KibaLabsLLC/Kiba/main/branding/A25ACB5D-92F7-4408-8972-CBD562BE4898.png" width="250" alt="KibaOS Banner">
 </p>
 
 <p align="center">
-  <a href="https://github.com/sponsors/WolfTech-Innovations">
+  <a href="https://github.com/sponsors/KibaLabsLLC">
     <img src="https://img.shields.io/badge/Sponsor-Kiba_Labs-ea4aaa?style=for-the-badge&logo=githubsponsors&logoColor=white" alt="Sponsor Kiba Labs">
   </a>
 </p>
@@ -17,19 +17,19 @@
 ### An OS by Kiba Labs, LLC
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/branding/oin-member-2-0-horiz-1.png" alt="OIN Member" width="200">
+  <img src="https://raw.githubusercontent.com/KibaLabsLLC/Kiba/main/branding/oin-member-2-0-horiz-1.png" alt="OIN Member" width="200">
 </p>
 
 **A friendly, ready-to-use Linux desktop, built for people switching to simple.**
 
-[![Build Status](https://img.shields.io/github/actions/workflow/status/WolfTech-Innovations/Kiba/build.yml?branch=main&label=Build&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/WolfTech-Innovations/Kiba/actions)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/KibaLabsLLC/Kiba/build.yml?branch=main&label=Build&style=for-the-badge&logo=githubactions&logoColor=white)](https://github.com/KibaLabsLLC/Kiba/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-3DDC97?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](#license)
 [![SourceForge](https://img.shields.io/sourceforge/dt/kibaos?style=for-the-badge&color=orange&logo=sourceforge&logoColor=white)](https://sourceforge.net/projects/kibaos/)
 
-<img src="https://img.shields.io/github/repo-size/WolfTech-Innovations/Kiba?style=flat-square&color=blue" alt="Repo Size">
-<img src="https://img.shields.io/github/stars/WolfTech-Innovations/Kiba?style=flat-square&color=yellow" alt="Stars">
-<img src="https://img.shields.io/github/forks/WolfTech-Innovations/Kiba?style=flat-square&color=lightgrey" alt="Forks">
-<img src="https://img.shields.io/github/last-commit/WolfTech-Innovations/Kiba?style=flat-square&color=green" alt="Last Commit">
+<img src="https://img.shields.io/github/repo-size/KibaLabsLLC/Kiba?style=flat-square&color=blue" alt="Repo Size">
+<img src="https://img.shields.io/github/stars/KibaLabsLLC/Kiba?style=flat-square&color=yellow" alt="Stars">
+<img src="https://img.shields.io/github/forks/KibaLabsLLC/Kiba?style=flat-square&color=lightgrey" alt="Forks">
+<img src="https://img.shields.io/github/last-commit/KibaLabsLLC/Kiba?style=flat-square&color=green" alt="Last Commit">
 
 <br>
 
@@ -40,7 +40,7 @@
 ---
 
 <p align="center">
-  <img width="1000" alt="KibaOS Desktop Screenshot" src="https://raw.githubusercontent.com/WolfTech-Innovations/Kiba/main/branding/IMG_0168.png" />
+  <img width="1000" alt="KibaOS Desktop Screenshot" src="https://raw.githubusercontent.com/KibaLabsLLC/Kiba/main/branding/IMG_0168.png" />
 </p>
 
 ---
@@ -240,7 +240,7 @@ If you'd like to build your own copy of the KibaOS ISO from source instead of do
 - A Linux computer with at least 15 GB of free disk space
 
 ```bash
-git clone https://github.com/WolfTech-Innovations/Kiba
+git clone https://github.com/KibaLabsLLC/Kiba
 cd Kiba
 docker run --rm --privileged \
   -v "$PWD:/w" \
@@ -287,7 +287,7 @@ Kiba/
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for detailed information on how to contribute to KibaOS.
 
-Issues and pull requests are welcome at the [WolfTech-Innovations/Kiba](https://github.com/WolfTech-Innovations/Kiba) repository. If you're planning a larger change, please open an issue first so we can discuss it — thanks!
+Issues and pull requests are welcome at the [KibaLabsLLC/Kiba](https://github.com/KibaLabsLLC/Kiba) repository. If you're planning a larger change, please open an issue first so we can discuss it — thanks!
 
 ---
 
@@ -301,6 +301,6 @@ KibaOS is a distribution, not a single piece of software — it bundles together
 
 KibaOS is a project by **Kiba Labs, LLC**.
 
-- [Visit our GitHub Organization](https://github.com/WolfTech-Innovations)
+- [Visit our GitHub Organization](https://github.com/KibaLabsLLC)
 - [Download on SourceForge](https://sourceforge.net/projects/kibaos/)
 - [View our Wiki](WIKI.md)
