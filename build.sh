@@ -2548,6 +2548,7 @@ bash
 irqbalance
 zram-generator
 nano
+gnome-console
 curl
 wget
 git
