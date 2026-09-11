@@ -3676,7 +3676,6 @@ else
   exit 1
 fi
 
-cd /; rm -rf "${AUR_BUILD}"
 userdel -r builduser 2>/dev/null || true
 rm -f /etc/sudoers.d/builduser
 # ══════════════════════════════════════════════════════════════════════════
