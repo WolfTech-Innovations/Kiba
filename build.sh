@@ -3493,12 +3493,6 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j"$(nproc)"
 pacman -Syu --noconfirm gtk4 libadwaita vala meson ninja
-git clone https://github.com/KibaLabsLLC/Yoru
-cd Yoru
-meson setup builddir
-cd builddir
-ninja
-ninja install
 pacman -Syu --noconfirm extra-cmake-modules qt5-base qt5-quickcontrols2 freetype2 fontconfig networkmanager-qt modemmanager-qt kcoreaddons
 git clone https://github.com/felixonmars/settings
 cd settings
