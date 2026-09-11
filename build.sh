@@ -3478,7 +3478,7 @@ public class KibaWinAppsSetup : Adw.Application {
     }
 }
 WINAPPSSETUPVALA
-pacman -Syu --no-confirm git
+pacman -Syu --noconfirm git
 git clone https://github.com/KibaLabsLLC/Roko
 cd Roko
 bash build.sh
@@ -3492,7 +3492,7 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j"$(nproc)"
-sudo pacman -Syu --no-confirm gtk4 libadwaita vala meson ninja
+sudo pacman -Syu --noconfirm gtk4 libadwaita vala meson ninja
 git clone https://github.com/KibaLabsLLC/Yoru
 cd Yoru
 meson setup builddir
