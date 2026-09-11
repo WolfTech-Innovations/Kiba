@@ -3492,14 +3492,7 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j"$(nproc)"
-pacman -Syu --noconfirm gtk4 libadwaita vala meson ninja
-pacman -Syu --noconfirm extra-cmake-modules qt5-base qt5-quickcontrols2 freetype2 fontconfig networkmanager-qt modemmanager-qt kcoreaddons qt5-tools qt6-tools rust
-git clone https://git.oss.uzinfocom.uz/xinux/settings.git
-cd settings
-meson setup builddir
-meson compile -C builddir
-meson setup builddir
-meson install -C builddir
+pacman -Syu --noconfirm glibc
 cat > /usr/share/WA/src/meson.build << 'WAMESON'
 project('winapps-setup', 'vala', 'c', version: '1.0')
 
