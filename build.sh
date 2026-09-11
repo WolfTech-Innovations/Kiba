@@ -3493,7 +3493,7 @@ mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j"$(nproc)"
 pacman -Syu --noconfirm gtk4 libadwaita vala meson ninja
-pacman -Syu --noconfirm extra-cmake-modules qt5-base qt5-quickcontrols2 freetype2 fontconfig networkmanager-qt modemmanager-qt kcoreaddons qt5-tools qt6-tools
+pacman -Syu --noconfirm extra-cmake-modules qt5-base qt5-quickcontrols2 freetype2 fontconfig networkmanager-qt modemmanager-qt kcoreaddons qt5-tools qt6-tools rust
 git clone https://git.oss.uzinfocom.uz/xinux/settings.git
 cd settings
 meson setup builddir
