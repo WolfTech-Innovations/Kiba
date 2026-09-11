@@ -3487,18 +3487,26 @@ set -euo pipefail
 git clone --depth 1 https://github.com/KibaLabsLLC/Okami.git
 cd Okami
 pacman -Syu --noconfirm --needed \
-  cmake extra-cmake-modules qt6-base qt6-declarative qt6-svg kirigami flatpak
+  cmake extra-cmake-modules qt6-base qt6-declarative qt6-svg kirigami flatpak kcoreaddons ki18n
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . -j"$(nproc)"
-sudo pacman -Syu --noconfirm gtk4 libadwaita vala meson ninja
+pacman -Syu --noconfirm gtk4 libadwaita vala meson ninja
 git clone https://github.com/KibaLabsLLC/Yoru
 cd Yoru
 meson setup builddir
 cd builddir
 ninja
-sudo ninja install
+ninja install
+pacman -Syu --noconfirm extra-cmake-modules qt5-base qt5-quickcontrols2 freetype2 fontconfig networkmanager-qt modemmanager-qt kcoreaddons
+git clone https://github.com/felixonmars/settings
+cd settings
+mkdir build
+cd build
+cmake ..
+make
+make install
 cat > /usr/share/WA/src/meson.build << 'WAMESON'
 project('winapps-setup', 'vala', 'c', version: '1.0')
 
