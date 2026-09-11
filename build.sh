@@ -2579,7 +2579,7 @@ pkg-config
 gdm
 budgie-desktop
 budgie-session
-wayfire
+labwc
 swaybg
 grim
 slurp
@@ -9366,9 +9366,9 @@ mkdir -p /usr/share/wayland-sessions
 rm -rf /usr/share/wayland-sessions/budgie-desktop.desktop
 cat > /usr/share/wayland-sessions/budgie-desktop.desktop << 'WFSESSION'
 [Desktop Entry]
-Name=Budgie Desktop on Wayfire
+Name=Budgie Desktop on labwc
 Comment=This session logs you into the Budgie Desktop
-Exec=/usr/bin/wayfire & budgie-desktop
+Exec=/usr/bin/labwc --session=/usr/bin/budgie-desktop
 Icon=
 Type=Application
 DesktopNames=Budgie;GNOME
@@ -9401,7 +9401,7 @@ mkdir -p "${SKEL}/.config/autostart"
 cat > "${SKEL}/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop" << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
-Name=Budgie labwc bridge (disabled — KibaOS runs Wayfire, not labwc)
+Name=Budgie labwc bridge (disabled — KibaOS runs labwc, not labwc)
 Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
@@ -9702,8 +9702,8 @@ rollback_patch() {
 restart_compositor() {
   log "Restarting session..."
   systemctl restart gdm 2>/dev/null || \
-  pkill -TERM wayfire 2>/dev/null || \
-  pkill -TERM wayfire 2>/dev/null || true
+  pkill -TERM labwc 2>/dev/null || \
+  pkill -TERM labwc 2>/dev/null || true
   sleep 1
   log "Session restarted."
 }
@@ -9865,7 +9865,7 @@ while IFS= read -r line; do
   case "${FILEPATH}" in
     etc/gdm*|usr/lib/gdm*|usr/bin/gdm*|usr/share/gdm*|etc/dconf/db/gdm.d*)
       NEEDS_DISPLAY_RESTART=true ;;
-    usr/bin/wayfire*)
+    usr/bin/labwc*)
       # kwinrc/autostart/environment all live per-user under
       # ~/.config, seeded from /etc/skel at account creation, same
       # story labwc's rc.xml used to have. An OTA patch to the
@@ -11511,10 +11511,10 @@ fi
 
 # ── Hide cmake-gui from the app launcher ───────────────────────────────────
 # leftover safety net: cmake used to get pulled into this chroot to
-# compile wayfire-plugins-extra from source, and Arch's cmake package
+# compile labwc-plugins-extra from source, and Arch's cmake package
 # drags a cmake-gui.desktop entry along with it -- no business showing up
 # in a consumer app menu. cmake isn't installed in the image at all
-# anymore now that that build's gone (see where WAYFIRE IPC used to be),
+# anymore now that that build's gone (see where labwc IPC used to be),
 # so this if-check is realistically dead code today. leaving it in
 # anyway in case cmake ever ends up pulled in here again for something
 # else later -- costs nothing to keep, and it's a lot cheaper than
@@ -12088,7 +12088,7 @@ mkdir -p /home/liveuser/.config/autostart
 cat > /home/liveuser/.config/autostart/org.buddiesofbudgie.labwc-bridge.desktop << 'NOLABWCBRIDGE'
 [Desktop Entry]
 Type=Application
-Name=Budgie labwc bridge (disabled — KibaOS runs wayfire, not labwc)
+Name=Budgie labwc bridge (disabled — KibaOS runs labwc, not labwc)
 Exec=/bin/true
 Hidden=true
 NOLABWCBRIDGE
