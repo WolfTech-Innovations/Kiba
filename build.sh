@@ -3263,7 +3263,8 @@ fi
 # not oobe.css, for exactly that reason: nothing here needs a resource
 # file to exist post-install, just the compiled binary itself, which
 # lands in /usr/bin -- untouched by the live_only cleanup list.
-cat > /usr/share/kibaos-oobe/src/winapps-setup.vala << 'WINAPPSSETUPVALA'
+mkdir -p /usr/share/WA/src
+cat > /usr/share/WA/src/winapps-setup.vala << 'WINAPPSSETUPVALA'
 public class KibaWinAppsSetup : Adw.Application {
     private Adw.ApplicationWindow window;
     private Gtk.ProgressBar progress_bar;
