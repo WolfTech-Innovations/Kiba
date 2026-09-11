@@ -5542,7 +5542,6 @@ gsettings set org.nemo.preferences default-folder-viewer       'icon-view'
 gsettings set org.nemo.icon-view default-zoom-level            'standard'
 gsettings set org.nemo.preferences show-location-entry         false
 
-```bash
 # ── Panel config, schema verified straight from upstream source ──────────
 # (src/panel/manager.vala, BuddiesOfBudgie/budgie-desktop main branch), so
 # this isn't a guess:
@@ -5754,7 +5753,6 @@ Hidden=false
 NoDisplay=true
 X-GNOME-Autostart-enabled=true
 AUTOCFG
-```
 
 # ── OEM-mode autostart: launches io.kibaos.oobe (which self-detects
 # OEM-finish mode via /etc/kibaos/oem-pending, see main.vala) on login to
