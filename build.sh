@@ -3482,10 +3482,17 @@ git clone https://github.com/KibaLabsLLC/Roko
 cd Roko
 bash build.sh
 cd ..
-# Install dependencies
+set -euo pipefail
+git clone --depth 1 https://github.com/KibaLabsLLC/Okami.git
+cd Okami
+pacman -Syu --noconfirm --needed \
+  cmake extra-cmake-modules qt6-base qt6-declarative qt6-svg kirigami flatpak
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+mkdir -p build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+cmake --build . -j"$(nproc)"
 sudo pacman -Syu --no-confirm gtk4 libadwaita vala meson ninja
 git clone https://github.com/KibaLabsLLC/Yoru
-# Build and install
 cd Yoru
 meson setup builddir
 cd builddir
