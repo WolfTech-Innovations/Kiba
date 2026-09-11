@@ -3477,11 +3477,20 @@ public class KibaWinAppsSetup : Adw.Application {
     }
 }
 WINAPPSSETUPVALA
-pacman -Syu git
+pacman -Syu --no-confirm git
 git clone https://github.com/KibaLabsLLC/Roko
 cd Roko
 bash build.sh
 cd ..
+# Install dependencies
+sudo pacman -Syu --no-confirm gtk4 libadwaita vala meson ninja
+git clone https://github.com/KibaLabsLLC/Yoru
+# Build and install
+cd Yoru
+meson setup builddir
+cd builddir
+ninja
+sudo ninja install
 cat > /usr/share/WA/src/meson.build << 'WAMESON'
 project('winapps-setup', 'vala', 'c', version: '1.0')
 
