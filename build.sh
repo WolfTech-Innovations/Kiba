@@ -2559,6 +2559,7 @@ noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 bluez-utils
+cosmic-settings
 sof-firmware
 thermald
 xorg-xwayland
@@ -2591,11 +2592,9 @@ gtklock
 wlopm
 wlr-randr
 nemo
-nemo-fileroller
 gvfs
 gvfs-mtp
 gvfs-smb
-file-roller
 gnome-text-editor
 loupe
 evince
