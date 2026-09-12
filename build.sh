@@ -2559,7 +2559,7 @@ noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 bluez-utils
-cosmic-settings
+switchboard
 sof-firmware
 thermald
 xorg-xwayland
