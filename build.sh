@@ -2559,7 +2559,6 @@ noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 bluez-utils
-switchboard
 switchboard-plug-desktop
 switchboard-plug-display
 switchboard-plug-network
@@ -2573,7 +2572,7 @@ switchboard-plug-about
 switchboard-plug-applications
 switchboard-plug-locale
 switchboard-plug-notifications
-switchboard-plug-pantheon-shell
+switchboard
 switchboard-plug-printers
 switchboard-plug-security-privacy
 switchboard-plug-sharing
